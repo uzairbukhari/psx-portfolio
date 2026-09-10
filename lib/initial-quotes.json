@@ -1,0 +1,163 @@
+{
+  "BFAGRO": {
+    "price": 30.7,
+    "asOf": "Thu, Sep 10, 2026 1:18 PM",
+    "source": "https://dps.psx.com.pk/company/BFAGRO",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "BIPL": {
+    "price": 24.8,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/BIPL",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "EFERT": {
+    "price": 184.9,
+    "asOf": "Thu, Sep 10, 2026 1:18 PM",
+    "source": "https://dps.psx.com.pk/company/EFERT",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "ENGROH": {
+    "price": 265.4,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/ENGROH",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "FABL": {
+    "price": 92.18,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/FABL",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "FATIMA": {
+    "price": 150.6,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/FATIMA",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "GLAXO": {
+    "price": 305.79,
+    "asOf": "Thu, Sep 10, 2026 1:18 PM",
+    "source": "https://dps.psx.com.pk/company/GLAXO",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "HALEON": {
+    "price": 697.0,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/HALEON",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "IREIT": {
+    "price": 8.09,
+    "asOf": "Thu, Sep 10, 2026 1:18 PM",
+    "source": "https://dps.psx.com.pk/company/IREIT",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "ISL": {
+    "price": 84.5,
+    "asOf": "Thu, Sep 10, 2026 1:18 PM",
+    "source": "https://dps.psx.com.pk/company/ISL",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "LOTCHEM": {
+    "price": 25.81,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/LOTCHEM",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "LPL": {
+    "price": 19.76,
+    "asOf": "Thu, Sep 10, 2026 1:16 PM",
+    "source": "https://dps.psx.com.pk/company/LPL",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "LUCK": {
+    "price": 412.79,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/LUCK",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "MARI": {
+    "price": 649.45,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/MARI",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "MEBL": {
+    "price": 548.4,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/MEBL",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "OGDC": {
+    "price": 320.03,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/OGDC",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "PQGTL": {
+    "price": 12.8,
+    "asOf": "Thu, Sep 10, 2026 1:17 PM",
+    "source": "https://dps.psx.com.pk/company/PQGTL",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "PSO": {
+    "price": 349.0,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/PSO",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "SPSL": {
+    "price": 15.2,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/SPSL",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "SYS": {
+    "price": 123.67,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/SYS",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "WAHDAT": {
+    "price": 14.9,
+    "asOf": "Thu, Sep 10, 2026 1:18 PM",
+    "source": "https://dps.psx.com.pk/company/WAHDAT",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "FFC": {
+    "price": 541.26,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/FFC",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  },
+  "COLG": {
+    "price": 1172.5,
+    "asOf": "Thu, Sep 10, 2026 1:19 PM",
+    "source": "https://dps.psx.com.pk/company/COLG",
+    "date": "2026-09-10",
+    "fetchedAt": "2026-09-10T08:23:52.788223+00:00"
+  }
+}
