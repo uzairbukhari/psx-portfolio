@@ -38,6 +38,7 @@ import {
   type Trade,
   type Company,
 } from '@/lib/portfolio';
+import ResearchDesk from './research-desk';
 type ApiResponse = {
   error?: string;
   portfolio: Portfolio;
@@ -418,6 +419,7 @@ export default function Dashboard() {
           <TabsTrigger value="holdings">Holdings</TabsTrigger>
           <TabsTrigger value="sip">Monthly SIP</TabsTrigger>
           <TabsTrigger value="history">Purchase log</TabsTrigger>
+          <TabsTrigger value="research-desk">Research desk</TabsTrigger>
           <TabsTrigger value="research">AI review</TabsTrigger>
         </TabsList>
         <TabsContent value="holdings">
@@ -834,6 +836,9 @@ export default function Dashboard() {
               </TableBody>
             </Table>
           </section>
+        </TabsContent>
+        <TabsContent value="research-desk">
+          <ResearchDesk portfolio={p} onSave={save} />
         </TabsContent>
         <TabsContent value="research">
           <div className="two-col">

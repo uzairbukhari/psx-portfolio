@@ -31,12 +31,33 @@ export type Portfolio = {
   trades: Trade[];
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
+  research?: ResearchCompany[];
   aiReview?: {
     summary: string;
     weights: Record<string, number>;
     generatedAt: string;
     snapshot: string;
   };
+};
+export type ResearchCompany = {
+  ticker: string;
+  status: 'Queue' | 'Researching' | 'Complete' | 'Update needed';
+  score: number | null;
+  fairValue: number | null;
+  thesis: string;
+  risks: string;
+  catalysts: string;
+  conversationUrl: string;
+  sources: string[];
+  financials: {
+    year: string;
+    revenue: number | null;
+    profit: number | null;
+    eps: number | null;
+    roe: number | null;
+    debt: number | null;
+  }[];
+  updatedAt: string;
 };
 export const today = () =>
   new Intl.DateTimeFormat('en-CA', {
@@ -116,6 +137,36 @@ export function initialPortfolio(): Portfolio {
       })),
     quotes: {},
     budgets: { [today().slice(0, 7)]: 100000 },
+    research: [
+      {
+        ticker: 'MEBL',
+        status: 'Complete',
+        score: null,
+        fairValue: null,
+        thesis:
+          'Full dossier available. Replace illustrative information only with verified filings.',
+        risks:
+          'Sovereign concentration, costs and underlying earnings require monitoring.',
+        catalysts: '',
+        conversationUrl: '',
+        sources: [],
+        financials: [],
+        updatedAt: '2026-09-10',
+      },
+      ...['FFC', 'EFERT', 'FATIMA', 'MARI', 'LUCK', 'SYS'].map((ticker) => ({
+        ticker,
+        status: 'Queue' as const,
+        score: null,
+        fairValue: null,
+        thesis: '',
+        risks: '',
+        catalysts: '',
+        conversationUrl: '',
+        sources: [],
+        financials: [],
+        updatedAt: '',
+      })),
+    ],
   };
 }
 export function holdings(p: Portfolio) {
@@ -173,6 +224,34 @@ export function validate(p: Portfolio) {
     !p.budgets
   )
     throw Error('Invalid portfolio format.');
+  if (p.research !== undefined) {
+    if (!Array.isArray(p.research) || p.research.length > 200)
+      throw Error('Invalid research workspace.');
+    const researchTickers = new Set<string>();
+    for (const r of p.research) {
+      if (
+        !tickersPlaceholder(r.ticker) ||
+        researchTickers.has(r.ticker) ||
+        !['Queue', 'Researching', 'Complete', 'Update needed'].includes(
+          r.status,
+        ) ||
+        (r.score !== null &&
+          (!Number.isFinite(r.score) || r.score < 0 || r.score > 100)) ||
+        (r.fairValue !== null &&
+          (!Number.isFinite(r.fairValue) || r.fairValue < 0)) ||
+        ![r.thesis, r.risks, r.catalysts, r.conversationUrl, r.updatedAt].every(
+          (v) => typeof v === 'string',
+        ) ||
+        [r.thesis, r.risks, r.catalysts, r.conversationUrl].some(
+          (v) => v.length > 5000,
+        ) ||
+        !Array.isArray(r.sources) ||
+        !Array.isArray(r.financials)
+      )
+        throw Error('Invalid research dossier.');
+      researchTickers.add(r.ticker);
+    }
+  }
   if (p.companies.length > 200 || p.trades.length > 20000)
     throw Error('Portfolio exceeds supported size.');
   const tickers = new Set<string>();
@@ -269,6 +348,9 @@ export function validate(p: Portfolio) {
     throw Error('Invalid saved AI review.');
   holdings(p);
   return p;
+}
+function tickersPlaceholder(ticker: unknown) {
+  return typeof ticker === 'string' && /^[A-Z0-9]{2,12}$/.test(ticker);
 }
 export function dateOK(s: string) {
   return (
