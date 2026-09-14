@@ -1,13 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { Plus, ExternalLink, Save, Download, Upload } from 'lucide-react';
-import {
-  money,
-  today,
-  type Portfolio,
-  type ResearchCompany,
-} from '@/lib/portfolio';
-
+import { today, type Portfolio, type ResearchCompany } from '@/lib/portfolio';
+import DossierExperience from './dossier-experience';
 type Props = {
   portfolio: Portfolio;
   onSave: (next: Portfolio, message?: string) => Promise<void>;
@@ -42,15 +37,14 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
     setSelected(ticker);
     setDraft(structuredClone(r));
   };
-  const save = async () => {
-    if (!draft) return;
+  const save = async (value = draft) => {
+    if (!value) return;
     const next = structuredClone(portfolio);
     next.research = [
-      ...(next.research ?? []).filter((r) => r.ticker !== draft.ticker),
-      { ...draft, updatedAt: today() },
+      ...(next.research ?? []).filter((r) => r.ticker !== value.ticker),
+      { ...value, updatedAt: today() },
     ];
-    await onSave(next, `${draft.ticker} research dossier saved.`);
-    setSelected(null);
+    await onSave(next, `${value.ticker} research dossier saved.`);
   };
   const exportDossier = () => {
     if (!draft) return;
@@ -128,6 +122,7 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
             })
           : [],
         updatedAt: String(c.week ?? today()),
+        details: c,
       }))
       .filter((r) => /^[A-Z0-9]{2,12}$/.test(r.ticker));
     for (const c of data.companies) {
@@ -158,274 +153,18 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
   };
   if (selected && draft)
     return (
-      <section className="research-detail">
-        <div className="section-top">
-          <div>
-            <p className="eyebrow">RESEARCH DOSSIER</p>
-            <h2>
-              {draft.ticker} —{' '}
-              {portfolio.companies.find((c) => c.ticker === draft.ticker)
-                ?.name ?? 'Company'}
-            </h2>
-          </div>
-          <div className="row">
-            <button className="secondary" onClick={() => setSelected(null)}>
-              Back to queue
-            </button>
-            <button onClick={() => void save()}>
-              <Save size={16} /> Save dossier
-            </button>
-          </div>
-        </div>
-        <div className="research-grid">
-          <section className="panel">
-            <label>
-              Research status
-              <select
-                value={draft.status}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    status: e.target.value as ResearchCompany['status'],
-                  })
-                }
-              >
-                {['Queue', 'Researching', 'Complete', 'Update needed'].map(
-                  (s) => (
-                    <option key={s}>{s}</option>
-                  ),
-                )}
-              </select>
-            </label>
-            <label>
-              Quality score (0–100)
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={draft.score ?? ''}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    score:
-                      e.target.value === '' ? null : Number(e.target.value),
-                  })
-                }
-              />
-            </label>
-            <label>
-              Fair value (PKR/share)
-              <input
-                type="number"
-                min="0"
-                value={draft.fairValue ?? ''}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    fairValue:
-                      e.target.value === '' ? null : Number(e.target.value),
-                  })
-                }
-              />
-            </label>
-            <label>
-              Company conversation URL
-              <input
-                type="url"
-                placeholder="https://chatgpt.com/..."
-                value={draft.conversationUrl}
-                onChange={(e) =>
-                  setDraft({ ...draft, conversationUrl: e.target.value })
-                }
-              />
-            </label>
-            {draft.conversationUrl && (
-              <a target="_blank" rel="noreferrer" href={draft.conversationUrl}>
-                Open company conversation <ExternalLink size={14} />
-              </a>
-            )}
-          </section>
-          <section className="panel">
-            <p className="eyebrow">WORKFLOW</p>
-            <h2>One company, one continuing conversation</h2>
-            <p>
-              Create or reuse a chat named{' '}
-              <b>
-                {draft.ticker} —{' '}
-                {
-                  portfolio.companies.find((c) => c.ticker === draft.ticker)
-                    ?.name
-                }
-              </b>
-              . Put your verified figures, source links and judgement here; then
-              save the structured record in this dossier.
-            </p>
-            <button className="secondary" onClick={exportDossier}>
-              <Download size={16} /> Export company JSON
-            </button>
-          </section>
-        </div>
-        <section className="panel">
-          <h2>Investment view</h2>
-          <div className="form-grid">
-            <label className="wide">
-              Thesis
-              <textarea
-                rows={4}
-                placeholder="Why could this business create value?"
-                value={draft.thesis}
-                onChange={(e) => setDraft({ ...draft, thesis: e.target.value })}
-              />
-            </label>
-            <label>
-              Key risks
-              <textarea
-                rows={4}
-                placeholder="What could invalidate the thesis?"
-                value={draft.risks}
-                onChange={(e) => setDraft({ ...draft, risks: e.target.value })}
-              />
-            </label>
-            <label>
-              Catalysts / watch items
-              <textarea
-                rows={4}
-                placeholder="What events or evidence should change the view?"
-                value={draft.catalysts}
-                onChange={(e) =>
-                  setDraft({ ...draft, catalysts: e.target.value })
-                }
-              />
-            </label>
-          </div>
-        </section>
-        <section className="panel">
-          <h2>Document links</h2>
-          <p>
-            One verified source URL per line: annual reports, results,
-            presentations or official disclosures.
-          </p>
-          <textarea
-            rows={4}
-            placeholder="https://..."
-            value={draft.sources.join('\n')}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                sources: e.target.value
-                  .split('\n')
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-          />
-          {draft.sources.length > 0 && (
-            <div className="source-links">
-              {draft.sources.map((source) => (
-                <a key={source} href={source} target="_blank" rel="noreferrer">
-                  Open source <ExternalLink size={13} />
-                </a>
-              ))}
-            </div>
-          )}
-        </section>
-        <section className="panel">
-          <h2>Annual financial evidence</h2>
-          <p>
-            Amounts in PKR millions; EPS in PKR/share. Add figures only after
-            checking period, units, currency and consolidation basis.
-          </p>
-          <div className="scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Period</th>
-                  <th>Revenue</th>
-                  <th>Profit</th>
-                  <th>EPS</th>
-                  <th>ROE %</th>
-                  <th>Debt</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {draft.financials.map((f, i) => (
-                  <tr key={i}>
-                    {(
-                      [
-                        'year',
-                        'revenue',
-                        'profit',
-                        'eps',
-                        'roe',
-                        'debt',
-                      ] as const
-                    ).map((k) => (
-                      <td key={k}>
-                        <input
-                          value={f[k] ?? ''}
-                          onChange={(e) => {
-                            const fs = structuredClone(draft.financials);
-                            fs[i] = {
-                              ...fs[i],
-                              [k]:
-                                k === 'year'
-                                  ? e.target.value
-                                  : e.target.value === ''
-                                    ? null
-                                    : Number(e.target.value),
-                            };
-                            setDraft({ ...draft, financials: fs });
-                          }}
-                        />
-                      </td>
-                    ))}
-                    <td>
-                      <button
-                        className="secondary compact"
-                        onClick={() =>
-                          setDraft({
-                            ...draft,
-                            financials: draft.financials.filter(
-                              (_, n) => n !== i,
-                            ),
-                          })
-                        }
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button
-            className="secondary"
-            onClick={() =>
-              setDraft({
-                ...draft,
-                financials: [
-                  ...draft.financials,
-                  {
-                    year: '',
-                    revenue: null,
-                    profit: null,
-                    eps: null,
-                    roe: null,
-                    debt: null,
-                  },
-                ],
-              })
-            }
-          >
-            <Plus size={16} /> Add year
-          </button>
-        </section>
-      </section>
+      <DossierExperience
+        draft={draft}
+        company={portfolio.companies.find((c) => c.ticker === draft.ticker)}
+        onChange={setDraft}
+        onBack={() => setSelected(null)}
+        onSave={save}
+        onExport={exportDossier}
+      />
     );
+
   return (
-    <section>
+    <section className="research-queue">
       <div className="section-top">
         <div>
           <p className="eyebrow">PSX RESEARCH DESK</p>
@@ -434,7 +173,7 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
         </div>
         <div className="row">
           <label className="import-label">
-            <Upload size={15} /> Import former Research Desk backup
+            <Upload size={15} /> Import research backup
             <input
               type="file"
               accept="application/json,.json"
@@ -488,8 +227,6 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                 <th>Company</th>
                 <th>Status</th>
                 <th>Score</th>
-                <th>Fair value</th>
-                <th>Thesis</th>
                 <th>Last saved</th>
                 <th></th>
               </tr>
@@ -505,10 +242,6 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                     <span className="tag">{r.status}</span>
                   </td>
                   <td>{r.score ?? '—'}</td>
-                  <td>{r.fairValue === null ? '—' : money(r.fairValue)}</td>
-                  <td>
-                    <small>{r.thesis || 'Not written yet'}</small>
-                  </td>
                   <td>{r.updatedAt || '—'}</td>
                   <td>
                     <button
@@ -527,3 +260,4 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
     </section>
   );
 }
+

@@ -58,6 +58,7 @@ export type ResearchCompany = {
     debt: number | null;
   }[];
   updatedAt: string;
+  details?: Record<string, unknown>;
 };
 export const today = () =>
   new Intl.DateTimeFormat('en-CA', {
