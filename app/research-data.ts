@@ -13,6 +13,7 @@ export type Financial = {
   verified: boolean;
 };
 export type Company = {
+  schemaVersion?: 1 | 2;
   ticker: string;
   name: string;
   sector: string;
@@ -24,6 +25,7 @@ export type Company = {
   financials: Financial[];
   scores: (number | null)[];
   scoreNotes: string[];
+  scoreRubric?: { name: string; max: number }[];
   thesis: string;
   risk: string;
   catalyst: string;
@@ -31,6 +33,9 @@ export type Company = {
   documents: { title: string; url: string; kind: string; date: string }[];
   history: { date: string; text: string }[];
   scenarios: { name: string; eps: number | null; multiple: number | null }[];
+  confidence?: string;
+  missingInformation?: string[];
+  researchNarrative?: string;
 };
 export const statuses = ['Queued', 'Researching', 'Complete', 'Update needed'];
 export const rubric = [
@@ -79,4 +84,3 @@ export function safeUrl(s: string) {
     return false;
   }
 }
-

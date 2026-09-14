@@ -81,14 +81,22 @@ export function Dossier({
     }
     setSaving(true);
     try {
-      await onSave(c, 'Dossier updated: financials, assumptions, scorecard or research notes');
+      await onSave(
+        c,
+        'Dossier updated: financials, assumptions, scorecard or research notes',
+      );
       setDirty(false);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Dossier was not saved.');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
   const latest = c.financials.slice().sort((a, b) => b.year - a.year)[0];
+  const activeRubric = c.scoreRubric?.length
+    ? c.scoreRubric.map((item) => [item.name, item.max] as const)
+    : rubric;
   return (
     <>
       <button
@@ -117,7 +125,11 @@ export function Dossier({
               : 'Your research dossier · verify figures against source documents'}
           </p>
         </div>
-        <button className="primary" disabled={saving} onClick={() => void save()}>
+        <button
+          className="primary"
+          disabled={saving}
+          onClick={() => void save()}
+        >
           <Save size={16} />
           {dirty ? 'Save changes' : 'Save dossier'}
         </button>
@@ -217,6 +229,29 @@ export function Dossier({
           ))}
         </TabsList>
         <TabsContent value="research">
+          {c.researchNarrative && (
+            <section className="panel padded research-narrative">
+              <div className="section-heading">
+                <div>
+                  <h2>Research findings</h2>
+                  <p className="help">
+                    Confidence: {c.confidence || 'Not stated'}
+                  </p>
+                </div>
+              </div>
+              <p>{c.researchNarrative}</p>
+              {!!c.missingInformation?.length && (
+                <>
+                  <h3>Missing information</h3>
+                  <ul>
+                    {c.missingInformation.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          )}
           <div className="note-grid">
             {[
               [
@@ -551,7 +586,7 @@ export function Dossier({
                 <small>/100</small>
               </strong>
             </div>
-            {rubric.map(([name, max], i) => (
+            {activeRubric.map(([name, max], i) => (
               <div className="score-row" key={name}>
                 <div>
                   <h3>{name}</h3>
@@ -596,9 +631,9 @@ export function Dossier({
           <section className="panel padded">
             <h2>Source documents</h2>
             <p className="help">
-              Link annual reports, PSX filings and announcements. PDF upload and
-              automatic extraction are future integrations; attach reports in
-              your company ChatGPT conversation for now.
+              Official annual reports, PSX filings and announcements used by
+              this dossier. Original downloaded files are retained in the
+              company folder on your Mac.
             </p>
             <div className="inline-form">
               <input
@@ -744,4 +779,3 @@ function FinancialChart({
     </figure>
   );
 }
-

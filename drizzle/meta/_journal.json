@@ -15,6 +15,13 @@
       "when": 1789030200615,
       "tag": "0001_harsh_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789385005477,
+      "tag": "0002_mighty_morbius",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,130 @@
+import { db, failure } from '@/lib/server';
+
+export const RESEARCH_BUDGET_MICROS = 500_000;
+export const ACTIVE_JOB_STATUSES = [
+  'queued',
+  'researching',
+  'needs_attention',
+] as const;
+export const RESEARCH_STAGES = [
+  'waiting',
+  'verifying',
+  'finding_reports',
+  'downloading',
+  'extracting',
+  'analyzing',
+  'validating',
+  'saving',
+  'complete',
+  'needs_attention',
+  'cancelled',
+] as const;
+
+export type ResearchStage = (typeof RESEARCH_STAGES)[number];
+export type ResearchJobStatus =
+  | 'queued'
+  | 'researching'
+  | 'complete'
+  | 'needs_attention'
+  | 'cancelled';
+
+export type ResearchJobRow = {
+  id: string;
+  user_id: string;
+  ticker: string;
+  company_name: string;
+  sector: string;
+  status: ResearchJobStatus;
+  stage: ResearchStage;
+  message: string;
+  budget_micros: number;
+  spent_micros: number;
+  reports_found: number;
+  checkpoint: string | null;
+  result: string | null;
+  error: string | null;
+  lease_owner: string | null;
+  lease_until: string | null;
+  cancel_requested: number;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+export function publicJob(row: ResearchJobRow, helperLastSeen?: string | null) {
+  return {
+    id: row.id,
+    ticker: row.ticker,
+    companyName: row.company_name,
+    sector: row.sector,
+    status: row.status,
+    stage: row.stage,
+    message: row.message,
+    budgetUsd: row.budget_micros / 1_000_000,
+    spentUsd: row.spent_micros / 1_000_000,
+    reportsFound: row.reports_found,
+    error: row.error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    helperOnline:
+      !!helperLastSeen &&
+      Date.now() - new Date(helperLastSeen).getTime() < 90_000,
+  };
+}
+
+export async function sha256(value: string) {
+  const bytes = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(bytes)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function helperIdentity(req: Request) {
+  const authorization = req.headers.get('authorization') ?? '';
+  if (!authorization.startsWith('Bearer '))
+    throw Error('Helper authorization is required.');
+  const hash = await sha256(authorization.slice(7));
+  const helper = await db()
+    .prepare(
+      'SELECT id,user_id FROM research_helpers WHERE token_hash=? AND revoked_at IS NULL',
+    )
+    .bind(hash)
+    .first<{ id: string; user_id: string }>();
+  if (!helper) throw Error('This helper connection is no longer valid.');
+  await db()
+    .prepare('UPDATE research_helpers SET last_seen_at=? WHERE id=?')
+    .bind(new Date().toISOString(), helper.id)
+    .run();
+  return helper;
+}
+
+export function helperFailure(error: unknown, status = 400) {
+  if (
+    error instanceof Error &&
+    [
+      'Helper authorization is required.',
+      'This helper connection is no longer valid.',
+    ].includes(error.message)
+  )
+    status = 401;
+  return failure(error, status);
+}
+
+export async function addEvent(jobId: string, stage: string, message: string) {
+  await db()
+    .prepare(
+      'INSERT INTO research_events (job_id,stage,message,created_at) VALUES (?,?,?,?)',
+    )
+    .bind(jobId, stage, message.slice(0, 1000), new Date().toISOString())
+    .run();
+}
+
+export function tickerOK(value: string) {
+  return /^[A-Z0-9]{2,12}$/.test(value);
+}
