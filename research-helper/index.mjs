@@ -20,6 +20,9 @@ const baseUrl = String(config.baseUrl).replace(/\/$/, '');
 const companiesRoot = resolve(String(config.companiesRoot));
 const headers = {
   Authorization: `Bearer ${config.token}`,
+  ...(config.sitesBypassToken
+    ? { 'OAI-Sites-Authorization': `Bearer ${config.sitesBypassToken}` }
+    : {}),
   'Content-Type': 'application/json',
 };
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));

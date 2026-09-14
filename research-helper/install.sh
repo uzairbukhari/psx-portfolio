@@ -14,6 +14,11 @@ stty -echo
 read -r TOKEN
 stty echo
 printf '\n'
+printf 'Sites bypass token for private hosted access (leave blank for local/public apps): '
+stty -echo
+read -r SITES_BYPASS_TOKEN
+stty echo
+printf '\n'
 printf 'Companies folder [%s]: ' "$DEFAULT_ROOT"
 read -r ROOT_INPUT
 COMPANIES_ROOT=${ROOT_INPUT:-$DEFAULT_ROOT}
@@ -21,7 +26,7 @@ COMPANIES_ROOT=${ROOT_INPUT:-$DEFAULT_ROOT}
 mkdir -p "$CONFIG_DIR" "$HOME/Library/LaunchAgents" "$CONFIG_DIR/logs"
 chmod 700 "$CONFIG_DIR"
 umask 077
-printf '{"baseUrl":"%s","token":"%s","companiesRoot":"%s"}\n' "$BASE_URL" "$TOKEN" "$COMPANIES_ROOT" > "$CONFIG_FILE"
+printf '{"baseUrl":"%s","token":"%s","sitesBypassToken":"%s","companiesRoot":"%s"}\n' "$BASE_URL" "$TOKEN" "$SITES_BYPASS_TOKEN" "$COMPANIES_ROOT" > "$CONFIG_FILE"
 chmod 600 "$CONFIG_FILE"
 
 cat > "$PLIST" <<EOF
