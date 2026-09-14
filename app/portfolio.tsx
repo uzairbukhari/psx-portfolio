@@ -504,7 +504,10 @@ export default function Dashboard() {
                     <TableCell>
                       {h.value === null ? '—' : money(h.value)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell style={{
+                      color:
+                        h.gain === null ? 'inherit' : h.gain >= 0 ? '#17744c' : '#b33d3d',
+                    }}>
                       {h.gain === null ? '—' : money(h.gain)}
                     </TableCell>
                     <TableCell>
