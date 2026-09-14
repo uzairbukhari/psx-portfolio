@@ -161,7 +161,11 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
     }
   }, [open, research]);
   const latestJob = useMemo(
-    () => new Map(jobs.map((job) => [job.ticker, job])),
+    () => {
+      const latest = new Map<string, Job>();
+      for (const job of jobs) if (!latest.has(job.ticker)) latest.set(job.ticker, job);
+      return latest;
+    },
     [jobs],
   );
   const rows = useMemo(() => {
