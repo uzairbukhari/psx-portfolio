@@ -124,37 +124,38 @@ async function discover(job) {
       .slice(0, 100) || job.sector;
   const firstLinks = [...new Set(links(page.text, psxUrl))];
   const psxHost = new URL(psxUrl).host;
-  const excluded =
-    /facebook|twitter|linkedin|youtube|instagram|mailto:|javascript:/i;
-  const companyCandidates = firstLinks.filter((url) => {
-    const host = new URL(url).host;
-    return (
-      host !== psxHost &&
-      !excluded.test(url) &&
-      !/google|cloudflare/i.test(host)
-    );
-  });
-  const directPdfs = firstLinks.filter(
+  const websiteBlock = page.text.match(
+    /item__head["'][^>]*>WEBSITE<\/div>[\s\S]{0,500}?href=["']([^"']+)["']/i,
+  );
+  const companyWebsite = websiteBlock
+    ? absolute(websiteBlock[1], psxUrl)
+    : null;
+  const financialPanel =
+    page.text.match(
+      /<div class=["']tabs__panel["'] data-name=["']Financial Results["']>[\s\S]*?(?=<div class=["']tabs__panel["']|<\/section>)/i,
+    )?.[0] || '';
+  const directPdfs = links(financialPanel, psxUrl).filter(
     (url) => /\.pdf(?:$|\?)/i.test(url) || /\/download\/document\//i.test(url),
   );
-  const pages = firstLinks
-    .filter((url) => /annual|financial|investor|report|result/i.test(url))
-    .slice(0, 8);
-  if (companyCandidates[0]) pages.push(companyCandidates[0]);
-  const allowedHosts = new Set([
-    psxHost,
-    ...companyCandidates.slice(0, 3).map((url) => new URL(url).host),
-  ]);
+  const pages = companyWebsite ? [companyWebsite] : [];
+  const allowedHosts = new Set([psxHost]);
+  if (companyWebsite) {
+    const companyHost = new URL(companyWebsite).host;
+    allowedHosts.add(companyHost);
+    allowedHosts.add(companyHost.replace(/^www\./, ''));
+    allowedHosts.add('www.' + companyHost.replace(/^www\./, ''));
+  }
   const discovered = [...directPdfs];
-  for (const url of [...new Set(pages)].slice(0, 9)) {
+  for (let pageIndex = 0; pageIndex < pages.length && pageIndex < 9; pageIndex++) {
+    const url = pages[pageIndex];
     try {
       const found = await fetchText(url);
       for (const link of links(found.text, found.finalUrl)) {
-        if (
-          allowedHosts.has(new URL(link).host) &&
-          (/\.pdf(?:$|\?)/i.test(link) || /\/download\/document\//i.test(link))
-        )
+        if (!allowedHosts.has(new URL(link).host)) continue;
+        if (/\.pdf(?:$|\?)/i.test(link))
           discovered.push(link);
+        else if (/annual|financial|investor|report|result/i.test(link))
+          pages.push(link);
       }
     } catch {}
   }

@@ -2,6 +2,7 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+NODE_BIN=$(node -p 'process.execPath')
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)/companies
 CONFIG_DIR="$HOME/.psx-research-helper"
 CONFIG_FILE="$CONFIG_DIR/config.json"
@@ -34,7 +35,7 @@ cat > "$PLIST" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>com.psx-research.helper</string>
-<key>ProgramArguments</key><array><string>$(command -v node)</string><string>$SCRIPT_DIR/index.mjs</string></array>
+<key>ProgramArguments</key><array><string>$NODE_BIN</string><string>$SCRIPT_DIR/index.mjs</string></array>
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
 <key>StandardOutPath</key><string>$CONFIG_DIR/logs/output.log</string>
 <key>StandardErrorPath</key><string>$CONFIG_DIR/logs/error.log</string>
