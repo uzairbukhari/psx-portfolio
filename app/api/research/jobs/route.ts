@@ -47,7 +47,7 @@ async function resolveCompany(ticker: string, userId: string) {
   const sector = html
     .match(/Sector(?:<[^>]+>|\s|&nbsp;)*([A-Za-z][A-Za-z &/-]{2,80})/i)?.[1]
     ?.trim();
-  return { name: heading || title || ticker, sector: sector || 'Unknown' };
+  return { name: title || heading || ticker, sector: sector || 'Unknown' };
 }
 
 export async function GET(req: Request) {

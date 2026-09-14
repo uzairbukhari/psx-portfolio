@@ -188,7 +188,9 @@ export function Dossier({
           [
             'Quality score',
             score(c) === null ? '—' : score(c) + '/100',
-            'Complete all five categories',
+            c.schemaVersion === 2
+              ? 'Complete all seven categories'
+              : 'Complete all five categories',
           ],
           ['Latest EPS', money(latest?.eps), 'PKR per share'],
           [

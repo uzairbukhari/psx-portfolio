@@ -125,7 +125,7 @@ async function discover(job) {
     .match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]
     ?.replace(/<[^>]+>/g, '')
     .trim();
-  const companyName = heading || title || job.companyName;
+  const companyName = title || heading || job.companyName;
   const sector =
     cleanHtml(page.text.match(/Sector[\s\S]{0,350}/i)?.[0] || '')
       .replace(/^Sector\s*/i, '')
