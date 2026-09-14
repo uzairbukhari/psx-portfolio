@@ -11,7 +11,8 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "WRANGLER_LOG_PATH=.wrangler/logs wrangler d1 migrations apply DB --local --persist-to .wrangler/state"
   },
   "dependencies": {
     "react": "19.2.6",

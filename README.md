@@ -27,7 +27,7 @@ Only previous research and explicitly supplied quote data are available to this 
 ## Development & deployment
 
 - Node >=22.13; install with npm and preserve package-lock.json.
-- `npm run dev` starts the Vinext preview. Local sign-in uses the starter's `/signin-with-chatgpt` flow.
+- Before the first local run, execute `npm run db:migrate:local` once to create the local D1 tables. Then `npm run dev` starts the Vinext preview. Local sign-in uses the starter's `/signin-with-chatgpt` flow.
 - `node --test tests/portfolio.test.mjs` checks cost accounting, sales, missing data, dates, monthly budgets, allocation limits and AI weights.
 - `npx tsc --noEmit` checks types; `npm run build` builds the Cloudflare Worker.
 - D1 schema is in `db/schema.ts`; generate append-only migrations with `npm run db:generate`. Apply local migrations using Wrangler with `--local --persist-to .wrangler/state`; production migrations are managed by Sites deployment.
