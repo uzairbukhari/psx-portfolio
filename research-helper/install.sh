@@ -3,6 +3,8 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 NODE_BIN=$(node -p 'process.execPath')
+PDFTOTEXT_BIN=$(command -v pdftotext)
+PDFINFO_BIN=$(command -v pdfinfo)
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)/companies
 CONFIG_DIR="$HOME/.psx-research-helper"
 CONFIG_FILE="$CONFIG_DIR/config.json"
@@ -27,7 +29,7 @@ COMPANIES_ROOT=${ROOT_INPUT:-$DEFAULT_ROOT}
 mkdir -p "$CONFIG_DIR" "$HOME/Library/LaunchAgents" "$CONFIG_DIR/logs"
 chmod 700 "$CONFIG_DIR"
 umask 077
-printf '{"baseUrl":"%s","token":"%s","sitesBypassToken":"%s","companiesRoot":"%s"}\n' "$BASE_URL" "$TOKEN" "$SITES_BYPASS_TOKEN" "$COMPANIES_ROOT" > "$CONFIG_FILE"
+printf '{"baseUrl":"%s","token":"%s","sitesBypassToken":"%s","companiesRoot":"%s","pdftotextPath":"%s","pdfinfoPath":"%s"}\n' "$BASE_URL" "$TOKEN" "$SITES_BYPASS_TOKEN" "$COMPANIES_ROOT" "$PDFTOTEXT_BIN" "$PDFINFO_BIN" > "$CONFIG_FILE"
 chmod 600 "$CONFIG_FILE"
 
 cat > "$PLIST" <<EOF

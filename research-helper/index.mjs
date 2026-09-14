@@ -18,6 +18,14 @@ const configPath =
 const config = JSON.parse(readFileSync(configPath, 'utf8'));
 const baseUrl = String(config.baseUrl).replace(/\/$/, '');
 const companiesRoot = resolve(String(config.companiesRoot));
+const toolPath = (configured, name) => {
+  if (configured && existsSync(configured)) return configured;
+  return ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin']
+    .map((directory) => join(directory, name))
+    .find(existsSync) || name;
+};
+const pdftotextPath = toolPath(config.pdftotextPath, 'pdftotext');
+const pdfinfoPath = toolPath(config.pdfinfoPath, 'pdfinfo');
 const headers = {
   Authorization: `Bearer ${config.token}`,
   ...(config.sitesBypassToken
@@ -214,7 +222,7 @@ async function downloadReports(job, found) {
       }
       if (!hasPdfSignature(bytes)) throw Error('saved file is not a PDF');
       if (!existsSync(textPath)) {
-        const raw = execFileSync('pdftotext', ['-layout', pdfPath, '-'], {
+        const raw = execFileSync(pdftotextPath, ['-layout', pdfPath, '-'], {
           maxBuffer: 80 * 1024 * 1024,
         }).toString();
         const marked = raw
@@ -233,7 +241,7 @@ async function downloadReports(job, found) {
       try {
         pages =
           Number(
-            execFileSync('pdfinfo', [pdfPath])
+            execFileSync(pdfinfoPath, [pdfPath])
               .toString()
               .match(/^Pages:\s+(\d+)/m)?.[1],
           ) || null;
@@ -270,6 +278,9 @@ async function downloadReports(job, found) {
         { documents },
       );
     } catch (error) {
+      process.stderr.write(
+        `[${new Date().toISOString()}] ${job.ticker} ${filename}: ${error.message}\n`,
+      );
       documents.push({
         id: filename.replace(/\.pdf$/i, ''),
         title: filename,
@@ -369,6 +380,8 @@ async function processJob(job) {
   let checkpoint = job.checkpoint || {};
   try {
     if (checkpoint.dossier && checkpoint.found) {
+      checkpoint.dossier.ticker = job.ticker;
+      checkpoint.dossier.name = checkpoint.found.companyName;
       await request('/api/research/helper', {
         method: 'POST',
         body: JSON.stringify({
@@ -407,7 +420,11 @@ async function processJob(job) {
     checkpoint = { found, documents: bundle.documents };
     if (!valid.length)
       throw Error(
-        'Official links were found, but none produced a readable PDF. Partial download records were preserved.',
+        `Official links were found, but none produced a readable PDF. ${bundle.documents
+          .map((document) => document.error)
+          .filter(Boolean)
+          .slice(0, 3)
+          .join('; ') || 'Partial download records were preserved.'}`,
       );
     await progress(
       job,
@@ -432,6 +449,8 @@ async function processJob(job) {
         })),
       }),
     });
+    synthesis.dossier.ticker = job.ticker;
+    synthesis.dossier.name = found.companyName;
     await progress(
       job,
       'validating',

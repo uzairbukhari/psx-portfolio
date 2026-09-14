@@ -18,13 +18,13 @@ import {
 const textValue = (value: unknown) =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
-function dossierResult(value: unknown, ticker: string, name: string) {
+function dossierResult(value: unknown, ticker: string) {
   if (!value || typeof value !== 'object')
     throw Error('The dossier result is missing.');
   const details = value as Record<string, unknown>;
   if (
     details.ticker !== ticker ||
-    textValue(details.name).trim() !== name.trim()
+    !textValue(details.name).trim()
   )
     throw Error('The dossier company does not match the research job.');
   if (details.schemaVersion !== 2 || details.status !== 'Complete')
@@ -220,7 +220,6 @@ export async function POST(req: Request) {
       const details = dossierResult(
         body.dossier,
         row.ticker,
-        body.companyName || row.company_name,
       );
       if (body.companyName) {
         row.company_name = body.companyName.slice(0, 150);
