@@ -344,7 +344,10 @@ async function downloadReports(job, found) {
       );
       let bytes;
       if (existsSync(pdfPath)) bytes = readFileSync(pdfPath);
-      else if (new URL(url).host === 'financials.psx.com.pk') {
+      else if (
+        new URL(url).host === 'financials.psx.com.pk' ||
+        /dps\.psx\.com\.pk\/download\/(?:document|attachment)\//i.test(url)
+      ) {
         const temporary = pdfPath + '.download';
         try {
           await downloadWithCurl(
