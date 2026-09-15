@@ -15,7 +15,7 @@ import {
 } from '@/lib/research-policy.mjs';
 
 const MODEL = 'gpt-5-nano';
-const MAX_OUTPUT_TOKENS = 14_000;
+const MAX_OUTPUT_TOKENS = 24_000;
 const SCORE_RUBRIC = [
   { name: 'Business quality', max: 20 },
   { name: 'Financial strength', max: 20 },
@@ -254,7 +254,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
         model: MODEL,
         store: false,
         max_output_tokens: MAX_OUTPUT_TOKENS,
-        reasoning: { effort: 'medium' },
+        reasoning: { effort: 'low' },
         instructions,
         input: `REFERENCE MARKET DATA (deterministic PSX capture)\n${JSON.stringify(body.market || {})}\n\nSOURCE MANIFEST\n${JSON.stringify(documents)}\n\nSOURCE EXTRACTS\n${evidence}`,
         text: {
@@ -304,7 +304,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
     }
     if (result.status !== 'completed')
       throw Error(
-        'The AI analysis stopped before completing. Partial research files were preserved.',
+        `The AI analysis stopped before completing (${JSON.stringify(result.incomplete_details || result.status)}). Partial research files were preserved.`,
       );
     const analysis = JSON.parse(outputText(result)) as Record<string, unknown>;
     await db().prepare('UPDATE research_jobs SET result=? WHERE id=? AND lease_owner=? AND status=\'researching\'')

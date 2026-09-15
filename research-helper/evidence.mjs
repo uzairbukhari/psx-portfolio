@@ -2,7 +2,7 @@
 export function selectEvidence(documents, webSources = []) {
   const sections = [];
   for (const document of documents) {
-    const pages = document.text.split(/(?=--- PDF PAGE \d+ ---)/).filter(Boolean);
+    const pages = document.text.replace(/[ \t]{2,}/g, '\t').split(/(?=--- PDF PAGE \d+ ---)/).filter(Boolean);
     const ranked = pages.map((text, index) => {
       const tables = /(?:six|five)\s+year[s]?\s+performance|financial highlights/i.test(text) && /\d{4}/.test(text);
       const statements = /statement of (?:cash flows|financial position|profit|comprehensive)/i.test(text);
