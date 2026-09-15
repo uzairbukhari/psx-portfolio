@@ -37,7 +37,7 @@ test('ticker validation accepts PSX symbols and rejects path-like input', () => 
   assert.equal(validPsxTicker('../MEBL'), false);
 });
 
-const scoreNote = 'Annual report page 10 supports the assessment. Sector evidence and the five-year record also identify material limitations.';
+const scoreNote = 'Evidence: Annual Report 2025, page 65. The audited trend supports the assigned score across the five-year record. Material operating risks and evidence limitations prevent a maximum score.';
 const annual = (year) => ({
   year, revenue: 100_000, profit: 20_000, eps: 10, ocf: 22_000,
   debt: 5_000, equity: 80_000, dividend: 4,
@@ -81,6 +81,19 @@ test('accepts a cited five-year dossier with ordered valuation and strict scores
       { eps: 30, multiple: 5 }, { eps: 35, multiple: 6 }, { eps: 40, multiple: 7 },
     ],
   }, 200));
+});
+
+test('rejects shallow score explanations and identifies their categories', () => {
+  assert.throws(() => validateInvestmentDossier({
+    financials: [2025, 2024, 2023, 2022, 2021].map(annual),
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill('Evidence: Annual Report 2025, page 65. Too brief.'),
+    scenarios: [
+      { name: 'Bear', eps: 30, multiple: 5 },
+      { name: 'Base', eps: 35, multiple: 6 },
+      { name: 'Bull', eps: 40, multiple: 7 },
+    ],
+  }, 200, 2026), /Invalid score categories: 1, 2, 3, 4, 5, 6, 7/);
 });
 
 test('rejects stale fiscal labels, broken units, and missing latest DPS', () => {

@@ -45,6 +45,8 @@ const schema = {
     missingInformation: { type: 'array', items: { type: 'string' } },
     financials: {
       type: 'array',
+      minItems: 5,
+      maxItems: 5,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -224,7 +226,7 @@ Return exactly five comparable FULL-YEAR annual periods, newest first, using the
 
 Reference market data is supplied separately. Build Bear, Base and Bull valuations using positive normalized forward EPS and defensible P/E multiples. Explain normalization, multiple selection, peer/industry context, upside/downside, and key assumptions in valuationNotes. Do not leave valuation blank when five-year earnings and a market price support it.
 
-Grade strictly against these category maximums: Business quality 20, Financial strength 20, Growth 15, Management 10, Dividend quality 10, Valuation 15, Risk resilience 10. A maximum means exceptional evidence versus credible PSX peers, not merely adequate disclosure. Penalize circular debt, commodity/regulatory exposure, governance gaps, volatile earnings, weak cash conversion, capital intensity, and missing evidence. Never return a perfect score. Each score note must be at least two evidence-based sentences. Start EVERY score note with "Evidence: [exact source title, printed page]" or "Evidence: PSX company page" and then explain what that evidence supports and what limits the score. Use null only if a category truly cannot be assessed and set investmentStance to Research incomplete. The stance must be one of Research incomplete, Avoid, Watchlist, or Consider; it is research guidance, not an instruction to trade.
+Grade strictly against these category maximums: Business quality 20, Financial strength 20, Growth 15, Management 10, Dividend quality 10, Valuation 15, Risk resilience 10. A maximum means exceptional evidence versus credible PSX peers, not merely adequate disclosure. Penalize circular debt, commodity/regulatory exposure, governance gaps, volatile earnings, weak cash conversion, capital intensity, and missing evidence. Never return a perfect score. Each score note must contain at least 120 characters and at least two complete evidence-based sentences. Start EVERY score note with "Evidence: [exact source title, printed page]" or "Evidence: PSX company page" and then explain both what that evidence supports and what risk, gap, or peer comparison limits the score. Use null only if a category truly cannot be assessed and set investmentStance to Research incomplete. The stance must be one of Research incomplete, Avoid, Watchlist, or Consider; it is research guidance, not an instruction to trade.
 
 Explain findings simply. The narrative must cover the business, industry and macro setting, five-year record and trends, earnings/cash quality, balance sheet, dividends, governance, catalysts, risks, valuation, score rationale, investment stance, disconfirming evidence and next review. Flag every important missing item.`;
     const response = await fetch('https://api.openai.com/v1/responses', {
