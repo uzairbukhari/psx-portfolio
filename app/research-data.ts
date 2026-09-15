@@ -29,6 +29,9 @@ export type Company = {
   thesis: string;
   risk: string;
   catalyst: string;
+  investmentStance?: 'Research incomplete' | 'Avoid' | 'Watchlist' | 'Consider';
+  decisionSummary?: string;
+  valuationNotes?: string;
   conversation: string;
   documents: { title: string; url: string; kind: string; date: string }[];
   history: { date: string; text: string }[];

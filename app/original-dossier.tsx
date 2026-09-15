@@ -252,6 +252,12 @@ export function Dossier({
                   </ul>
                 </>
               )}
+              {c.investmentStance && (
+                <div className="notice">
+                  <h3>Investment stance: {c.investmentStance}</h3>
+                  <p>{c.decisionSummary}</p>
+                </div>
+              )}
             </section>
           )}
           <div className="note-grid">
@@ -571,6 +577,12 @@ export function Dossier({
                 );
               })}
             </div>
+            {c.valuationNotes && (
+              <div className="research-narrative mt">
+                <h3>Valuation reasoning and assumptions</h3>
+                <p>{c.valuationNotes}</p>
+              </div>
+            )}
           </section>
         </TabsContent>
         <TabsContent value="score">

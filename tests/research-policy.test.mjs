@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   RESEARCH_BUDGET_MICROS,
   hasPdfSignature,
+  normalizeAnnualFinancials,
   researchReserveMicros,
+  validateInvestmentDossier,
   validPsxTicker,
   validScorecard,
 } from '../lib/research-policy.mjs';
@@ -32,4 +34,41 @@ test('ticker validation accepts PSX symbols and rejects path-like input', () => 
   assert.equal(validPsxTicker('MEBL'), true);
   assert.equal(validPsxTicker('786'), true);
   assert.equal(validPsxTicker('../MEBL'), false);
+});
+
+const scoreNote = 'Annual report page 10 supports the assessment. Sector evidence and the five-year record also identify material limitations.';
+const annual = (year) => ({
+  year, revenue: 100_000, profit: 20_000, eps: 10, ocf: 22_000,
+  debt: 5_000, equity: 80_000, dividend: 4,
+  source: `Annual Report ${year}`, page: '10',
+  basis: 'Consolidated, PKR million', verified: true,
+});
+
+test('normalizes monetary figures reported in PKR thousands', () => {
+  const [row] = normalizeAnnualFinancials([
+    { ...annual(2025), revenue: 473_761_000, profit: 169_902_000, eps: 39.5 },
+  ]);
+  assert.equal(row.revenue, 473_761);
+  assert.equal(row.profit, 169_902);
+  assert.equal(row.eps, 39.5);
+});
+
+test('rejects the prior unsafe dossier shape', () => {
+  assert.throws(() => validateInvestmentDossier({
+    financials: [annual(2026), annual(2025)],
+    scores: [20, 20, 15, 10, 10, 15, 10],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: Array(3).fill({ eps: null, multiple: null }),
+  }, null), /Five directly cited annual periods/);
+});
+
+test('accepts a cited five-year dossier with ordered valuation and strict scores', () => {
+  assert.doesNotThrow(() => validateInvestmentDossier({
+    financials: [2025, 2024, 2023, 2022, 2021].map(annual),
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: [
+      { eps: 30, multiple: 5 }, { eps: 35, multiple: 6 }, { eps: 40, multiple: 7 },
+    ],
+  }, 200));
 });

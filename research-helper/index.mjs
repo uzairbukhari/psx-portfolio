@@ -71,6 +71,47 @@ function cleanHtml(value) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+const credibleResearchHost = (host, issuerHosts = []) =>
+  issuerHosts.includes(host) ||
+  issuerHosts.includes(host.replace(/^www\./, '')) ||
+  /(^|\.)(psx\.com\.pk|secp\.gov\.pk|sbp\.org\.pk|pacra\.com|jcrvis\.com\.pk|reuters\.com|dawn\.com|brecorder\.com|pakistantoday\.com\.pk|arifhabibltd\.com|akdsl\.com|topline\.com\.pk|ktrade\.pk)$/.test(
+    host.replace(/^www\./, ''),
+  );
+async function externalResearch(query, issuerHosts) {
+  const searchUrl =
+    'https://www.bing.com/search?format=rss&q=' + encodeURIComponent(query);
+  try {
+    const result = await fetchText(searchUrl);
+    const urls = [...result.text.matchAll(/<link>(https?:[^<]+)<\/link>/gi)]
+      .map((match) => match[1].replace(/&amp;/g, '&'))
+      .filter((url) => {
+        try {
+          return credibleResearchHost(new URL(url).host, issuerHosts);
+        } catch {
+          return false;
+        }
+      })
+      .slice(0, 8);
+    const sources = [];
+    for (const url of urls) {
+      try {
+        const page = await fetchText(url);
+        const text = cleanHtml(page.text).slice(0, 45_000);
+        if (text.length >= 500)
+          sources.push({
+            title:
+              page.text.match(/<title[^>]*>([^<]+)/i)?.[1]?.trim() ||
+              new URL(page.finalUrl).host,
+            url: page.finalUrl,
+            text,
+          });
+      } catch {}
+    }
+    return sources;
+  } catch {
+    return [];
+  }
+}
 async function request(path, options = {}) {
   const response = await fetch(baseUrl + path, {
     ...options,
@@ -130,7 +171,6 @@ async function discover(job) {
     cleanHtml(page.text.match(/Sector[\s\S]{0,350}/i)?.[0] || '')
       .replace(/^Sector\s*/i, '')
       .slice(0, 100) || job.sector;
-  const firstLinks = [...new Set(links(page.text, psxUrl))];
   const psxHost = new URL(psxUrl).host;
   const websiteBlock = page.text.match(
     /item__head["'][^>]*>WEBSITE<\/div>[\s\S]{0,500}?href=["']([^"']+)["']/i,
@@ -138,6 +178,17 @@ async function discover(job) {
   const companyWebsite = websiteBlock
     ? absolute(websiteBlock[1], psxUrl)
     : null;
+  const price = Number(
+    page.text.match(/quote__close["'][^>]*>Rs\.\s*([0-9,.]+)/i)?.[1]?.replace(
+      /,/g,
+      '',
+    ),
+  );
+  const marketPe = Number(
+    page.text
+      .match(/P\/E Ratio \(TTM\)[\s\S]{0,180}?stats_value["'][^>]*>([0-9,.]+)/i)?.[1]
+      ?.replace(/,/g, ''),
+  );
   const financialPanel =
     page.text.match(
       /<div class=["']tabs__panel["'] data-name=["']Financial Results["']>[\s\S]*?(?=<div class=["']tabs__panel["']|<\/section>)/i,
@@ -145,7 +196,14 @@ async function discover(job) {
   const directPdfs = links(financialPanel, psxUrl).filter(
     (url) => /\.pdf(?:$|\?)/i.test(url) || /\/download\/document\//i.test(url),
   );
-  const pages = companyWebsite ? [companyWebsite] : [];
+  const pages = companyWebsite
+    ? [
+        companyWebsite,
+        absolute('/investors/financial-reports', companyWebsite),
+        absolute('/investors/annual-reports', companyWebsite),
+        absolute('/publications', companyWebsite),
+      ].filter(Boolean)
+    : [];
   const allowedHosts = new Set([psxHost]);
   if (companyWebsite) {
     const companyHost = new URL(companyWebsite).host;
@@ -167,6 +225,20 @@ async function discover(job) {
       }
     } catch {}
   }
+  const issuerHosts = companyWebsite
+    ? [new URL(companyWebsite).host.replace(/^www\./, '')]
+    : [];
+  const webSources = [
+    {
+      title: `PSX company page for ${job.ticker}`,
+      url: psxUrl,
+      text: cleanHtml(page.text).slice(0, 90_000),
+    },
+    ...(await externalResearch(
+      `${companyName} ${job.ticker} Pakistan investment research rating industry outlook`,
+      issuerHosts,
+    )),
+  ];
   const ranked = [...new Set(discovered)].sort((a, b) => {
     const score = (url) =>
       (/annual/i.test(url) ? 5 : 0) +
@@ -186,6 +258,12 @@ async function discover(job) {
     companyName,
     sector,
     psxUrl,
+    market: {
+      price: Number.isFinite(price) && price > 0 ? price : null,
+      priceDate: new Date().toISOString().slice(0, 10),
+      pe: Number.isFinite(marketPe) && marketPe > 0 ? marketPe : null,
+    },
+    webSources,
     urls: [...new Set(ranked)].slice(0, 12),
   };
 }
@@ -295,13 +373,14 @@ async function downloadReports(job, found) {
   return { root, documents };
 }
 
-function evidenceFrom(documents, root) {
+function evidenceFrom(documents, root, webSources = []) {
   const keywords =
-    /revenue|income|profit|earnings per share|dividend|equity|cash flow|governance|related part|capital adequacy|deposit|provision|risk|segment|auditor|valuation/gi;
+    /six.year|financial highlight|revenue|sales|income|profit|earnings per share|dividend|equity|cash flow|statement of financial position|statement of profit|governance|related part|capital adequacy|deposit|provision|risk|segment|auditor|valuation|reserve|production|circular debt/gi;
   const pieces = [];
   for (const document of documents.filter(
     (item) => item.status === 'downloaded_pdf_validated',
   )) {
+    keywords.lastIndex = 0;
     const text = readFileSync(join(root, document.text_path), 'utf8');
     const selected = [text.slice(0, 30_000)];
     let match;
@@ -319,6 +398,8 @@ function evidenceFrom(documents, root) {
       ),
     );
   }
+  for (const source of webSources)
+    pieces.push(`\n===== WEB SOURCE: ${source.title} | ${source.url} =====\n${source.text}`);
   return pieces.join('\n').slice(0, 880_000);
 }
 
@@ -327,7 +408,11 @@ function writeOutputs(job, found, bundle, dossier) {
   const manifest = {
     as_of: new Date().toISOString().slice(0, 10),
     documents: bundle.documents,
-    web_sources: [{ id: `PSX-${job.ticker}`, url: found.psxUrl }],
+    web_sources: found.webSources.map((source, index) => ({
+      id: index === 0 ? `PSX-${job.ticker}` : `WEB-${index}`,
+      title: source.title,
+      url: source.url,
+    })),
   };
   atomic(join(root, 'sources.json'), JSON.stringify(manifest, null, 2) + '\n');
   atomic(
@@ -433,20 +518,32 @@ async function processJob(job) {
       valid.length,
       checkpoint,
     );
-    const evidence = evidenceFrom(bundle.documents, bundle.root);
+    const evidence = evidenceFrom(
+      bundle.documents,
+      bundle.root,
+      found.webSources,
+    );
     const synthesis = await request('/api/research/synthesize', {
       method: 'POST',
       body: JSON.stringify({
         id: job.id,
         ticker: job.ticker,
         companyName: found.companyName,
+        market: found.market,
         evidence,
         documents: valid.map(({ title, url, kind, date }) => ({
           title,
           url,
           kind,
           date,
-        })),
+        })).concat(
+          found.webSources.map((source) => ({
+            title: source.title,
+            url: source.url,
+            kind: 'Web research',
+            date: found.market.priceDate,
+          })),
+        ),
       }),
     });
     synthesis.dossier.ticker = job.ticker;

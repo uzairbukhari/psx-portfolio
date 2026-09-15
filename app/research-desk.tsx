@@ -189,12 +189,12 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
     ];
     await onSave(next, `${value.ticker} research dossier saved.`);
   };
-  const startResearch = async () => {
-    const value = ticker.trim().toUpperCase(),
+  const startResearch = async (refreshTicker?: string) => {
+    const value = (refreshTicker || ticker).trim().toUpperCase(),
       complete = research.find(
         (item) => item.ticker === value && item.status === 'Complete',
       );
-    if (complete) {
+    if (complete && !refreshTicker) {
       setAddOpen(false);
       open(value);
       return;
@@ -527,6 +527,15 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                           ? 'View progress'
                           : 'Open'}
                       </button>
+                      {dossier?.status === 'Complete' && !active && (
+                        <button
+                          className="secondary compact"
+                          disabled={busy}
+                          onClick={() => void startResearch(value)}
+                        >
+                          <RotateCcw size={14} /> Refresh research
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
