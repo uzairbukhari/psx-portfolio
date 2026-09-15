@@ -4,6 +4,7 @@ import {
   RESEARCH_BUDGET_MICROS,
   hasPdfSignature,
   normalizeAnnualFinancials,
+  normalizeValuationScenarios,
   researchReserveMicros,
   validateInvestmentDossier,
   validPsxTicker,
@@ -51,6 +52,15 @@ test('normalizes monetary figures reported in PKR thousands', () => {
   assert.equal(row.revenue, 473_761);
   assert.equal(row.profit, 169_902);
   assert.equal(row.eps, 39.5);
+});
+
+test('normalizes valuation scenarios into conservative display order', () => {
+  const scenarios = normalizeValuationScenarios([
+    { name: 'Base', eps: 35, multiple: 6 },
+    { name: 'Bull', eps: 40, multiple: 7 },
+    { name: 'Bear', eps: 30, multiple: 5 },
+  ]);
+  assert.deepEqual(scenarios.map((item) => item.name), ['Bear', 'Base', 'Bull']);
 });
 
 test('rejects the prior unsafe dossier shape', () => {

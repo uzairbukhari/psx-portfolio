@@ -8,6 +8,7 @@ import {
 } from '@/lib/research-jobs';
 import {
   normalizeAnnualFinancials,
+  normalizeValuationScenarios,
   researchReserveMicros,
   validateInvestmentDossier,
 } from '@/lib/research-policy.mjs';
@@ -291,6 +292,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
       );
     const analysis = JSON.parse(outputText(result)) as Record<string, unknown>;
     analysis.financials = normalizeAnnualFinancials(analysis.financials);
+    analysis.scenarios = normalizeValuationScenarios(analysis.scenarios);
     validateInvestmentDossier(analysis, marketPrice);
     const details = {
       schemaVersion: 2,
