@@ -196,6 +196,18 @@ async function discover(job) {
   const directPdfs = links(financialPanel, psxUrl).filter(
     (url) => /\.pdf(?:$|\?)/i.test(url) || /\/download\/document\//i.test(url),
   );
+  let annualPdfs = [];
+  try {
+    const reportArchive = await fetchText(
+      `https://dps.psx.com.pk/company/reports/${job.ticker}`,
+    );
+    annualPdfs = [...reportArchive.text.matchAll(/<tr>[\s\S]*?<\/tr>/gi)]
+      .map((match) => match[0])
+      .filter((row) => /<td>\s*<a[^>]*>Annual<\/a>/i.test(row))
+      .flatMap((row) => links(row, reportArchive.finalUrl))
+      .reverse()
+      .slice(0, 5);
+  } catch {}
   const pages = companyWebsite
     ? [
         companyWebsite,
@@ -211,7 +223,7 @@ async function discover(job) {
     allowedHosts.add(companyHost.replace(/^www\./, ''));
     allowedHosts.add('www.' + companyHost.replace(/^www\./, ''));
   }
-  const discovered = [...directPdfs];
+  const discovered = [...annualPdfs, ...directPdfs];
   for (let pageIndex = 0; pageIndex < pages.length && pageIndex < 9; pageIndex++) {
     const url = pages[pageIndex];
     try {
