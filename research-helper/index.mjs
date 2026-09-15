@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -26,6 +27,7 @@ const toolPath = (configured, name) => {
 };
 const pdftotextPath = toolPath(config.pdftotextPath, 'pdftotext');
 const pdfinfoPath = toolPath(config.pdfinfoPath, 'pdfinfo');
+const curlPath = toolPath(config.curlPath, 'curl');
 const headers = {
   Authorization: `Bearer ${config.token}`,
   ...(config.sitesBypassToken
@@ -309,6 +311,28 @@ async function downloadReports(job, found) {
       );
       let bytes;
       if (existsSync(pdfPath)) bytes = readFileSync(pdfPath);
+      else if (new URL(url).host === 'financials.psx.com.pk') {
+        const temporary = pdfPath + '.download';
+        try {
+          execFileSync(
+            curlPath,
+            [
+              '--location', '--fail', '--silent', '--show-error',
+              '--max-time', '180',
+              '--user-agent', 'Mozilla/5.0 PSX Research Helper/1.0',
+              '--output', temporary,
+              url,
+            ],
+            { timeout: 190_000 },
+          );
+          bytes = readFileSync(temporary);
+          if (!hasPdfSignature(bytes)) throw Error('download was not a PDF');
+          renameSync(temporary, pdfPath);
+        } catch (error) {
+          if (existsSync(temporary)) unlinkSync(temporary);
+          throw error;
+        }
+      }
       else {
         const response = await fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0 PSX Research Helper/1.0' },
