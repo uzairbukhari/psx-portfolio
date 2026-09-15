@@ -199,10 +199,12 @@ async function discover(job) {
     ?.replace(/<[^>]+>/g, '')
     .trim();
   const companyName = title || heading || job.companyName;
+  const cleanPage = cleanHtml(page.text);
+  const escapedCompanyName = String(companyName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const sector =
-    cleanHtml(page.text.match(/Sector[\s\S]{0,350}/i)?.[0] || '')
-      .replace(/^Sector\s*/i, '')
-      .slice(0, 100) || job.sector;
+    cleanPage
+      .match(new RegExp(`${escapedCompanyName}\\s+([A-Z][A-Z &/()-]{3,80})\\s+Rs\\.`, 'i'))?.[1]
+      ?.trim() || job.sector;
   const psxHost = new URL(psxUrl).host;
   const websiteBlock = page.text.match(
     /item__head["'][^>]*>WEBSITE<\/div>[\s\S]{0,500}?href=["']([^"']+)["']/i,

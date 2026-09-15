@@ -5,6 +5,7 @@ import {
   hasPdfSignature,
   normalizeAnnualFinancials,
   normalizeValuationScenarios,
+  financialValueSupported,
   researchReserveMicros,
   validateInvestmentDossier,
   validPsxTicker,
@@ -61,6 +62,14 @@ test('normalizes valuation scenarios into conservative display order', () => {
     { name: 'Bear', eps: 30, multiple: 5 },
   ]);
   assert.deepEqual(scenarios.map((item) => item.name), ['Bear', 'Base', 'Bull']);
+});
+
+test('matches financial values to labelled source lines across unit conversions', () => {
+  const evidence = 'Net Sales Rs in billion 401.18 463.70\nProfit for the year (Rupees in thousand) 169,900,000\nEarnings per Share 39.50';
+  assert.equal(financialValueSupported(evidence, /net sales/i, 401_180), true);
+  assert.equal(financialValueSupported(evidence, /profit for the year/i, 169_900), true);
+  assert.equal(financialValueSupported(evidence, /earnings per share/i, 39.5), true);
+  assert.equal(financialValueSupported(evidence, /earnings per share/i, 52.23), false);
 });
 
 test('rejects the prior unsafe dossier shape', () => {
