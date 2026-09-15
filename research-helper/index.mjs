@@ -12,6 +12,7 @@ import {
 import { basename, dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { hasPdfSignature } from '../lib/research-policy.mjs';
+import { selectEvidence } from './evidence.mjs';
 
 const configPath =
   process.env.PSX_RESEARCH_HELPER_CONFIG ||
@@ -143,12 +144,14 @@ async function externalResearch(query, issuerHosts) {
 }
 async function request(path, options = {}) {
   const response = await fetch(baseUrl + path, {
+    signal: AbortSignal.timeout(240_000),
     ...options,
     headers: { ...headers, ...options.headers },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok)
     throw Error(body.error || `Research service returned ${response.status}.`);
+  if (body.cancelled || body.cancelRequested) throw Error('Research cancelled.');
   return body;
 }
 async function progress(job, stage, message, reportsFound = 0, checkpoint) {
@@ -408,7 +411,7 @@ async function downloadReports(job, found) {
       } catch {}
       documents.push({
         id: filename.replace(/\.pdf$/i, ''),
-        title: filename
+        title: ((text.match(/Annual Report\s+(20\d{2})/i)?.[0]) || filename)
           .replace(/^\d+-/, '')
           .replace(/\.pdf$/i, '')
           .replace(/-/g, ' '),
@@ -456,41 +459,9 @@ async function downloadReports(job, found) {
 }
 
 function evidenceFrom(documents, root, webSources = []) {
-  const keywords =
-    /six.year|financial highlight|revenue|sales|income|profit|earnings per share|dividend|equity|cash flow|statement of financial position|statement of profit|governance|related part|capital adequacy|deposit|provision|risk|segment|auditor|valuation|reserve|production|circular debt/gi;
-  const pieces = [];
-  for (const document of documents.filter(
-    (item) => item.status === 'downloaded_pdf_validated',
-  )) {
-    keywords.lastIndex = 0;
-    const text = readFileSync(join(root, document.text_path), 'utf8');
-    const selected = [];
-    for (const match of text.matchAll(/six year performance/gi)) {
-      const section = text.slice(match.index, match.index + 35_000);
-      if (/operational performance/i.test(section.slice(0, 5_000))) {
-        selected.push(section);
-        break;
-      }
-    }
-    selected.push(text.slice(0, 30_000));
-    let match;
-    let count = 0;
-    while ((match = keywords.exec(text)) && count < 220) {
-      selected.push(
-        text.slice(Math.max(0, match.index - 900), match.index + 2200),
-      );
-      count++;
-    }
-    pieces.push(
-      `\n===== ${document.title} | ${document.url} =====\n${[...new Set(selected)].join('\n')}`.slice(
-        0,
-        180_000,
-      ),
-    );
-  }
-  for (const source of webSources)
-    pieces.push(`\n===== WEB SOURCE: ${source.title} | ${source.url} =====\n${source.text}`);
-  return pieces.join('\n').slice(0, 880_000);
+  return selectEvidence(documents.filter(d => d.status === 'downloaded_pdf_validated').map(d => ({
+    ...d, text: readFileSync(join(root, d.text_path), 'utf8'),
+  })), webSources);
 }
 
 function writeOutputs(job, found, bundle, dossier) {
@@ -504,6 +475,9 @@ function writeOutputs(job, found, bundle, dossier) {
       url: source.url,
     })),
   };
+  if (existsSync(join(root, 'data', 'company.json'))) {
+    atomic(join(root, 'history', `${new Date().toISOString().replace(/:/g, '-')}-previous.json`), readFileSync(join(root, 'data', 'company.json')));
+  }
   atomic(join(root, 'sources.json'), JSON.stringify(manifest, null, 2) + '\n');
   atomic(
     join(root, 'RESEARCH.md'),
@@ -552,11 +526,20 @@ function writeOutputs(job, found, bundle, dossier) {
 }
 
 async function processJob(job) {
+  const checkpointPath = join(companiesRoot, job.ticker, 'history', `${job.id}-checkpoint.json`);
   let checkpoint = job.checkpoint || {};
+  if (existsSync(checkpointPath)) {
+    const local = JSON.parse(readFileSync(checkpointPath, 'utf8'));
+    if (local.dossier) checkpoint = local;
+  }
+  const heartbeat = setInterval(() => void request('/api/research/helper', {
+    method: 'POST', body: JSON.stringify({ id: job.id, action: 'heartbeat' }),
+  }).catch(() => {}), 30_000);
   try {
     if (checkpoint.dossier && checkpoint.found) {
       checkpoint.dossier.ticker = job.ticker;
       checkpoint.dossier.name = checkpoint.found.companyName;
+      writeOutputs(job, checkpoint.found, { root: join(companiesRoot, job.ticker), documents: checkpoint.documents }, checkpoint.dossier);
       await request('/api/research/helper', {
         method: 'POST',
         body: JSON.stringify({
@@ -613,6 +596,7 @@ async function processJob(job) {
       bundle.root,
       found.webSources,
     );
+    atomic(join(bundle.root, 'extracted', `${job.id}-evidence.txt`), evidence);
     const synthesis = await request('/api/research/synthesize', {
       method: 'POST',
       body: JSON.stringify({
@@ -638,6 +622,8 @@ async function processJob(job) {
     });
     synthesis.dossier.ticker = job.ticker;
     synthesis.dossier.name = found.companyName;
+    checkpoint = { ...checkpoint, dossier: synthesis.dossier };
+    atomic(checkpointPath, JSON.stringify(checkpoint, null, 2));
     await progress(
       job,
       'validating',
@@ -676,6 +662,8 @@ async function processJob(job) {
         }),
       });
     } catch {}
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 

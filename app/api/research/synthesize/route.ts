@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { db } from '@/lib/server';
+import researchContext from '@/lib/research-context.json';
 import {
   addEvent,
   helperFailure,
@@ -80,17 +81,19 @@ const schema = {
         ],
       },
     },
-    scores: {
-      type: 'array',
-      minItems: 7,
-      maxItems: 7,
-      items: { type: ['number', 'null'] },
-    },
-    scoreNotes: {
-      type: 'array',
-      minItems: 7,
-      maxItems: 7,
-      items: { type: 'string' },
+    assessments: {
+      type: 'object', additionalProperties: false,
+      properties: Object.fromEntries(SCORE_RUBRIC.map(({ name }) => [name, {
+        type: 'object', additionalProperties: false,
+        properties: {
+          score: nullableNumber,
+          source: { type: 'string', description: 'Exact supplied document title or URL and page locator.' },
+          finding: { type: 'string', description: 'Concrete company-specific evidence and why it supports the score.' },
+          limitation: { type: 'string', description: 'Specific risk, contrary evidence or missing information that limits this score.' },
+        },
+        required: ['score', 'source', 'finding', 'limitation'],
+      }])),
+      required: SCORE_RUBRIC.map(({ name }) => name),
     },
     scenarios: {
       type: 'array',
@@ -120,8 +123,7 @@ const schema = {
     'valuationNotes',
     'missingInformation',
     'financials',
-    'scores',
-    'scoreNotes',
+    'assessments',
     'scenarios',
   ],
 };
@@ -142,6 +144,7 @@ function outputText(result: Record<string, unknown>) {
 export async function POST(req: Request) {
   let jobId = '';
   let reserve = 0;
+  let authorizedJob = false;
   try {
     const helper = await helperIdentity(req);
     if (!env.OPENAI_API_KEY)
@@ -164,8 +167,13 @@ export async function POST(req: Request) {
       .prepare('SELECT * FROM research_jobs WHERE id=? AND user_id=?')
       .bind(jobId, helper.user_id)
       .first<ResearchJobRow>();
-    if (!row || row.status !== 'researching' || row.lease_owner !== helper.id)
+    if (!row || row.status !== 'researching' || row.cancel_requested || row.lease_owner !== helper.id || !row.lease_until || row.lease_until < new Date().toISOString())
       throw Error('The active research lease was not found.');
+    authorizedJob = true;
+    if (row.result) {
+      const cached = JSON.parse(row.result);
+      if (cached.status === 'Complete') return Response.json({ dossier: cached, costUsd: 0, cached: true });
+    }
     if (body.ticker !== row.ticker) throw Error('Research ticker mismatch.');
     const evidence = String(body.evidence || '');
     if (!evidence || evidence.length > 900_000)
@@ -183,7 +191,7 @@ export async function POST(req: Request) {
     reserve = researchReserveMicros(evidence.length, MAX_OUTPUT_TOKENS);
     const budget = await db()
       .prepare(
-        'UPDATE research_jobs SET spent_micros=spent_micros+?,stage=?,message=?,updated_at=? WHERE id=? AND spent_micros+?<=budget_micros',
+        "UPDATE research_jobs SET spent_micros=spent_micros+?,stage=?,message=?,updated_at=? WHERE id=? AND status='researching' AND cancel_requested=0 AND lease_owner=? AND spent_micros+?<=budget_micros",
       )
       .bind(
         reserve,
@@ -191,6 +199,7 @@ export async function POST(req: Request) {
         'Analyzing verified source extracts',
         new Date().toISOString(),
         row.id,
+        helper.id,
         reserve,
       )
       .run();
@@ -226,7 +235,12 @@ Return exactly five comparable FULL-YEAR annual periods, newest first, using the
 
 Reference market data is supplied separately. Build Bear, Base and Bull valuations using positive normalized forward EPS and defensible P/E multiples. Explain normalization, multiple selection, peer/industry context, upside/downside, and key assumptions in valuationNotes. Do not leave valuation blank when five-year earnings and a market price support it.
 
-Grade strictly against these category maximums: Business quality 20, Financial strength 20, Growth 15, Management 10, Dividend quality 10, Valuation 15, Risk resilience 10. A maximum means exceptional evidence versus credible PSX peers, not merely adequate disclosure. Penalize circular debt, commodity/regulatory exposure, governance gaps, volatile earnings, weak cash conversion, capital intensity, and missing evidence. Never return a perfect score. Each score note must contain at least 120 characters and at least two complete evidence-based sentences. Start EVERY score note with "Evidence: [exact source title, printed page]" or "Evidence: PSX company page" and then explain both what that evidence supports and what risk, gap, or peer comparison limits the score. Use null only if a category truly cannot be assessed and set investmentStance to Research incomplete. The stance must be one of Research incomplete, Avoid, Watchlist, or Consider; it is research guidance, not an instruction to trade.
+Grade strictly against these category maximums: Business quality 20, Financial strength 20, Growth 15, Management 10, Dividend quality 10, Valuation 15, Risk resilience 10. A maximum means exceptional evidence versus credible PSX peers, not merely adequate disclosure. Penalize circular debt, commodity/regulatory exposure, governance gaps, volatile earnings, weak cash conversion, capital intensity, and missing evidence. Never return a perfect score. Return one assessment for EVERY named category. Each assessment must include its numeric score, an exact supplied source title or URL with page locator, a concrete company-specific finding of at least 60 characters, and a specific limitation of at least 60 characters. These are separate required fields: do not substitute a generic statement that the evidence is limited. Scores are provisional analyst judgments. Use null only if a category truly cannot be assessed and set investmentStance to Research incomplete. The stance must be one of Research incomplete, Avoid, Watchlist, or Consider; it is research guidance, not an instruction to trade.
+
+Use only citations to documents in the supplied manifest. Never invent peer figures. Where external research, peer comparisons or the newest interim cannot be obtained, explicitly list that gap and limit confidence.
+
+FRAMEWORK (sector adaptations and scoring anchors):
+${researchContext.framework}
 
 Explain findings simply. The narrative must cover the business, industry and macro setting, five-year record and trends, earnings/cash quality, balance sheet, dividends, governance, catalysts, risks, valuation, score rationale, investment stance, disconfirming evidence and next review. Flag every important missing item.`;
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -240,7 +254,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
         model: MODEL,
         store: false,
         max_output_tokens: MAX_OUTPUT_TOKENS,
-        reasoning: { effort: 'low' },
+        reasoning: { effort: 'medium' },
         instructions,
         input: `REFERENCE MARKET DATA (deterministic PSX capture)\n${JSON.stringify(body.market || {})}\n\nSOURCE MANIFEST\n${JSON.stringify(documents)}\n\nSOURCE EXTRACTS\n${evidence}`,
         text: {
@@ -293,9 +307,33 @@ Explain findings simply. The narrative must cover the business, industry and mac
         'The AI analysis stopped before completing. Partial research files were preserved.',
       );
     const analysis = JSON.parse(outputText(result)) as Record<string, unknown>;
+    await db().prepare('UPDATE research_jobs SET result=? WHERE id=? AND lease_owner=? AND status=\'researching\'')
+      .bind(JSON.stringify({ status: 'Draft', analysis, costUsd: actual / 1_000_000 }), row.id, helper.id).run();
+    await addEvent(row.id, 'analyzing', `AI cost record: reserved $${(reserve / 1_000_000).toFixed(6)}, charged $${(actual / 1_000_000).toFixed(6)}; response ${typeof result.id === 'string' ? result.id : 'unknown'}.`);
+    const assessments = analysis.assessments as Record<string, { score: number | null; source: string; finding: string; limitation: string }>;
+    for (const { name } of SCORE_RUBRIC) {
+      const assessment = assessments?.[name];
+      if (!assessment || assessment.finding.trim().length < 60 || assessment.limitation.trim().length < 60)
+        throw Error(`The ${name} assessment needs a concrete finding and limitation. Draft preserved for review.`);
+    }
+    analysis.scores = SCORE_RUBRIC.map(({ name }) => assessments[name].score);
+    analysis.scoreNotes = SCORE_RUBRIC.map(({ name }) => {
+      const item = assessments[name];
+      return `Evidence: ${item.source}\nFinding: ${item.finding}\nLimitation: ${item.limitation}`;
+    });
     analysis.financials = normalizeAnnualFinancials(analysis.financials);
     analysis.scenarios = normalizeValuationScenarios(analysis.scenarios);
     validateInvestmentDossier(analysis, marketPrice);
+    for (const financial of analysis.financials as Array<{source:string; page:string}>) {
+      if (!documents.some(d => financial.source.toLowerCase().includes(d.title.toLowerCase()) || financial.source.includes(d.url)))
+        throw Error('A financial row cites a source absent from the manifest.');
+    }
+    for (const { name } of SCORE_RUBRIC) {
+      const source = assessments[name].source.toLowerCase();
+      if (!documents.some(d => source.includes(d.title.toLowerCase()) || source.includes(d.url.toLowerCase())))
+        throw Error(`The ${name} assessment cites a source absent from the manifest.`);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.market?.priceDate))) throw Error('A dated reference quote is required.');
     const details = {
       schemaVersion: 2,
       ticker: row.ticker,
@@ -329,9 +367,12 @@ Explain findings simply. The narrative must cover the business, industry and mac
       missingInformation: analysis.missingInformation,
       researchNarrative: analysis.researchNarrative,
     };
+    const saved = await db().prepare("UPDATE research_jobs SET result=? WHERE id=? AND status='researching' AND lease_owner=? AND cancel_requested=0")
+      .bind(JSON.stringify(details), row.id, helper.id).run();
+    if (!saved.meta.changes) throw Error('Research was cancelled or its lease changed before saving.');
     return Response.json({ dossier: details, costUsd: actual / 1_000_000 });
   } catch (error) {
-    if (jobId) {
+    if (jobId && authorizedJob) {
       const message =
         error instanceof Error ? error.message : 'Research analysis failed.';
       await db()

@@ -149,7 +149,7 @@ export async function PATCH(req: Request) {
     if (body.action === 'cancel') {
       if (row.status === 'complete' || row.status === 'cancelled')
         throw Error('This research job has already finished.');
-      if (row.status === 'queued') {
+      if (row.status === 'queued' || row.status === 'needs_attention') {
         await db()
           .prepare(
             "UPDATE research_jobs SET status='cancelled',stage='cancelled',message='Research cancelled',cancel_requested=0,completed_at=?,updated_at=? WHERE id=?",

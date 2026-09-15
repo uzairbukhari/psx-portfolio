@@ -78,7 +78,7 @@ test('accepts a cited five-year dossier with ordered valuation and strict scores
     scores: [16, 15, 10, 7, 8, 9, 6],
     scoreNotes: Array(7).fill(scoreNote),
     scenarios: [
-      { eps: 30, multiple: 5 }, { eps: 35, multiple: 6 }, { eps: 40, multiple: 7 },
+      { name: 'Bear', eps: 30, multiple: 5 }, { name: 'Base', eps: 35, multiple: 6 }, { name: 'Bull', eps: 40, multiple: 7 },
     ],
   }, 200));
 });
@@ -102,7 +102,7 @@ test('rejects stale fiscal labels, broken units, and missing latest DPS', () => 
     scores: [16, 15, 10, 7, 8, 9, 6],
     scoreNotes: Array(7).fill(scoreNote),
     scenarios: [
-      { eps: 30, multiple: 5 }, { eps: 35, multiple: 6 }, { eps: 40, multiple: 7 },
+      { name: 'Bear', eps: 30, multiple: 5 }, { name: 'Base', eps: 35, multiple: 6 }, { name: 'Bull', eps: 40, multiple: 7 },
     ],
   };
   assert.throws(() => validateInvestmentDossier(base, 200, 2026), /five latest consecutive/);
