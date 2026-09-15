@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -36,6 +36,33 @@ const headers = {
   'Content-Type': 'application/json',
 };
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
+async function downloadWithCurl(url, output, heartbeat) {
+  const child = spawn(curlPath, [
+    '--location', '--fail', '--silent', '--show-error',
+    '--max-time', '300',
+    '--user-agent', 'Mozilla/5.0 PSX Research Helper/1.0',
+    '--output', output,
+    url,
+  ]);
+  let errorText = '';
+  child.stderr.on('data', (chunk) => {
+    errorText += chunk.toString();
+  });
+  const timer = setInterval(() => void heartbeat().catch(() => {}), 30_000);
+  try {
+    await new Promise((resolvePromise, rejectPromise) => {
+      child.once('error', rejectPromise);
+      child.once('exit', (code) =>
+        code === 0
+          ? resolvePromise()
+          : rejectPromise(Error(errorText.trim() || `curl exited with ${code}`)),
+      );
+    });
+  } finally {
+    clearInterval(timer);
+  }
+}
 
 function safeName(value) {
   return (
@@ -314,16 +341,16 @@ async function downloadReports(job, found) {
       else if (new URL(url).host === 'financials.psx.com.pk') {
         const temporary = pdfPath + '.download';
         try {
-          execFileSync(
-            curlPath,
-            [
-              '--location', '--fail', '--silent', '--show-error',
-              '--max-time', '180',
-              '--user-agent', 'Mozilla/5.0 PSX Research Helper/1.0',
-              '--output', temporary,
-              url,
-            ],
-            { timeout: 190_000 },
+          await downloadWithCurl(
+            url,
+            temporary,
+            () => progress(
+              job,
+              'downloading',
+              `Downloading report ${index + 1} of ${found.urls.length}`,
+              completedCount,
+              { documents },
+            ),
           );
           bytes = readFileSync(temporary);
           if (!hasPdfSignature(bytes)) throw Error('download was not a PDF');
