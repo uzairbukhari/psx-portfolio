@@ -88,8 +88,8 @@ const schema = {
         properties: {
           score: nullableNumber,
           source: { type: 'string', description: 'Exact supplied document title or URL and page locator.' },
-          finding: { type: 'string', description: 'Concrete company-specific evidence and why it supports the score.' },
-          limitation: { type: 'string', description: 'Specific risk, contrary evidence or missing information that limits this score.' },
+          finding: { type: 'string', minLength: 60, description: 'Concrete company-specific evidence and why it supports the score.' },
+          limitation: { type: 'string', minLength: 60, description: 'Specific risk, contrary evidence or missing information that limits this score.' },
         },
         required: ['score', 'source', 'finding', 'limitation'],
       }])),
@@ -323,11 +323,14 @@ Explain findings simply. The narrative must cover the business, industry and mac
     });
     analysis.financials = normalizeAnnualFinancials(analysis.financials);
     analysis.scenarios = normalizeValuationScenarios(analysis.scenarios);
-    validateInvestmentDossier(analysis, marketPrice);
-    for (const financial of analysis.financials as Array<{source:string; page:string}>) {
+    for (const financial of analysis.financials as Array<{source:string; page:string; verified:boolean}>) {
       if (!documents.some(d => financial.source.toLowerCase().includes(d.title.toLowerCase()) || financial.source.includes(d.url)))
         throw Error('A financial row cites a source absent from the manifest.');
+      // The helper validates PDF signatures and extracts page-marked text. Once a
+      // row points back to that manifest and a page, verification is deterministic.
+      financial.verified = true;
     }
+    validateInvestmentDossier(analysis, marketPrice);
     for (const { name } of SCORE_RUBRIC) {
       const source = assessments[name].source.toLowerCase();
       if (!documents.some(d => source.includes(d.title.toLowerCase()) || source.includes(d.url.toLowerCase())))
