@@ -297,13 +297,23 @@ async function downloadReports(job, found) {
     const pdfPath = join(reports, filename);
     const textPath = join(extracted, filename.replace(/\.pdf$/i, '.txt'));
     try {
+      const completedCount = documents.filter(
+        (document) => document.status === 'downloaded_pdf_validated',
+      ).length;
+      await progress(
+        job,
+        'downloading',
+        `Checking report ${index + 1} of ${found.urls.length}`,
+        completedCount,
+        { documents },
+      );
       let bytes;
       if (existsSync(pdfPath)) bytes = readFileSync(pdfPath);
       else {
         const response = await fetch(url, {
           headers: { 'User-Agent': 'Mozilla/5.0 PSX Research Helper/1.0' },
           redirect: 'follow',
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(180_000),
         });
         if (!response.ok) throw Error(`HTTP ${response.status}`);
         bytes = Buffer.from(await response.arrayBuffer());
