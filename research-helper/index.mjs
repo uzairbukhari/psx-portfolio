@@ -464,7 +464,15 @@ function evidenceFrom(documents, root, webSources = []) {
   )) {
     keywords.lastIndex = 0;
     const text = readFileSync(join(root, document.text_path), 'utf8');
-    const selected = [text.slice(0, 30_000)];
+    const selected = [];
+    for (const match of text.matchAll(/six year performance/gi)) {
+      const section = text.slice(match.index, match.index + 35_000);
+      if (/operational performance/i.test(section.slice(0, 5_000))) {
+        selected.push(section);
+        break;
+      }
+    }
+    selected.push(text.slice(0, 30_000));
     let match;
     let count = 0;
     while ((match = keywords.exec(text)) && count < 220) {
