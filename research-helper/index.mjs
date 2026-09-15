@@ -235,7 +235,13 @@ async function discover(job) {
       .filter((row) => /<td>\s*<a[^>]*>Annual<\/a>/i.test(row))
       .flatMap((row) => links(row, reportArchive.finalUrl))
       .reverse()
-      .slice(0, 5);
+      .slice(0, 5)
+      .map((url) => {
+        const id = new URL(url).searchParams.get('id');
+        return /^\d+$/.test(id || '')
+          ? `https://dps.psx.com.pk/download/document/${id}.pdf`
+          : url;
+      });
   } catch {}
   const pages = companyWebsite
     ? [
