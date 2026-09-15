@@ -82,3 +82,21 @@ test('accepts a cited five-year dossier with ordered valuation and strict scores
     ],
   }, 200));
 });
+
+test('rejects stale fiscal labels, broken units, and missing latest DPS', () => {
+  const base = {
+    financials: [2024, 2023, 2022, 2021, 2020].map(annual),
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: [
+      { eps: 30, multiple: 5 }, { eps: 35, multiple: 6 }, { eps: 40, multiple: 7 },
+    ],
+  };
+  assert.throws(() => validateInvestmentDossier(base, 200, 2026), /five latest consecutive/);
+  const wrongUnits = { ...base, financials: [2025, 2024, 2023, 2022, 2021].map(annual) };
+  wrongUnits.financials[0] = { ...wrongUnits.financials[0], equity: 100, dividend: 4 };
+  assert.throws(() => validateInvestmentDossier(wrongUnits, 200, 2026), /units are internally inconsistent/);
+  const missingDps = { ...base, financials: [2025, 2024, 2023, 2022, 2021].map(annual) };
+  missingDps.financials[0] = { ...missingDps.financials[0], dividend: null };
+  assert.throws(() => validateInvestmentDossier(missingDps, 200, 2026), /dividend per share/);
+});
