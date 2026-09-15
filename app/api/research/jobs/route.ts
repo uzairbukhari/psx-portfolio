@@ -1,4 +1,5 @@
 import { db, failure, identity } from '@/lib/server';
+import { initialPortfolio } from '@/lib/portfolio';
 import {
   addEvent,
   publicJob,
@@ -30,24 +31,12 @@ async function resolveCompany(ticker: string, userId: string) {
     if (company)
       return { name: String(company.name || ticker), sector: 'Unknown' };
   }
-  const response = await fetch(`https://dps.psx.com.pk/company/${ticker}`, {
-    headers: { 'User-Agent': 'PSX Research Desk/1.0' },
-    signal: AbortSignal.timeout(12_000),
-  });
-  const html = await response.text();
-  if (!response.ok || /page not found|company not found/i.test(html))
-    throw Error(`PSX ticker ${ticker} was not found.`);
-  const rawTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
-  const title =
-    rawTitle
-      ?.match(/Stock quote for (.+?)\s*-\s*Pakistan Stock Exchange/i)?.[1]
-      ?.trim() ||
-    rawTitle?.replace(/\s*[|–-]\s*Pakistan Stock Exchange.*$/i, '').trim();
-  const heading = html.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1]?.trim();
-  const sector = html
-    .match(/Sector(?:<[^>]+>|\s|&nbsp;)*([A-Za-z][A-Za-z &/-]{2,80})/i)?.[1]
-    ?.trim();
-  return { name: title || heading || ticker, sector: sector || 'Unknown' };
+  const seeded = initialPortfolio().companies.find(
+    (company) => company.ticker === ticker,
+  );
+  // The Worker cannot reliably reach DPS. The Mac helper verifies unknown
+  // symbols and sends the authoritative company name when it completes.
+  return { name: seeded?.name || ticker, sector: 'Unknown' };
 }
 
 export async function GET(req: Request) {

@@ -79,3 +79,24 @@ export const researchHelpers = sqliteTable(
   },
   (table) => [index('idx_research_helpers_user_id').on(table.userId)],
 );
+
+export const quoteRefreshes = sqliteTable(
+  'quote_refreshes',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    tickers: text('tickers').notNull(),
+    status: text('status').notNull(),
+    result: text('result'),
+    error: text('error'),
+    leaseOwner: text('lease_owner'),
+    leaseUntil: text('lease_until'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    index('idx_quote_refreshes_user_updated').on(table.userId, table.updatedAt),
+    index('idx_quote_refreshes_status_lease').on(table.status, table.leaseUntil),
+  ],
+);

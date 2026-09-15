@@ -1,73 +1,105 @@
-import { identity, failure } from '@/lib/server';
-import { today } from '@/lib/portfolio';
+import { db, failure, identity } from '@/lib/server';
+import { tickerOK } from '@/lib/research-jobs';
+
+type QuoteRefreshRow = {
+  id: string;
+  user_id: string;
+  tickers: string;
+  status: 'queued' | 'fetching' | 'complete' | 'needs_attention';
+  result: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+function publicRefresh(row: QuoteRefreshRow) {
+  let result: Record<string, unknown> = {};
+  try {
+    result = row.result ? JSON.parse(row.result) : {};
+  } catch {}
+  return {
+    id: row.id,
+    status: row.status,
+    quotes: result.quotes ?? {},
+    errors: result.errors ?? [],
+    reasons: result.reasons ?? {},
+    error: row.error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+  };
+}
+
+export async function GET(req: Request) {
+  try {
+    const userId = await identity(req);
+    const id = new URL(req.url).searchParams.get('id');
+    if (!id) throw Error('Quote refresh id is required.');
+    const row = await db()
+      .prepare('SELECT * FROM quote_refreshes WHERE id=? AND user_id=?')
+      .bind(id, userId)
+      .first<QuoteRefreshRow>();
+    if (!row) return failure(Error('Quote refresh was not found.'), 404);
+    return Response.json(publicRefresh(row), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error) {
+    return failure(error);
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    await identity(req, true);
-    const { tickers } = (await req.json()) as { tickers: string[] };
+    const userId = await identity(req, true);
+    const input = (await req.json()) as { tickers?: unknown };
+    const tickers = Array.isArray(input.tickers)
+      ? [
+          ...new Set(
+            input.tickers.map((ticker) => String(ticker).trim().toUpperCase()),
+          ),
+        ]
+      : [];
     if (
-      !Array.isArray(tickers) ||
+      !tickers.length ||
       tickers.length > 200 ||
-      tickers.some((t) => !/^[A-Z0-9]{2,12}$/.test(t))
+      tickers.some((ticker) => !tickerOK(ticker))
     )
       throw Error('Invalid symbols.');
-    const quotes: Record<string, unknown> = {},
-      errors: string[] = [];
-    for (let i = 0; i < tickers.length; i += 5) {
-      await Promise.all(
-        tickers.slice(i, i + 5).map(async (ticker) => {
-          try {
-            const source = 'https://dps.psx.com.pk/company/' + ticker;
-            const response = await fetch(source, {
-              headers: { 'User-Agent': 'Mozilla/5.0' },
-              signal: AbortSignal.timeout(18000),
-            });
-            if (!response.ok) throw Error();
-            const html = await response.text();
-            const price = Number(
-              html
-                .match(/class="quote__close">Rs\.([\d,.]+)/)?.[1]
-                ?.replaceAll(',', ''),
-            );
-            const asOf = html.match(
-              /class="quote__date">\^ As of ([^<]+)/,
-            )?.[1];
-            if (!price || !asOf) throw Error();
-            const match = asOf.match(/(?:\w+), (\w+) (\d+), (\d{4})/);
-            const months = [
-              'Jan',
-              'Feb',
-              'Mar',
-              'Apr',
-              'May',
-              'Jun',
-              'Jul',
-              'Aug',
-              'Sep',
-              'Oct',
-              'Nov',
-              'Dec',
-            ];
-            if (!match || !months.includes(match[1])) throw Error();
-            const date = `${match[3]}-${String(months.indexOf(match[1]) + 1).padStart(2, '0')}-${match[2].padStart(2, '0')}`;
-            if (date > today()) throw Error();
-            quotes[ticker] = {
-              price,
-              asOf,
-              date,
-              source,
-              fetchedAt: new Date().toISOString(),
-            };
-          } catch {
-            errors.push(ticker);
-          }
-        }),
+    const active = await db()
+      .prepare(
+        "SELECT * FROM quote_refreshes WHERE user_id=? AND status IN ('queued','fetching') ORDER BY created_at DESC LIMIT 1",
+      )
+      .bind(userId)
+      .first<QuoteRefreshRow>();
+    if (active)
+      return Response.json(
+        { refresh: publicRefresh(active), existing: true },
+        { status: 202, headers: { 'Cache-Control': 'no-store' } },
       );
-    }
+    const now = new Date().toISOString();
+    const row: QuoteRefreshRow = {
+      id: crypto.randomUUID(),
+      user_id: userId,
+      tickers: JSON.stringify(tickers),
+      status: 'queued',
+      result: null,
+      error: null,
+      created_at: now,
+      updated_at: now,
+      completed_at: null,
+    };
+    await db()
+      .prepare(
+        'INSERT INTO quote_refreshes (id,user_id,tickers,status,created_at,updated_at) VALUES (?,?,?,?,?,?)',
+      )
+      .bind(row.id, row.user_id, row.tickers, row.status, now, now)
+      .run();
     return Response.json(
-      { quotes, errors },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { refresh: publicRefresh(row), existing: false },
+      { status: 202, headers: { 'Cache-Control': 'no-store' } },
     );
-  } catch (e) {
-    return failure(e);
+  } catch (error) {
+    return failure(error);
   }
 }
