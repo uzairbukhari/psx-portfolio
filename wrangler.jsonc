@@ -5,9 +5,18 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "site-creator-d1",
+      // Placeholder — after `wrangler d1 create psx-portfolio-sip`,
+      // replace with the real database_id it prints.
+      "database_name": "psx-portfolio-sip",
       "database_id": "00000000-0000-4000-8000-000000000000",
       "migrations_dir": "drizzle"
     }
-  ]
+  ],
+  "vars": {
+    // Comma-separated list of Google account emails allowed to sign in.
+    // Empty denies everyone — fill this in before deploying.
+    "ALLOWED_EMAILS": "",
+    // Public OAuth client ID from Google Cloud Console (not a secret).
+    "GOOGLE_CLIENT_ID": ""
+  }
 }
