@@ -323,8 +323,8 @@ export default function Dashboard() {
                 ? 'Loading your holdings and purchase history…'
                 : 'Sign in to open your private investment workspace.'}
             </p>
-            <a href="/signin-with-chatgpt?return_to=%2F" target="_top">
-              Sign in with ChatGPT →
+            <a href="/api/auth/google/login?return_to=%2F" target="_top">
+              Sign in with Google →
             </a>
             {message && (
               <p role="alert" className="notice error">
