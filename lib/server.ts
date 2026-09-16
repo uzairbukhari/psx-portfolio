@@ -1,11 +1,11 @@
 import { env } from 'cloudflare:workers';
-import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { getCurrentUser } from '@/lib/auth';
 export async function identity(req: Request, write = false) {
-  const user = await getChatGPTUser();
+  const user = await getCurrentUser();
   if (!user) throw Error('Sign in to access your portfolio.');
   if (write && req.headers.get('origin') !== new URL(req.url).origin)
     throw Error('Invalid request origin.');
-  return user.userId;
+  return user.email;
 }
 export function db() {
   if (!env.DB) throw Error('Portfolio storage is not available.');
