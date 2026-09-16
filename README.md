@@ -1,6 +1,6 @@
 # PSX Portfolio & SIP
 
-Private investment ledger with D1 persistence, official PSX quote refresh, and a low-cost GPT-5 nano review. Keep Sites owner-only: the initial account is populated from the user's private CDC statement.
+Private investment ledger with D1 persistence, official PSX quote refresh, and a low-cost GPT-5 nano review. Keep this app owner-only: the initial account is populated from the user's private CDC statement.
 
 ## User workflow
 
@@ -27,12 +27,12 @@ Only previous research and explicitly supplied quote data are available to this 
 ## Development & deployment
 
 - Node >=22.13; install with npm and preserve package-lock.json.
-- Before the first local run, execute `npm run db:migrate:local` once to create the local D1 tables. Then `npm run dev` starts the Vinext preview. Local sign-in uses the starter's `/signin-with-chatgpt` flow.
-- `node --test tests/portfolio.test.mjs` checks cost accounting, sales, missing data, dates, monthly budgets, allocation limits and AI weights.
+- Before the first local run, execute `npm run db:migrate:local` once to create the local D1 tables. Then `npm run dev` starts the Vinext preview.
+- `node --test 'tests/*.test.mjs'` runs all tests: portfolio cost accounting, sales, missing data, dates, monthly budgets, allocation limits and AI weights (`tests/portfolio.test.mjs`), plus session cookie signing/verification (`tests/session.test.mjs`).
 - `npx tsc --noEmit` checks types; `npm run build` builds the Cloudflare Worker.
-- D1 schema is in `db/schema.ts`; generate append-only migrations with `npm run db:generate`. Apply local migrations using Wrangler with `--local --persist-to .wrangler/state`; production migrations are managed by Sites deployment.
-- `.env.local` is ignored; `OPENAI_API_KEY` is a server-side secret. Never put a key in a public variable, source file, hosting manifest or bundle. Hosted secrets are configured through Sites.
-- API requests require ChatGPT identity and writes require same-origin requests. Per-user data is isolated with revision checks to reject concurrent stale saves.
+- D1 schema is in `db/schema.ts`; generate append-only migrations with `npm run db:generate`. Apply local migrations with `--local --persist-to .wrangler/state`; apply them to your own deployed database with `wrangler d1 migrations apply DB --remote`.
+- This is a standalone Cloudflare Worker deployment (`wrangler deploy`) in your own Cloudflare account — no external hosting platform is involved. Secrets (`OPENAI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`) are set with `wrangler secret put <NAME>`, never committed. Non-secret config (`ALLOWED_EMAILS`, `GOOGLE_CLIENT_ID`) lives in `wrangler.jsonc`'s `vars`.
+- API requests require a signed-in Google account whose email is in `ALLOWED_EMAILS`; writes also require same-origin requests. Per-user data is isolated with revision checks to reject concurrent stale saves.
 
 ## Validation
 
