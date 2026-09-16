@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -42,6 +43,22 @@ import {
 } from '@/lib/portfolio';
 import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
+
+const TAB_PATHS: Record<string, string> = {
+  holdings: '/',
+  reports: '/reports',
+  sip: '/sip',
+  history: '/history',
+  'research-desk': '/research-desk',
+  research: '/research',
+};
+const PATH_TABS: Record<string, string> = Object.fromEntries(
+  Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
+);
+function tabFromPathname(pathname: string): string {
+  return PATH_TABS[pathname] ?? 'holdings';
+}
+
 type ApiResponse = {
   error?: string;
   portfolio: Portfolio;
@@ -157,12 +174,27 @@ function TradeHistoryTable({
   );
 }
 export default function Dashboard() {
+  const initialPathname = usePathname();
+  const [tab, setTabState] = useState(() => tabFromPathname(initialPathname));
+  function setTab(next: string) {
+    setTabState(next);
+    const path = TAB_PATHS[next] ?? '/';
+    if (typeof window !== 'undefined' && window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+    }
+  }
+  useEffect(() => {
+    function onPopState() {
+      setTabState(tabFromPathname(window.location.pathname));
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
   const [p, setP] = useState<Portfolio | null>(null),
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
     [failed, setFailed] = useState(false),
-    [tab, setTab] = useState('holdings'),
     [month, setMonth] = useState(today().slice(0, 7)),
     [fees, setFees] = useState(0),
     [allowOld, setAllowOld] = useState(false);
