@@ -2,6 +2,7 @@ import { db } from '@/lib/server';
 import { validateInvestmentDossier } from '@/lib/research-policy.mjs';
 import {
   initialPortfolio,
+  round,
   today,
   validate,
   type Portfolio,
@@ -60,13 +61,22 @@ async function completeJob(
     ? JSON.parse(portfolioRow.payload)
     : initialPortfolio();
   const scores = details.scores as Array<number | null>;
+  const scenarios = details.scenarios as Array<{
+    eps: number;
+    multiple: number;
+  }>;
+  const [fairValueLow, fairValue, fairValueHigh] = scenarios.map((s) =>
+    round(s.eps * s.multiple),
+  );
   const research: ResearchCompany = {
     ticker: row.ticker,
     status: 'Complete',
     score: scores.every((score) => score !== null)
       ? scores.reduce<number>((sum, score) => sum + (score ?? 0), 0)
       : null,
-    fairValue: null,
+    fairValue,
+    fairValueLow,
+    fairValueHigh,
     thesis: textValue(details.thesis).slice(0, 5000),
     risks: textValue(details.risk).slice(0, 5000),
     catalysts: textValue(details.catalyst).slice(0, 5000),

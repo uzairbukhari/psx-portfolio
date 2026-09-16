@@ -55,6 +55,8 @@ const blank = (ticker: string): ResearchCompany => ({
   status: 'Queue',
   score: null,
   fairValue: null,
+  fairValueLow: null,
+  fairValueHigh: null,
   thesis: '',
   risks: '',
   catalysts: '',
@@ -359,6 +361,8 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
               )
             : null,
         fairValue: null,
+        fairValueLow: null,
+        fairValueHigh: null,
         thesis: textValue(company.thesis),
         risks: textValue(company.risk),
         catalysts: textValue(company.catalyst),

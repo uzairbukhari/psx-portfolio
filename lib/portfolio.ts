@@ -77,6 +77,8 @@ export type ResearchCompany = {
   status: 'Queue' | 'Researching' | 'Complete' | 'Update needed';
   score: number | null;
   fairValue: number | null;
+  fairValueLow: number | null;
+  fairValueHigh: number | null;
   thesis: string;
   risks: string;
   catalysts: string;
@@ -178,6 +180,8 @@ export function initialPortfolio(): Portfolio {
         status: 'Complete',
         score: null,
         fairValue: null,
+        fairValueLow: null,
+        fairValueHigh: null,
         thesis:
           'Full dossier available. Replace illustrative information only with verified filings.',
         risks:
@@ -193,6 +197,8 @@ export function initialPortfolio(): Portfolio {
         status: 'Queue' as const,
         score: null,
         fairValue: null,
+        fairValueLow: null,
+        fairValueHigh: null,
         thesis: '',
         risks: '',
         catalysts: '',
@@ -272,8 +278,9 @@ export function validate(p: Portfolio) {
         ) ||
         (r.score !== null &&
           (!Number.isFinite(r.score) || r.score < 0 || r.score > 100)) ||
-        (r.fairValue !== null &&
-          (!Number.isFinite(r.fairValue) || r.fairValue < 0)) ||
+        [r.fairValue, r.fairValueLow, r.fairValueHigh].some(
+          (v) => v != null && (!Number.isFinite(v) || v < 0),
+        ) ||
         ![r.thesis, r.risks, r.catalysts, r.conversationUrl, r.updatedAt].every(
           (v) => typeof v === 'string',
         ) ||
@@ -545,4 +552,99 @@ export function validateReview(value: unknown, p: Portfolio) {
   if (Math.abs(sum - 100) > 0.01)
     throw Error('AI target weights must total 100%.');
   return r;
+}
+export type ResearchInsight = {
+  ticker: string;
+  status: ResearchCompany['status'] | 'None';
+  score: number | null;
+  fairValueLow: number | null;
+  fairValue: number | null;
+  fairValueHigh: number | null;
+  price: number | null;
+  valuationPct: number | null;
+  updatedAt: string | null;
+  thesis: string;
+  risks: string;
+  catalysts: string;
+};
+export function researchInsights(
+  p: Portfolio,
+  tickers: string[],
+): ResearchInsight[] {
+  return tickers.map((ticker) => {
+    const r = p.research?.find((entry) => entry.ticker === ticker);
+    const price = p.quotes[ticker]?.price ?? null;
+    const fairValue = r?.fairValue ?? null;
+    return {
+      ticker,
+      status: r?.status ?? 'None',
+      score: r?.score ?? null,
+      fairValueLow: r?.fairValueLow ?? null,
+      fairValue,
+      fairValueHigh: r?.fairValueHigh ?? null,
+      price,
+      valuationPct:
+        fairValue !== null && price
+          ? round(((fairValue - price) / price) * 100)
+          : null,
+      updatedAt: r?.updatedAt || null,
+      thesis: r?.thesis ?? '',
+      risks: r?.risks ?? '',
+      catalysts: r?.catalysts ?? '',
+    };
+  });
+}
+const WEIGHT_CAP = 20;
+function capAndNormalize(
+  tickers: string[],
+  units: number[],
+): Record<string, number> {
+  const weights = units.map(
+    (u) => (u / units.reduce((a, b) => a + b, 0)) * 100,
+  );
+  for (let pass = 0; pass < tickers.length; pass++) {
+    const overIdx = weights.reduce<number[]>(
+      (idx, w, i) => (w > WEIGHT_CAP ? [...idx, i] : idx),
+      [],
+    );
+    if (!overIdx.length) break;
+    let excess = 0;
+    for (const i of overIdx) {
+      excess += weights[i] - WEIGHT_CAP;
+      weights[i] = WEIGHT_CAP;
+    }
+    const underIdx = weights.reduce<number[]>(
+      (idx, w, i) => (w < WEIGHT_CAP ? [...idx, i] : idx),
+      [],
+    );
+    const underTotal = underIdx.reduce((a, i) => a + weights[i], 0);
+    for (const i of underIdx)
+      weights[i] +=
+        underTotal > 0
+          ? (excess * weights[i]) / underTotal
+          : excess / underIdx.length;
+  }
+  const rounded = weights.map(round);
+  const diff = round(100 - rounded.reduce((a, b) => a + b, 0));
+  if (diff !== 0) {
+    const maxIdx = rounded.indexOf(Math.max(...rounded));
+    rounded[maxIdx] = round(rounded[maxIdx] + diff);
+  }
+  return Object.fromEntries(tickers.map((t, i) => [t, rounded[i]]));
+}
+export function researchWeightProfile(
+  p: Portfolio,
+  tickers: string[],
+): Record<string, number> {
+  const insights = researchInsights(p, tickers);
+  const units = insights.map((r) => {
+    if (r.score === null) return 0.5;
+    const qualityUnit = r.score / 100;
+    const valuationUnit =
+      r.valuationPct === null
+        ? 0.5
+        : Math.min(1, Math.max(0, (r.valuationPct + 30) / 60));
+    return 0.6 + qualityUnit * 0.7 + valuationUnit * 0.5;
+  });
+  return capAndNormalize(tickers, units);
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,today,SECTORS,DEFAULT_RESEARCH_SETTINGS} from '../lib/portfolio.ts';
+import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,today,SECTORS,DEFAULT_RESEARCH_SETTINGS} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
@@ -51,4 +51,25 @@ test('research settings accept configured values and reject out-of-range ones',(
     bp.researchSettings=bad;
     assert.throws(()=>validate(bp));
   }
+});
+test('researchInsights reports a valuation gap only when both fair value and price are known',()=>{
+  const p={companies:[],trades:[],budgets:{},quotes:{A:{price:100,date,asOf:date,source:'https://dps.psx.com.pk/company/A',fetchedAt:new Date().toISOString()}},research:[{ticker:'A',status:'Complete',score:80,fairValue:120,fairValueLow:100,fairValueHigh:140,thesis:'',risks:'',catalysts:'',conversationUrl:'',sources:[],financials:[],updatedAt:date}]};
+  const [a,b]=researchInsights(p,['A','B']);
+  assert.equal(a.status,'Complete');
+  assert.equal(a.valuationPct,20);
+  assert.equal(b.status,'None');
+  assert.equal(b.score,null);
+  assert.equal(b.valuationPct,null);
+});
+test('researchWeightProfile rewards higher scores and undervaluation, penalizes missing research, and always sums to 100 within the 20% cap',()=>{
+  const q=(t)=>({price:80,date,asOf:date,source:'https://dps.psx.com.pk/company/'+t,fetchedAt:new Date().toISOString()});
+  const dossier=(t,score,fairValue)=>({ticker:t,status:'Complete',score,fairValue,fairValueLow:fairValue*.8,fairValueHigh:fairValue*1.2,thesis:'',risks:'',catalysts:'',conversationUrl:'',sources:[],financials:[],updatedAt:date});
+  const tickers=['HIGH','LOW','UNRESEARCHED','C','D','E'];
+  const p={companies:[],trades:[],budgets:{},quotes:Object.fromEntries(tickers.map(t=>[t,q(t)])),research:[dossier('HIGH',95,120),dossier('LOW',30,60),dossier('C',60,80),dossier('D',60,80),dossier('E',60,80)]};
+  const w=researchWeightProfile(p,tickers);
+  assert.equal(Math.round(Object.values(w).reduce((a,b)=>a+b,0)*100)/100,100);
+  for(const t of tickers) assert.ok(w[t]>=0&&w[t]<=20.01);
+  assert.ok(w.HIGH>w.C);
+  assert.ok(w.C>w.LOW);
+  assert.ok(w.LOW>w.UNRESEARCHED);
 });

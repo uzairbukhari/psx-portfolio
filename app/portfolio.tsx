@@ -34,6 +34,7 @@ import {
   round,
   validate,
   reviewPrompt,
+  researchInsights,
   validateReview,
   SECTORS,
   type Portfolio,
@@ -349,6 +350,11 @@ export default function Dashboard() {
     gain = cost === null || missing.length ? null : round(value - cost),
     calc = plan(p, month, fees, allowOld),
     budget = p.budgets[month] ?? 100000;
+  const shortlistTickers = p.companies
+    .filter((c) => c.target > 0)
+    .map((c) => c.ticker);
+  const research = researchInsights(p, shortlistTickers);
+  const researched = research.filter((r) => r.status === 'Complete');
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -1031,27 +1037,93 @@ export default function Dashboard() {
               </p>
             </section>
             <aside className="panel accent">
-              <p className="eyebrow">RESEARCH STATUS · 10 SEP 2026</p>
+              <p className="eyebrow">RESEARCH STATUS · LIVE</p>
               <h2>Evidence before allocation.</h2>
               <p>
-                MEBL has a full dossier. The other six companies remain a
-                provisional shortlist. SYS is paused pending a
-                consolidated-results check. FFC needs care around its Shariah
-                screening threshold.
+                {researched.length} of {shortlistTickers.length} shortlisted
+                companies have a full dossier
+                {researched.length
+                  ? ` (${researched.map((r) => r.ticker).join(', ')})`
+                  : ''}
+                . The rest are shortlist-only, with no score or fair value yet.
               </p>
-              <p>
-                LPL is excluded from new contributions under the saved June 2026
-                screening result.
-              </p>
-              <a
-                href="https://www.psx.com.pk/psx/files/?file=277899-1.pdf"
-                target="_blank"
-                rel="noreferrer"
-              >
-                View prior PSX screening notice ↗
-              </a>
+              {p.companies.some(
+                (c) => shortlistTickers.includes(c.ticker) && !c.approved,
+              ) && (
+                <p>
+                  Excluded from new contributions:{' '}
+                  {p.companies
+                    .filter(
+                      (c) =>
+                        shortlistTickers.includes(c.ticker) && !c.approved,
+                    )
+                    .map((c) => c.ticker)
+                    .join(', ')}
+                  . See each company&rsquo;s note in Holdings.
+                </p>
+              )}
             </aside>
           </div>
+          {shortlistTickers.length > 0 && (
+            <section className="panel table-panel" style={{ marginTop: 24 }}>
+              <h2>Research evidence</h2>
+              <p className="muted">
+                Computed directly from saved dossiers and the latest quote —
+                no AI involved. Use it to sanity-check the AI review below.
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {[
+                      'Company',
+                      'Status',
+                      'Score',
+                      'Fair value (bear–bull)',
+                      'Price',
+                      'Valuation',
+                      'Updated',
+                    ].map((x) => (
+                      <TableHead key={x}>{x}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {research.map((r) => (
+                    <TableRow key={r.ticker}>
+                      <TableCell>{r.ticker}</TableCell>
+                      <TableCell>{r.status}</TableCell>
+                      <TableCell>
+                        {r.score === null ? '—' : `${r.score}/100`}
+                      </TableCell>
+                      <TableCell>
+                        {r.fairValueLow === null || r.fairValueHigh === null
+                          ? '—'
+                          : `${money(r.fairValueLow)} – ${money(r.fairValueHigh)}`}
+                      </TableCell>
+                      <TableCell>
+                        {r.price === null ? '—' : money(r.price)}
+                      </TableCell>
+                      <TableCell
+                        style={{
+                          color:
+                            r.valuationPct === null
+                              ? 'inherit'
+                              : r.valuationPct >= 0
+                                ? '#17744c'
+                                : '#b33d3d',
+                        }}
+                      >
+                        {r.valuationPct === null
+                          ? '—'
+                          : `${r.valuationPct >= 0 ? 'Undervalued' : 'Overvalued'} ${Math.abs(r.valuationPct)}%`}
+                      </TableCell>
+                      <TableCell>{r.updatedAt || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </section>
+          )}
           <section className="panel" style={{ marginTop: 24 }}>
             <h2>Bring back a ChatGPT review</h2>
             <p>
