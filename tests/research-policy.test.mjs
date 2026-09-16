@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {
   RESEARCH_BUDGET_MICROS,
   correctFiscalYearLabels,
+  describeNullFinancialFields,
   hasPdfSignature,
   normalizeAnnualFinancials,
   normalizeValuationScenarios,
   financialValueSupported,
+  FINANCIAL_VALUE_LABELS,
   researchReserveMicros,
   validateInvestmentDossier,
   validPsxTicker,
@@ -131,6 +133,12 @@ test('leaves fiscal years unchanged when no FY-range or Annual Report year is ci
   assert.deepEqual(correctFiscalYearLabels(rows), rows);
 });
 
+test('recognizes the singular "Shareholders’ Fund" label used by real PSX six-year performance tables', () => {
+  const evidence = 'Shareholders’ Fund\tRs in billion\t711\t770\t875\t1,083\t1,250\t1,348';
+  assert.equal(financialValueSupported(evidence, FINANCIAL_VALUE_LABELS.equity, 1_250_000), true);
+  assert.equal(financialValueSupported(evidence, FINANCIAL_VALUE_LABELS.equity, 1_083_000), true);
+});
+
 test('rejects stale fiscal labels, broken units, and missing latest DPS', () => {
   const base = {
     financials: [2024, 2023, 2022, 2021, 2020].map(annual),
@@ -144,7 +152,30 @@ test('rejects stale fiscal labels, broken units, and missing latest DPS', () => 
   const wrongUnits = { ...base, financials: [2025, 2024, 2023, 2022, 2021].map(annual) };
   wrongUnits.financials[0] = { ...wrongUnits.financials[0], equity: 100, dividend: 4 };
   assert.throws(() => validateInvestmentDossier(wrongUnits, 200, 2026), /units are internally inconsistent/);
-  const missingDps = { ...base, financials: [2025, 2024, 2023, 2022, 2021].map(annual) };
-  missingDps.financials[0] = { ...missingDps.financials[0], dividend: null };
-  assert.throws(() => validateInvestmentDossier(missingDps, 200, 2026), /dividend per share/);
+  const negativeDps = { ...base, financials: [2025, 2024, 2023, 2022, 2021].map(annual) };
+  negativeDps.financials[0] = { ...negativeDps.financials[0], dividend: -1 };
+  assert.throws(() => validateInvestmentDossier(negativeDps, 200, 2026), /cannot be negative/);
+});
+
+test('allows equity and dividend to be null when genuinely unavailable, without failing validation', () => {
+  const financials = [2025, 2024, 2023, 2022, 2021].map(annual);
+  financials[0] = { ...financials[0], dividend: null };
+  financials[1] = { ...financials[1], equity: null };
+  assert.doesNotThrow(() => validateInvestmentDossier({
+    financials,
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: [
+      { name: 'Bear', eps: 30, multiple: 5 }, { name: 'Base', eps: 35, multiple: 6 }, { name: 'Bull', eps: 40, multiple: 7 },
+    ],
+  }, 200, 2026));
+});
+
+test('describes which year and field is missing when a financial value is null', () => {
+  const financials = [2025, 2024].map(annual);
+  financials[0] = { ...financials[0], dividend: null };
+  financials[1] = { ...financials[1], equity: null, ocf: null };
+  assert.deepEqual(describeNullFinancialFields(financials), ['2025 dividend', '2024 equity', '2024 ocf']);
+  assert.deepEqual(describeNullFinancialFields([]), []);
+  assert.deepEqual(describeNullFinancialFields(null), []);
 });
