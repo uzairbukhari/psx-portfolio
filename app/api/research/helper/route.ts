@@ -19,35 +19,6 @@ import {
 const textValue = (value: unknown) =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
-type QuoteRefreshRow = {
-  id: string;
-  user_id: string;
-  tickers: string;
-  status: 'queued' | 'fetching' | 'complete' | 'needs_attention';
-  lease_owner: string | null;
-  lease_until: string | null;
-};
-
-async function claimQuoteRefresh(userId: string, helperId: string) {
-  const now = new Date().toISOString();
-  const candidate = await db()
-    .prepare(
-      "SELECT * FROM quote_refreshes WHERE user_id=? AND (status='queued' OR (status='fetching' AND lease_until<?)) ORDER BY created_at LIMIT 1",
-    )
-    .bind(userId, now)
-    .first<QuoteRefreshRow>();
-  if (!candidate) return null;
-  const leaseUntil = new Date(Date.now() + 120_000).toISOString();
-  const claimed = await db()
-    .prepare(
-      "UPDATE quote_refreshes SET status='fetching',lease_owner=?,lease_until=?,updated_at=? WHERE id=? AND (status='queued' OR (status='fetching' AND lease_until<?))",
-    )
-    .bind(helperId, leaseUntil, now, candidate.id, now)
-    .run();
-  if (!claimed.meta.changes) return null;
-  return { id: candidate.id, tickers: JSON.parse(candidate.tickers) as string[] };
-}
-
 function dossierResult(value: unknown, ticker: string) {
   if (!value || typeof value !== 'object')
     throw Error('The dossier result is missing.');
@@ -157,8 +128,6 @@ async function completeJob(
 export async function GET(req: Request) {
   try {
     const helper = await helperIdentity(req);
-    const quoteRefresh = await claimQuoteRefresh(helper.user_id, helper.id);
-    if (quoteRefresh) return Response.json({ job: null, quoteRefresh });
     const now = new Date().toISOString();
     const leaseUntil = new Date(Date.now() + 120_000).toISOString();
     const candidate = await db()

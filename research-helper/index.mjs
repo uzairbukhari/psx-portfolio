@@ -669,72 +669,12 @@ async function processJob(job) {
   }
 }
 
-function quoteDate(asOf) {
-  const match = asOf.match(/(?:\w+), (\w+) (\d+), (\d{4})/);
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-  if (!match || !months.includes(match[1]))
-    throw Error(`Unrecognised quote date "${asOf}"`);
-  return `${match[3]}-${String(months.indexOf(match[1]) + 1).padStart(2, '0')}-${match[2].padStart(2, '0')}`;
-}
-
-async function fetchQuote(ticker) {
-  const source = `https://dps.psx.com.pk/company/${ticker}`;
-  const page = await fetchText(source);
-  const price = Number(
-    page.text
-      .match(/quote__close["'][^>]*>Rs\.\s*([0-9,.]+)/i)?.[1]
-      ?.replace(/,/g, ''),
-  );
-  const asOf = page.text.match(/quote__date["'][^>]*>\^ As of ([^<]+)/i)?.[1]?.trim();
-  if (!Number.isFinite(price) || price <= 0 || !asOf)
-    throw Error(`Unexpected PSX quote markup (${page.text.length} bytes)`);
-  return {
-    price,
-    asOf,
-    date: quoteDate(asOf),
-    source,
-    fetchedAt: new Date().toISOString(),
-  };
-}
-
-async function processQuoteRefresh(refresh) {
-  const quotes = {};
-  const errors = [];
-  const reasons = {};
-  for (let index = 0; index < refresh.tickers.length; index += 5) {
-    await Promise.all(
-      refresh.tickers.slice(index, index + 5).map(async (ticker) => {
-        try {
-          quotes[ticker] = await fetchQuote(ticker);
-        } catch (error) {
-          errors.push(ticker);
-          reasons[ticker] = error instanceof Error ? error.message : 'Unknown failure';
-        }
-      }),
-    );
-  }
-  await request('/api/research/helper/quotes', {
-    method: 'POST',
-    body: JSON.stringify({
-      id: refresh.id,
-      quotes,
-      errors,
-      reasons,
-      error: errors.length === refresh.tickers.length ? 'Every PSX quote request failed on the Mac helper.' : undefined,
-    }),
-  });
-}
-
 async function main() {
   mkdirSync(companiesRoot, { recursive: true });
   for (;;) {
     try {
-      const { job, quoteRefresh } = await request('/api/research/helper');
-      if (quoteRefresh) await processQuoteRefresh(quoteRefresh);
-      else if (job) await processJob(job);
+      const { job } = await request('/api/research/helper');
+      if (job) await processJob(job);
     } catch (error) {
       process.stderr.write(`[${new Date().toISOString()}] ${error.message}\n`);
     }

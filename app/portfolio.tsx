@@ -73,8 +73,6 @@ type ApiResponse = {
   weights?: Record<string, number>;
 };
 type QuoteRefreshResponse = {
-  id: string;
-  status: 'queued' | 'fetching' | 'complete' | 'needs_attention';
   quotes: Portfolio['quotes'];
   errors: string[];
   reasons?: Record<string, string>;
@@ -368,36 +366,14 @@ export default function Dashboard() {
   async function refresh() {
     setBusy(true);
     try {
+      notify('Fetching PSX prices…');
       const r = await fetch('/api/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tickers: p!.companies.map((c) => c.ticker) }),
       });
-      const created = (await r.json()) as {
-        error?: string;
-        refresh?: QuoteRefreshResponse;
-      };
-      if (!r.ok || !created.refresh) throw Error(created.error);
-      let d = created.refresh;
-      notify('Fetching PSX prices through your Mac helper…');
-      for (
-        let attempt = 0;
-        d.status === 'queued' || d.status === 'fetching';
-        attempt++
-      ) {
-        if (attempt >= 45)
-          throw Error(
-            'The Mac helper has not returned the PSX quotes yet. Keep it running, then refresh again.',
-          );
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        const pending = await fetch(
-          '/api/quotes?id=' + encodeURIComponent(d.id),
-        );
-        d = (await pending.json()) as QuoteRefreshResponse;
-        if (!pending.ok) throw Error(d.error);
-      }
-      if (d.status === 'needs_attention')
-        throw Error(d.error || 'The Mac helper could not fetch PSX quotes.');
+      const d = (await r.json()) as QuoteRefreshResponse;
+      if (!r.ok) throw Error(d.error);
       const next = { ...p!, quotes: { ...p!.quotes, ...d.quotes } };
       validate(next);
       const s = await fetch('/api/portfolio', {
