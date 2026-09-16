@@ -778,7 +778,7 @@ node --test 'tests/*.test.mjs'
 npm run lint
 ```
 
-Expected: all PASS.
+Expected: `tsc` and tests PASS cleanly. `npm run lint` has pre-existing failures unrelated to this work (confirmed while executing this plan: 25 errors, all in files this plan never touches — shadcn UI components under `components/ui/`, `lib/portfolio.ts:439`, `components/ui/chart.tsx`). The bar here is zero *new* lint errors from this plan's files, not a clean `npm run lint` overall — diff the error list against that pre-existing baseline rather than expecting it to pass outright.
 
 - [ ] **Step 7: Commit**
 
