@@ -8,6 +8,7 @@ import {
   type ResearchJobRow,
 } from '@/lib/research-jobs';
 import {
+  correctFiscalYearLabels,
   normalizeAnnualFinancials,
   normalizeValuationScenarios,
   financialValueSupported,
@@ -322,7 +323,9 @@ Explain findings simply. The narrative must cover the business, industry and mac
       const item = assessments[name];
       return `Evidence: ${item.source}\nFinding: ${item.finding}\nLimitation: ${item.limitation}`;
     });
-    analysis.financials = normalizeAnnualFinancials(analysis.financials);
+    analysis.financials = correctFiscalYearLabels(
+      normalizeAnnualFinancials(analysis.financials),
+    );
     analysis.scenarios = normalizeValuationScenarios(analysis.scenarios);
     for (const financial of analysis.financials as Array<{year:number; source:string; page:string; verified:boolean; revenue:number; profit:number; eps:number; equity:number; dividend:number}>) {
       if (!documents.some(d => financial.source.toLowerCase().includes(d.title.toLowerCase()) || financial.source.includes(d.url)))

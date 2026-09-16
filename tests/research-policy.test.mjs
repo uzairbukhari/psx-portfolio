@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   RESEARCH_BUDGET_MICROS,
+  correctFiscalYearLabels,
   hasPdfSignature,
   normalizeAnnualFinancials,
   normalizeValuationScenarios,
@@ -103,6 +104,31 @@ test('rejects shallow score explanations and identifies their categories', () =>
       { name: 'Bull', eps: 40, multiple: 7 },
     ],
   }, 200, 2026), /Invalid score categories: 1, 2, 3, 4, 5, 6, 7/);
+});
+
+test('corrects fiscal years mislabelled by their FY-range start year instead of end year', () => {
+  const mislabelled = [
+    { ...annual(2024), source: 'OGDCL Annual Report 2025 (Consolidated, FY2024-25)' },
+    { ...annual(2023), source: 'OGDCL Annual Report 2025 (Consolidated, FY2023-24)' },
+    { ...annual(2022), source: 'OGDCL Annual Report 2025 (Consolidated, FY2022-23)' },
+    { ...annual(2021), source: 'OGDCL Annual Report 2025 (Consolidated, FY2021-22)' },
+    { ...annual(2020), source: 'OGDCL Annual Report 2025 (Six Year Performance, FY2020-21)' },
+  ];
+  const corrected = correctFiscalYearLabels(mislabelled);
+  assert.deepEqual(corrected.map((row) => row.year), [2025, 2024, 2023, 2022, 2021]);
+  assert.doesNotThrow(() => validateInvestmentDossier({
+    financials: corrected,
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: [
+      { name: 'Bear', eps: 30, multiple: 5 }, { name: 'Base', eps: 35, multiple: 6 }, { name: 'Bull', eps: 40, multiple: 7 },
+    ],
+  }, 200, 2026));
+});
+
+test('leaves fiscal years unchanged when no FY-range or Annual Report year is cited', () => {
+  const rows = [2025, 2024, 2023, 2022, 2021].map(annual);
+  assert.deepEqual(correctFiscalYearLabels(rows), rows);
 });
 
 test('rejects stale fiscal labels, broken units, and missing latest DPS', () => {
