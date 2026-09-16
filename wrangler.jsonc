@@ -15,6 +15,6 @@
     // Empty denies everyone — fill this in before deploying.
     "ALLOWED_EMAILS": "suzairbukhari@gmail.com,uahmed@folio3.com",
     // Public OAuth client ID from Google Cloud Console (not a secret).
-    "GOOGLE_CLIENT_ID": "596070908499-5pv2ea6aidkgcsujpkmsp6rslacocft2.apps.googleusercontent.com"
+    "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com"
   }
 }
