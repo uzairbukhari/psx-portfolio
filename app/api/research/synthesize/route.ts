@@ -5,6 +5,7 @@ import {
   addEvent,
   helperFailure,
   helperIdentity,
+  resolveResearchSettings,
   type ResearchJobRow,
 } from '@/lib/research-jobs';
 import {
@@ -18,9 +19,6 @@ import {
   validateInvestmentDossier,
 } from '@/lib/research-policy.mjs';
 
-const MODEL = 'gpt-5-nano';
-const MAX_OUTPUT_TOKENS = 24_000;
-const MAX_ATTEMPTS = 3;
 const SCORE_RUBRIC = [
   { name: 'Business quality', max: 20 },
   { name: 'Financial strength', max: 20 },
@@ -180,6 +178,7 @@ export async function POST(req: Request) {
     if (!row || row.status !== 'researching' || row.cancel_requested || row.lease_owner !== helper.id || !row.lease_until || row.lease_until < new Date().toISOString())
       throw Error('The active research lease was not found.');
     authorizedJob = true;
+    const settings = await resolveResearchSettings(row.user_id);
     if (row.result) {
       const cached = JSON.parse(row.result);
       if (cached.status === 'Complete') return Response.json({ dossier: cached, costUsd: 0, cached: true });
@@ -222,8 +221,8 @@ Explain findings simply. The narrative must cover the business, industry and mac
 
     const issues: string[] = [];
     let totalCostUsd = 0;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const reserve = researchReserveMicros(evidence.length, MAX_OUTPUT_TOKENS);
+    for (let attempt = 1; attempt <= settings.maxAttempts; attempt++) {
+      const reserve = researchReserveMicros(evidence.length, settings.maxOutputTokens);
       const budget = await db()
         .prepare(
           "UPDATE research_jobs SET spent_micros=spent_micros+?,stage=?,message=?,updated_at=? WHERE id=? AND status='researching' AND cancel_requested=0 AND lease_owner=? AND spent_micros+?<=budget_micros",
@@ -233,7 +232,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
           'analyzing',
           attempt === 1
             ? 'Analyzing verified source extracts'
-            : `Correcting research issue (attempt ${attempt} of ${MAX_ATTEMPTS})`,
+            : `Correcting research issue (attempt ${attempt} of ${settings.maxAttempts})`,
           new Date().toISOString(),
           row.id,
           helper.id,
@@ -243,18 +242,18 @@ Explain findings simply. The narrative must cover the business, industry and mac
       if (!budget.meta.changes)
         throw Error(
           issues.length
-            ? `The US$0.50 research limit was reached after ${issues.length} correction attempt${issues.length === 1 ? '' : 's'}. Outstanding issues: ${issuesSummary(issues)}`
-            : 'The US$0.50 research limit was reached.',
+            ? `The US$${settings.budgetUsd.toFixed(2)} research limit was reached after ${issues.length} correction attempt${issues.length === 1 ? '' : 's'}. Outstanding issues: ${issuesSummary(issues)}`
+            : `The US$${settings.budgetUsd.toFixed(2)} research limit was reached.`,
         );
       await addEvent(
         row.id,
         'analyzing',
         attempt === 1
-          ? 'Analyzing source extracts with GPT-5 nano.'
+          ? `Analyzing source extracts with ${settings.model}.`
           : `Retrying analysis to correct: ${issues[issues.length - 1]}`,
       );
       const correctionBlock = issues.length
-        ? `\n\nCORRECTION NEEDED (attempt ${attempt} of ${MAX_ATTEMPTS})\nThe previous attempt was rejected for this reason: "${issues[issues.length - 1]}"\nRe-examine the evidence and return a complete, corrected dossier that resolves this specific problem. Keep every other already-correct figure and citation unchanged; do not introduce a new error while fixing this one.`
+        ? `\n\nCORRECTION NEEDED (attempt ${attempt} of ${settings.maxAttempts})\nThe previous attempt was rejected for this reason: "${issues[issues.length - 1]}"\nRe-examine the evidence and return a complete, corrected dossier that resolves this specific problem. Keep every other already-correct figure and citation unchanged; do not introduce a new error while fixing this one.`
         : '';
       const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
@@ -264,10 +263,10 @@ Explain findings simply. The narrative must cover the business, industry and mac
         },
         signal: AbortSignal.timeout(180_000),
         body: JSON.stringify({
-          model: MODEL,
+          model: settings.model,
           store: false,
-          max_output_tokens: MAX_OUTPUT_TOKENS,
-          reasoning: { effort: 'low' },
+          max_output_tokens: settings.maxOutputTokens,
+          reasoning: { effort: settings.reasoningEffort },
           instructions,
           input: baseInput + correctionBlock,
           text: {
@@ -438,7 +437,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
       }
     }
     throw Error(
-      `Automatic correction could not produce a fully verified dossier after ${MAX_ATTEMPTS} attempts. Outstanding issues: ${issuesSummary(issues)} The latest draft was preserved for manual review.`,
+      `Automatic correction could not produce a fully verified dossier after ${settings.maxAttempts} attempts. Outstanding issues: ${issuesSummary(issues)} The latest draft was preserved for manual review.`,
     );
   } catch (error) {
     if (jobId && authorizedJob) {

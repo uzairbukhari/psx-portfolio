@@ -3,7 +3,7 @@ import { initialPortfolio } from '@/lib/portfolio';
 import {
   addEvent,
   publicJob,
-  RESEARCH_BUDGET_MICROS,
+  resolveResearchSettings,
   type ResearchJobRow,
   tickerOK,
 } from '@/lib/research-jobs';
@@ -93,6 +93,8 @@ export async function POST(req: Request) {
     if (existing)
       return Response.json({ job: publicJob(existing), existing: true });
     const company = await resolveCompany(ticker, userId);
+    const settings = await resolveResearchSettings(userId);
+    const budgetMicros = Math.round(settings.budgetUsd * 1_000_000);
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     await db()
@@ -105,7 +107,7 @@ export async function POST(req: Request) {
         ticker,
         company.name,
         company.sector,
-        RESEARCH_BUDGET_MICROS,
+        budgetMicros,
         now,
         now,
       )

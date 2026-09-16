@@ -40,12 +40,31 @@ export type Quote = {
   fetchedAt: string;
   manual?: boolean;
 };
+export const RESEARCH_MODELS = ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'] as const;
+export type ResearchModel = (typeof RESEARCH_MODELS)[number];
+export const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+export type ResearchSettings = {
+  model: ResearchModel;
+  maxOutputTokens: number;
+  reasoningEffort: ReasoningEffort;
+  budgetUsd: number;
+  maxAttempts: number;
+};
+export const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
+  model: 'gpt-5-nano',
+  maxOutputTokens: 24_000,
+  reasoningEffort: 'low',
+  budgetUsd: 0.5,
+  maxAttempts: 3,
+};
 export type Portfolio = {
   companies: Company[];
   trades: Trade[];
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   research?: ResearchCompany[];
+  researchSettings?: ResearchSettings;
   aiReview?: {
     summary: string;
     weights: Record<string, number>;
@@ -365,6 +384,24 @@ export function validate(p: Portfolio) {
       !p.aiReview.weights)
   )
     throw Error('Invalid saved AI review.');
+  if (p.researchSettings !== undefined) {
+    const s = p.researchSettings;
+    if (
+      !s ||
+      !RESEARCH_MODELS.includes(s.model as ResearchModel) ||
+      !REASONING_EFFORTS.includes(s.reasoningEffort as ReasoningEffort) ||
+      !Number.isFinite(s.maxOutputTokens) ||
+      s.maxOutputTokens < 4000 ||
+      s.maxOutputTokens > 64000 ||
+      !Number.isFinite(s.budgetUsd) ||
+      s.budgetUsd < 0.05 ||
+      s.budgetUsd > 5 ||
+      !Number.isInteger(s.maxAttempts) ||
+      s.maxAttempts < 1 ||
+      s.maxAttempts > 5
+    )
+      throw Error('Invalid research settings.');
+  }
   holdings(p);
   return p;
 }

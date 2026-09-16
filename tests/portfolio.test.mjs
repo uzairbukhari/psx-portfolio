@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,today,SECTORS} from '../lib/portfolio.ts';
+import {initialPortfolio,holdings,validate,plan,validateReview,today,SECTORS,DEFAULT_RESEARCH_SETTINGS} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
@@ -27,5 +27,28 @@ test('company sector must be one of the allowed sectors or empty for older recor
   for (const sector of SECTORS) {
     p.companies[0].sector=sector;
     validate(p);
+  }
+});
+test('research settings accept configured values and reject out-of-range ones',()=>{
+  const p=fresh();
+  validate(p);
+  p.researchSettings=DEFAULT_RESEARCH_SETTINGS;
+  validate(p);
+  p.researchSettings={model:'gpt-5-mini',maxOutputTokens:32000,reasoningEffort:'high',budgetUsd:1.5,maxAttempts:5};
+  validate(p);
+  for (const bad of [
+    {...DEFAULT_RESEARCH_SETTINGS,model:'gpt-4o'},
+    {...DEFAULT_RESEARCH_SETTINGS,reasoningEffort:'extreme'},
+    {...DEFAULT_RESEARCH_SETTINGS,maxOutputTokens:1000},
+    {...DEFAULT_RESEARCH_SETTINGS,maxOutputTokens:100000},
+    {...DEFAULT_RESEARCH_SETTINGS,budgetUsd:0.01},
+    {...DEFAULT_RESEARCH_SETTINGS,budgetUsd:10},
+    {...DEFAULT_RESEARCH_SETTINGS,maxAttempts:0},
+    {...DEFAULT_RESEARCH_SETTINGS,maxAttempts:6},
+    {...DEFAULT_RESEARCH_SETTINGS,maxAttempts:2.5},
+  ]) {
+    const bp=fresh();
+    bp.researchSettings=bad;
+    assert.throws(()=>validate(bp));
   }
 });

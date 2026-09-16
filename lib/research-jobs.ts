@@ -1,6 +1,11 @@
 import { db, failure } from '@/lib/server';
+import {
+  DEFAULT_RESEARCH_SETTINGS,
+  REASONING_EFFORTS,
+  RESEARCH_MODELS,
+  type ResearchSettings,
+} from '@/lib/portfolio';
 
-export const RESEARCH_BUDGET_MICROS = 500_000;
 export const ACTIVE_JOB_STATUSES = [
   'queued',
   'researching',
@@ -127,4 +132,32 @@ export async function addEvent(jobId: string, stage: string, message: string) {
 
 export function tickerOK(value: string) {
   return /^[A-Z0-9]{2,12}$/.test(value);
+}
+
+export async function resolveResearchSettings(
+  userId: string,
+): Promise<ResearchSettings> {
+  const saved = await db()
+    .prepare('SELECT payload FROM portfolios WHERE user_id=?')
+    .bind(userId)
+    .first<{ payload: string }>();
+  if (!saved) return DEFAULT_RESEARCH_SETTINGS;
+  try {
+    const portfolio = JSON.parse(saved.payload) as {
+      researchSettings?: Partial<ResearchSettings>;
+    };
+    const s = portfolio.researchSettings;
+    if (
+      !s ||
+      !RESEARCH_MODELS.includes(s.model as never) ||
+      !REASONING_EFFORTS.includes(s.reasoningEffort as never) ||
+      !Number.isFinite(s.maxOutputTokens) ||
+      !Number.isFinite(s.budgetUsd) ||
+      !Number.isInteger(s.maxAttempts)
+    )
+      return DEFAULT_RESEARCH_SETTINGS;
+    return s as ResearchSettings;
+  } catch {
+    return DEFAULT_RESEARCH_SETTINGS;
+  }
 }
