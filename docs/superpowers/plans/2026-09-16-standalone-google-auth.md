@@ -571,8 +571,8 @@ Expected: PASS, zero errors — this was the last dangling reference to the dele
 
 - [ ] **Step 3: Run the full existing test suite**
 
-Run: `node --test tests/`
-Expected: PASS — `tests/portfolio.test.mjs` and `tests/session.test.mjs` both green (this task doesn't touch calculation logic, so `portfolio.test.mjs` should be unaffected; run it to confirm no accidental breakage).
+Run: `node --test 'tests/*.test.mjs'`
+Expected: PASS — all existing test files plus `tests/session.test.mjs` green (this task doesn't touch calculation logic, so the others should be unaffected; run them to confirm no accidental breakage). Note: `node --test tests/` (a bare directory, no glob) fails with `MODULE_NOT_FOUND` on this project's Node version — always use the glob form.
 
 - [ ] **Step 4: Commit**
 
@@ -774,7 +774,7 @@ Expected: exactly one `d1_databases` entry (`database_name: "psx-portfolio-sip"`
 
 ```bash
 npx tsc --noEmit
-node --test tests/
+node --test 'tests/*.test.mjs'
 npm run lint
 ```
 
@@ -822,7 +822,7 @@ with:
 ```markdown
 - Node >=22.13; install with npm and preserve package-lock.json.
 - Before the first local run, execute `npm run db:migrate:local` once to create the local D1 tables. Then `npm run dev` starts the Vinext preview.
-- `node --test tests/` runs all tests: portfolio cost accounting, sales, missing data, dates, monthly budgets, allocation limits and AI weights (`tests/portfolio.test.mjs`), plus session cookie signing/verification (`tests/session.test.mjs`).
+- `node --test 'tests/*.test.mjs'` runs all tests: portfolio cost accounting, sales, missing data, dates, monthly budgets, allocation limits and AI weights (`tests/portfolio.test.mjs`), plus session cookie signing/verification (`tests/session.test.mjs`).
 - `npx tsc --noEmit` checks types; `npm run build` builds the Cloudflare Worker.
 - D1 schema is in `db/schema.ts`; generate append-only migrations with `npm run db:generate`. Apply local migrations with `--local --persist-to .wrangler/state`; apply them to your own deployed database with `wrangler d1 migrations apply DB --remote`.
 - This is a standalone Cloudflare Worker deployment (`wrangler deploy`) in your own Cloudflare account — no external hosting platform is involved. Secrets (`OPENAI_API_KEY`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`) are set with `wrangler secret put <NAME>`, never committed. Non-secret config (`ALLOWED_EMAILS`, `GOOGLE_CLIENT_ID`) lives in `wrangler.jsonc`'s `vars`.
