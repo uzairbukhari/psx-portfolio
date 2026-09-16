@@ -364,6 +364,7 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
         next.companies.push({
           ticker: value,
           name: textValue(company.name, value),
+          sector: '',
           target: 0,
           approved: false,
           screenDate: '',

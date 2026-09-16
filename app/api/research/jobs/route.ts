@@ -29,14 +29,17 @@ async function resolveCompany(ticker: string, userId: string) {
       (item: { ticker?: string }) => item.ticker === ticker,
     );
     if (company)
-      return { name: String(company.name || ticker), sector: 'Unknown' };
+      return {
+        name: String(company.name || ticker),
+        sector: String(company.sector || 'Unknown'),
+      };
   }
   const seeded = initialPortfolio().companies.find(
     (company) => company.ticker === ticker,
   );
   // The Worker cannot reliably reach DPS. The Mac helper verifies unknown
   // symbols and sends the authoritative company name when it completes.
-  return { name: seeded?.name || ticker, sector: 'Unknown' };
+  return { name: seeded?.name || ticker, sector: seeded?.sector || 'Unknown' };
 }
 
 export async function GET(req: Request) {

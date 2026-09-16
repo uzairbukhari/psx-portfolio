@@ -34,10 +34,13 @@ import {
   validate,
   reviewPrompt,
   validateReview,
+  SECTORS,
   type Portfolio,
   type Trade,
   type Company,
+  type Sector,
 } from '@/lib/portfolio';
+import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
 type ApiResponse = {
   error?: string;
@@ -69,9 +72,9 @@ function download(name: string, data: string, type = 'application/json') {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-const blankTrade = (): Trade => ({
+const blankTrade = (ticker = 'MEBL'): Trade => ({
   id: crypto.randomUUID(),
-  ticker: 'MEBL',
+  ticker,
   kind: 'buy',
   date: today(),
   shares: 1,
@@ -80,6 +83,79 @@ const blankTrade = (): Trade => ({
   month: today().slice(0, 7),
   note: '',
 });
+const cashAmount = (t: Trade) =>
+  t.price === null
+    ? null
+    : t.shares * t.price + (t.kind === 'sell' ? -t.fees : t.fees);
+const kindLabel = (t: Trade) =>
+  t.kind === 'opening' ? 'Opening' : t.kind === 'sell' ? 'Sale' : 'Purchase';
+function ledgerGroups(trades: Trade[], ticker = '') {
+  const groups = new Map<string, Trade[]>();
+  for (const t of [...trades]
+    .filter((entry) => !ticker || entry.ticker === ticker)
+    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))) {
+    const rows = groups.get(t.ticker) ?? [];
+    rows.push(t);
+    groups.set(t.ticker, rows);
+  }
+  return [...groups.entries()];
+}
+function TradeHistoryTable({
+  trades,
+  onCorrect,
+}: {
+  trades: Trade[];
+  onCorrect: (t: Trade) => void;
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {[
+            'Date',
+            'Type',
+            'Shares',
+            'Price',
+            'Fees',
+            'Cash amount',
+            'SIP month',
+            '',
+          ].map((x) => (
+            <TableHead key={x}>{x}</TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {trades.map((t) => (
+          <TableRow key={t.id} style={{ opacity: t.voided ? 0.5 : 1 }}>
+            <TableCell>{t.date}</TableCell>
+            <TableCell>
+              {t.voided ? 'Voided · ' : ''}
+              {kindLabel(t)}
+            </TableCell>
+            <TableCell>{t.shares.toLocaleString()}</TableCell>
+            <TableCell>{money(t.price)}</TableCell>
+            <TableCell>{money(t.fees)}</TableCell>
+            <TableCell>
+              {cashAmount(t) === null ? 'Unknown' : money(cashAmount(t))}
+            </TableCell>
+            <TableCell>{t.month || '—'}</TableCell>
+            <TableCell>
+              {!t.voided && (
+                <button
+                  className="secondary compact"
+                  onClick={() => onCorrect(t)}
+                >
+                  Correct
+                </button>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
 export default function Dashboard() {
   const [p, setP] = useState<Portfolio | null>(null),
     [revision, setRevision] = useState(0),
@@ -103,7 +179,8 @@ export default function Dashboard() {
     } | null>(null),
     [reviewBusy, setReviewBusy] = useState(false),
     [promptOpen, setPromptOpen] = useState(false),
-    [aiAvailable, setAiAvailable] = useState(false);
+    [aiAvailable, setAiAvailable] = useState(false),
+    [historyTicker, setHistoryTicker] = useState('');
   function notify(s: string, error = false) {
     setMessage(s);
     setFailed(error);
@@ -229,7 +306,9 @@ export default function Dashboard() {
         </section>
       </main>
     );
-  const hs = holdings(p),
+  const hs = holdings(p)
+      .slice()
+      .sort((a, b) => (b.value ?? -1) - (a.value ?? -1)),
     held = hs.filter((h) => h.shares > 0),
     missing = held.filter((h) => !h.quote),
     unknown = held.filter((h) => h.cost === null),
@@ -245,6 +324,15 @@ export default function Dashboard() {
       .filter((t) => t.kind === 'buy' && !t.voided)
       .reduce((a, t) => a + t.shares * t.price! + t.fees, 0),
   );
+  const historyGroups = ledgerGroups(p.trades, historyTicker);
+  function openHistory(ticker: string) {
+    setHistoryTicker(ticker);
+    setTab('history');
+  }
+  function correctTrade(t: Trade) {
+    setEditing(t.id);
+    setTrade({ ...t });
+  }
   async function refresh() {
     setBusy(true);
     try {
@@ -260,11 +348,19 @@ export default function Dashboard() {
       if (!r.ok || !created.refresh) throw Error(created.error);
       let d = created.refresh;
       notify('Fetching PSX prices through your Mac helper…');
-      for (let attempt = 0; d.status === 'queued' || d.status === 'fetching'; attempt++) {
+      for (
+        let attempt = 0;
+        d.status === 'queued' || d.status === 'fetching';
+        attempt++
+      ) {
         if (attempt >= 45)
-          throw Error('The Mac helper has not returned the PSX quotes yet. Keep it running, then refresh again.');
+          throw Error(
+            'The Mac helper has not returned the PSX quotes yet. Keep it running, then refresh again.',
+          );
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        const pending = await fetch('/api/quotes?id=' + encodeURIComponent(d.id));
+        const pending = await fetch(
+          '/api/quotes?id=' + encodeURIComponent(d.id),
+        );
         d = (await pending.json()) as QuoteRefreshResponse;
         if (!pending.ok) throw Error(d.error);
       }
@@ -309,10 +405,12 @@ export default function Dashboard() {
       next,
       editing
         ? 'Correction saved. Previous entry retained as voided.'
-        : 'Transaction saved. Holdings and average cost updated.',
+        : 'Transaction saved as a new line item. Holdings and average cost updated.',
     );
     setTrade(null);
     setEditing(null);
+    setHistoryTicker(entry.ticker);
+    setTab('history');
   }
   async function saveCompany(e: React.FormEvent) {
     e.preventDefault();
@@ -380,7 +478,7 @@ export default function Dashboard() {
             disabled={busy}
             onClick={() => {
               setEditing(null);
-              setTrade(blankTrade());
+              setTrade(blankTrade(historyTicker || 'MEBL'));
             }}
           >
             <Plus size={17} /> Record a purchase
@@ -395,7 +493,17 @@ export default function Dashboard() {
           {message}
         </div>
       )}
-      <div className="metrics">
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+        <TabsList>
+          <TabsTrigger value="holdings">Holdings</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="sip">Monthly SIP</TabsTrigger>
+          <TabsTrigger value="history">Purchase log</TabsTrigger>
+          <TabsTrigger value="research-desk">Research desk</TabsTrigger>
+          <TabsTrigger value="research">AI review</TabsTrigger>
+        </TabsList>
+        <TabsContent value="holdings">
+          <div className="metrics">
         <article>
           <span>
             {missing.length
@@ -438,15 +546,6 @@ export default function Dashboard() {
           </small>
         </article>
       </div>
-      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-        <TabsList>
-          <TabsTrigger value="holdings">Holdings</TabsTrigger>
-          <TabsTrigger value="sip">Monthly SIP</TabsTrigger>
-          <TabsTrigger value="history">Purchase log</TabsTrigger>
-          <TabsTrigger value="research-desk">Research desk</TabsTrigger>
-          <TabsTrigger value="research">AI review</TabsTrigger>
-        </TabsList>
-        <TabsContent value="holdings">
           <div className="section-top">
             <div>
               <h2>Your companies</h2>
@@ -462,6 +561,7 @@ export default function Dashboard() {
                 setCompany({
                   ticker: '',
                   name: '',
+                  sector: '',
                   target: 0,
                   approved: false,
                   screenDate: '',
@@ -494,8 +594,16 @@ export default function Dashboard() {
                 {hs.map((h) => (
                   <TableRow key={h.ticker}>
                     <TableCell>
-                      <div className="ticker">{h.ticker}</div>
-                      <small>{h.name}</small>
+                      <button
+                        className="quote-btn ticker"
+                        onClick={() => openHistory(h.ticker)}
+                      >
+                        {h.ticker}
+                      </button>
+                      <small>
+                        {h.name}
+                        {h.sector ? ` · ${h.sector}` : ''}
+                      </small>
                       {h.target > 0 && (
                         <span className="tag">SIP shortlist</span>
                       )}
@@ -528,10 +636,16 @@ export default function Dashboard() {
                     <TableCell>
                       {h.value === null ? '—' : money(h.value)}
                     </TableCell>
-                    <TableCell style={{
-                      color:
-                        h.gain === null ? 'inherit' : h.gain >= 0 ? '#17744c' : '#b33d3d',
-                    }}>
+                    <TableCell
+                      style={{
+                        color:
+                          h.gain === null
+                            ? 'inherit'
+                            : h.gain >= 0
+                              ? '#17744c'
+                              : '#b33d3d',
+                      }}
+                    >
                       {h.gain === null ? '—' : money(h.gain)}
                     </TableCell>
                     <TableCell>
@@ -553,16 +667,26 @@ export default function Dashboard() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <button
-                        className="secondary compact"
-                        onClick={() =>
-                          setCompany({
-                            ...p.companies.find((c) => c.ticker === h.ticker)!,
-                          })
-                        }
-                      >
-                        Edit
-                      </button>
+                      <div className="row">
+                        <button
+                          className="secondary compact"
+                          onClick={() => openHistory(h.ticker)}
+                        >
+                          History
+                        </button>
+                        <button
+                          className="secondary compact"
+                          onClick={() =>
+                            setCompany({
+                              ...p.companies.find(
+                                (c) => c.ticker === h.ticker,
+                              )!,
+                            })
+                          }
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -573,6 +697,9 @@ export default function Dashboard() {
               values exclude cash and unrecorded corporate actions.
             </p>
           </section>
+        </TabsContent>
+        <TabsContent value="reports">
+          <PortfolioReports portfolio={p} />
         </TabsContent>
         <TabsContent value="sip">
           <div className="two-col">
@@ -770,6 +897,7 @@ export default function Dashboard() {
                   </span>
                   <small>
                     {c.approved ? 'Eligible under saved screen' : 'Paused'} ·{' '}
+                    {c.sector || 'No sector'} ·{' '}
                     {c.screenDate || 'No screen date'}
                   </small>
                   <p>{c.note}</p>
@@ -781,88 +909,76 @@ export default function Dashboard() {
         <TabsContent value="history">
           <div className="section-top">
             <div>
-              <h2>Every purchase, in one place</h2>
+              <h2>Transaction line items</h2>
               <p>
-                Opening balances are snapshots, not invented purchase history.
-                Corrections retain the original entry.
+                Each purchase is saved as its own dated entry. Viewing a company
+                shows every trade: date, shares, and price.
               </p>
             </div>
-            <button
-              className="secondary"
-              onClick={() => {
-                setEditing(null);
-                setTrade({ ...blankTrade(), kind: 'sell', month: '' });
-              }}
-            >
-              Record a sale
-            </button>
+            <div className="row">
+              <label className="history-filter">
+                Company
+                <select
+                  value={historyTicker}
+                  onChange={(e) => setHistoryTicker(e.target.value)}
+                >
+                  <option value="">All companies</option>
+                  {p.companies.map((c) => (
+                    <option key={c.ticker} value={c.ticker}>
+                      {c.ticker} · {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
-          <section className="panel table-panel">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {[
-                    'Date',
-                    'Company',
-                    'Type',
-                    'Shares',
-                    'Price',
-                    'Fees',
-                    'Cash amount',
-                    'SIP month',
-                    '',
-                  ].map((x) => (
-                    <TableHead key={x}>{x}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...p.trades]
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .map((t) => (
-                    <TableRow
-                      key={t.id}
-                      style={{ opacity: t.voided ? 0.5 : 1 }}
+          {historyGroups.length === 0 ? (
+            <section className="panel">
+              <p className="muted">
+                {historyTicker
+                  ? `No transactions recorded for ${historyTicker} yet.`
+                  : 'No transactions recorded yet.'}
+              </p>
+            </section>
+          ) : (
+            historyGroups.map(([ticker, rows]) => {
+              const name =
+                p.companies.find((c) => c.ticker === ticker)?.name ?? ticker;
+              const live = rows.filter((t) => !t.voided);
+              const purchases = live.filter((t) => t.kind === 'buy').length;
+              return (
+                <section
+                  className="panel table-panel ledger-group"
+                  key={ticker}
+                >
+                  <div className="ledger-heading">
+                    <div>
+                      <h3>
+                        {ticker}
+                        <small>{name}</small>
+                      </h3>
+                      <p>
+                        {live.length} line item{live.length === 1 ? '' : 's'}
+                        {purchases
+                          ? ` · ${purchases} purchase${purchases === 1 ? '' : 's'}`
+                          : ''}
+                      </p>
+                    </div>
+                    <button
+                      className="secondary compact"
+                      onClick={() => {
+                        setEditing(null);
+                        setTrade(blankTrade(ticker));
+                      }}
                     >
-                      <TableCell>{t.date}</TableCell>
-                      <TableCell className="ticker">
-                        {t.ticker}
-                        <small>{t.note}</small>
-                      </TableCell>
-                      <TableCell>
-                        {t.voided ? 'Voided · ' : ''}
-                        {t.kind}
-                      </TableCell>
-                      <TableCell>{t.shares.toLocaleString()}</TableCell>
-                      <TableCell>{money(t.price)}</TableCell>
-                      <TableCell>{money(t.fees)}</TableCell>
-                      <TableCell>
-                        {t.price === null
-                          ? 'Unknown'
-                          : money(
-                              t.shares * t.price +
-                                (t.kind === 'sell' ? -t.fees : t.fees),
-                            )}
-                      </TableCell>
-                      <TableCell>{t.month || '—'}</TableCell>
-                      <TableCell>
-                        {!t.voided && (
-                          <button
-                            className="secondary compact"
-                            onClick={() => {
-                              setEditing(t.id);
-                              setTrade({ ...t });
-                            }}
-                          >
-                            Correct
-                          </button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </section>
+                      <Plus size={14} /> Add purchase
+                    </button>
+                  </div>
+                  <TradeHistoryTable trades={rows} onCorrect={correctTrade} />
+                </section>
+              );
+            })
+          )}
         </TabsContent>
         <TabsContent value="research-desk">
           <ResearchDesk portfolio={p} onSave={save} />
@@ -1277,6 +1393,28 @@ export default function Dashboard() {
                       setCompany({ ...company, name: e.target.value })
                     }
                   />
+                </label>
+                <label>
+                  Sector
+                  <select
+                    required
+                    value={company.sector ?? ''}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        sector: e.target.value as Sector | '',
+                      })
+                    }
+                  >
+                    <option value="" disabled>
+                      Select sector
+                    </option>
+                    {SECTORS.map((sector) => (
+                      <option key={sector} value={sector}>
+                        {sector}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label>
                   Target weight (%)

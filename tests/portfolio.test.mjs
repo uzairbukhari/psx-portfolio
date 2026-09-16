@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,today} from '../lib/portfolio.ts';
+import {initialPortfolio,holdings,validate,plan,validateReview,today,SECTORS} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
@@ -15,3 +15,17 @@ test('whole-share allocation is within budget, no paused purchases, no overweigh
 test('many budgets remain affordable including fees and expensive single shares',()=>{for(let i=0;i<150;i++){const p=initialPortfolio();p.trades=[];p.budgets[month]=i*711.37;for(const [j,c] of p.companies.entries())p.quotes[c.ticker]={price:(j+1)*131.79,date,asOf:date,source:'https://dps.psx.com.pk/company/'+c.ticker,fetchedAt:new Date().toISOString()};const r=plan(p,month,1.27);assert.ok(r.invested<=r.remaining+.001);assert.ok(r.leftover>=0);assert.equal(Math.round((r.invested+r.leftover)*100),Math.round(r.remaining*100))}});
 test('invalid AI weights are rejected and valid proposed targets leave holdings unchanged',()=>{const p=initialPortfolio();const weights=Object.fromEntries(p.companies.filter(c=>c.target).map(c=>[c.ticker,c.target]));assert.ok(validateReview({summary:'Keep current targets pending updated research.',weights},p));assert.throws(()=>validateReview({summary:'Invalid very concentrated targets.',weights:{...weights,MEBL:60}},p));assert.equal(holdings(p).find(h=>h.ticker==='MEBL').shares,615)});
 test('opening statement and quote source validate without inventing costs',()=>{const p=initialPortfolio();p.quotes=JSON.parse(readFileSync(new URL('../lib/initial-quotes.json',import.meta.url)));validate(p);assert.equal(p.trades.length,21);assert.equal(holdings(p).filter(h=>h.shares>0&&h.cost===null).length,21)});
+test('company sector must be one of the allowed sectors or empty for older records',()=>{
+  const p=fresh();
+  p.companies[0].sector='Bank';
+  validate(p);
+  assert.equal(holdings(p)[0].sector,'Bank');
+  p.companies[0].sector='Not a sector';
+  assert.throws(()=>validate(p));
+  delete p.companies[0].sector;
+  validate(p);
+  for (const sector of SECTORS) {
+    p.companies[0].sector=sector;
+    validate(p);
+  }
+});

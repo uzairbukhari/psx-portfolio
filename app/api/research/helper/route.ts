@@ -120,6 +120,7 @@ async function completeJob(
     portfolio.companies.push({
       ticker: row.ticker,
       name: row.company_name,
+      sector: '',
       target: 0,
       approved: false,
       screenDate: '',

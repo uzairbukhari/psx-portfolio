@@ -1,6 +1,20 @@
+export const SECTORS = [
+  'Bank',
+  'Fertilizer',
+  'Cement',
+  'Oil & Gas',
+  'Pharma',
+  'Foods',
+  'Real Estate',
+  'Technology',
+  'Auto',
+  'Others',
+] as const;
+export type Sector = (typeof SECTORS)[number];
 export type Company = {
   ticker: string;
   name: string;
+  sector: Sector | '';
   target: number;
   approved: boolean;
   screenDate: string;
@@ -77,36 +91,37 @@ export const money = (n: number | null) =>
       }).format(n);
 export const round = (n: number) =>
   Math.round((n + Number.EPSILON) * 100) / 100;
-const seeds: [string, string, number, number][] = [
-  ['BFAGRO', 'Barkat Frisian Agro', 3102, 0],
-  ['BIPL', 'BankIslami Pakistan', 57, 0],
-  ['EFERT', 'Engro Fertilizers', 110, 0],
-  ['ENGROH', 'Engro Holdings', 10, 0],
-  ['FABL', 'Faysal Bank', 470, 0],
-  ['FATIMA', 'Fatima Fertilizer', 106, 0],
-  ['GLAXO', 'GlaxoSmithKline Pakistan', 5, 0],
-  ['HALEON', 'Haleon Pakistan', 35, 12.5],
-  ['IREIT', 'Image REIT', 1078, 0],
-  ['ISL', 'International Steels', 10, 0],
-  ['LOTCHEM', 'Lotte Chemical Pakistan', 100, 0],
-  ['LPL', 'Lalpir Power', 25, 0],
-  ['LUCK', 'Lucky Cement', 48, 15],
-  ['MARI', 'Mari Energies', 135, 15],
-  ['MEBL', 'Meezan Bank', 615, 15],
-  ['OGDC', 'Oil & Gas Development', 18, 0],
-  ['PQGTL', 'Pak-Qatar General Takaful', 1500, 0],
-  ['PSO', 'Pakistan State Oil', 15, 0],
-  ['SPSL', 'Sitara Petroleum Service', 1500, 0],
-  ['SYS', 'Systems', 340, 15],
-  ['WAHDAT', 'Wahdat Poultry Farm', 1000, 0],
-  ['FFC', 'Fauji Fertilizer', 0, 15],
-  ['COLG', 'Colgate-Palmolive Pakistan', 0, 12.5],
+const seeds: [string, string, number, number, Sector][] = [
+  ['BFAGRO', 'Barkat Frisian Agro', 3102, 0, 'Foods'],
+  ['BIPL', 'BankIslami Pakistan', 57, 0, 'Bank'],
+  ['EFERT', 'Engro Fertilizers', 110, 0, 'Fertilizer'],
+  ['ENGROH', 'Engro Holdings', 10, 0, 'Others'],
+  ['FABL', 'Faysal Bank', 470, 0, 'Bank'],
+  ['FATIMA', 'Fatima Fertilizer', 106, 0, 'Fertilizer'],
+  ['GLAXO', 'GlaxoSmithKline Pakistan', 5, 0, 'Pharma'],
+  ['HALEON', 'Haleon Pakistan', 35, 12.5, 'Pharma'],
+  ['IREIT', 'Image REIT', 1078, 0, 'Real Estate'],
+  ['ISL', 'International Steels', 10, 0, 'Others'],
+  ['LOTCHEM', 'Lotte Chemical Pakistan', 100, 0, 'Others'],
+  ['LPL', 'Lalpir Power', 25, 0, 'Others'],
+  ['LUCK', 'Lucky Cement', 48, 15, 'Cement'],
+  ['MARI', 'Mari Energies', 135, 15, 'Oil & Gas'],
+  ['MEBL', 'Meezan Bank', 615, 15, 'Bank'],
+  ['OGDC', 'Oil & Gas Development', 18, 0, 'Oil & Gas'],
+  ['PQGTL', 'Pak-Qatar General Takaful', 1500, 0, 'Others'],
+  ['PSO', 'Pakistan State Oil', 15, 0, 'Oil & Gas'],
+  ['SPSL', 'Sitara Petroleum Service', 1500, 0, 'Oil & Gas'],
+  ['SYS', 'Systems', 340, 15, 'Technology'],
+  ['WAHDAT', 'Wahdat Poultry Farm', 1000, 0, 'Foods'],
+  ['FFC', 'Fauji Fertilizer', 0, 15, 'Fertilizer'],
+  ['COLG', 'Colgate-Palmolive Pakistan', 0, 12.5, 'Foods'],
 ];
 export function initialPortfolio(): Portfolio {
   return {
-    companies: seeds.map(([ticker, name, , target]) => ({
+    companies: seeds.map(([ticker, name, , target, sector]) => ({
       ticker,
       name,
+      sector,
       target,
       approved: target > 0 && ticker !== 'SYS',
       screenDate: target ? '2026-06-05' : '',
@@ -262,6 +277,9 @@ export function validate(p: Portfolio) {
       tickers.has(c.ticker) ||
       typeof c.name !== 'string' ||
       c.name.length > 150 ||
+      (c.sector !== undefined &&
+        c.sector !== '' &&
+        !SECTORS.includes(c.sector as Sector)) ||
       typeof c.approved !== 'boolean' ||
       !Number.isFinite(c.target) ||
       c.target < 0 ||
