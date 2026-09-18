@@ -18,10 +18,15 @@
 let pdfjsLibPromise: ReturnType<typeof loadPdfjs> | null = null;
 async function loadPdfjs() {
   const pdfjsLib = await import('pdfjs-dist');
-  const worker = new Worker(
-    new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url),
-    { type: 'module' },
-  );
+  // In the built app, `import.meta.url` here has been observed to resolve
+  // to a `file:///...` base rather than the page's real origin (the
+  // hashed asset path itself is correct — only the base is wrong), which
+  // a Worker constructor refuses cross-origin. Since this only ever runs
+  // client-side, rebuild it from window.location.origin when that happens.
+  let workerUrl = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url);
+  if (workerUrl.protocol !== 'http:' && workerUrl.protocol !== 'https:')
+    workerUrl = new URL(workerUrl.pathname, window.location.origin);
+  const worker = new Worker(workerUrl, { type: 'module' });
   pdfjsLib.GlobalWorkerOptions.workerPort = worker;
   return pdfjsLib;
 }
