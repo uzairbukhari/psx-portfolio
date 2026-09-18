@@ -433,12 +433,21 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
         onExport={exportDossier}
       />
     );
+  const researchingCount = jobs.filter((job) =>
+    ['queued', 'researching'].includes(job.status),
+  ).length;
+  const completeCount = research.filter(
+    (item) => item.status === 'Complete',
+  ).length;
+  const attentionCount =
+    jobs.filter((job) => job.status === 'needs_attention').length +
+    research.filter((item) => item.status === 'Update needed').length;
   return (
     <section className="research-queue">
-      <div className="section-top">
+      <div className="research-hero">
         <div>
           <p className="eyebrow">PSX RESEARCH DESK</p>
-          <h2>Research queue & dossiers</h2>
+          <h2>Research queue &amp; dossiers</h2>
           <p>Start cited company research and follow each saved stage.</p>
         </div>
         <div className="row">
@@ -492,26 +501,15 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       <section className="metrics research-metrics">
         <article>
           <span>Researching</span>
-          <strong>
-            {
-              jobs.filter((job) =>
-                ['queued', 'researching'].includes(job.status),
-              ).length
-            }
-          </strong>
+          <strong>{researchingCount}</strong>
         </article>
-        <article>
+        <article className={completeCount ? 'stat-pos' : ''}>
           <span>Complete</span>
-          <strong>
-            {research.filter((item) => item.status === 'Complete').length}
-          </strong>
+          <strong>{completeCount}</strong>
         </article>
-        <article>
+        <article className={attentionCount ? 'stat-neg' : ''}>
           <span>Needs attention</span>
-          <strong>
-            {jobs.filter((job) => job.status === 'needs_attention').length +
-              research.filter((item) => item.status === 'Update needed').length}
-          </strong>
+          <strong>{attentionCount}</strong>
         </article>
       </section>
       <section className="panel table-panel">
@@ -533,8 +531,11 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
               {rows.map(({ ticker: value, dossier, job, company }) => {
                 const active =
                   job && !['complete', 'cancelled'].includes(job.status);
+                const needsAttention =
+                  job?.status === 'needs_attention' ||
+                  dossier?.status === 'Update needed';
                 return (
-                  <tr key={value}>
+                  <tr key={value} className={needsAttention ? 'row-attention' : ''}>
                     <td>
                       <span className="ticker">{value}</span>
                       <small>{job?.companyName || company?.name}</small>

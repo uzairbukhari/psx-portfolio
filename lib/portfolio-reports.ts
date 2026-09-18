@@ -23,6 +23,16 @@ export type TargetPoint = {
 export type ActivityPoint = {
   month: string;
   invested: number;
+  cumulative: number;
+};
+
+export type PerformancePoint = {
+  ticker: string;
+  name: string;
+  cost: number;
+  value: number;
+  gain: number;
+  gainPercent: number;
 };
 
 export type PortfolioReport = {
@@ -30,6 +40,7 @@ export type PortfolioReport = {
   sectorAllocation: SectorPoint[];
   targetComparison: TargetPoint[];
   monthlyActivity: ActivityPoint[];
+  performance: PerformancePoint[];
   summary: {
     pricedValue: number;
     largestHolding: AllocationPoint | null;
@@ -40,6 +51,8 @@ export type PortfolioReport = {
       held: number;
       percentage: number;
     };
+    totalGain: number | null;
+    totalGainPercent: number | null;
   };
 };
 
@@ -106,15 +119,43 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
       ),
     );
   }
+  let cumulative = 0;
   const monthlyActivity = [...activity]
     .map(([month, invested]) => ({ month, invested }))
-    .sort((a, b) => a.month.localeCompare(b.month));
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((item) => {
+      cumulative = round(cumulative + item.invested);
+      return { ...item, cumulative };
+    });
+
+  const performance = priced
+    .filter(
+      (item): item is typeof item & { cost: number } =>
+        typeof item.cost === 'number',
+    )
+    .map((item) => ({
+      ticker: item.ticker,
+      name: item.name,
+      cost: item.cost,
+      value: item.value,
+      gain: round(item.value - item.cost),
+      gainPercent: item.cost > 0 ? round(((item.value - item.cost) / item.cost) * 100) : 0,
+    }))
+    .sort((a, b) => b.gain - a.gain || a.ticker.localeCompare(b.ticker));
+
+  const totalCost = round(
+    performance.reduce((total, item) => total + item.cost, 0),
+  );
+  const totalValue = round(
+    performance.reduce((total, item) => total + item.value, 0),
+  );
 
   return {
     companyAllocation,
     sectorAllocation,
     targetComparison,
     monthlyActivity,
+    performance,
     summary: {
       pricedValue,
       largestHolding: companyAllocation[0] ?? null,
@@ -131,6 +172,11 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
         held: held.length,
         percentage: percentage(priced.length, held.length),
       },
+      totalGain: performance.length ? round(totalValue - totalCost) : null,
+      totalGainPercent:
+        performance.length && totalCost > 0
+          ? round(((totalValue - totalCost) / totalCost) * 100)
+          : null,
     },
   };
 }

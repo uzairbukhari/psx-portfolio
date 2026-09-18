@@ -137,6 +137,9 @@ const seeds: [string, string, number, number, Sector][] = [
   ['FFC', 'Fauji Fertilizer', 0, 15, 'Fertilizer'],
   ['COLG', 'Colgate-Palmolive Pakistan', 0, 12.5, 'Foods'],
 ];
+export function blankPortfolio(): Portfolio {
+  return { companies: [], trades: [], quotes: {}, budgets: {} };
+}
 export function initialPortfolio(): Portfolio {
   return {
     companies: seeds.map(([ticker, name, , target, sector]) => ({

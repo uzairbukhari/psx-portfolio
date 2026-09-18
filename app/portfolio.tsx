@@ -17,6 +17,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Spinner } from '@/components/ui/spinner';
 import {
   ArrowUpRight,
   RefreshCw,
@@ -25,6 +26,7 @@ import {
   Sparkles,
   Wallet,
   ShieldCheck,
+  LogOut,
 } from 'lucide-react';
 import {
   holdings,
@@ -33,9 +35,6 @@ import {
   today,
   round,
   validate,
-  reviewPrompt,
-  researchInsights,
-  validateReview,
   SECTORS,
   type Portfolio,
   type Trade,
@@ -44,6 +43,8 @@ import {
 } from '@/lib/portfolio';
 import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
+import PsxMarketPulse from './psx-market-pulse';
+import AiReview from './ai-review';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -58,6 +59,95 @@ const PATH_TABS: Record<string, string> = Object.fromEntries(
 );
 function tabFromPathname(pathname: string): string {
   return PATH_TABS[pathname] ?? 'holdings';
+}
+const SIGNIN_TICKERS: { ticker: string; up: boolean }[] = [
+  { ticker: 'MEBL', up: true },
+  { ticker: 'OGDC', up: true },
+  { ticker: 'LUCK', up: false },
+  { ticker: 'FFC', up: true },
+  { ticker: 'MARI', up: true },
+  { ticker: 'PSO', up: false },
+  { ticker: 'SYS', up: true },
+  { ticker: 'FATIMA', up: true },
+];
+const SIGNIN_CANDLES: [number, number][] = [
+  [18, 24],
+  [24, 21],
+  [21, 30],
+  [30, 27],
+  [27, 36],
+  [36, 43],
+  [43, 39],
+  [39, 49],
+  [49, 56],
+  [56, 51],
+  [51, 61],
+  [61, 68],
+  [68, 63],
+  [63, 72],
+  [72, 80],
+  [80, 88],
+];
+function SignInChart() {
+  const width = 640,
+    height = 220,
+    gap = width / SIGNIN_CANDLES.length;
+  const scale = (v: number) => height - 20 - v * 1.9;
+  return (
+    <svg
+      className="signin-chart"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {SIGNIN_CANDLES.map(([open, close], i) => {
+        const x = i * gap + gap / 2;
+        const up = close >= open;
+        const color = up ? '#22e0a0' : '#ff5d6c';
+        const bodyTop = scale(Math.max(open, close));
+        const bodyBottom = scale(Math.min(open, close));
+        return (
+          <g key={i} stroke={color} fill={color}>
+            <line
+              x1={x}
+              x2={x}
+              y1={scale(Math.max(open, close) + 4)}
+              y2={scale(Math.min(open, close) - 4)}
+              strokeWidth={1.5}
+            />
+            <rect
+              x={x - gap * 0.28}
+              y={bodyTop}
+              width={gap * 0.56}
+              height={Math.max(bodyBottom - bodyTop, 2)}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03l3-2.33Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97l3 2.33C4.66 5.17 6.65 3.58 9 3.58Z"
+      />
+    </svg>
+  );
 }
 
 type ApiResponse = {
@@ -172,7 +262,7 @@ function TradeHistoryTable({
     </Table>
   );
 }
-export default function Dashboard() {
+export default function Dashboard({ email }: { email: string | null }) {
   const initialPathname = usePathname();
   const [tab, setTabState] = useState(() => tabFromPathname(initialPathname));
   function setTab(next: string) {
@@ -203,14 +293,11 @@ export default function Dashboard() {
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
     [quoteDate, setQuoteDate] = useState(today()),
-    [aiText, setAiText] = useState(''),
     [proposal, setProposal] = useState<{
       summary: string;
       weights: Record<string, number>;
     } | null>(null),
     [reviewBusy, setReviewBusy] = useState(false),
-    [promptOpen, setPromptOpen] = useState(false),
-    [aiAvailable, setAiAvailable] = useState(false),
     [historyTicker, setHistoryTicker] = useState('');
   function notify(s: string, error = false) {
     setMessage(s);
@@ -232,10 +319,6 @@ export default function Dashboard() {
   }
   useEffect(() => {
     void load();
-    fetch('/api/review')
-      .then((r) => r.json() as Promise<ApiResponse>)
-      .then((d) => setAiAvailable(!!d.available))
-      .catch(() => {});
   }, []);
   async function save(
     next: Portfolio,
@@ -304,28 +387,60 @@ export default function Dashboard() {
     } catch {}
     return () => abort.abort();
   }, [p, fees, allowOld]);
+  if (!p && email && !(failed && message))
+    return (
+      <main className="app-loading">
+        <div className="brand">
+          <Wallet size={26} />
+          <span>PSX / PERSONAL INVESTING</span>
+        </div>
+        <Spinner className="size-6" />
+        <p className="muted">Loading your holdings…</p>
+      </main>
+    );
   if (!p)
     return (
-      <main className="desk">
-        <header>
+      <main className="signin">
+        <section className="signin-hero">
           <div className="brand">
-            P<span>PSX / PERSONAL INVESTING</span>
+            <Wallet size={26} />
+            <span>PSX / PERSONAL INVESTING</span>
           </div>
-          <span className="badge">PRIVATE WORKSPACE</span>
-        </header>
-        <section className="heading">
-          <div>
-            <p className="eyebrow">YOUR LONG-TERM PICTURE</p>
-            <h1>Portfolio & SIP desk</h1>
+          <div className="signin-hero-copy">
+            <h1>Every rupee you&rsquo;ve put into PSX, in one ledger.</h1>
             <p>
+              Purchases, prices and your monthly SIP plan, tracked the way
+              you actually invest, not how a spreadsheet assumes you should.
+            </p>
+          </div>
+          <SignInChart />
+          <div className="signin-ticker" aria-hidden="true">
+            <div className="signin-ticker-track">
+              {[...SIGNIN_TICKERS, ...SIGNIN_TICKERS].map((t, i) => (
+                <span key={i}>
+                  {t.ticker} <span className={t.up ? 'up' : 'down'}>{t.up ? '▲' : '▼'}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+        <section className="signin-panel">
+          <div className="signin-card">
+            <p className="signin-kicker">Portfolio & SIP desk</p>
+            <h2>Sign in to continue</h2>
+            <p className="muted">
               {busy
                 ? 'Loading your holdings and purchase history…'
-                : 'Sign in to open your private investment workspace.'}
+                : 'Your holdings stay private to your Google account.'}
             </p>
-            <a href="/api/auth/google/login?return_to=%2F" target="_top">
-              Sign in with Google →
+            <a
+              className="google-btn"
+              href="/api/auth/google/login?return_to=%2F"
+              target="_top"
+            >
+              <GoogleMark /> Continue with Google
             </a>
-            {message && (
+            {message && !message.includes('Sign in to access your portfolio') && (
               <p role="alert" className="notice error">
                 {message}
               </p>
@@ -350,11 +465,6 @@ export default function Dashboard() {
     gain = cost === null || missing.length ? null : round(value - cost),
     calc = plan(p, month, fees, allowOld),
     budget = p.budgets[month] ?? 100000;
-  const shortlistTickers = p.companies
-    .filter((c) => c.target > 0)
-    .map((c) => c.ticker);
-  const research = researchInsights(p, shortlistTickers);
-  const researched = research.filter((r) => r.status === 'Complete');
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -436,30 +546,6 @@ export default function Dashboard() {
     await save(next);
     setCompany(null);
   }
-  async function aiReview() {
-    setReviewBusy(true);
-    try {
-      const r = await fetch('/api/review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, revision }),
-      });
-      const d = (await r.json()) as ApiResponse;
-      if (!r.ok) throw Error(d.error);
-      if (d.revision !== revision)
-        throw Error('Portfolio changed. Run the review again.');
-      setProposal(validateReview(d, p!));
-      notify(
-        d.cached
-          ? 'Saved review reused · no new API charge.'
-          : `AI review ready · estimated API cost $${(d.estimatedCostUsd ?? 0).toFixed(6)}. Inspect the reasoning before applying targets.`,
-      );
-    } catch (e) {
-      notify(String(e), true);
-    } finally {
-      setReviewBusy(false);
-    }
-  }
   return (
     <main className="desk">
       <header>
@@ -467,9 +553,20 @@ export default function Dashboard() {
           <Wallet size={29} />
           <span>PSX / PERSONAL INVESTING</span>
         </div>
-        <span className="badge">
-          <ShieldCheck size={14} /> PRIVATE WORKSPACE
-        </span>
+        <div className="header-right">
+          <span className="badge">
+            <ShieldCheck size={14} /> PRIVATE WORKSPACE
+          </span>
+          {email && (
+            <span className="account-chip">
+              <span className="account-email">{email}</span>
+              <a className="signout-link" href="/api/auth/logout">
+                <LogOut size={13} />
+                Sign out
+              </a>
+            </span>
+          )}
+        </div>
       </header>
       <section className="heading">
         <div>
@@ -517,6 +614,7 @@ export default function Dashboard() {
           <TabsTrigger value="research">AI review</TabsTrigger>
         </TabsList>
         <TabsContent value="holdings">
+          <PsxMarketPulse />
           <div className="metrics">
         <article>
           <span>
@@ -548,7 +646,7 @@ export default function Dashboard() {
             className="amount"
             style={{
               color:
-                gain === null ? 'inherit' : gain >= 0 ? '#17744c' : '#b33d3d',
+                gain === null ? 'inherit' : gain >= 0 ? '#22e0a0' : '#ff5d6c',
             }}
           >
             {gain === null ? 'Not yet known' : money(gain)}
@@ -656,8 +754,8 @@ export default function Dashboard() {
                           h.gain === null
                             ? 'inherit'
                             : h.gain >= 0
-                              ? '#17744c'
-                              : '#b33d3d',
+                              ? '#22e0a0'
+                              : '#ff5d6c',
                       }}
                     >
                       {h.gain === null ? '—' : money(h.gain)}
@@ -998,214 +1096,18 @@ export default function Dashboard() {
           <ResearchDesk portfolio={p} onSave={save} />
         </TabsContent>
         <TabsContent value="research">
-          <div className="two-col">
-            <section className="panel">
-              <p className="eyebrow">LOW-COST MODE · GPT-5 NANO</p>
-              <h2>A useful second look. At a tiny cost.</h2>
-              <p>
-                Review concentration, current holdings, your {money(budget)}{' '}
-                budget, quote dates, and the seven-company research shortlist.
-                AI uses a compact summary and saved research to propose target
-                weights. Calculations run without AI charges. Unchanged reviews
-                are reused.
-              </p>
-              <div className="row">
-                <button
-                  disabled={reviewBusy || busy || !aiAvailable}
-                  onClick={aiReview}
-                >
-                  <Sparkles size={16} />
-                  {reviewBusy ? 'Reviewing portfolio…' : 'Generate AI review'}
-                </button>
-                <button
-                  className="secondary"
-                  onClick={() => setPromptOpen(true)}
-                >
-                  Export to ChatGPT
-                </button>
-              </div>
-              {!aiAvailable && (
-                <p className="notice">
-                  Built-in AI is awaiting a secure connection. The ChatGPT
-                  handoff below works now.
-                </p>
-              )}
-              <p className="muted">
-                No paid web searches or automatic retries. This review uses
-                saved research; it does not verify new filings or current
-                Shariah status. No orders are placed.
-              </p>
-            </section>
-            <aside className="panel accent">
-              <p className="eyebrow">RESEARCH STATUS · LIVE</p>
-              <h2>Evidence before allocation.</h2>
-              <p>
-                {researched.length} of {shortlistTickers.length} shortlisted
-                companies have a full dossier
-                {researched.length
-                  ? ` (${researched.map((r) => r.ticker).join(', ')})`
-                  : ''}
-                . The rest are shortlist-only, with no score or fair value yet.
-              </p>
-              {p.companies.some(
-                (c) => shortlistTickers.includes(c.ticker) && !c.approved,
-              ) && (
-                <p>
-                  Excluded from new contributions:{' '}
-                  {p.companies
-                    .filter(
-                      (c) =>
-                        shortlistTickers.includes(c.ticker) && !c.approved,
-                    )
-                    .map((c) => c.ticker)
-                    .join(', ')}
-                  . See each company&rsquo;s note in Holdings.
-                </p>
-              )}
-            </aside>
-          </div>
-          {shortlistTickers.length > 0 && (
-            <section className="panel table-panel" style={{ marginTop: 24 }}>
-              <h2>Research evidence</h2>
-              <p className="muted">
-                Computed directly from saved dossiers and the latest quote —
-                no AI involved. Use it to sanity-check the AI review below.
-              </p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {[
-                      'Company',
-                      'Status',
-                      'Score',
-                      'Fair value (bear–bull)',
-                      'Price',
-                      'Valuation',
-                      'Updated',
-                    ].map((x) => (
-                      <TableHead key={x}>{x}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {research.map((r) => (
-                    <TableRow key={r.ticker}>
-                      <TableCell>{r.ticker}</TableCell>
-                      <TableCell>{r.status}</TableCell>
-                      <TableCell>
-                        {r.score === null ? '—' : `${r.score}/100`}
-                      </TableCell>
-                      <TableCell>
-                        {r.fairValueLow === null || r.fairValueHigh === null
-                          ? '—'
-                          : `${money(r.fairValueLow)} – ${money(r.fairValueHigh)}`}
-                      </TableCell>
-                      <TableCell>
-                        {r.price === null ? '—' : money(r.price)}
-                      </TableCell>
-                      <TableCell
-                        style={{
-                          color:
-                            r.valuationPct === null
-                              ? 'inherit'
-                              : r.valuationPct >= 0
-                                ? '#17744c'
-                                : '#b33d3d',
-                        }}
-                      >
-                        {r.valuationPct === null
-                          ? '—'
-                          : `${r.valuationPct >= 0 ? 'Undervalued' : 'Overvalued'} ${Math.abs(r.valuationPct)}%`}
-                      </TableCell>
-                      <TableCell>{r.updatedAt || '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </section>
-          )}
-          <section className="panel" style={{ marginTop: 24 }}>
-            <h2>Bring back a ChatGPT review</h2>
-            <p>
-              Export the review prompt, use it in your research conversation,
-              then paste its JSON here. Review the proposed changes before
-              applying them.
-            </p>
-            <label>
-              AI review JSON
-              <textarea
-                rows={5}
-                value={aiText}
-                onChange={(e) => setAiText(e.target.value)}
-                placeholder={
-                  '{"summary":"Reasoning with sources and research gaps…","weights":{"MEBL":15,…}}'
-                }
-              />
-            </label>
-            <button
-              className="secondary"
-              onClick={() => {
-                try {
-                  setProposal(validateReview(JSON.parse(aiText), p));
-                  notify(
-                    'Review validated. Inspect the proposed weights below.',
-                  );
-                } catch (e) {
-                  notify(String(e), true);
-                }
-              }}
-            >
-              Validate & preview
-            </button>
-          </section>
-          {proposal && (
-            <section className="panel" style={{ marginTop: 24 }}>
-              <p className="eyebrow">PROPOSED TARGETS · NOT APPLIED</p>
-              <h2>Review the reasoning</h2>
-              <p style={{ whiteSpace: 'pre-wrap' }}>{proposal.summary}</p>
-              <div className="target-grid">
-                {Object.entries(proposal.weights).map(([t, w]) => (
-                  <div key={t} className="mini-stat">
-                    <span>{t}</span>
-                    <b>
-                      {p.companies.find((c) => c.ticker === t)?.target}% → {w}%
-                    </b>
-                  </div>
-                ))}
-              </div>
-              <button
-                disabled={busy}
-                onClick={() =>
-                  attempt(async () => {
-                    const next = clone(p);
-                    next.companies = next.companies.map((c) => ({
-                      ...c,
-                      target: proposal.weights[c.ticker] ?? c.target,
-                    }));
-                    next.aiReview = {
-                      ...proposal,
-                      generatedAt: new Date().toISOString(),
-                      snapshot: JSON.stringify({ revision, month }),
-                    };
-                    await save(
-                      next,
-                      'Reviewed AI targets applied. Purchase eligibility remains your decision.',
-                    );
-                    setTab('sip');
-                  })
-                }
-              >
-                Apply reviewed targets
-              </button>
-            </section>
-          )}
-          {p.aiReview && (
-            <section className="panel" style={{ marginTop: 24 }}>
-              <h2>Last applied AI review</h2>
-              <small>{p.aiReview.generatedAt}</small>
-              <p style={{ whiteSpace: 'pre-wrap' }}>{p.aiReview.summary}</p>
-            </section>
-          )}
+          <AiReview
+            portfolio={p}
+            revision={revision}
+            month={month}
+            busy={busy}
+            reviewBusy={reviewBusy}
+            setReviewBusy={setReviewBusy}
+            proposal={proposal}
+            setProposal={setProposal}
+            onSave={save}
+            onApplied={() => setTab('sip')}
+          />
         </TabsContent>
       </Tabs>
       <footer>
@@ -1616,47 +1518,6 @@ export default function Dashboard() {
             </p>
             <button disabled={busy}>Save manual price</button>
           </form>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
-        <DialogContent className="form-dialog">
-          <DialogTitle>Review in ChatGPT</DialogTitle>
-          <DialogDescription>
-            This contains your holdings and transactions. Copy it into your
-            private research conversation.
-          </DialogDescription>
-          <textarea
-            aria-label="Portfolio review prompt"
-            readOnly
-            rows={12}
-            value={reviewPrompt(p, month)}
-          />
-          <div className="row">
-            <button
-              onClick={() =>
-                attempt(async () => {
-                  await navigator.clipboard.writeText(reviewPrompt(p, month));
-                  notify(
-                    'Review prompt copied. Paste it into your research conversation.',
-                  );
-                })
-              }
-            >
-              Copy review prompt
-            </button>
-            <button
-              className="secondary"
-              onClick={() =>
-                download(
-                  `psx-ai-review-${today()}.txt`,
-                  reviewPrompt(p, month),
-                  'text/plain',
-                )
-              }
-            >
-              Download prompt
-            </button>
-          </div>
         </DialogContent>
       </Dialog>
     </main>

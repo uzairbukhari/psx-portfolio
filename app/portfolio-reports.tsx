@@ -1,14 +1,19 @@
 'use client';
 
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   LabelList,
   Pie,
   PieChart,
+  Rectangle,
+  ReferenceLine,
   XAxis,
   YAxis,
+  type BarShapeProps,
 } from 'recharts';
 import {
   ChartContainer,
@@ -18,34 +23,72 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { money, type Portfolio } from '@/lib/portfolio';
-import { portfolioReport } from '@/lib/portfolio-reports';
+import { money, round, type Portfolio } from '@/lib/portfolio';
+import {
+  portfolioReport,
+  type PerformancePoint,
+  type SectorPoint,
+} from '@/lib/portfolio-reports';
 
 const companyConfig = {
-  weight: { label: 'Portfolio weight', color: '#125aeb' },
+  weight: { label: 'Portfolio weight', color: 'var(--primary)' },
 } satisfies ChartConfig;
 
 const targetConfig = {
-  actual: { label: 'Actual weight', color: '#125aeb' },
-  target: { label: 'SIP target', color: '#92a4b9' },
+  actual: { label: 'Actual weight', color: 'var(--primary)' },
+  target: { label: 'SIP target', color: '#7f93b8' },
 } satisfies ChartConfig;
 
 const activityConfig = {
-  invested: { label: 'Cash invested', color: '#17744c' },
+  invested: { label: 'Cash invested', color: 'var(--primary)' },
 } satisfies ChartConfig;
 
+const cumulativeConfig = {
+  cumulative: { label: 'Cumulative invested', color: 'var(--primary)' },
+} satisfies ChartConfig;
+
+const performanceConfig = {
+  gainPercent: { label: 'Gain / loss', color: 'var(--success)' },
+} satisfies ChartConfig;
+
+// Validated against this app's dark surface (#05070d) with
+// scripts/validate_palette.js from the dataviz skill: fixed hue order,
+// worst adjacent CVD ΔE 8.4, worst adjacent normal-vision ΔE 19.3.
 const sectorColors = [
-  '#125aeb',
-  '#173f6b',
-  '#3f78b5',
-  '#17744c',
-  '#5d7792',
-  '#75629a',
-  '#4b8b8b',
-  '#8b6d4b',
-  '#8a5264',
-  '#9aa9ba',
+  '#3987e5',
+  '#d95926',
+  '#199e70',
+  '#c98500',
+  '#d55181',
+  '#008300',
+  '#9085e9',
 ];
+const OTHER_SECTOR_COLOR = '#5b6b85';
+
+function foldSectors(sectors: SectorPoint[], cap = sectorColors.length) {
+  if (sectors.length <= cap) return sectors;
+  const rest = sectors.slice(cap);
+  return [
+    ...sectors.slice(0, cap),
+    {
+      sector: 'Other',
+      value: round(rest.reduce((total, item) => total + item.value, 0)),
+      weight: round(rest.reduce((total, item) => total + item.weight, 0)),
+    },
+  ];
+}
+
+function performanceBarShape(props: BarShapeProps) {
+  const { payload, ...rest } = props;
+  const gain = (payload as PerformancePoint).gain;
+  return (
+    <Rectangle
+      {...rest}
+      radius={[3, 3, 3, 3]}
+      fill={gain >= 0 ? 'var(--success)' : 'var(--danger)'}
+    />
+  );
+}
 
 const monthLabel = (month: string) => {
   const [year, value] = month.split('-').map(Number);
@@ -68,6 +111,16 @@ export default function PortfolioReports({
     ...item,
     label: monthLabel(item.month),
   }));
+  const sectors = foldSectors(report.sectorAllocation);
+  const maxAbsGain = Math.max(
+    1,
+    ...report.performance.map((item) => Math.abs(item.gainPercent)),
+  );
+  const totalGain = report.summary.totalGain;
+  const totalGainPercent = report.summary.totalGainPercent;
+  const cumulativeTotal = activity.length
+    ? activity[activity.length - 1].cumulative
+    : 0;
 
   return (
     <div className="reports">
@@ -80,13 +133,30 @@ export default function PortfolioReports({
             activity uses recorded transactions, not estimated market history.
           </p>
         </div>
-        <div className="reports-priced-value">
-          <span>Priced market value</span>
-          <strong>{money(report.summary.pricedValue)}</strong>
-          <small>
-            {report.summary.quoteCoverage.priced} of{' '}
-            {report.summary.quoteCoverage.held} held companies priced
-          </small>
+        <div className="reports-hero-stats">
+          <div className="reports-priced-value">
+            <span>Priced market value</span>
+            <strong>{money(report.summary.pricedValue)}</strong>
+            <small>
+              {report.summary.quoteCoverage.priced} of{' '}
+              {report.summary.quoteCoverage.held} held companies priced
+            </small>
+          </div>
+          <div
+            className={`reports-priced-value ${totalGain === null ? '' : totalGain >= 0 ? 'pos' : 'neg'}`}
+          >
+            <span>Unrealized gain / loss</span>
+            <strong>
+              {totalGain === null
+                ? '—'
+                : `${totalGain >= 0 ? '+' : ''}${money(totalGain)}`}
+            </strong>
+            <small>
+              {totalGainPercent === null
+                ? 'Add purchase prices to calculate'
+                : `${totalGainPercent >= 0 ? '+' : ''}${totalGainPercent.toFixed(1)}% vs cost basis`}
+            </small>
+          </div>
         </div>
       </div>
 
@@ -160,6 +230,12 @@ export default function PortfolioReports({
                 layout="vertical"
                 margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
               >
+                <defs>
+                  <linearGradient id="allocationFill" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="var(--primary)" />
+                    <stop offset="100%" stopColor="#7dd3fc" />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid horizontal={false} />
                 <XAxis
                   type="number"
@@ -179,7 +255,7 @@ export default function PortfolioReports({
                   axisLine={false}
                 />
                 <ChartTooltip
-                  cursor={{ fill: '#edf3fa' }}
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
                   content={
                     <ChartTooltipContent
                       hideLabel
@@ -195,11 +271,7 @@ export default function PortfolioReports({
                     />
                   }
                 />
-                <Bar
-                  dataKey="weight"
-                  fill="var(--color-weight)"
-                  radius={[0, 5, 5, 0]}
-                >
+                <Bar dataKey="weight" fill="url(#allocationFill)" radius={[0, 5, 5, 0]}>
                   <LabelList
                     dataKey="weight"
                     position="right"
@@ -222,12 +294,104 @@ export default function PortfolioReports({
         <section className="panel report-panel">
           <div className="report-heading">
             <div>
+              <p className="eyebrow">PERFORMANCE</p>
+              <h3>Gain / loss vs cost</h3>
+            </div>
+            <span>Unrealized, by company</span>
+          </div>
+          {report.performance.length ? (
+            <>
+              <ChartContainer
+                config={performanceConfig}
+                className="report-chart"
+                style={{
+                  height: Math.max(220, report.performance.length * 32 + 60),
+                }}
+              >
+                <BarChart
+                  accessibilityLayer
+                  data={report.performance}
+                  layout="vertical"
+                  margin={{ top: 8, right: 20, bottom: 20, left: 4 }}
+                >
+                  <CartesianGrid horizontal={false} />
+                  <XAxis
+                    type="number"
+                    domain={[-maxAbsGain, maxAbsGain]}
+                    tickFormatter={(value) =>
+                      `${Number(value) >= 0 ? '+' : ''}${value}%`
+                    }
+                    label={{
+                      value: 'Gain / loss (%)',
+                      position: 'insideBottom',
+                      offset: -12,
+                    }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="ticker"
+                    width={58}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ReferenceLine x={0} stroke="var(--border)" />
+                  <ChartTooltip
+                    cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                    content={
+                      <ChartTooltipContent
+                        hideLabel
+                        formatter={(value, _name, item) => (
+                          <div className="report-tooltip-row">
+                            <span>{item.payload.name}</span>
+                            <b
+                              className={
+                                item.payload.gain >= 0 ? 'pos-text' : 'neg-text'
+                              }
+                            >
+                              {item.payload.gain >= 0 ? '+' : ''}
+                              {money(item.payload.gain)} (
+                              {Number(value) >= 0 ? '+' : ''}
+                              {Number(value).toFixed(1)}%)
+                            </b>
+                          </div>
+                        )}
+                      />
+                    }
+                  />
+                  <Bar dataKey="gainPercent" shape={performanceBarShape} />
+                </BarChart>
+              </ChartContainer>
+              <div className="perf-key" aria-label="Gain and loss by company">
+                {report.performance.map((item) => (
+                  <div key={item.ticker}>
+                    <span>{item.ticker}</span>
+                    <b className={item.gain >= 0 ? 'pos-text' : 'neg-text'}>
+                      {item.gain >= 0 ? '+' : ''}
+                      {item.gainPercent.toFixed(1)}%
+                    </b>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <ReportEmpty>
+              Add purchase prices to every holding to see gain and loss.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded cost basis vs latest portfolio quotes · unrealized
+          </p>
+        </section>
+
+        <section className="panel report-panel">
+          <div className="report-heading">
+            <div>
               <p className="eyebrow">DIVERSIFICATION</p>
               <h3>Sector allocation</h3>
             </div>
             <span>Current snapshot</span>
           </div>
-          {report.sectorAllocation.length ? (
+          {sectors.length ? (
             <ChartContainer
               config={{ value: { label: 'Market value' } }}
               className="report-chart report-chart--square"
@@ -250,9 +414,12 @@ export default function PortfolioReports({
                   }
                 />
                 <Pie
-                  data={report.sectorAllocation.map((item, index) => ({
+                  data={sectors.map((item, index) => ({
                     ...item,
-                    fill: sectorColors[index % sectorColors.length],
+                    fill:
+                      item.sector === 'Other'
+                        ? OTHER_SECTOR_COLOR
+                        : sectorColors[index % sectorColors.length],
                   }))}
                   dataKey="value"
                   nameKey="sector"
@@ -268,12 +435,15 @@ export default function PortfolioReports({
             </ReportEmpty>
           )}
           <div className="sector-key" aria-label="Sector allocation legend">
-            {report.sectorAllocation.map((item, index) => (
+            {sectors.map((item, index) => (
               <div key={item.sector}>
                 <i
                   aria-hidden="true"
                   style={{
-                    background: sectorColors[index % sectorColors.length],
+                    background:
+                      item.sector === 'Other'
+                        ? OTHER_SECTOR_COLOR
+                        : sectorColors[index % sectorColors.length],
                   }}
                 />
                 <span>{item.sector}</span>
@@ -367,7 +537,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel report-panel--wide">
+        <section className="panel report-panel">
           <div className="report-heading">
             <div>
               <p className="eyebrow">CONTRIBUTION RHYTHM</p>
@@ -425,7 +595,7 @@ export default function PortfolioReports({
                   dataKey="invested"
                   fill="var(--color-invested)"
                   radius={[5, 5, 0, 0]}
-                  maxBarSize={72}
+                  maxBarSize={56}
                 />
               </BarChart>
             </ChartContainer>
@@ -437,6 +607,83 @@ export default function PortfolioReports({
           <p className="report-source">
             Source: non-voided purchase transactions · opening balances and
             sales excluded
+          </p>
+        </section>
+
+        <section className="panel report-panel">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">SIP TRAJECTORY</p>
+              <h3>Cumulative invested</h3>
+            </div>
+            <span>{activity.length ? money(cumulativeTotal) : '—'} to date</span>
+          </div>
+          {activity.length ? (
+            <ChartContainer
+              config={cumulativeConfig}
+              className="report-chart report-chart--trend"
+            >
+              <AreaChart
+                accessibilityLayer
+                data={activity}
+                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
+              >
+                <defs>
+                  <linearGradient id="cumulativeFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  label={{
+                    value: 'Purchase month',
+                    position: 'insideBottom',
+                    offset: -16,
+                  }}
+                />
+                <YAxis
+                  width={72}
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value) => (
+                        <div className="report-tooltip-row">
+                          <span>Cumulative invested</span>
+                          <b>{money(Number(value))}</b>
+                        </div>
+                      )}
+                    />
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  fill="url(#cumulativeFill)"
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)' }}
+                />
+              </AreaChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>
+              Record purchases to see your contribution trajectory.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: running total of non-voided purchases · opening balances
+            and sales excluded
           </p>
         </section>
       </div>

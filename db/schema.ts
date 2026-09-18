@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 export const portfolios = sqliteTable('portfolios', {
   userId: text('user_id').primaryKey(),
   payload: text('payload').notNull(),
@@ -79,4 +79,21 @@ export const researchHelpers = sqliteTable(
   },
   (table) => [index('idx_research_helpers_user_id').on(table.userId)],
 );
+
+export const quoteRefreshes = sqliteTable('quote_refreshes', {
+  ticker: text('ticker').primaryKey(),
+  price: real('price').notNull(),
+  asOf: text('as_of').notNull(),
+  quoteDate: text('quote_date').notNull(),
+  source: text('source').notNull(),
+  fetchedAt: text('fetched_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const marketSummaryRefreshes = sqliteTable('market_summary_refreshes', {
+  id: text('id').primaryKey(),
+  payload: text('payload').notNull(),
+  fetchedAt: text('fetched_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
 

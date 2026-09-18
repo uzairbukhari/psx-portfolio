@@ -36,6 +36,20 @@
       "when": 1789565392178,
       "tag": "0004_nappy_jetstream",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789662194125,
+      "tag": "0005_keen_goblin_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789666232228,
+      "tag": "0006_brainy_vance_astro",
+      "breakpoints": true
     }
   ]
 }

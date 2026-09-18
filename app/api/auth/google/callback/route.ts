@@ -50,7 +50,9 @@ export async function GET(req: Request) {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
   const email = userInfo.email?.toLowerCase();
-  if (!userInfo.email_verified || !email || !allowed.includes(email))
+  if (!userInfo.email_verified || !email)
+    return redirectWithError(url.origin, 'oauth_email');
+  if (allowed.length && !allowed.includes(email))
     return redirectWithError(url.origin, 'oauth_email');
 
   if (!env.SESSION_SECRET) return redirectWithError(url.origin, 'oauth_config');

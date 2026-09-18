@@ -136,8 +136,110 @@ test('compares actual and target weights when every held company is priced', () 
 test('aggregates buy cash including fees and excludes openings sales and voids', () => {
   const report = portfolioReport(portfolio());
   assert.deepEqual(report.monthlyActivity, [
-    { month: '2026-02', invested: 105 },
+    { month: '2026-02', invested: 105, cumulative: 105 },
   ]);
+});
+
+test('gain/loss performance excludes holdings with unknown cost basis', () => {
+  const report = portfolioReport(portfolio());
+  assert.deepEqual(report.performance, [
+    {
+      ticker: 'BBB',
+      name: 'Beta Foods',
+      cost: 84,
+      value: 100,
+      gain: 16,
+      gainPercent: 19.05,
+    },
+  ]);
+});
+
+test('monthly activity carries a running cumulative total across months', () => {
+  const p = {
+    companies: [
+      {
+        ticker: 'X',
+        name: 'Xylo Corp',
+        sector: 'Tech',
+        target: 50,
+        approved: true,
+        screenDate: '',
+        note: '',
+      },
+      {
+        ticker: 'Y',
+        name: 'Yara Mills',
+        sector: 'Textile',
+        target: 50,
+        approved: true,
+        screenDate: '',
+        note: '',
+      },
+    ],
+    trades: [
+      {
+        id: 'x1',
+        ticker: 'X',
+        kind: 'buy',
+        date: '2026-01-15',
+        shares: 10,
+        price: 10,
+        fees: 0,
+        month: '2026-01',
+        note: '',
+      },
+      {
+        id: 'y1',
+        ticker: 'Y',
+        kind: 'buy',
+        date: '2026-01-20',
+        shares: 5,
+        price: 20,
+        fees: 0,
+        month: '2026-01',
+        note: '',
+      },
+      {
+        id: 'x2',
+        ticker: 'X',
+        kind: 'buy',
+        date: '2026-02-05',
+        shares: 5,
+        price: 12,
+        fees: 0,
+        month: '2026-02',
+        note: '',
+      },
+    ],
+    quotes: {
+      X: {
+        price: 15,
+        date: '2026-09-15',
+        asOf: '2026-09-15',
+        source: 'https://dps.psx.com.pk/company/X',
+        fetchedAt: '2026-09-15T12:00:00Z',
+      },
+      Y: {
+        price: 18,
+        date: '2026-09-15',
+        asOf: '2026-09-15',
+        source: 'https://dps.psx.com.pk/company/Y',
+        fetchedAt: '2026-09-15T12:00:00Z',
+      },
+    },
+    budgets: {},
+  };
+  const report = portfolioReport(p);
+  assert.deepEqual(report.monthlyActivity, [
+    { month: '2026-01', invested: 200, cumulative: 200 },
+    { month: '2026-02', invested: 60, cumulative: 260 },
+  ]);
+  assert.deepEqual(report.performance, [
+    { ticker: 'X', name: 'Xylo Corp', cost: 160, value: 225, gain: 65, gainPercent: 40.63 },
+    { ticker: 'Y', name: 'Yara Mills', cost: 100, value: 90, gain: -10, gainPercent: -10 },
+  ]);
+  assert.equal(report.summary.totalGain, 55);
+  assert.equal(report.summary.totalGainPercent, 21.15);
 });
 
 test('reports incomplete quote coverage without presenting actual target weights', () => {

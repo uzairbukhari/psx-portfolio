@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { db, identity, failure } from '@/lib/server';
 import {
-  initialPortfolio,
+  blankPortfolio,
   holdings,
   plan,
   researchInsights,
@@ -10,7 +10,6 @@ import {
   validateReview,
   type Portfolio,
 } from '@/lib/portfolio';
-import initialQuotes from '@/lib/initial-quotes.json';
 const MODEL = 'gpt-5-nano';
 function researchContext(p: Portfolio, tickers: string[]) {
   return researchInsights(p, tickers)
@@ -60,7 +59,7 @@ export async function POST(req: Request) {
       );
     const portfolio: Portfolio = row
       ? JSON.parse(row.payload)
-      : { ...initialPortfolio(), quotes: initialQuotes };
+      : blankPortfolio();
     const tickers = portfolio.companies
       .filter((c) => c.target > 0)
       .map((c) => c.ticker);

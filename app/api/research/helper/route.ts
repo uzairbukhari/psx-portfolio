@@ -1,7 +1,7 @@
 import { db } from '@/lib/server';
 import { validateInvestmentDossier } from '@/lib/research-policy.mjs';
 import {
-  initialPortfolio,
+  blankPortfolio,
   round,
   today,
   validate,
@@ -59,7 +59,7 @@ async function completeJob(
     .first<{ payload: string; revision: number }>();
   const portfolio: Portfolio = portfolioRow
     ? JSON.parse(portfolioRow.payload)
-    : initialPortfolio();
+    : blankPortfolio();
   const scores = details.scores as Array<number | null>;
   const scenarios = details.scenarios as Array<{
     eps: number;

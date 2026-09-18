@@ -1,4 +1,5 @@
 import { today, type Quote } from '@/lib/portfolio';
+import { fetchPsx } from '@/lib/psx-fetch';
 
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -14,12 +15,7 @@ function quoteDate(asOf: string) {
 
 export async function fetchPsxQuote(ticker: string): Promise<Quote> {
   const source = `https://dps.psx.com.pk/company/${ticker}`;
-  const response = await fetch(source, {
-    headers: { 'User-Agent': 'Mozilla/5.0 PSX Portfolio Dashboard/1.0' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw Error(`${response.status} from PSX`);
+  const response = await fetchPsx(source);
   const text = await response.text();
   const price = Number(
     text.match(/quote__close["'][^>]*>Rs\.\s*([0-9,.]+)/i)?.[1]?.replace(/,/g, ''),

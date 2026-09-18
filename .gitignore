@@ -34,6 +34,8 @@ yarn-error.log*
 next-env.d.ts
 /dist/
 /.wrangler/
+/workers/*/.wrangler/
+/workers/*/dist/
 /outputs/
 /work/
 

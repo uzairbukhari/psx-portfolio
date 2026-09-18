@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "psx-portfolio-sip-quote-refresh",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-22",
+  // 07:00 and 11:00 UTC, Monday-Friday = 12:00 and 16:00 Pakistan Standard Time (UTC+5).
+  "triggers": { "crons": ["0 7 * * 1-5", "0 11 * * 1-5"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "psx-portfolio-sip",
+      "database_id": "f72a6264-371b-49ff-89e3-20eef1ce2b19",
+      "migrations_dir": "../../drizzle"
+    }
+  ]
+}

@@ -1,6 +1,5 @@
-import initialQuotes from '@/lib/initial-quotes.json';
 import { db, identity, failure } from '@/lib/server';
-import { initialPortfolio, validate } from '@/lib/portfolio';
+import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
@@ -8,13 +7,31 @@ export async function GET(req: Request) {
       .prepare('SELECT payload,revision FROM portfolios WHERE user_id=?')
       .bind(user)
       .first<{ payload: string; revision: number }>();
+    const portfolio: Portfolio = row
+      ? JSON.parse(row.payload)
+      : blankPortfolio();
+    const cache = await db()
+      .prepare('SELECT * FROM quote_refreshes')
+      .all<{
+        ticker: string;
+        price: number;
+        as_of: string;
+        quote_date: string;
+        source: string;
+        fetched_at: string;
+      }>();
+    for (const cached of cache.results) {
+      if (portfolio.quotes[cached.ticker]?.manual) continue;
+      portfolio.quotes[cached.ticker] = {
+        price: cached.price,
+        asOf: cached.as_of,
+        date: cached.quote_date,
+        source: cached.source,
+        fetchedAt: cached.fetched_at,
+      };
+    }
     return Response.json(
-      {
-        portfolio: row
-          ? JSON.parse(row.payload)
-          : { ...initialPortfolio(), quotes: initialQuotes },
-        revision: row?.revision ?? 0,
-      },
+      { portfolio, revision: row?.revision ?? 0 },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
