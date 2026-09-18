@@ -53,6 +53,18 @@ export function getRunArchive(jobId: string) {
   return runArchive.get(jobId);
 }
 
+// The job's server-side checkpoint deliberately drops extracted text/bytes
+// (keeping the DB row small), so a resumed job that failed at synthesis —
+// not at download — has no way to know discover()/downloadReports() were
+// already done. Without this, clicking Resume re-fetches and re-extracts
+// every report from scratch. Caching per job id in this tab means a same-
+// tab retry skips straight back to evidence + synthesis; a resume claimed
+// by a different tab (or after a reload) just falls back to a full re-run.
+const downloadCache = new Map<
+  string,
+  { found: Awaited<ReturnType<typeof discover>>; documents: RunnerDocument[] }
+>();
+
 async function call(path: string, body: unknown) {
   const response = await fetch(path, {
     method: 'POST',
@@ -367,45 +379,63 @@ async function processJob(job: JobInput) {
         companyName: found.companyName,
         sector: found.sector,
       });
+      downloadCache.delete(job.id);
       return;
     }
-    await progress('verifying', `Verifying ${job.ticker} on PSX`, 0, checkpoint);
-    const found = await discover(job);
-    await progress(
-      'finding_reports',
-      `Found ${found.urls.length} official report candidate${found.urls.length === 1 ? '' : 's'}`,
-      0,
-      { ...checkpoint, found },
-    );
-    if (!found.urls.length)
-      throw Error(
-        'No official report links were found. Add or verify the company investor-relations source, then resume.',
-      );
-    const documents = await downloadReports(job, found, async (partial) => {
-      const validCount = partial.filter((d) => d.status === 'downloaded_pdf_validated').length;
+    const cached = downloadCache.get(job.id);
+    let found: Awaited<ReturnType<typeof discover>>;
+    let documents: RunnerDocument[];
+    if (cached) {
+      ({ found, documents } = cached);
+      const validCount = documents.filter((d) => d.status === 'downloaded_pdf_validated').length;
+      checkpoint = { found, documents: documents.map(({ bytes: _bytes, text: _text, ...rest }) => rest) };
       await progress(
-        'downloading',
-        `Validated ${validCount} official report${validCount === 1 ? '' : 's'}`,
+        'extracting',
+        `Reusing ${validCount} report${validCount === 1 ? '' : 's'} already downloaded this session`,
         validCount,
-        { found, documents: partial.map(({ bytes: _bytes, text: _text, ...rest }) => rest) },
+        checkpoint,
       );
-    });
+    } else {
+      await progress('verifying', `Verifying ${job.ticker} on PSX`, 0, checkpoint);
+      found = await discover(job);
+      await progress(
+        'finding_reports',
+        `Found ${found.urls.length} official report candidate${found.urls.length === 1 ? '' : 's'}`,
+        0,
+        { ...checkpoint, found },
+      );
+      if (!found.urls.length)
+        throw Error(
+          'No official report links were found. Add or verify the company investor-relations source, then resume.',
+        );
+      documents = await downloadReports(job, found, async (partial) => {
+        const validCount = partial.filter((d) => d.status === 'downloaded_pdf_validated').length;
+        await progress(
+          'downloading',
+          `Validated ${validCount} official report${validCount === 1 ? '' : 's'}`,
+          validCount,
+          { found, documents: partial.map(({ bytes: _bytes, text: _text, ...rest }) => rest) },
+        );
+      });
+      checkpoint = { found, documents: documents.map(({ bytes: _bytes, text: _text, ...rest }) => rest) };
+      const validAfterDownload = documents.filter((document) => document.status === 'downloaded_pdf_validated');
+      if (!validAfterDownload.length)
+        throw Error(
+          `Official links were found, but none produced a readable PDF. ${documents
+            .map((document) => document.error)
+            .filter(Boolean)
+            .slice(0, 3)
+            .join('; ') || 'Partial download records were preserved.'}`,
+        );
+      downloadCache.set(job.id, { found, documents });
+      await progress(
+        'extracting',
+        `Preparing cited evidence from ${validAfterDownload.length} validated report${validAfterDownload.length === 1 ? '' : 's'}`,
+        validAfterDownload.length,
+        checkpoint,
+      );
+    }
     const valid = documents.filter((document) => document.status === 'downloaded_pdf_validated');
-    checkpoint = { found, documents: documents.map(({ bytes: _bytes, text: _text, ...rest }) => rest) };
-    if (!valid.length)
-      throw Error(
-        `Official links were found, but none produced a readable PDF. ${documents
-          .map((document) => document.error)
-          .filter(Boolean)
-          .slice(0, 3)
-          .join('; ') || 'Partial download records were preserved.'}`,
-      );
-    await progress(
-      'extracting',
-      `Preparing cited evidence from ${valid.length} validated report${valid.length === 1 ? '' : 's'}`,
-      valid.length,
-      checkpoint,
-    );
     const evidence = evidenceFrom(documents, found.webSources);
     const synthesis = (await call('/api/research/synthesize', {
       id: job.id,
@@ -444,6 +474,7 @@ async function processJob(job: JobInput) {
       companyName: found.companyName,
       sector: found.sector,
     });
+    downloadCache.delete(job.id);
   } catch (error) {
     try {
       await call('/api/research/run', {
