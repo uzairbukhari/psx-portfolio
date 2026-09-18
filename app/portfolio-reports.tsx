@@ -205,7 +205,7 @@ export default function PortfolioReports({
       </section>
 
       <div className="reports-grid">
-        <section className="panel report-panel report-panel--wide">
+        <section className="panel report-panel">
           <div className="report-heading">
             <div>
               <p className="eyebrow">ALLOCATION LADDER</p>

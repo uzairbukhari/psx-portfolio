@@ -785,8 +785,8 @@ textarea:focus {
 .original-research-dossier button.back,.original-research-dossier button.text-button{background:transparent!important;color:#bcd4f7!important}
 .original-research-dossier .stats.compact{padding:0!important;font-size:inherit!important}
 .original-research-dossier .dossier-tabs [data-slot=tab-indicator]{display:none}
-.original-research-dossier .dossier-tabs [data-slot=tabs-trigger]{background:transparent!important;color:var(--muted-foreground)!important;border-radius:0!important}
-.original-research-dossier .dossier-tabs [data-slot=tabs-trigger][data-active]{color:var(--foreground)!important;border-bottom:2px solid var(--primary)}
+.original-research-dossier .dossier-tabs [data-slot=tabs-trigger]{background:transparent!important;color:var(--muted-foreground)!important;border-radius:0!important;box-shadow:none!important}
+.original-research-dossier .dossier-tabs [data-slot=tabs-trigger][data-active]{color:var(--foreground)!important;border-bottom:2px solid var(--primary);box-shadow:none!important}
 .original-research-dossier h2{margin:0;font-size:18px}
 .original-research-dossier label{margin:0}
 .original-research-dossier .note-grid textarea{font-size:14px}
