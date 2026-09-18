@@ -312,6 +312,17 @@ Explain findings simply. The narrative must cover the business, industry and mac
           throw Error(
             'OpenAI API credit is exhausted. Partial research files were preserved.',
           );
+        // Firing correction attempts back-to-back can trip the account's
+        // own rate limit, burning a correction attempt on a throttle
+        // instead of an actual retry. Back off before the next attempt —
+        // honoring OpenAI's Retry-After header when it sends one.
+        if (code === 'rate_limit_exceeded' && attempt < settings.maxAttempts) {
+          const retryAfterSeconds = Number(response.headers.get('retry-after'));
+          const delaySeconds = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+            ? Math.min(retryAfterSeconds, 20)
+            : 5;
+          await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        }
         issues.push(`Attempt ${attempt}: the AI analysis request failed (${code || 'unknown error'}).`);
         continue;
       }
