@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectEvidence } from '../research-helper/evidence.mjs';
+import { selectEvidence } from '../lib/research-evidence.mjs';
 
 test('retains annual tables, adjacent pages and external evidence without duplicate windows', () => {
   const doc = { title: 'Annual Report 2025', url: 'https://example.com/annual.pdf', text:

@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Upload, Laptop, RotateCcw, Settings, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { Download, Plus, Upload, RotateCcw, Settings, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,8 @@ import {
   type ResearchSettings,
 } from '@/lib/portfolio';
 import DossierExperience from './dossier-experience';
+import { onRunnerEvent, startResearchRunner, getRunArchive } from './research-runner';
+import { downloadRunSources } from './research-zip';
 
 type Props = {
   portfolio: Portfolio;
@@ -43,9 +45,20 @@ type Job = {
   updatedAt: string;
   startedAt: string | null;
   completedAt: string | null;
-  helperOnline: boolean;
+  claimed: boolean;
 };
 type Event = { id: number; stage: string; message: string; created_at: string };
+const STAGE_SEQUENCE = [
+  'waiting',
+  'verifying',
+  'finding_reports',
+  'downloading',
+  'extracting',
+  'analyzing',
+  'validating',
+  'saving',
+  'complete',
+] as const;
 const textValue = (value: unknown, fallback = '') =>
   typeof value === 'string' || typeof value === 'number'
     ? String(value)
@@ -66,7 +79,7 @@ const blank = (ticker: string): ResearchCompany => ({
   updatedAt: today(),
 });
 const stageLabel: Record<string, string> = {
-  waiting: 'Waiting for your Mac',
+  waiting: 'Queued',
   verifying: 'Verifying company',
   finding_reports: 'Finding reports',
   downloading: 'Downloading reports',
@@ -99,15 +112,13 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
     [events, setEvents] = useState<Event[]>([]),
     [jobOpen, setJobOpen] = useState<Job | null>(null),
     [addOpen, setAddOpen] = useState(false),
-    [pairOpen, setPairOpen] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [settingsDraft, setSettingsDraft] = useState<ResearchSettings>(
       DEFAULT_RESEARCH_SETTINGS,
     ),
     [ticker, setTicker] = useState(''),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [pairToken, setPairToken] = useState('');
+    [error, setError] = useState('');
   const settings = useMemo(
     () => portfolio.researchSettings ?? DEFAULT_RESEARCH_SETTINGS,
     [portfolio.researchSettings],
@@ -166,6 +177,20 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       window.clearInterval(timer);
     };
   }, [jobOpen?.id, loadJobs]);
+  useEffect(() => {
+    const stop = startResearchRunner();
+    const unsubscribe = onRunnerEvent(({ jobId, stage, message, reportsFound }) => {
+      const patch = { stage, message, reportsFound, claimed: true };
+      setJobs((prev) =>
+        prev.map((job) => (job.id === jobId ? { ...job, ...patch } : job)),
+      );
+      setJobOpen((prev) => (prev && prev.id === jobId ? { ...prev, ...patch } : prev));
+    });
+    return () => {
+      stop();
+      unsubscribe();
+    };
+  }, []);
   useEffect(() => {
     const value = sessionStorage.getItem('open-completed-dossier');
     if (
@@ -268,25 +293,6 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
         reason instanceof Error
           ? reason.message
           : 'Research could not be updated.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-  const pair = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const response = await fetch('/api/research/pair', { method: 'POST' }),
-        data = (await response.json()) as { error?: string; token: string };
-      if (!response.ok)
-        throw Error(data.error || 'A pairing token could not be created.');
-      setPairToken(data.token);
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : 'A pairing token could not be created.',
       );
     } finally {
       setBusy(false);
@@ -461,16 +467,6 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
           >
             <Settings size={16} /> Settings
           </button>
-          <button
-            className="secondary"
-            onClick={() => {
-              setPairOpen(true);
-              setPairToken('');
-              setError('');
-            }}
-          >
-            <Laptop size={16} /> Connect Mac helper
-          </button>
           <label className="import-label">
             <Upload size={15} /> Import research backup
             <input
@@ -550,9 +546,9 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                             stageLabel[job?.stage || ''] ||
                             'Queue'}
                       </span>
-                      {active && !job.helperOnline && (
+                      {active && !job.claimed && (
                         <small className="helper-offline">
-                          Waiting for your Mac
+                          Open Research desk to process
                         </small>
                       )}
                     </td>
@@ -598,8 +594,9 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
         <DialogContent className="form-dialog">
           <DialogTitle>Research a PSX company</DialogTitle>
           <DialogDescription>
-            Enter the ticker. The dossier appears immediately and your Mac
-            helper continues the research in the background.
+            Enter the ticker. The dossier appears immediately and research
+            continues automatically while this tab (or any other Research
+            desk tab you have open) stays open.
           </DialogDescription>
           <label>
             Company ticker
@@ -769,11 +766,41 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
           <DialogDescription>{jobOpen?.companyName}</DialogDescription>
           {jobOpen && (
             <>
+              {!['needs_attention', 'cancelled'].includes(jobOpen.status) && (
+                <div className="stage-track">
+                  {STAGE_SEQUENCE.map((stage) => {
+                    const currentIndex = STAGE_SEQUENCE.indexOf(
+                      jobOpen.stage as (typeof STAGE_SEQUENCE)[number],
+                    );
+                    const stageIndex = STAGE_SEQUENCE.indexOf(stage);
+                    const state =
+                      stageIndex < currentIndex
+                        ? 'done'
+                        : stageIndex === currentIndex
+                          ? 'active'
+                          : 'pending';
+                    return <span key={stage} className={`stage-step ${state}`} />;
+                  })}
+                </div>
+              )}
               <div className="current-stage">
                 <span className={`job-dot ${jobOpen.status}`} />
                 <div>
                   <b>{stageLabel[jobOpen.stage] || jobOpen.message}</b>
                   <p>{jobOpen.message}</p>
+                </div>
+                <div
+                  className="spend-gauge"
+                  style={
+                    {
+                      '--pct': Math.min(100, (jobOpen.spentUsd / 0.5) * 100),
+                    } as CSSProperties
+                  }
+                >
+                  <div className="spend-gauge-hole">
+                    <b>${jobOpen.spentUsd.toFixed(2)}</b>
+                    <small>/ $0.50</small>
+                  </div>
                 </div>
               </div>
               <div className="job-facts">
@@ -786,15 +813,15 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                   <b>{elapsed(jobOpen.startedAt, jobOpen.completedAt)}</b>
                 </div>
                 <div>
-                  <span>AI spending</span>
-                  <b>${jobOpen.spentUsd.toFixed(4)} / $0.50</b>
+                  <span>Processing</span>
+                  <b>{jobOpen.claimed ? 'This tab' : 'Not yet claimed'}</b>
                 </div>
               </div>
-              {!jobOpen.helperOnline &&
+              {!jobOpen.claimed &&
                 ['queued', 'researching'].includes(jobOpen.status) && (
                   <p className="notice">
-                    Waiting for your Mac helper. Research resumes automatically
-                    when the Mac is awake and connected.
+                    Queued. Research starts automatically as soon as a
+                    Research desk tab is open — this one, or any other.
                   </p>
                 )}
               {jobOpen.error && <p className="notice error">{jobOpen.error}</p>}
@@ -830,43 +857,17 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                     <X size={15} /> Cancel research
                   </button>
                 )}
+                {jobOpen.status === 'complete' && getRunArchive(jobOpen.id) && (
+                  <button
+                    className="secondary"
+                    onClick={() => downloadRunSources(jobOpen.id)}
+                  >
+                    <Download size={15} /> Download sources
+                  </button>
+                )}
               </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={pairOpen} onOpenChange={setPairOpen}>
-        <DialogContent className="form-dialog">
-          <DialogTitle>Connect this Mac</DialogTitle>
-          <DialogDescription>
-            Create a private one-time token, then run the included helper
-            installer on this Mac.
-          </DialogDescription>
-          {!pairToken ? (
-            <button disabled={busy} onClick={() => void pair()}>
-              <Laptop size={16} /> Create pairing token
-            </button>
-          ) : (
-            <>
-              <p className="notice success">
-                Pairing token created. It is shown once.
-              </p>
-              <label>
-                Pairing token
-                <input
-                  readOnly
-                  value={pairToken}
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-              </label>
-              <p className="help">
-                Run <code>portfolio-dashboard/research-helper/install.sh</code>.
-                Enter this app’s URL, paste the token when prompted, and accept
-                the default companies folder.
-              </p>
-            </>
-          )}
-          {error && <p className="notice error">{error}</p>}
         </DialogContent>
       </Dialog>
     </section>

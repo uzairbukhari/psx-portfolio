@@ -8,17 +8,6 @@ import {
   tickerOK,
 } from '@/lib/research-jobs';
 
-async function helperLastSeen(userId: string) {
-  return (
-    await db()
-      .prepare(
-        'SELECT last_seen_at FROM research_helpers WHERE user_id=? AND revoked_at IS NULL ORDER BY last_seen_at DESC LIMIT 1',
-      )
-      .bind(userId)
-      .first<{ last_seen_at: string | null }>()
-  )?.last_seen_at;
-}
-
 async function resolveCompany(ticker: string, userId: string) {
   const saved = await db()
     .prepare('SELECT payload FROM portfolios WHERE user_id=?')
@@ -37,8 +26,8 @@ async function resolveCompany(ticker: string, userId: string) {
   const seeded = initialPortfolio().companies.find(
     (company) => company.ticker === ticker,
   );
-  // The Worker cannot reliably reach DPS. The Mac helper verifies unknown
-  // symbols and sends the authoritative company name when it completes.
+  // The browser-side research runner verifies unknown symbols against PSX
+  // itself and sends the authoritative company name when it completes.
   return { name: seeded?.name || ticker, sector: seeded?.sector || 'Unknown' };
 }
 
@@ -51,7 +40,6 @@ export async function GET(req: Request) {
       )
       .bind(userId)
       .all<ResearchJobRow>();
-    const lastSeen = await helperLastSeen(userId);
     const selected = new URL(req.url).searchParams.get('job');
     let events: unknown[] = [];
     if (selected) {
@@ -67,7 +55,7 @@ export async function GET(req: Request) {
         ).results.reverse();
     }
     return Response.json(
-      { jobs: rows.results.map((row) => publicJob(row, lastSeen)), events },
+      { jobs: rows.results.map((row) => publicJob(row)), events },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
@@ -99,7 +87,7 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
     await db()
       .prepare(
-        "INSERT INTO research_jobs (id,user_id,ticker,company_name,sector,status,stage,message,budget_micros,created_at,updated_at) VALUES (?,?,?,?,?,'queued','waiting','Waiting for your Mac helper',?,?,?)",
+        "INSERT INTO research_jobs (id,user_id,ticker,company_name,sector,status,stage,message,budget_micros,created_at,updated_at) VALUES (?,?,?,?,?,'queued','waiting','Queued',?,?,?)",
       )
       .bind(
         id,
@@ -115,7 +103,7 @@ export async function POST(req: Request) {
     await addEvent(
       id,
       'waiting',
-      'Dossier queued. Waiting for your Mac helper.',
+      'Dossier queued. Open Research desk to process it.',
     );
     const row = await db()
       .prepare('SELECT * FROM research_jobs WHERE id=?')
@@ -173,7 +161,7 @@ export async function PATCH(req: Request) {
         );
       await db()
         .prepare(
-          "UPDATE research_jobs SET status='queued',stage='waiting',message='Waiting for your Mac helper',error=NULL,cancel_requested=0,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
+          "UPDATE research_jobs SET status='queued',stage='waiting',message='Queued',error=NULL,cancel_requested=0,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
         )
         .bind(now, row.id)
         .run();

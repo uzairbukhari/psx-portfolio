@@ -66,20 +66,6 @@ export const researchEvents = sqliteTable(
   (table) => [index('idx_research_events_job_id').on(table.jobId, table.id)],
 );
 
-export const researchHelpers = sqliteTable(
-  'research_helpers',
-  {
-    id: text('id').primaryKey(),
-    userId: text('user_id').notNull(),
-    tokenHash: text('token_hash').notNull().unique(),
-    label: text('label').notNull(),
-    createdAt: text('created_at').notNull(),
-    lastSeenAt: text('last_seen_at'),
-    revokedAt: text('revoked_at'),
-  },
-  (table) => [index('idx_research_helpers_user_id').on(table.userId)],
-);
-
 export const quoteRefreshes = sqliteTable('quote_refreshes', {
   ticker: text('ticker').primaryKey(),
   price: real('price').notNull(),

@@ -1,4 +1,4 @@
-import { db } from '@/lib/server';
+import { db, failure, identity } from '@/lib/server';
 import { validateInvestmentDossier } from '@/lib/research-policy.mjs';
 import {
   blankPortfolio,
@@ -10,8 +10,6 @@ import {
 } from '@/lib/portfolio';
 import {
   addEvent,
-  helperFailure,
-  helperIdentity,
   publicJob,
   RESEARCH_STAGES,
   type ResearchJobRow,
@@ -30,7 +28,7 @@ function dossierResult(value: unknown, ticker: string) {
   )
     throw Error('The dossier company does not match the research job.');
   if (details.schemaVersion !== 2 || details.status !== 'Complete')
-    throw Error('The helper must submit a completed version 2 dossier.');
+    throw Error('The run must submit a completed version 2 dossier.');
   if (!Array.isArray(details.financials) || !Array.isArray(details.documents))
     throw Error('The dossier is missing financials or source documents.');
   if (!Array.isArray(details.scoreRubric) || details.scoreRubric.length !== 7)
@@ -135,57 +133,22 @@ async function completeJob(
   );
 }
 
-export async function GET(req: Request) {
-  try {
-    const helper = await helperIdentity(req);
-    const now = new Date().toISOString();
-    const leaseUntil = new Date(Date.now() + 120_000).toISOString();
-    const candidate = await db()
-      .prepare(
-        "SELECT * FROM research_jobs WHERE user_id=? AND cancel_requested=0 AND (status='queued' OR (status='researching' AND lease_until<?)) ORDER BY created_at LIMIT 1",
-      )
-      .bind(helper.user_id, now)
-      .first<ResearchJobRow>();
-    if (!candidate) return Response.json({ job: null });
-    const claimed = await db()
-      .prepare(
-        "UPDATE research_jobs SET status='researching',stage=CASE WHEN status='queued' THEN 'verifying' ELSE stage END,message=CASE WHEN status='queued' THEN 'Verifying company' ELSE message END,lease_owner=?,lease_until=?,started_at=COALESCE(started_at,?),updated_at=? WHERE id=? AND (status='queued' OR lease_until<?)",
-      )
-      .bind(helper.id, leaseUntil, now, now, candidate.id, now)
-      .run();
-    if (!claimed.meta.changes) return Response.json({ job: null });
-    const row = await db()
-      .prepare('SELECT * FROM research_jobs WHERE id=?')
-      .bind(candidate.id)
-      .first<ResearchJobRow>();
-    if (candidate.status === 'queued')
-      await addEvent(
-        candidate.id,
-        'verifying',
-        'Mac helper started the research run.',
-      );
-    return Response.json({
-      job: {
-        ...publicJob(row!),
-        checkpoint: row!.checkpoint ? JSON.parse(row!.checkpoint) : null,
-      },
-    });
-  } catch (error) {
-    return helperFailure(error);
-  }
-}
-
+// Claims the next queued/stale-leased job for the signed-in user's browser
+// tab and reports its progress back — this is the in-browser research
+// runner's counterpart to the old Mac helper's poll loop.
 export async function POST(req: Request) {
   try {
-    const helper = await helperIdentity(req);
+    const userId = await identity(req, true);
     const body = (await req.json()) as {
-      id?: string;
       action?:
+        | 'claim'
         | 'progress'
         | 'heartbeat'
         | 'complete'
         | 'attention'
         | 'cancelled';
+      runnerId?: string;
+      id?: string;
       stage?: string;
       message?: string;
       reportsFound?: number;
@@ -195,14 +158,48 @@ export async function POST(req: Request) {
       companyName?: string;
       sector?: string;
     };
+    const runnerId = String(body.runnerId || '');
+    if (!runnerId) throw Error('A runner id is required.');
+
+    if (body.action === 'claim') {
+      const now = new Date().toISOString();
+      const leaseUntil = new Date(Date.now() + 120_000).toISOString();
+      const candidate = await db()
+        .prepare(
+          "SELECT * FROM research_jobs WHERE user_id=? AND cancel_requested=0 AND (status='queued' OR (status='researching' AND lease_until<?)) ORDER BY created_at LIMIT 1",
+        )
+        .bind(userId, now)
+        .first<ResearchJobRow>();
+      if (!candidate) return Response.json({ job: null });
+      const claimed = await db()
+        .prepare(
+          "UPDATE research_jobs SET status='researching',stage=CASE WHEN status='queued' THEN 'verifying' ELSE stage END,message=CASE WHEN status='queued' THEN 'Verifying company' ELSE message END,lease_owner=?,lease_until=?,started_at=COALESCE(started_at,?),updated_at=? WHERE id=? AND (status='queued' OR lease_until<?)",
+        )
+        .bind(runnerId, leaseUntil, now, now, candidate.id, now)
+        .run();
+      if (!claimed.meta.changes) return Response.json({ job: null });
+      const row = await db()
+        .prepare('SELECT * FROM research_jobs WHERE id=?')
+        .bind(candidate.id)
+        .first<ResearchJobRow>();
+      if (candidate.status === 'queued')
+        await addEvent(candidate.id, 'verifying', 'Research started.');
+      return Response.json({
+        job: {
+          ...publicJob(row!),
+          checkpoint: row!.checkpoint ? JSON.parse(row!.checkpoint) : null,
+        },
+      });
+    }
+
     const row = await db()
       .prepare('SELECT * FROM research_jobs WHERE id=? AND user_id=?')
-      .bind(body.id, helper.user_id)
+      .bind(body.id, userId)
       .first<ResearchJobRow>();
     if (!row) throw Error('Research job was not found.');
     if (row.status === 'complete' && body.action === 'complete') return Response.json({ complete: true });
-    if (row.status !== 'researching' || row.lease_owner !== helper.id)
-      throw Error('This job is leased to another helper process.');
+    if (row.status !== 'researching' || row.lease_owner !== runnerId)
+      throw Error('This job is being processed by another browser tab.');
     const now = new Date().toISOString();
     const leaseUntil = new Date(Date.now() + 120_000).toISOString();
     if (row.cancel_requested || body.action === 'cancelled') {
@@ -274,7 +271,7 @@ export async function POST(req: Request) {
       body.action !== 'progress' ||
       !RESEARCH_STAGES.includes(body.stage as never)
     )
-      throw Error('Invalid helper update.');
+      throw Error('Invalid run update.');
     const message = String(body.message || '').slice(0, 1000);
     await db()
       .prepare(
@@ -298,6 +295,6 @@ export async function POST(req: Request) {
     await addEvent(row.id, String(body.stage), message);
     return Response.json({ ok: true });
   } catch (error) {
-    return helperFailure(error);
+    return failure(error);
   }
 }

@@ -50,6 +50,13 @@
       "when": 1789666232228,
       "tag": "0006_brainy_vance_astro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789747442120,
+      "tag": "0007_woozy_nextwave",
+      "breakpoints": true
     }
   ]
 }

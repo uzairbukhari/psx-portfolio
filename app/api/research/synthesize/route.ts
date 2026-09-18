@@ -1,10 +1,8 @@
 import { env } from 'cloudflare:workers';
-import { db } from '@/lib/server';
+import { db, failure, identity } from '@/lib/server';
 import researchContext from '@/lib/research-context.json';
 import {
   addEvent,
-  helperFailure,
-  helperIdentity,
   resolveResearchSettings,
   type ResearchJobRow,
 } from '@/lib/research-jobs';
@@ -154,11 +152,12 @@ export async function POST(req: Request) {
   let jobId = '';
   let authorizedJob = false;
   try {
-    const helper = await helperIdentity(req);
+    const userId = await identity(req, true);
     if (!env.OPENAI_API_KEY)
       throw Error('The secure AI connection is not configured.');
     const body = (await req.json()) as {
       id?: string;
+      runnerId?: string;
       ticker?: string;
       companyName?: string;
       evidence?: string;
@@ -171,11 +170,13 @@ export async function POST(req: Request) {
       market?: { price?: number | null; priceDate?: string; pe?: number | null };
     };
     jobId = String(body.id || '');
+    const runnerId = String(body.runnerId || '');
+    if (!runnerId) throw Error('A runner id is required.');
     const row = await db()
       .prepare('SELECT * FROM research_jobs WHERE id=? AND user_id=?')
-      .bind(jobId, helper.user_id)
+      .bind(jobId, userId)
       .first<ResearchJobRow>();
-    if (!row || row.status !== 'researching' || row.cancel_requested || row.lease_owner !== helper.id || !row.lease_until || row.lease_until < new Date().toISOString())
+    if (!row || row.status !== 'researching' || row.cancel_requested || row.lease_owner !== runnerId || !row.lease_until || row.lease_until < new Date().toISOString())
       throw Error('The active research lease was not found.');
     authorizedJob = true;
     const settings = await resolveResearchSettings(row.user_id);
@@ -235,7 +236,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
             : `Correcting research issue (attempt ${attempt} of ${settings.maxAttempts})`,
           new Date().toISOString(),
           row.id,
-          helper.id,
+          runnerId,
           reserve,
         )
         .run();
@@ -328,7 +329,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
         continue;
       }
       await db().prepare('UPDATE research_jobs SET result=? WHERE id=? AND lease_owner=? AND status=\'researching\'')
-        .bind(JSON.stringify({ status: 'Draft', analysis, costUsd: totalCostUsd }), row.id, helper.id).run();
+        .bind(JSON.stringify({ status: 'Draft', analysis, costUsd: totalCostUsd }), row.id, runnerId).run();
       await addEvent(row.id, 'analyzing', `AI cost record (attempt ${attempt}): reserved $${(reserve / 1_000_000).toFixed(6)}, charged $${(actual / 1_000_000).toFixed(6)}; response ${typeof result.id === 'string' ? result.id : 'unknown'}.`);
       try {
         const assessments = analysis.assessments as Record<string, { score: number | null; source: string; finding: string; limitation: string }>;
@@ -423,7 +424,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
           researchNarrative: analysis.researchNarrative,
         };
         const saved = await db().prepare("UPDATE research_jobs SET result=? WHERE id=? AND status='researching' AND lease_owner=? AND cancel_requested=0")
-          .bind(JSON.stringify(details), row.id, helper.id).run();
+          .bind(JSON.stringify(details), row.id, runnerId).run();
         if (!saved.meta.changes)
           throw new FatalSynthesisError('Research was cancelled or its lease changed before saving.');
         return Response.json({ dossier: details, costUsd: totalCostUsd });
@@ -453,6 +454,6 @@ Explain findings simply. The narrative must cover the business, industry and mac
         .catch(() => {});
       await addEvent(jobId, 'needs_attention', message).catch(() => {});
     }
-    return helperFailure(error);
+    return failure(error);
   }
 }

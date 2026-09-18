@@ -1,4 +1,4 @@
-import { db, failure } from '@/lib/server';
+import { db } from '@/lib/server';
 import {
   DEFAULT_RESEARCH_SETTINGS,
   REASONING_EFFORTS,
@@ -57,7 +57,7 @@ export type ResearchJobRow = {
   completed_at: string | null;
 };
 
-export function publicJob(row: ResearchJobRow, helperLastSeen?: string | null) {
+export function publicJob(row: ResearchJobRow) {
   return {
     id: row.id,
     ticker: row.ticker,
@@ -74,51 +74,11 @@ export function publicJob(row: ResearchJobRow, helperLastSeen?: string | null) {
     updatedAt: row.updated_at,
     startedAt: row.started_at,
     completedAt: row.completed_at,
-    helperOnline:
-      !!helperLastSeen &&
-      Date.now() - new Date(helperLastSeen).getTime() < 90_000,
+    claimed:
+      row.status === 'researching' &&
+      !!row.lease_until &&
+      row.lease_until > new Date().toISOString(),
   };
-}
-
-export async function sha256(value: string) {
-  const bytes = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(value),
-  );
-  return [...new Uint8Array(bytes)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-export async function helperIdentity(req: Request) {
-  const authorization = req.headers.get('authorization') ?? '';
-  if (!authorization.startsWith('Bearer '))
-    throw Error('Helper authorization is required.');
-  const hash = await sha256(authorization.slice(7));
-  const helper = await db()
-    .prepare(
-      'SELECT id,user_id FROM research_helpers WHERE token_hash=? AND revoked_at IS NULL',
-    )
-    .bind(hash)
-    .first<{ id: string; user_id: string }>();
-  if (!helper) throw Error('This helper connection is no longer valid.');
-  await db()
-    .prepare('UPDATE research_helpers SET last_seen_at=? WHERE id=?')
-    .bind(new Date().toISOString(), helper.id)
-    .run();
-  return helper;
-}
-
-export function helperFailure(error: unknown, status = 400) {
-  if (
-    error instanceof Error &&
-    [
-      'Helper authorization is required.',
-      'This helper connection is no longer valid.',
-    ].includes(error.message)
-  )
-    status = 401;
-  return failure(error, status);
 }
 
 export async function addEvent(jobId: string, stage: string, message: string) {
