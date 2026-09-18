@@ -6,15 +6,17 @@ import { credibleResearchHost, isPrivateOrLocalHost } from '@/lib/research-polic
 // fetches on its behalf — the same reason the old Mac helper used curl
 // server-side instead of a browser. It is the one SSRF-sensitive surface
 // this feature adds: 'search' mode is locked to a fixed credible-source
-// allow-list, 'report' mode allows an arbitrary https URL (mirroring the
-// issuer investor-relations crawl the helper already did) but rejects
-// private/loopback/link-local hosts.
+// allow-list, 'report' mode allows an arbitrary http(s) URL (mirroring the
+// issuer investor-relations crawl the helper already did — plenty of
+// smaller PSX issuers still run plain http) but rejects private/loopback/
+// link-local hosts regardless of scheme.
 const REPORT_BYTES_LIMIT = 40 * 1024 * 1024;
 const TEXT_BYTES_LIMIT = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 
 function checkAllowed(url: URL, mode: 'report' | 'search') {
-  if (url.protocol !== 'https:') throw Error('Only https URLs can be fetched.');
+  if (url.protocol !== 'https:' && url.protocol !== 'http:')
+    throw Error('Only http/https URLs can be fetched.');
   if (isPrivateOrLocalHost(url.hostname)) throw Error('This host cannot be fetched.');
   if (mode === 'search' && url.hostname !== 'www.bing.com' && !credibleResearchHost(url.hostname))
     throw Error('This host is not on the credible-source list.');
