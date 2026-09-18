@@ -31,6 +31,8 @@ async function loadPdfjs() {
   return pdfjsLib;
 }
 
+import { reconstructPageText } from '@/lib/pdf-layout.mjs';
+
 export async function extractPdfText(
   bytes: Uint8Array,
 ): Promise<{ text: string; pages: number }> {
@@ -45,9 +47,8 @@ export async function extractPdfText(
       const page = await doc.getPage(pageNumber);
       try {
         const content = await page.getTextContent();
-        const text = content.items
-          .map((item) => ('str' in item ? item.str : ''))
-          .join(' ');
+        const items = content.items.filter((item) => 'str' in item);
+        const text = reconstructPageText(items);
         marked.push(`\n--- PDF PAGE ${pageNumber} ---\n${text.trim()}\n`);
       } finally {
         page.cleanup();

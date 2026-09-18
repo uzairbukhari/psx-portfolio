@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Download, Plus, Upload, RotateCcw, Settings, X } from 'lucide-react';
+import { Download, Plus, Trash2, Upload, RotateCcw, Settings, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -298,6 +298,35 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       setBusy(false);
     }
   };
+  const deleteResearch = async (value: string) => {
+    if (!window.confirm(`Delete all research for ${value}? This cannot be undone.`))
+      return;
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(
+          `/api/research/jobs?ticker=${encodeURIComponent(value)}`,
+          { method: 'DELETE' },
+        ),
+        data = (await response.json()) as { error?: string };
+      if (!response.ok)
+        throw Error(data.error || 'Research could not be deleted.');
+      setJobs((prev) => prev.filter((job) => job.ticker !== value));
+      const next = structuredClone(portfolio);
+      next.research = (next.research ?? []).filter(
+        (item) => item.ticker !== value,
+      );
+      await onSave(next, `${value} research deleted.`);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Research could not be deleted.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   const saveSettings = async () => {
     setBusy(true);
     setError('');
@@ -560,28 +589,39 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                         '—'}
                     </td>
                     <td>
-                      <button
-                        className="secondary compact"
-                        onClick={() => {
-                          if (active || job?.status === 'needs_attention') {
-                            setJobOpen(job!);
-                            void loadJobs(job!.id);
-                          } else open(value);
-                        }}
-                      >
-                        {active || job?.status === 'needs_attention'
-                          ? 'View progress'
-                          : 'Open'}
-                      </button>
-                      {dossier?.status === 'Complete' && !active && (
+                      <div className="row">
                         <button
                           className="secondary compact"
-                          disabled={busy}
-                          onClick={() => void startResearch(value)}
+                          onClick={() => {
+                            if (active || job?.status === 'needs_attention') {
+                              setJobOpen(job!);
+                              void loadJobs(job!.id);
+                            } else open(value);
+                          }}
                         >
-                          <RotateCcw size={14} /> Refresh research
+                          {active || job?.status === 'needs_attention'
+                            ? 'View progress'
+                            : 'Open'}
                         </button>
-                      )}
+                        {dossier?.status === 'Complete' && !active && (
+                          <button
+                            className="secondary compact"
+                            disabled={busy}
+                            onClick={() => void startResearch(value)}
+                          >
+                            <RotateCcw size={14} /> Refresh research
+                          </button>
+                        )}
+                        {!active && (
+                          <button
+                            className="secondary compact"
+                            disabled={busy}
+                            onClick={() => void deleteResearch(value)}
+                          >
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

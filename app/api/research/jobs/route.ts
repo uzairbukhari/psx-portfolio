@@ -180,3 +180,35 @@ export async function PATCH(req: Request) {
     return failure(error);
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const userId = await identity(req, true);
+    const ticker = String(new URL(req.url).searchParams.get('ticker') ?? '')
+      .trim()
+      .toUpperCase();
+    if (!tickerOK(ticker))
+      throw Error('Enter a valid PSX ticker using letters and numbers.');
+    const active = await db()
+      .prepare(
+        "SELECT id FROM research_jobs WHERE user_id=? AND ticker=? AND status IN ('queued','researching') LIMIT 1",
+      )
+      .bind(userId, ticker)
+      .first();
+    if (active)
+      throw Error('Cancel the active research run before deleting it.');
+    await db().batch([
+      db()
+        .prepare(
+          'DELETE FROM research_events WHERE job_id IN (SELECT id FROM research_jobs WHERE user_id=? AND ticker=?)',
+        )
+        .bind(userId, ticker),
+      db()
+        .prepare('DELETE FROM research_jobs WHERE user_id=? AND ticker=?')
+        .bind(userId, ticker),
+    ]);
+    return Response.json({ ok: true });
+  } catch (error) {
+    return failure(error);
+  }
+}
