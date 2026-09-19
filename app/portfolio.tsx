@@ -39,6 +39,7 @@ import {
   SECTORS,
   sharesHeldOn,
   taxSummary,
+  dateOK,
   type Portfolio,
   type Trade,
   type Company,
@@ -212,6 +213,98 @@ const blankDividend = (ticker: string): Dividend => ({
   grossAmount: 0,
   note: '',
 });
+function parseCdcPaymentDate(s: string): string | null {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (!m) return null;
+  const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return dateOK(iso) ? iso : null;
+}
+type CdcImportSummary = {
+  dividends: Dividend[];
+  imported: number;
+  skippedNotPaid: number;
+  skippedDuplicate: number;
+  skippedUnknownTicker: number;
+  skippedInvalid: number;
+};
+function importCdcDividends(
+  raw: unknown,
+  companies: Company[],
+  existing: Dividend[],
+): CdcImportSummary {
+  const rows: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as { data?: unknown } | null)?.data)
+      ? ((raw as { data: unknown[] }).data)
+      : [];
+  const tickers = new Set(companies.map((c) => c.ticker));
+  const seenIds = new Set(
+    existing.filter((d) => !d.voided && d.externalId).map((d) => d.externalId),
+  );
+  const summary: CdcImportSummary = {
+    dividends: [],
+    imported: 0,
+    skippedNotPaid: 0,
+    skippedDuplicate: 0,
+    skippedUnknownTicker: 0,
+    skippedInvalid: 0,
+  };
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    if (
+      typeof r.dividendStatus !== 'string' ||
+      r.dividendStatus.toUpperCase() !== 'PAID'
+    ) {
+      summary.skippedNotPaid++;
+      continue;
+    }
+    const eventId = typeof r.eventId === 'string' ? r.eventId : undefined;
+    if (eventId && seenIds.has(eventId)) {
+      summary.skippedDuplicate++;
+      continue;
+    }
+    const ticker =
+      typeof r.securitySymbol === 'string'
+        ? r.securitySymbol.toUpperCase()
+        : '';
+    if (!tickers.has(ticker)) {
+      summary.skippedUnknownTicker++;
+      continue;
+    }
+    const date =
+      typeof r.paymentDate === 'string'
+        ? parseCdcPaymentDate(r.paymentDate)
+        : null;
+    const gross = Number(r.grossDividendAmount);
+    const net = Number(r.netDividendAmount);
+    if (
+      !date ||
+      !Number.isFinite(gross) ||
+      gross < 0 ||
+      !Number.isFinite(net) ||
+      net < 0 ||
+      net > gross
+    ) {
+      summary.skippedInvalid++;
+      continue;
+    }
+    summary.dividends.push({
+      id: crypto.randomUUID(),
+      ticker,
+      date,
+      source: 'import',
+      grossAmount: round(gross),
+      netAmount: round(net),
+      externalId: eventId,
+      financialYear:
+        typeof r.financialYear === 'string' ? r.financialYear : undefined,
+      note: '',
+    });
+    if (eventId) seenIds.add(eventId);
+    summary.imported++;
+  }
+  return summary;
+}
 const kindLabel = (t: Trade) =>
   t.kind === 'opening' ? 'Opening' : t.kind === 'sell' ? 'Sale' : 'Purchase';
 function ledgerGroups(trades: Trade[], ticker = '') {
@@ -1303,61 +1396,109 @@ export default function Dashboard({ email }: { email: string | null }) {
               </label>
             </RadioGroup>
           </section>
+          <section className="panel">
+            <p className="eyebrow">DATA MANAGEMENT</p>
+            <h2>Backup and import</h2>
+            <div className="row">
+              <button
+                className="secondary compact"
+                onClick={() =>
+                  download(
+                    `psx-portfolio-${today()}.json`,
+                    JSON.stringify(
+                      {
+                        schemaVersion: 1,
+                        kind: 'psx-portfolio-ledger',
+                        exportedAt: new Date().toISOString(),
+                        portfolio: p,
+                      },
+                      null,
+                      2,
+                    ),
+                  )
+                }
+              >
+                <Download size={14} /> Export backup
+              </button>
+              <label className="import-label">
+                Restore backup
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    attempt(async () => {
+                      const data = JSON.parse(await f.text());
+                      if (
+                        data.kind !== 'psx-portfolio-ledger' ||
+                        data.schemaVersion !== 1
+                      )
+                        throw Error(
+                          'Choose a portfolio-ledger backup, not a company research file.',
+                        );
+                      validate(data.portfolio);
+                      if (
+                        !window.confirm(
+                          'Replace this portfolio with the selected backup? Export your current backup first.',
+                        )
+                      )
+                        return;
+                      await save(data.portfolio, 'Portfolio backup restored.');
+                    });
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              <label className="import-label">
+                Import dividends (CDC JSON)
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    attempt(async () => {
+                      const raw = JSON.parse(await f.text());
+                      const result = importCdcDividends(
+                        raw,
+                        p.companies,
+                        p.dividends ?? [],
+                      );
+                      if (!result.imported) {
+                        notify(
+                          `No dividends imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
+                          true,
+                        );
+                        return;
+                      }
+                      const next = clone(p);
+                      next.dividends = [
+                        ...(next.dividends ?? []),
+                        ...result.dividends,
+                      ];
+                      await save(
+                        next,
+                        `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
+                      );
+                    });
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </div>
+            <p className="muted">
+              Import expects the CDC Access dividend export JSON (an array,
+              or an object with a <code>data</code> array). Only Paid rows
+              are imported; personal and bank fields are never read or
+              stored.
+            </p>
+          </section>
         </TabsContent>
       </Tabs>
       <footer>
         <div className="row">
           <span>All amounts in PKR · Private saved ledger</span>
-          <button
-            className="secondary compact"
-            onClick={() =>
-              download(
-                `psx-portfolio-${today()}.json`,
-                JSON.stringify(
-                  {
-                    schemaVersion: 1,
-                    kind: 'psx-portfolio-ledger',
-                    exportedAt: new Date().toISOString(),
-                    portfolio: p,
-                  },
-                  null,
-                  2,
-                ),
-              )
-            }
-          >
-            <Download size={14} /> Export backup
-          </button>
-          <label className="import-label">
-            Restore backup
-            <input
-              type="file"
-              accept="application/json,.json"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                attempt(async () => {
-                  const data = JSON.parse(await f.text());
-                  if (
-                    data.kind !== 'psx-portfolio-ledger' ||
-                    data.schemaVersion !== 1
-                  )
-                    throw Error(
-                      'Choose a portfolio-ledger backup, not a company research file.',
-                    );
-                  validate(data.portfolio);
-                  if (
-                    !window.confirm(
-                      'Replace this portfolio with the selected backup? Export your current backup first.',
-                    )
-                  )
-                    return;
-                  await save(data.portfolio, 'Portfolio backup restored.');
-                });
-                e.target.value = '';
-              }}
-            />
-          </label>
         </div>
         <p>
           Plans are estimates. Actual execution prices, fees, taxes and
