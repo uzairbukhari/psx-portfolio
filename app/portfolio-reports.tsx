@@ -159,7 +159,6 @@ export default function PortfolioReports({
     label: monthLabel(item.month),
   }));
   const dividendCompanies = foldDividendCompanies(report.dividendByCompany);
-  const dividendPaymentCount = report.realized.dividends.length;
   const totalDividendNet =
     report.realized.totalDividendTax === null
       ? null
@@ -211,6 +210,19 @@ export default function PortfolioReports({
               {totalGainPercent === null
                 ? 'Add purchase prices to calculate'
                 : `${totalGainPercent >= 0 ? '+' : ''}${totalGainPercent.toFixed(1)}% vs cost basis`}
+            </small>
+          </div>
+          <div className="reports-priced-value">
+            <span>Total dividend income</span>
+            <strong>
+              {totalDividendNet === null
+                ? money(report.realized.totalDividendIncomeGross)
+                : money(totalDividendNet)}
+            </strong>
+            <small>
+              {totalDividendNet === null
+                ? 'Gross · set filer status in Settings for net'
+                : 'Net of withholding tax'}
             </small>
           </div>
           <div
@@ -318,95 +330,6 @@ export default function PortfolioReports({
       </section>
 
       <div className="reports-grid">
-        <section className="panel report-panel">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">DIVIDEND INCOME</p>
-              <h3>Monthly gross vs net</h3>
-            </div>
-            <span>
-              {dividendPaymentCount} payment
-              {dividendPaymentCount === 1 ? '' : 's'} ·{' '}
-              {totalDividendNet === null ? '—' : money(totalDividendNet)} net
-              to date
-            </span>
-          </div>
-          {dividendActivity.length ? (
-            <ChartContainer
-              config={dividendActivityConfig}
-              className="report-chart report-chart--activity"
-            >
-              <BarChart
-                accessibilityLayer
-                data={dividendActivity}
-                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
-              >
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  label={{
-                    value: 'Dividend month',
-                    position: 'insideBottom',
-                    offset: -16,
-                  }}
-                />
-                <YAxis
-                  width={72}
-                  tickFormatter={(value) =>
-                    new Intl.NumberFormat('en-PK', {
-                      notation: 'compact',
-                    }).format(value)
-                  }
-                  label={{
-                    value: 'Amount (PKR)',
-                    angle: -90,
-                    position: 'insideLeft',
-                  }}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value, name) => (
-                        <div className="report-tooltip-row">
-                          <span>
-                            {dividendActivityConfig[
-                              name as keyof typeof dividendActivityConfig
-                            ]?.label ?? name}
-                          </span>
-                          <b>
-                            {value === null ? '—' : money(Number(value))}
-                          </b>
-                        </div>
-                      )}
-                    />
-                  }
-                />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar
-                  dataKey="net"
-                  fill="var(--color-net)"
-                  radius={[5, 5, 0, 0]}
-                  maxBarSize={44}
-                />
-                <Bar
-                  dataKey="gross"
-                  fill="var(--color-gross)"
-                  radius={[5, 5, 0, 0]}
-                  maxBarSize={44}
-                />
-              </BarChart>
-            </ChartContainer>
-          ) : (
-            <ReportEmpty>Record a dividend to see monthly income.</ReportEmpty>
-          )}
-          <p className="report-source">
-            Source: recorded dividends · net requires a filer status in
-            Settings
-          </p>
-        </section>
-
         <section className="panel report-panel">
           <div className="report-heading">
             <div>
