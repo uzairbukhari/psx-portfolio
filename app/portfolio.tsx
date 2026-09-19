@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -61,7 +61,7 @@ import {
 } from '@/lib/portfolio';
 import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
-import PsxMarketPulse from './psx-market-pulse';
+import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import AiReview from './ai-review';
 
 const TAB_PATHS: Record<string, string> = {
@@ -451,6 +451,7 @@ export default function Dashboard({
   email: string | null;
   name: string | null;
 }) {
+  const pulseRef = useRef<PsxMarketPulseHandle>(null);
   const initialPathname = usePathname();
   const [tab, setTabState] = useState(() => tabFromPathname(initialPathname));
   function setTab(next: string) {
@@ -727,6 +728,7 @@ export default function Dashboard({
     setBusy(true);
     try {
       notify('Fetching PSX prices…');
+      void pulseRef.current?.refresh();
       const r = await fetch('/api/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -916,7 +918,7 @@ export default function Dashboard({
           </TabsList>
         )}
         <TabsContent value="holdings">
-          <PsxMarketPulse />
+          <PsxMarketPulse ref={pulseRef} />
           <div className="metrics">
             <article>
               <span>
@@ -1011,7 +1013,7 @@ export default function Dashboard({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {hs.map((h) => (
+                {held.map((h) => (
                   <TableRow key={h.ticker}>
                     <TableCell>
                       <button

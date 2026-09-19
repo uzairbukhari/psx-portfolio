@@ -1,7 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { IndexSummary, TopMovers, IndexPoint } from '@/lib/psx-market';
+
+export interface PsxMarketPulseHandle {
+  refresh: () => Promise<void>;
+}
 
 interface SectorRow {
   sector: string;
@@ -57,7 +61,7 @@ function timeAgo(iso: string) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-export default function PsxMarketPulse() {
+export default forwardRef<PsxMarketPulseHandle>(function PsxMarketPulse(_props, ref) {
   const [summary, setSummary] = useState<MarketSummary | null>(null);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,6 +99,8 @@ export default function PsxMarketPulse() {
       setLoading(false);
     }
   }
+
+  useImperativeHandle(ref, () => ({ refresh }));
 
   if (!summary) {
     return (
@@ -205,4 +211,4 @@ export default function PsxMarketPulse() {
       </div>
     </section>
   );
-}
+});
