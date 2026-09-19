@@ -8,6 +8,7 @@
 // the existing job list/detail UI keeps working unchanged.
 import { hasPdfSignature, credibleResearchHost } from '@/lib/research-policy.mjs';
 import { selectEvidence } from '@/lib/research-evidence.mjs';
+import { resolveDocumentTitle } from '@/lib/report-title.mjs';
 import { extractPdfText } from './research-pdf';
 
 export type RunnerDocument = {
@@ -65,12 +66,12 @@ const downloadCache = new Map<
   { found: Awaited<ReturnType<typeof discover>>; documents: RunnerDocument[] }
 >();
 
-async function call(path: string, body: unknown) {
+async function call(path: string, body: unknown, timeoutMs = 240_000) {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(240_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok)
@@ -78,6 +79,13 @@ async function call(path: string, body: unknown) {
   if (data.cancelled || data.cancelRequested) throw Error('Research cancelled.');
   return data;
 }
+// /api/research/synthesize runs every correction attempt (each with its own
+// up-to-180s OpenAI call, plus rate-limit backoff) inside ONE response, not
+// one request per attempt. With maxAttempts=5 that's a legitimate ~1000s+
+// of server-side work — comfortably longer than call()'s default 240s
+// client timeout, which was aborting the request while the server was
+// still correctly working through later attempts.
+const SYNTHESIZE_TIMEOUT_MS = 20 * 60_000;
 
 async function proxyFetch(url: string, mode: 'report' | 'search') {
   const response = await fetch('/api/research/proxy', {
@@ -306,11 +314,7 @@ async function downloadReports(
       const { text } = await extractPdfText(bytes);
       if (text.replace(/\s/g, '').length < 300) throw Error('PDF text is unreadable or image-only');
       documents.push({
-        title:
-          (text.match(/Annual Report\s+(20\d{2})/i)?.[0] || filename)
-            .replace(/^\d+-/, '')
-            .replace(/\.pdf$/i, '')
-            .replace(/-/g, ' '),
+        title: resolveDocumentTitle(text, filename, url),
         url,
         kind: /annual/i.test(filename)
           ? 'Annual report'
@@ -466,7 +470,7 @@ async function processJob(job: JobInput) {
             date: found.market.priceDate,
           })),
         ),
-    })) as { dossier: Record<string, unknown> };
+    }, SYNTHESIZE_TIMEOUT_MS)) as { dossier: Record<string, unknown> };
     synthesis.dossier.ticker = job.ticker;
     synthesis.dossier.name = found.companyName;
     checkpoint = { ...checkpoint, dossier: synthesis.dossier };
