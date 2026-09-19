@@ -76,6 +76,22 @@ export const quoteRefreshes = sqliteTable('quote_refreshes', {
   updatedAt: text('updated_at').notNull(),
 });
 
+export const aiUsage = sqliteTable(
+  'ai_usage',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    source: text('source').notNull(),
+    model: text('model').notNull(),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    cachedTokens: integer('cached_tokens').notNull().default(0),
+    costUsd: real('cost_usd').notNull().default(0),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('idx_ai_usage_user_created').on(table.userId, table.createdAt)],
+);
+
 export const marketSummaryRefreshes = sqliteTable('market_summary_refreshes', {
   id: text('id').primaryKey(),
   payload: text('payload').notNull(),

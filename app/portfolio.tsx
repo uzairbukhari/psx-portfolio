@@ -477,7 +477,12 @@ export default function Dashboard({
       weights: Record<string, number>;
     } | null>(null),
     [reviewBusy, setReviewBusy] = useState(false),
-    [historyTicker, setHistoryTicker] = useState('');
+    [historyTicker, setHistoryTicker] = useState(''),
+    [usage, setUsage] = useState<{
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
+    } | null>(null);
   function notify(s: string, error = false) {
     setMessage(s);
     setFailed(error);
@@ -499,6 +504,20 @@ export default function Dashboard({
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if (tab !== 'settings' || usage) return;
+    void fetch('/api/usage')
+      .then(
+        (r) =>
+          r.json() as Promise<{
+            inputTokens: number;
+            outputTokens: number;
+            costUsd: number;
+          }>,
+      )
+      .then((d) => setUsage(d))
+      .catch(() => {});
+  }, [tab, usage]);
   async function save(
     next: Portfolio,
     success = 'Saved to your private portfolio.',
@@ -1513,6 +1532,39 @@ export default function Dashboard({
                 </div>
               );
             })()}
+          </section>
+          <section className="panel">
+            <p className="eyebrow">USAGE &amp; COST</p>
+            <h2>AI usage</h2>
+            <p className="muted">
+              Tracked from account setup date forward — usage before this
+              feature existed isn&rsquo;t included.
+            </p>
+            {usage ? (
+              <div className="split-stats">
+                <div>
+                  <small>Input tokens</small>
+                  <strong>{usage.inputTokens.toLocaleString()}</strong>
+                </div>
+                <div>
+                  <small>Output tokens</small>
+                  <strong>{usage.outputTokens.toLocaleString()}</strong>
+                </div>
+                <div>
+                  <small>Estimated cost</small>
+                  <strong>
+                    {new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 4,
+                    }).format(usage.costUsd)}
+                  </strong>
+                </div>
+              </div>
+            ) : (
+              <p className="muted">Loading…</p>
+            )}
           </section>
           <section className="panel">
             <p className="eyebrow">DATA MANAGEMENT</p>

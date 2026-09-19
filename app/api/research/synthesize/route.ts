@@ -315,6 +315,22 @@ Explain findings simply. The narrative must cover the business, industry and mac
           .bind(reserve - actual, new Date().toISOString(), row.id)
           .run();
       totalCostUsd += actual / 1_000_000;
+      await db()
+        .prepare(
+          'INSERT INTO ai_usage (id,user_id,source,model,input_tokens,output_tokens,cached_tokens,cost_usd,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+        )
+        .bind(
+          crypto.randomUUID(),
+          row.user_id,
+          'research',
+          settings.model,
+          usage?.input_tokens ?? 0,
+          usage?.output_tokens ?? 0,
+          cachedTokens,
+          actual / 1_000_000,
+          new Date().toISOString(),
+        )
+        .run();
       if (!response.ok) {
         const code = result.error?.code ?? result.error?.type;
         if (code === 'credit_balance_exhausted' || code === 'insufficient_quota')

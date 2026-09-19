@@ -268,6 +268,22 @@ export async function POST(req: Request) {
       1000000;
     await db()
       .prepare(
+        'INSERT INTO ai_usage (id,user_id,source,model,input_tokens,output_tokens,cached_tokens,cost_usd,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+      )
+      .bind(
+        crypto.randomUUID(),
+        owner,
+        'review',
+        MODEL,
+        input,
+        output,
+        cachedTokens,
+        estimatedCostUsd,
+        now,
+      )
+      .run();
+    await db()
+      .prepare(
         "UPDATE ai_reviews SET status='completed',payload=? WHERE id=? AND user_id=?",
       )
       .bind(

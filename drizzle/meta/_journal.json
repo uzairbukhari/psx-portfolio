@@ -57,6 +57,13 @@
       "when": 1789747442120,
       "tag": "0007_woozy_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789819371098,
+      "tag": "0008_empty_thundra",
+      "breakpoints": true
     }
   ]
 }
