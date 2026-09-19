@@ -40,6 +40,10 @@ import {
   sharesHeldOn,
   taxSummary,
   dateOK,
+  RESEARCH_MODELS,
+  REASONING_EFFORTS,
+  DEFAULT_RESEARCH_SETTINGS,
+  type ResearchSettings,
   type Portfolio,
   type Trade,
   type Company,
@@ -1342,7 +1346,11 @@ export default function Dashboard({ email }: { email: string | null }) {
           )}
         </TabsContent>
         <TabsContent value="research-desk">
-          <ResearchDesk portfolio={p} onSave={save} />
+          <ResearchDesk
+            portfolio={p}
+            onSave={save}
+            onOpenSettings={() => setTab('settings')}
+          />
         </TabsContent>
         <TabsContent value="research">
           <AiReview
@@ -1395,6 +1403,110 @@ export default function Dashboard({ email }: { email: string | null }) {
                 — 30%
               </label>
             </RadioGroup>
+          </section>
+          <section className="panel">
+            <p className="eyebrow">AI MODEL</p>
+            <h2>Research desk model settings</h2>
+            <p className="muted">
+              Applies to research runs started after you save. Jobs already
+              queued or in progress keep the settings they started with.
+            </p>
+            {(() => {
+              const rs: ResearchSettings =
+                p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS;
+              const update = (patch: Partial<ResearchSettings>) =>
+                attempt(() =>
+                  save(
+                    { ...p, researchSettings: { ...rs, ...patch } },
+                    'AI model settings saved.',
+                  ),
+                );
+              return (
+                <div className="form-grid">
+                  <label>
+                    AI model
+                    <select
+                      value={rs.model}
+                      onChange={(e) =>
+                        update({
+                          model: e.target.value as ResearchSettings['model'],
+                        })
+                      }
+                    >
+                      {RESEARCH_MODELS.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Reasoning effort
+                    <select
+                      value={rs.reasoningEffort}
+                      onChange={(e) =>
+                        update({
+                          reasoningEffort: e.target
+                            .value as ResearchSettings['reasoningEffort'],
+                        })
+                      }
+                    >
+                      {REASONING_EFFORTS.map((effort) => (
+                        <option key={effort} value={effort}>
+                          {effort}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Budget limit per run (US$)
+                    <input
+                      type="number"
+                      min={0.05}
+                      max={5}
+                      step={0.05}
+                      key={'budget-' + rs.budgetUsd}
+                      defaultValue={rs.budgetUsd}
+                      onBlur={(e) => {
+                        const v = Number(e.target.value);
+                        if (v !== rs.budgetUsd) update({ budgetUsd: v });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Max output tokens
+                    <input
+                      type="number"
+                      min={4000}
+                      max={64000}
+                      step={1000}
+                      key={'tokens-' + rs.maxOutputTokens}
+                      defaultValue={rs.maxOutputTokens}
+                      onBlur={(e) => {
+                        const v = Number(e.target.value);
+                        if (v !== rs.maxOutputTokens)
+                          update({ maxOutputTokens: v });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Self-correction attempts
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      step={1}
+                      key={'attempts-' + rs.maxAttempts}
+                      defaultValue={rs.maxAttempts}
+                      onBlur={(e) => {
+                        const v = Number(e.target.value);
+                        if (v !== rs.maxAttempts) update({ maxAttempts: v });
+                      }}
+                    />
+                  </label>
+                </div>
+              );
+            })()}
           </section>
           <section className="panel">
             <p className="eyebrow">DATA MANAGEMENT</p>

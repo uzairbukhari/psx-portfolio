@@ -9,12 +9,9 @@ import {
 } from '@/components/ui/dialog';
 import {
   DEFAULT_RESEARCH_SETTINGS,
-  REASONING_EFFORTS,
-  RESEARCH_MODELS,
   today,
   type Portfolio,
   type ResearchCompany,
-  type ResearchSettings,
 } from '@/lib/portfolio';
 import DossierExperience from './dossier-experience';
 import { onRunnerEvent, startResearchRunner, getRunArchive } from './research-runner';
@@ -23,6 +20,7 @@ import { downloadRunSources } from './research-zip';
 type Props = {
   portfolio: Portfolio;
   onSave: (next: Portfolio, message?: string) => Promise<void>;
+  onOpenSettings: () => void;
 };
 type Job = {
   id: string;
@@ -105,17 +103,17 @@ function elapsed(start: string | null, end?: string | null) {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
-export default function ResearchDesk({ portfolio, onSave }: Props) {
+export default function ResearchDesk({
+  portfolio,
+  onSave,
+  onOpenSettings,
+}: Props) {
   const [selected, setSelected] = useState<string | null>(null),
     [draft, setDraft] = useState<ResearchCompany | null>(null),
     [jobs, setJobs] = useState<Job[]>([]),
     [events, setEvents] = useState<Event[]>([]),
     [jobOpen, setJobOpen] = useState<Job | null>(null),
     [addOpen, setAddOpen] = useState(false),
-    [settingsOpen, setSettingsOpen] = useState(false),
-    [settingsDraft, setSettingsDraft] = useState<ResearchSettings>(
-      DEFAULT_RESEARCH_SETTINGS,
-    ),
     [ticker, setTicker] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -332,24 +330,6 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       setBusy(false);
     }
   };
-  const saveSettings = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      const next = structuredClone(portfolio);
-      next.researchSettings = settingsDraft;
-      await onSave(next, 'Research settings updated.');
-      setSettingsOpen(false);
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : 'Research settings could not be saved.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
   const exportDossier = () => {
     if (!draft) return;
     const url = URL.createObjectURL(
@@ -491,14 +471,7 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
           <p>Start cited company research and follow each saved stage.</p>
         </div>
         <div className="row">
-          <button
-            className="secondary"
-            onClick={() => {
-              setSettingsDraft(settings);
-              setSettingsOpen(true);
-              setError('');
-            }}
-          >
+          <button className="secondary" onClick={onOpenSettings}>
             <Settings size={16} /> Settings
           </button>
           <label className="import-label">
@@ -676,122 +649,6 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
               {busy ? 'Checking ticker…' : 'Start research'}
             </button>
             <button className="secondary" onClick={() => setAddOpen(false)}>
-              Cancel
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="form-dialog">
-          <DialogTitle>Research settings</DialogTitle>
-          <DialogDescription>
-            Applies to every research run started after you save. Jobs
-            already queued or in progress keep the settings they started
-            with.
-          </DialogDescription>
-          <label>
-            AI model
-            <select
-              value={settingsDraft.model}
-              onChange={(event) =>
-                setSettingsDraft({
-                  ...settingsDraft,
-                  model: event.target.value as ResearchSettings['model'],
-                })
-              }
-            >
-              {RESEARCH_MODELS.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Reasoning effort
-            <select
-              value={settingsDraft.reasoningEffort}
-              onChange={(event) =>
-                setSettingsDraft({
-                  ...settingsDraft,
-                  reasoningEffort: event.target
-                    .value as ResearchSettings['reasoningEffort'],
-                })
-              }
-            >
-              {REASONING_EFFORTS.map((effort) => (
-                <option key={effort} value={effort}>
-                  {effort}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Budget limit per run (US$)
-            <input
-              type="number"
-              min={0.05}
-              max={5}
-              step={0.05}
-              value={settingsDraft.budgetUsd}
-              onChange={(event) =>
-                setSettingsDraft({
-                  ...settingsDraft,
-                  budgetUsd: Number(event.target.value),
-                })
-              }
-            />
-          </label>
-          <label>
-            Max output tokens
-            <input
-              type="number"
-              min={4000}
-              max={64000}
-              step={1000}
-              value={settingsDraft.maxOutputTokens}
-              onChange={(event) =>
-                setSettingsDraft({
-                  ...settingsDraft,
-                  maxOutputTokens: Number(event.target.value),
-                })
-              }
-            />
-          </label>
-          <label>
-            Self-correction attempts
-            <input
-              type="number"
-              min={1}
-              max={5}
-              step={1}
-              value={settingsDraft.maxAttempts}
-              onChange={(event) =>
-                setSettingsDraft({
-                  ...settingsDraft,
-                  maxAttempts: Number(event.target.value),
-                })
-              }
-            />
-          </label>
-          <p className="help">
-            A validation failure gets fed back to the model for another try,
-            up to this many attempts, before a job is flagged for manual
-            review.
-          </p>
-          {error && (
-            <p className="notice error" role="alert">
-              {error}
-            </p>
-          )}
-          <div className="row">
-            <button disabled={busy} onClick={() => void saveSettings()}>
-              {busy ? 'Saving…' : 'Save settings'}
-            </button>
-            <button
-              className="secondary"
-              onClick={() => setSettingsOpen(false)}
-            >
               Cancel
             </button>
           </div>
