@@ -17,6 +17,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Spinner } from '@/components/ui/spinner';
 import {
   ArrowUpRight,
@@ -53,6 +54,7 @@ const TAB_PATHS: Record<string, string> = {
   history: '/history',
   'research-desk': '/research-desk',
   research: '/research',
+  settings: '/settings',
 };
 const PATH_TABS: Record<string, string> = Object.fromEntries(
   Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
@@ -616,6 +618,7 @@ export default function Dashboard({ email }: { email: string | null }) {
           <TabsTrigger value="history">Purchase log</TabsTrigger>
           <TabsTrigger value="research-desk">Research desk</TabsTrigger>
           <TabsTrigger value="research">AI review</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="holdings">
           <PsxMarketPulse />
@@ -1129,6 +1132,45 @@ export default function Dashboard({ email }: { email: string | null }) {
             onSave={save}
             onApplied={() => setTab('sip')}
           />
+        </TabsContent>
+        <TabsContent value="settings">
+          <section className="panel">
+            <p className="eyebrow">ACCOUNT</p>
+            <h2>Signed in</h2>
+            <p className="muted">{email}</p>
+          </section>
+          <section className="panel">
+            <p className="eyebrow">TAX STATUS</p>
+            <h2>Filer or non-filer</h2>
+            <p className="muted">
+              Sets the capital-gains and dividend tax rate used in Reports:
+              15% for filers, 30% for non-filers. Applies to sells and
+              manually entered dividends; imported dividend records already
+              carry their own real, post-withholding amounts.
+            </p>
+            <RadioGroup
+              value={p.taxProfile?.filerStatus ?? ''}
+              onValueChange={(v) =>
+                attempt(() =>
+                  save(
+                    {
+                      ...p,
+                      taxProfile: { filerStatus: v as 'filer' | 'non-filer' },
+                    },
+                    'Tax status saved.',
+                  ),
+                )
+              }
+            >
+              <label className="check-row" htmlFor="tax-filer">
+                <RadioGroupItem id="tax-filer" value="filer" /> Filer — 15%
+              </label>
+              <label className="check-row" htmlFor="tax-non-filer">
+                <RadioGroupItem id="tax-non-filer" value="non-filer" /> Non-filer
+                — 30%
+              </label>
+            </RadioGroup>
+          </section>
         </TabsContent>
       </Tabs>
       <footer>
