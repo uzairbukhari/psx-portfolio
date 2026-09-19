@@ -225,6 +225,9 @@ const blankDividend = (ticker: string): Dividend => ({
   grossAmount: 0,
   note: '',
 });
+function parseCdcAmount(v: unknown): number {
+  return typeof v === 'string' ? Number(v.replace(/,/g, '')) : Number(v);
+}
 function parseCdcPaymentDate(s: string): string | null {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
   if (!m) return null;
@@ -287,8 +290,8 @@ function importCdcDividends(
       typeof r.paymentDate === 'string'
         ? parseCdcPaymentDate(r.paymentDate)
         : null;
-    const gross = Number(r.grossDividendAmount);
-    const net = Number(r.netDividendAmount);
+    const gross = parseCdcAmount(r.grossDividendAmount);
+    const net = parseCdcAmount(r.netDividendAmount);
     if (
       !date ||
       !Number.isFinite(gross) ||
