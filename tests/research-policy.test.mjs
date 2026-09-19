@@ -75,6 +75,30 @@ test('matches financial values to labelled source lines across unit conversions'
   assert.equal(financialValueSupported(evidence, /earnings per share/i, 52.23), false);
 });
 
+test('matches a chart caption to its data-point value on a different reconstructed line, same page', () => {
+  // Real case: MARI's annual report renders its six-year history as bar
+  // charts, not a text table. pdf.js emits the chart's title/caption and
+  // each bar's own value label as separate text runs at different
+  // y-positions, landing several reconstructed lines apart even for a
+  // completely genuine, correctly-cited figure (verified against the real
+  // report - see lib/research-policy.mjs).
+  const evidence = '--- PDF PAGE 131 ---\n' +
+    'Net Sales Exploration & Prospecting Expenditure Net Profit\n' +
+    '(Rupees in billion) (Rupees in billion) (Rupees in billion)\n' +
+    '181.83 177.10\n' +
+    '145.77\n' +
+    '95.13\n' +
+    '31.44 33.06\n' +
+    '72.03 73.02 30.31';
+  assert.equal(financialValueSupported(evidence, /net sales/i, 95_130), true);
+  assert.equal(financialValueSupported(evidence, /profit (?:for|after)|profit after taxation|net profit/i, 33_063), true);
+});
+
+test('does not match a value from an unrelated, different page', () => {
+  const evidence = '--- PDF PAGE 1 ---\nNet Sales 401.18\n--- PDF PAGE 2 ---\nUnrelated commentary 33.06';
+  assert.equal(financialValueSupported(evidence, /net sales/i, 33_060), false);
+});
+
 test('rejects the prior unsafe dossier shape', () => {
   assert.throws(() => validateInvestmentDossier({
     financials: [annual(2026), annual(2025)],
