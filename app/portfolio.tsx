@@ -486,6 +486,9 @@ export default function Dashboard({
     } | null>(null),
     [reviewBusy, setReviewBusy] = useState(false),
     [historyTicker, setHistoryTicker] = useState(''),
+    [historyView, setHistoryView] = useState<'all' | 'trades' | 'dividends'>(
+      'all',
+    ),
     [usage, setUsage] = useState<{
       inputTokens: number;
       outputTokens: number;
@@ -686,6 +689,25 @@ export default function Dashboard({
     (p.dividends ?? [])
       .filter((d) => d.ticker === ticker)
       .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  const companySummary = (ticker: string) => {
+    const h = hs.find((x) => x.ticker === ticker);
+    const div = taxedDividends.filter((d) => d.ticker === ticker);
+    const dividendGross = round(div.reduce((a, d) => a + d.grossAmount, 0));
+    const dividendNet = div.some((d) => d.netAmount === null)
+      ? null
+      : round(div.reduce((a, d) => a + (d.netAmount ?? 0), 0));
+    return {
+      cost: h?.cost ?? null,
+      value: h?.value ?? null,
+      gain: h?.gain ?? null,
+      gainPercent:
+        h?.gain !== null && h?.gain !== undefined && h.cost
+          ? round((h.gain / h.cost) * 100)
+          : null,
+      dividendGross,
+      dividendNet,
+    };
+  };
   function openHistory(ticker: string) {
     setHistoryTicker(ticker);
     setTab('history');
@@ -1353,22 +1375,97 @@ export default function Dashboard({
                   ))}
                 </select>
               </label>
+              {!historyTicker && (
+                <label className="history-filter">
+                  Show
+                  <select
+                    value={historyView}
+                    onChange={(e) =>
+                      setHistoryView(
+                        e.target.value as 'all' | 'trades' | 'dividends',
+                      )
+                    }
+                  >
+                    <option value="all">All activity</option>
+                    <option value="trades">Transactions only</option>
+                    <option value="dividends">Dividends only</option>
+                  </select>
+                </label>
+              )}
             </div>
           </div>
-          {historyGroups.length === 0 ? (
-            <section className="panel">
-              <p className="muted">
-                {historyTicker
-                  ? `No transactions recorded for ${historyTicker} yet.`
-                  : 'No transactions recorded yet.'}
-              </p>
-            </section>
-          ) : (
-            historyGroups.map(([ticker, rows]) => {
+          {historyTicker &&
+            historyGroups.length > 0 &&
+            (() => {
+              const s = companySummary(historyTicker);
+              return (
+                <div className="metrics company-summary">
+                  <article>
+                    <span>Invested</span>
+                    <strong>{s.cost === null ? '—' : money(s.cost)}</strong>
+                  </article>
+                  <article>
+                    <span>Current value</span>
+                    <strong>{s.value === null ? '—' : money(s.value)}</strong>
+                  </article>
+                  <article>
+                    <span>Profit / loss</span>
+                    <strong
+                      style={{
+                        color:
+                          s.gain === null
+                            ? 'inherit'
+                            : s.gain >= 0
+                              ? '#22e0a0'
+                              : '#ff5d6c',
+                      }}
+                    >
+                      {s.gain === null ? '—' : money(s.gain)}
+                      {s.gainPercent !== null && (
+                        <small>
+                          {' '}
+                          ({s.gainPercent >= 0 ? '+' : ''}
+                          {s.gainPercent.toFixed(1)}%)
+                        </small>
+                      )}
+                    </strong>
+                  </article>
+                  <article>
+                    <span>Dividends earned (gross → net)</span>
+                    <strong>
+                      {money(s.dividendGross)} →{' '}
+                      {s.dividendNet === null ? '—' : money(s.dividendNet)}
+                    </strong>
+                  </article>
+                </div>
+              );
+            })()}
+          {(() => {
+            const visibleGroups = historyGroups.filter(
+              ([ticker]) =>
+                historyTicker ||
+                historyView !== 'dividends' ||
+                dividendsByTicker(ticker).length > 0,
+            );
+            if (visibleGroups.length === 0)
+              return (
+                <section className="panel">
+                  <p className="muted">
+                    {historyTicker
+                      ? `No transactions recorded for ${historyTicker} yet.`
+                      : historyView === 'dividends'
+                        ? 'No dividends recorded yet.'
+                        : 'No transactions recorded yet.'}
+                  </p>
+                </section>
+              );
+            return visibleGroups.map(([ticker, rows]) => {
               const name =
                 p.companies.find((c) => c.ticker === ticker)?.name ?? ticker;
               const live = rows.filter((t) => !t.voided);
               const purchases = live.filter((t) => t.kind === 'buy').length;
+              const effectiveView = historyTicker ? 'all' : historyView;
+              const groupDividends = dividendsByTicker(ticker);
               return (
                 <section
                   className="panel table-panel ledger-group"
@@ -1397,21 +1494,26 @@ export default function Dashboard({
                       <Plus size={14} /> Add purchase
                     </button>
                   </div>
-                  <TradeHistoryTable trades={rows} onCorrect={correctTrade} />
-                  {dividendsByTicker(ticker).length > 0 && (
-                    <>
-                      <p className="table-note">Dividends</p>
+                  {effectiveView !== 'dividends' && (
+                    <TradeHistoryTable
+                      trades={rows}
+                      onCorrect={correctTrade}
+                    />
+                  )}
+                  {effectiveView !== 'trades' && groupDividends.length > 0 && (
+                    <div className="dividends-block">
+                      <p className="dividends-block-heading">Dividends</p>
                       <DividendHistoryTable
-                        dividends={dividendsByTicker(ticker)}
+                        dividends={groupDividends}
                         taxed={taxedDividends}
                         onCorrect={correctDividend}
                       />
-                    </>
+                    </div>
                   )}
                 </section>
               );
-            })
-          )}
+            });
+          })()}
         </TabsContent>
         <TabsContent value="research-desk">
           <ResearchDesk

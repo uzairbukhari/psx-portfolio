@@ -219,6 +219,10 @@ body{margin:0;font-size:16px}.desk{max-width:1460px;margin:auto;padding:0 48px}h
 .brand{background:none;border:0;padding:0;cursor:pointer;font:inherit}
 .settings-page .panel{margin-bottom:20px}
 .settings-page .panel:last-child{margin-bottom:0}
+.company-summary{margin:0 0 22px}
+.company-summary strong small{font-size:13px;font-weight:600;opacity:.75}
+.dividends-block{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);background:rgba(34,224,160,.03)}
+.dividends-block-heading{margin:0 0 6px;padding:0 24px;font-size:12px;font-weight:700;letter-spacing:1px;color:var(--success);text-transform:uppercase}
 .account-menu-header{display:flex;flex-direction:column;gap:2px;padding:8px 10px 10px}
 .account-menu-name{font-size:13px;font-weight:600}
 .account-menu-email{font-size:12px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
