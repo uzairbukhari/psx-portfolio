@@ -247,7 +247,7 @@ function importCdcDividends(
   const rows: unknown[] = Array.isArray(raw)
     ? raw
     : Array.isArray((raw as { data?: unknown } | null)?.data)
-      ? ((raw as { data: unknown[] }).data)
+      ? (raw as { data: unknown[] }).data
       : [];
   const tickers = new Set(companies.map((c) => c.ticker));
   const seenIds = new Set(
@@ -615,8 +615,8 @@ export default function Dashboard({
           <div className="signin-hero-copy">
             <h1>Every rupee you&rsquo;ve put into PSX, in one ledger.</h1>
             <p>
-              Purchases, prices and your monthly SIP plan, tracked the way
-              you actually invest, not how a spreadsheet assumes you should.
+              Purchases, prices and your monthly SIP plan, tracked the way you
+              actually invest, not how a spreadsheet assumes you should.
             </p>
           </div>
           <SignInChart />
@@ -624,7 +624,10 @@ export default function Dashboard({
             <div className="signin-ticker-track">
               {[...SIGNIN_TICKERS, ...SIGNIN_TICKERS].map((t, i) => (
                 <span key={i}>
-                  {t.ticker} <span className={t.up ? 'up' : 'down'}>{t.up ? '▲' : '▼'}</span>
+                  {t.ticker}{' '}
+                  <span className={t.up ? 'up' : 'down'}>
+                    {t.up ? '▲' : '▼'}
+                  </span>
                 </span>
               ))}
             </div>
@@ -646,11 +649,12 @@ export default function Dashboard({
             >
               <GoogleMark /> Continue with Google
             </a>
-            {message && !message.includes('Sign in to access your portfolio') && (
-              <p role="alert" className="notice error">
-                {message}
-              </p>
-            )}
+            {message &&
+              !message.includes('Sign in to access your portfolio') && (
+                <p role="alert" className="notice error">
+                  {message}
+                </p>
+              )}
             <button className="secondary" onClick={load}>
               Retry loading
             </button>
@@ -796,10 +800,15 @@ export default function Dashboard({
   return (
     <main className="desk">
       <header>
-        <div className="brand">
+        <button
+          type="button"
+          data-slot="brand"
+          className="brand"
+          onClick={() => setTab('holdings')}
+        >
           <Wallet size={29} />
           <span>PSX / PERSONAL INVESTING</span>
-        </div>
+        </button>
         <div className="header-right">
           {email && (
             <DropdownMenu>
@@ -832,34 +841,36 @@ export default function Dashboard({
           )}
         </div>
       </header>
-      <section className="heading">
-        <div>
-          <p className="eyebrow">YOUR LONG-TERM PICTURE</p>
-          <h1>Portfolio & SIP desk</h1>
-          <p>
-            A clear record of what you own. A considered plan for what comes
-            next.
-          </p>
-        </div>
-        <div className="row">
-          <button
-            className="secondary"
-            disabled={busy || reviewBusy}
-            onClick={refresh}
-          >
-            <RefreshCw size={16} /> Refresh PSX prices
-          </button>
-          <button
-            disabled={busy}
-            onClick={() => {
-              setEditing(null);
-              setTrade(blankTrade(historyTicker || 'MEBL'));
-            }}
-          >
-            <Plus size={17} /> Record a purchase
-          </button>
-        </div>
-      </section>
+      {tab !== 'settings' && (
+        <section className="heading">
+          <div>
+            <p className="eyebrow">YOUR LONG-TERM PICTURE</p>
+            <h1>Portfolio & SIP desk</h1>
+            <p>
+              A clear record of what you own. A considered plan for what comes
+              next.
+            </p>
+          </div>
+          <div className="row">
+            <button
+              className="secondary"
+              disabled={busy || reviewBusy}
+              onClick={refresh}
+            >
+              <RefreshCw size={16} /> Refresh PSX prices
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setTrade(blankTrade(historyTicker || 'MEBL'));
+              }}
+            >
+              <Plus size={17} /> Record a purchase
+            </button>
+          </div>
+        </section>
+      )}
       {message && (
         <div
           role={failed ? 'alert' : 'status'}
@@ -869,59 +880,67 @@ export default function Dashboard({
         </div>
       )}
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-        <TabsList>
-          <TabsTrigger value="holdings">Holdings</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="sip">Monthly SIP</TabsTrigger>
-          <TabsTrigger value="history">Purchase log</TabsTrigger>
-          <TabsTrigger value="research-desk">Research desk</TabsTrigger>
-          <TabsTrigger value="research">AI review</TabsTrigger>
-        </TabsList>
+        {tab !== 'settings' && (
+          <TabsList>
+            <TabsTrigger value="holdings">Holdings</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="sip">Monthly SIP</TabsTrigger>
+            <TabsTrigger value="history">Purchase log</TabsTrigger>
+            <TabsTrigger value="research-desk">Research desk</TabsTrigger>
+            <TabsTrigger value="research">AI review</TabsTrigger>
+          </TabsList>
+        )}
         <TabsContent value="holdings">
           <PsxMarketPulse />
           <div className="metrics">
-        <article>
-          <span>
-            {missing.length
-              ? 'Priced holdings · incomplete'
-              : 'Portfolio market value'}
-          </span>
-          <strong className="amount">
-            {missing.length === held.length ? 'Prices needed' : money(value)}
-          </strong>
-          <small>
-            {missing.length
-              ? `${missing.length} holdings need a price`
-              : `${held.length} holdings · each quote dated below`}
-          </small>
-        </article>
-        <article>
-          <span>Total remaining cost</span>
-          <strong className="amount">{money(cost)}</strong>
-          <small>
-            {unknown.length
-              ? `${unknown.length} holdings have unknown opening costs`
-              : `New purchases recorded: ${money(newBuys)}`}
-          </small>
-        </article>
-        <article>
-          <span>Unrealised gain / loss</span>
-          <strong
-            className="amount"
-            style={{
-              color:
-                gain === null ? 'inherit' : gain >= 0 ? '#22e0a0' : '#ff5d6c',
-            }}
-          >
-            {gain === null ? 'Not yet known' : money(gain)}
-          </strong>
-          <small>
-            {gain === null
-              ? 'Requires all opening costs and prices'
-              : 'Market value less remaining cost, including buy fees'}
-          </small>
-        </article>
-      </div>
+            <article>
+              <span>
+                {missing.length
+                  ? 'Priced holdings · incomplete'
+                  : 'Portfolio market value'}
+              </span>
+              <strong className="amount">
+                {missing.length === held.length
+                  ? 'Prices needed'
+                  : money(value)}
+              </strong>
+              <small>
+                {missing.length
+                  ? `${missing.length} holdings need a price`
+                  : `${held.length} holdings · each quote dated below`}
+              </small>
+            </article>
+            <article>
+              <span>Total remaining cost</span>
+              <strong className="amount">{money(cost)}</strong>
+              <small>
+                {unknown.length
+                  ? `${unknown.length} holdings have unknown opening costs`
+                  : `New purchases recorded: ${money(newBuys)}`}
+              </small>
+            </article>
+            <article>
+              <span>Unrealised gain / loss</span>
+              <strong
+                className="amount"
+                style={{
+                  color:
+                    gain === null
+                      ? 'inherit'
+                      : gain >= 0
+                        ? '#22e0a0'
+                        : '#ff5d6c',
+                }}
+              >
+                {gain === null ? 'Not yet known' : money(gain)}
+              </strong>
+              <small>
+                {gain === null
+                  ? 'Requires all opening costs and prices'
+                  : 'Market value less remaining cost, including buy fees'}
+              </small>
+            </article>
+          </div>
           <div className="section-top">
             <div>
               <h2>Your companies</h2>
@@ -1416,278 +1435,282 @@ export default function Dashboard({
           />
         </TabsContent>
         <TabsContent value="settings">
-          <section className="panel">
-            <p className="eyebrow">ACCOUNT</p>
-            <h2>{name ?? 'Signed in'}</h2>
-            <p className="muted">{email}</p>
-          </section>
-          <section className="panel">
-            <p className="eyebrow">TAX STATUS</p>
-            <h2>Filer or non-filer</h2>
-            <p className="muted">
-              Sets the capital-gains and dividend tax rate used in Reports:
-              15% for filers, 30% for non-filers. Applies to sells and
-              manually entered dividends; imported dividend records already
-              carry their own real, post-withholding amounts.
-            </p>
-            <RadioGroup
-              value={p.taxProfile?.filerStatus ?? ''}
-              onValueChange={(v) =>
-                attempt(() =>
-                  save(
-                    {
-                      ...p,
-                      taxProfile: { filerStatus: v as 'filer' | 'non-filer' },
-                    },
-                    'Tax status saved.',
-                  ),
-                )
-              }
-            >
-              <label className="check-row" htmlFor="tax-filer">
-                <RadioGroupItem id="tax-filer" value="filer" /> Filer — 15%
-              </label>
-              <label className="check-row" htmlFor="tax-non-filer">
-                <RadioGroupItem id="tax-non-filer" value="non-filer" /> Non-filer
-                — 30%
-              </label>
-            </RadioGroup>
-          </section>
-          <section className="panel">
-            <p className="eyebrow">AI MODEL</p>
-            <h2>Research desk model settings</h2>
-            <p className="muted">
-              Applies to research runs started after you save. Jobs already
-              queued or in progress keep the settings they started with.
-            </p>
-            {(() => {
-              const rs: ResearchSettings =
-                p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS;
-              const update = (patch: Partial<ResearchSettings>) =>
-                attempt(() =>
-                  save(
-                    { ...p, researchSettings: { ...rs, ...patch } },
-                    'AI model settings saved.',
-                  ),
-                );
-              return (
-                <div className="form-grid">
-                  <label>
-                    AI model
-                    <select
-                      value={rs.model}
-                      onChange={(e) =>
-                        update({
-                          model: e.target.value as ResearchSettings['model'],
-                        })
-                      }
-                    >
-                      {RESEARCH_MODELS.map((model) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Reasoning effort
-                    <select
-                      value={rs.reasoningEffort}
-                      onChange={(e) =>
-                        update({
-                          reasoningEffort: e.target
-                            .value as ResearchSettings['reasoningEffort'],
-                        })
-                      }
-                    >
-                      {REASONING_EFFORTS.map((effort) => (
-                        <option key={effort} value={effort}>
-                          {effort}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Budget limit per run (US$)
-                    <input
-                      type="number"
-                      min={0.05}
-                      max={5}
-                      step={0.05}
-                      key={'budget-' + rs.budgetUsd}
-                      defaultValue={rs.budgetUsd}
-                      onBlur={(e) => {
-                        const v = Number(e.target.value);
-                        if (v !== rs.budgetUsd) update({ budgetUsd: v });
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Max output tokens
-                    <input
-                      type="number"
-                      min={4000}
-                      max={64000}
-                      step={1000}
-                      key={'tokens-' + rs.maxOutputTokens}
-                      defaultValue={rs.maxOutputTokens}
-                      onBlur={(e) => {
-                        const v = Number(e.target.value);
-                        if (v !== rs.maxOutputTokens)
-                          update({ maxOutputTokens: v });
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Self-correction attempts
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      step={1}
-                      key={'attempts-' + rs.maxAttempts}
-                      defaultValue={rs.maxAttempts}
-                      onBlur={(e) => {
-                        const v = Number(e.target.value);
-                        if (v !== rs.maxAttempts) update({ maxAttempts: v });
-                      }}
-                    />
-                  </label>
-                </div>
-              );
-            })()}
-          </section>
-          <section className="panel">
-            <p className="eyebrow">USAGE &amp; COST</p>
-            <h2>AI usage</h2>
-            <p className="muted">
-              Tracked from account setup date forward — usage before this
-              feature existed isn&rsquo;t included.
-            </p>
-            {usage ? (
-              <div className="split-stats">
-                <div>
-                  <small>Input tokens</small>
-                  <strong>{usage.inputTokens.toLocaleString()}</strong>
-                </div>
-                <div>
-                  <small>Output tokens</small>
-                  <strong>{usage.outputTokens.toLocaleString()}</strong>
-                </div>
-                <div>
-                  <small>Estimated cost</small>
-                  <strong>
-                    {new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: 'USD',
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 4,
-                    }).format(usage.costUsd)}
-                  </strong>
-                </div>
-              </div>
-            ) : (
-              <p className="muted">Loading…</p>
-            )}
-          </section>
-          <section className="panel">
-            <p className="eyebrow">DATA MANAGEMENT</p>
-            <h2>Backup and import</h2>
-            <div className="row">
-              <button
-                className="secondary compact"
-                onClick={() =>
-                  download(
-                    `psx-portfolio-${today()}.json`,
-                    JSON.stringify(
+          <div className="settings-page">
+            <section className="panel">
+              <p className="eyebrow">ACCOUNT</p>
+              <h2>{name ?? 'Signed in'}</h2>
+              <p className="muted">{email}</p>
+            </section>
+            <section className="panel">
+              <p className="eyebrow">TAX STATUS</p>
+              <h2>Filer or non-filer</h2>
+              <p className="muted">
+                Sets the capital-gains and dividend tax rate used in Reports:
+                15% for filers, 30% for non-filers. Applies to sells and
+                manually entered dividends; imported dividend records already
+                carry their own real, post-withholding amounts.
+              </p>
+              <RadioGroup
+                value={p.taxProfile?.filerStatus ?? ''}
+                onValueChange={(v) =>
+                  attempt(() =>
+                    save(
                       {
-                        schemaVersion: 1,
-                        kind: 'psx-portfolio-ledger',
-                        exportedAt: new Date().toISOString(),
-                        portfolio: p,
+                        ...p,
+                        taxProfile: { filerStatus: v as 'filer' | 'non-filer' },
                       },
-                      null,
-                      2,
+                      'Tax status saved.',
                     ),
                   )
                 }
               >
-                <Download size={14} /> Export backup
-              </button>
-              <label className="import-label">
-                Restore backup
-                <input
-                  type="file"
-                  accept="application/json,.json"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    attempt(async () => {
-                      const data = JSON.parse(await f.text());
-                      if (
-                        data.kind !== 'psx-portfolio-ledger' ||
-                        data.schemaVersion !== 1
-                      )
-                        throw Error(
-                          'Choose a portfolio-ledger backup, not a company research file.',
-                        );
-                      validate(data.portfolio);
-                      if (
-                        !window.confirm(
-                          'Replace this portfolio with the selected backup? Export your current backup first.',
+                <label className="check-row" htmlFor="tax-filer">
+                  <RadioGroupItem id="tax-filer" value="filer" /> Filer — 15%
+                </label>
+                <label className="check-row" htmlFor="tax-non-filer">
+                  <RadioGroupItem id="tax-non-filer" value="non-filer" />{' '}
+                  Non-filer — 30%
+                </label>
+              </RadioGroup>
+            </section>
+            <section className="panel">
+              <p className="eyebrow">AI MODEL</p>
+              <h2>Research desk model settings</h2>
+              <p className="muted">
+                Applies to research runs started after you save. Jobs already
+                queued or in progress keep the settings they started with.
+              </p>
+              {(() => {
+                const rs: ResearchSettings =
+                  p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS;
+                const update = (patch: Partial<ResearchSettings>) =>
+                  attempt(() =>
+                    save(
+                      { ...p, researchSettings: { ...rs, ...patch } },
+                      'AI model settings saved.',
+                    ),
+                  );
+                return (
+                  <div className="form-grid">
+                    <label>
+                      AI model
+                      <select
+                        value={rs.model}
+                        onChange={(e) =>
+                          update({
+                            model: e.target.value as ResearchSettings['model'],
+                          })
+                        }
+                      >
+                        {RESEARCH_MODELS.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Reasoning effort
+                      <select
+                        value={rs.reasoningEffort}
+                        onChange={(e) =>
+                          update({
+                            reasoningEffort: e.target
+                              .value as ResearchSettings['reasoningEffort'],
+                          })
+                        }
+                      >
+                        {REASONING_EFFORTS.map((effort) => (
+                          <option key={effort} value={effort}>
+                            {effort}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Budget limit per run (US$)
+                      <input
+                        type="number"
+                        min={0.05}
+                        max={5}
+                        step={0.05}
+                        key={'budget-' + rs.budgetUsd}
+                        defaultValue={rs.budgetUsd}
+                        onBlur={(e) => {
+                          const v = Number(e.target.value);
+                          if (v !== rs.budgetUsd) update({ budgetUsd: v });
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Max output tokens
+                      <input
+                        type="number"
+                        min={4000}
+                        max={64000}
+                        step={1000}
+                        key={'tokens-' + rs.maxOutputTokens}
+                        defaultValue={rs.maxOutputTokens}
+                        onBlur={(e) => {
+                          const v = Number(e.target.value);
+                          if (v !== rs.maxOutputTokens)
+                            update({ maxOutputTokens: v });
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Self-correction attempts
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        step={1}
+                        key={'attempts-' + rs.maxAttempts}
+                        defaultValue={rs.maxAttempts}
+                        onBlur={(e) => {
+                          const v = Number(e.target.value);
+                          if (v !== rs.maxAttempts) update({ maxAttempts: v });
+                        }}
+                      />
+                    </label>
+                  </div>
+                );
+              })()}
+            </section>
+            <section className="panel">
+              <p className="eyebrow">USAGE &amp; COST</p>
+              <h2>AI usage</h2>
+              <p className="muted">
+                Tracked from account setup date forward — usage before this
+                feature existed isn&rsquo;t included.
+              </p>
+              {usage ? (
+                <div className="split-stats">
+                  <div>
+                    <small>Input tokens</small>
+                    <strong>{usage.inputTokens.toLocaleString()}</strong>
+                  </div>
+                  <div>
+                    <small>Output tokens</small>
+                    <strong>{usage.outputTokens.toLocaleString()}</strong>
+                  </div>
+                  <div>
+                    <small>Estimated cost</small>
+                    <strong>
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'USD',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 4,
+                      }).format(usage.costUsd)}
+                    </strong>
+                  </div>
+                </div>
+              ) : (
+                <p className="muted">Loading…</p>
+              )}
+            </section>
+            <section className="panel">
+              <p className="eyebrow">DATA MANAGEMENT</p>
+              <h2>Backup and import</h2>
+              <div className="row">
+                <button
+                  className="secondary compact"
+                  onClick={() =>
+                    download(
+                      `psx-portfolio-${today()}.json`,
+                      JSON.stringify(
+                        {
+                          schemaVersion: 1,
+                          kind: 'psx-portfolio-ledger',
+                          exportedAt: new Date().toISOString(),
+                          portfolio: p,
+                        },
+                        null,
+                        2,
+                      ),
+                    )
+                  }
+                >
+                  <Download size={14} /> Export backup
+                </button>
+                <label className="import-label">
+                  Restore backup
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      attempt(async () => {
+                        const data = JSON.parse(await f.text());
+                        if (
+                          data.kind !== 'psx-portfolio-ledger' ||
+                          data.schemaVersion !== 1
                         )
-                      )
-                        return;
-                      await save(data.portfolio, 'Portfolio backup restored.');
-                    });
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-              <label className="import-label">
-                Import dividends (CDC JSON)
-                <input
-                  type="file"
-                  accept="application/json,.json"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    attempt(async () => {
-                      const raw = JSON.parse(await f.text());
-                      const result = importCdcDividends(
-                        raw,
-                        p.companies,
-                        p.dividends ?? [],
-                      );
-                      if (!result.imported) {
-                        notify(
-                          `No dividends imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
-                          true,
+                          throw Error(
+                            'Choose a portfolio-ledger backup, not a company research file.',
+                          );
+                        validate(data.portfolio);
+                        if (
+                          !window.confirm(
+                            'Replace this portfolio with the selected backup? Export your current backup first.',
+                          )
+                        )
+                          return;
+                        await save(
+                          data.portfolio,
+                          'Portfolio backup restored.',
                         );
-                        return;
-                      }
-                      const next = clone(p);
-                      next.dividends = [
-                        ...(next.dividends ?? []),
-                        ...result.dividends,
-                      ];
-                      await save(
-                        next,
-                        `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
-                      );
-                    });
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-            </div>
-            <p className="muted">
-              Import expects the CDC Access dividend export JSON (an array,
-              or an object with a <code>data</code> array). Only Paid rows
-              are imported; personal and bank fields are never read or
-              stored.
-            </p>
-          </section>
+                      });
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <label className="import-label">
+                  Import dividends (CDC JSON)
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      attempt(async () => {
+                        const raw = JSON.parse(await f.text());
+                        const result = importCdcDividends(
+                          raw,
+                          p.companies,
+                          p.dividends ?? [],
+                        );
+                        if (!result.imported) {
+                          notify(
+                            `No dividends imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
+                            true,
+                          );
+                          return;
+                        }
+                        const next = clone(p);
+                        next.dividends = [
+                          ...(next.dividends ?? []),
+                          ...result.dividends,
+                        ];
+                        await save(
+                          next,
+                          `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
+                        );
+                      });
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="muted">
+                Import expects the CDC Access dividend export JSON (an array, or
+                an object with a <code>data</code> array). Only Paid rows are
+                imported; personal and bank fields are never read or stored.
+              </p>
+            </section>
+          </div>
         </TabsContent>
       </Tabs>
       <footer>
@@ -1724,20 +1747,31 @@ export default function Dashboard({
                 <div className="row" style={{ marginBottom: 16 }}>
                   <button
                     type="button"
-                    className={trade.kind === 'buy' ? 'compact' : 'secondary compact'}
-                    onClick={() => setTrade({ ...trade, kind: 'buy', month: today().slice(0, 7) })}
+                    className={
+                      trade.kind === 'buy' ? 'compact' : 'secondary compact'
+                    }
+                    onClick={() =>
+                      setTrade({
+                        ...trade,
+                        kind: 'buy',
+                        month: today().slice(0, 7),
+                      })
+                    }
                   >
                     Buy
                   </button>
                   <button
                     type="button"
-                    className={trade.kind === 'sell' ? 'compact' : 'secondary compact'}
+                    className={
+                      trade.kind === 'sell' ? 'compact' : 'secondary compact'
+                    }
                     onClick={() =>
                       setTrade({
                         ...trade,
                         kind: 'sell',
                         month: '',
-                        price: trade.price ?? p.quotes[trade.ticker]?.price ?? null,
+                        price:
+                          trade.price ?? p.quotes[trade.ticker]?.price ?? null,
                       })
                     }
                   >
