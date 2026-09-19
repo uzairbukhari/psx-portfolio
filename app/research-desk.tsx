@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Download, Plus, Trash2, Upload, RotateCcw, Settings, X } from 'lucide-react';
 import {
   Dialog,
@@ -119,6 +119,7 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
     [ticker, setTicker] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const eventListRef = useRef<HTMLDivElement | null>(null);
   const settings = useMemo(
     () => portfolio.researchSettings ?? DEFAULT_RESEARCH_SETTINGS,
     [portfolio.researchSettings],
@@ -191,6 +192,10 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       unsubscribe();
     };
   }, []);
+  useEffect(() => {
+    const node = eventListRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [events, jobOpen?.message]);
   useEffect(() => {
     const value = sessionStorage.getItem('open-completed-dossier');
     if (
@@ -865,7 +870,7 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                   </p>
                 )}
               {jobOpen.error && <p className="notice error">{jobOpen.error}</p>}
-              <div className="event-list">
+              <div className="event-list" ref={eventListRef}>
                 {events.map((item) => (
                   <div key={item.id}>
                     <span className="event-mark" />
