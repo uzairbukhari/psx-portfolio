@@ -198,6 +198,37 @@ test('rejects stale fiscal labels, broken units, and missing latest DPS', () => 
   assert.throws(() => validateInvestmentDossier(negativeDps, 200, 2026), /cannot be negative/);
 });
 
+test('flags an implausible dividend only for the newest year, not a historical one', () => {
+  // A bonus or rights issue restates EPS for comparability, but a
+  // dividend a company actually declared in an older year was never
+  // restated - real case (MARI, an 800% bonus event around FY2024): two
+  // different models independently read the same dividend figures from
+  // the same evidence, ruling out model error, yet they looked 3-4x EPS
+  // for the historical years only. The prompt already tells the model to
+  // preserve and flag such a break rather than invent an adjusted series,
+  // so only the newest year - the one that matters for a current
+  // decision, and which can't have this historical distortion - is
+  // checked against EPS.
+  const base = {
+    financials: [2025, 2024, 2023, 2022, 2021].map(annual),
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: [
+      { name: 'Bear', eps: 30, multiple: 5 }, { name: 'Base', eps: 35, multiple: 6 }, { name: 'Bull', eps: 40, multiple: 7 },
+    ],
+  };
+  const historicalOnly = {
+    ...base,
+    financials: base.financials.map((row, i) => (i === 4 ? { ...row, dividend: 124 } : row)),
+  };
+  assert.doesNotThrow(() => validateInvestmentDossier(historicalOnly, 200, 2026));
+  const newestImplausible = {
+    ...base,
+    financials: base.financials.map((row, i) => (i === 0 ? { ...row, dividend: 124 } : row)),
+  };
+  assert.throws(() => validateInvestmentDossier(newestImplausible, 200, 2026), /Dividend per share is implausible/);
+});
+
 test('allows equity and dividend to be null when genuinely unavailable, without failing validation', () => {
   const financials = [2025, 2024, 2023, 2022, 2021].map(annual);
   financials[0] = { ...financials[0], dividend: null };
