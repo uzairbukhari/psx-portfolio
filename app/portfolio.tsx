@@ -18,6 +18,13 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { Spinner } from '@/components/ui/spinner';
 import {
   ArrowUpRight,
@@ -26,8 +33,9 @@ import {
   Download,
   Sparkles,
   Wallet,
-  ShieldCheck,
   LogOut,
+  Settings,
+  ChevronDown,
 } from 'lucide-react';
 import {
   holdings,
@@ -793,17 +801,34 @@ export default function Dashboard({
           <span>PSX / PERSONAL INVESTING</span>
         </div>
         <div className="header-right">
-          <span className="badge">
-            <ShieldCheck size={14} /> PRIVATE WORKSPACE
-          </span>
           {email && (
-            <span className="account-chip">
-              <span className="account-email">{email}</span>
-              <a className="signout-link" href="/api/auth/logout">
-                <LogOut size={13} />
-                Sign out
-              </a>
-            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="account-trigger">
+                <span className="account-avatar">
+                  {(name || email).charAt(0).toUpperCase()}
+                </span>
+                <ChevronDown size={14} className="account-chevron" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="account-menu">
+                <div className="account-menu-header">
+                  {name && <span className="account-menu-name">{name}</span>}
+                  <span className="account-menu-email">{email}</span>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setTab('settings')}>
+                  <Settings size={15} /> Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => {
+                    window.location.href = '/api/auth/logout';
+                  }}
+                >
+                  <LogOut size={15} /> Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </header>
@@ -851,7 +876,6 @@ export default function Dashboard({
           <TabsTrigger value="history">Purchase log</TabsTrigger>
           <TabsTrigger value="research-desk">Research desk</TabsTrigger>
           <TabsTrigger value="research">AI review</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="holdings">
           <PsxMarketPulse />
