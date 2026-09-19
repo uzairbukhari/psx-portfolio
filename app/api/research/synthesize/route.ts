@@ -84,10 +84,19 @@ const schema = {
     },
     assessments: {
       type: 'object', additionalProperties: false,
-      properties: Object.fromEntries(SCORE_RUBRIC.map(({ name }) => [name, {
+      // Each category's max was previously only stated in prose ("Grade
+      // strictly against these category maximums..."), so nothing
+      // structurally stopped the model from returning e.g. 14 for a
+      // category capped at 10 (real case: Dividend quality and Risk
+      // resilience both exceeded their max, failing validScorecard on
+      // every attempt). This is a strict-mode JSON schema already enforced
+      // by the API, so putting the real per-category cap directly in the
+      // schema makes it a structural guarantee instead of relying on the
+      // model reading the prose limit correctly.
+      properties: Object.fromEntries(SCORE_RUBRIC.map(({ name, max }) => [name, {
         type: 'object', additionalProperties: false,
         properties: {
-          score: nullableNumber,
+          score: { type: ['number', 'null'], minimum: 0, maximum: max },
           source: { type: 'string', description: 'Exact supplied document title or URL and page locator.' },
           finding: { type: 'string', minLength: 60, description: 'Concrete company-specific evidence and why it supports the score.' },
           limitation: { type: 'string', minLength: 60, description: 'Specific risk, contrary evidence or missing information that limits this score.' },

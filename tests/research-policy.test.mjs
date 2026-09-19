@@ -4,6 +4,7 @@ import {
   RESEARCH_BUDGET_MICROS,
   correctFiscalYearLabels,
   describeNullFinancialFields,
+  describeScorecardIssues,
   hasPdfSignature,
   normalizeAnnualFinancials,
   normalizeValuationScenarios,
@@ -25,6 +26,17 @@ test('seven-category scores enforce framework limits and preserve null gaps', ()
   assert.equal(validScorecard([18, 17, 12, 8, null, 11, 7]), true);
   assert.equal(validScorecard([21, 17, 12, 8, 7, 11, 7]), false);
   assert.equal(validScorecard([18, 17, 12, 8, 7]), false);
+});
+
+test('names exactly which score categories exceeded their cap', () => {
+  // Real case: Dividend quality (max 10) came back as 14, Risk resilience
+  // (max 10) as 12 - a generic "did not pass validation" message gave the
+  // self-correction loop nothing concrete to fix on retry.
+  assert.equal(
+    describeScorecardIssues([16, 17, 12, 8, 14, 11, 12]),
+    'Dividend quality score 14 exceeds its maximum of 10; Risk resilience score 12 exceeds its maximum of 10',
+  );
+  assert.equal(describeScorecardIssues([18, 17, 12, 8, null, 11, 7]), '');
 });
 
 test('PDF validation rejects HTML returned by an official-looking URL', () => {
