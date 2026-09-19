@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,today,SECTORS,DEFAULT_RESEARCH_SETTINGS} from '../lib/portfolio.ts';
+import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
@@ -60,6 +60,89 @@ test('researchInsights reports a valuation gap only when both fair value and pri
   assert.equal(b.status,'None');
   assert.equal(b.score,null);
   assert.equal(b.valuationPct,null);
+});
+test('sharesHeldOn tracks running shares across buys and sells',()=>{
+  const p=fresh();
+  p.trades=[trade('1',100,10,'buy'),trade('2',30,20,'sell')];
+  assert.equal(sharesHeldOn(p,'TEST','2000-01-01'),0);
+  assert.equal(sharesHeldOn(p,'TEST',date),70);
+});
+test('realizedSales returns one record per sale and sums to holdings realized',()=>{
+  const p=fresh();
+  p.trades=[trade('1',100,10,'buy',10),trade('2',50,20,'buy',20),trade('3',50,30,'sell',5)];
+  validate(p);
+  const sales=realizedSales(p);
+  assert.equal(sales.length,1);
+  assert.equal(sales[0].shares,50);
+  assert.equal(sales[0].realizedGain,818.33);
+  assert.equal(holdings(p)[0].realized,sales.reduce((a,s)=>a+s.realizedGain,0));
+});
+test('realizedSales marks gain and cost basis null when average cost unknown',()=>{
+  const p=fresh();
+  p.trades=[trade('0',10,null,'opening'),trade('1',10,20),trade('2',20,30,'sell'),trade('3',5,25)];
+  const sales=realizedSales(p);
+  assert.equal(sales.length,1);
+  assert.equal(sales[0].realizedGain,null);
+  assert.equal(sales[0].costBasis,null);
+});
+test('taxSummary applies filer/non-filer rates to sells and manual dividends, losses pay no tax',()=>{
+  const p=fresh();
+  p.trades=[trade('1',100,10,'buy'),trade('2',50,5,'sell')];
+  p.dividends=[{id:'d1',ticker:'TEST',date,source:'manual',perShare:2,grossAmount:100,note:''}];
+  p.taxProfile={filerStatus:'filer'};
+  validate(p);
+  let t=taxSummary(p);
+  assert.equal(t.sales[0].realizedGain,-250);
+  assert.equal(t.sales[0].tax,0);
+  assert.equal(t.dividends[0].tax,15);
+  assert.equal(t.dividends[0].netAmount,85);
+  p.taxProfile={filerStatus:'non-filer'};
+  t=taxSummary(p);
+  assert.equal(t.dividends[0].tax,30);
+  assert.equal(t.dividends[0].netAmount,70);
+});
+test('imported dividend tax derives from stored gross/net regardless of filer status',()=>{
+  const p=fresh();
+  p.dividends=[{id:'d1',ticker:'TEST',date,source:'import',grossAmount:35,netAmount:30,externalId:'EV1',note:''}];
+  validate(p);
+  assert.equal(taxSummary(p).dividends[0].tax,5);
+  p.taxProfile={filerStatus:'non-filer'};
+  assert.equal(taxSummary(p).dividends[0].netAmount,30);
+});
+test('taxSummary returns null tax fields when filer status is not set',()=>{
+  const p=fresh();
+  p.trades=[trade('1',100,10,'buy'),trade('2',50,20,'sell')];
+  validate(p);
+  const t=taxSummary(p);
+  assert.equal(t.sales[0].tax,null);
+  assert.equal(t.totalCapitalGainsTax,null);
+  assert.equal(t.netRealizedReturn,null);
+});
+test('validate rejects dividends for unknown tickers, before shares held, duplicate imports, net exceeding gross, and bad filer status',()=>{
+  let p=fresh();
+  p.dividends=[{id:'1',ticker:'OTHER',date,source:'manual',perShare:1,grossAmount:1,note:''}];
+  assert.throws(()=>validate(p));
+
+  p=fresh();
+  p.dividends=[{id:'1',ticker:'TEST',date,source:'manual',perShare:1,grossAmount:1,note:''}];
+  assert.throws(()=>validate(p));
+
+  p=fresh();
+  p.trades=[trade('1',10,10,'buy')];
+  p.dividends=[
+    {id:'1',ticker:'TEST',date,source:'import',grossAmount:10,netAmount:8,externalId:'E1',note:''},
+    {id:'2',ticker:'TEST',date,source:'import',grossAmount:10,netAmount:8,externalId:'E1',note:''},
+  ];
+  assert.throws(()=>validate(p));
+
+  p=fresh();
+  p.trades=[trade('1',10,10,'buy')];
+  p.dividends=[{id:'1',ticker:'TEST',date,source:'import',grossAmount:10,netAmount:20,externalId:'E1',note:''}];
+  assert.throws(()=>validate(p));
+
+  p=fresh();
+  p.taxProfile={filerStatus:'exempt'};
+  assert.throws(()=>validate(p));
 });
 test('researchWeightProfile rewards higher scores and undervaluation, penalizes missing research, and always sums to 100 within the 20% cap',()=>{
   const q=(t)=>({price:80,date,asOf:date,source:'https://dps.psx.com.pk/company/'+t,fetchedAt:new Date().toISOString()});
