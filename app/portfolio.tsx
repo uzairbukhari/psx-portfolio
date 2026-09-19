@@ -433,7 +433,13 @@ function DividendHistoryTable({
     </Table>
   );
 }
-export default function Dashboard({ email }: { email: string | null }) {
+export default function Dashboard({
+  email,
+  name,
+}: {
+  email: string | null;
+  name: string | null;
+}) {
   const initialPathname = usePathname();
   const [tab, setTabState] = useState(() => tabFromPathname(initialPathname));
   function setTab(next: string) {
@@ -1369,7 +1375,7 @@ export default function Dashboard({ email }: { email: string | null }) {
         <TabsContent value="settings">
           <section className="panel">
             <p className="eyebrow">ACCOUNT</p>
-            <h2>Signed in</h2>
+            <h2>{name ?? 'Signed in'}</h2>
             <p className="muted">{email}</p>
           </section>
           <section className="panel">

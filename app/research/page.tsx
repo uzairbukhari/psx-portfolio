@@ -6,5 +6,5 @@ export const metadata = {
 };
 export default async function ResearchPage() {
   const user = await getCurrentUser();
-  return <Dashboard email={user?.email ?? null} />;
+  return <Dashboard email={user?.email ?? null} name={user?.name ?? null} />;
 }

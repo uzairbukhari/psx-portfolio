@@ -43,6 +43,7 @@ export async function GET(req: Request) {
   const userInfo = (await userInfoResponse.json()) as {
     email?: string;
     email_verified?: boolean;
+    name?: string;
   };
 
   const allowed = (env.ALLOWED_EMAILS ?? '')
@@ -56,7 +57,8 @@ export async function GET(req: Request) {
     return redirectWithError(url.origin, 'oauth_email');
 
   if (!env.SESSION_SECRET) return redirectWithError(url.origin, 'oauth_config');
-  const sessionToken = await signSession(email, env.SESSION_SECRET);
+  const name = typeof userInfo.name === 'string' ? userInfo.name : null;
+  const sessionToken = await signSession(email, name, env.SESSION_SECRET);
 
   const headers = new Headers({
     Location: new URL(returnTo, url.origin).toString(),

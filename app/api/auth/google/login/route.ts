@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     new URL('/api/auth/google/callback', url.origin).toString(),
   );
   authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('scope', 'openid email');
+  authUrl.searchParams.set('scope', 'openid email profile');
   authUrl.searchParams.set('state', state);
 
   const headers = new Headers({ Location: authUrl.toString() });

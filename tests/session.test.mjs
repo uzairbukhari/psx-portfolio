@@ -8,16 +8,27 @@ import {
   readCookieValue,
 } from '../lib/session.ts';
 
-test('a signed session round-trips to the original email', async () => {
-  const token = await signSession('owner@example.com', 'test-secret');
-  assert.equal(await verifySession(token, 'test-secret'), 'owner@example.com');
+test('a signed session round-trips to the original email and name', async () => {
+  const token = await signSession('owner@example.com', 'Owner Name', 'test-secret');
+  assert.deepEqual(await verifySession(token, 'test-secret'), {
+    email: 'owner@example.com',
+    name: 'Owner Name',
+  });
+});
+
+test('a session signed without a name verifies with name null', async () => {
+  const token = await signSession('owner@example.com', null, 'test-secret');
+  assert.deepEqual(await verifySession(token, 'test-secret'), {
+    email: 'owner@example.com',
+    name: null,
+  });
 });
 
 test('a tampered payload is rejected', async () => {
-  const token = await signSession('owner@example.com', 'test-secret');
+  const token = await signSession('owner@example.com', 'Owner Name', 'test-secret');
   const [, signature] = token.split('.');
   const forgedPayload = Buffer.from(
-    JSON.stringify({ email: 'attacker@example.com', exp: Date.now() + 100000 }),
+    JSON.stringify({ email: 'attacker@example.com', name: null, exp: Date.now() + 100000 }),
   ).toString('base64url');
   assert.equal(
     await verifySession(`${forgedPayload}.${signature}`, 'test-secret'),
@@ -26,18 +37,18 @@ test('a tampered payload is rejected', async () => {
 });
 
 test('a tampered signature is rejected', async () => {
-  const token = await signSession('owner@example.com', 'test-secret');
+  const token = await signSession('owner@example.com', 'Owner Name', 'test-secret');
   const [payload] = token.split('.');
   assert.equal(await verifySession(`${payload}.deadbeef`, 'test-secret'), null);
 });
 
 test('the wrong secret is rejected', async () => {
-  const token = await signSession('owner@example.com', 'test-secret');
+  const token = await signSession('owner@example.com', 'Owner Name', 'test-secret');
   assert.equal(await verifySession(token, 'wrong-secret'), null);
 });
 
 test('an expired session is rejected', async () => {
-  const token = await signSession('owner@example.com', 'test-secret', -1000);
+  const token = await signSession('owner@example.com', 'Owner Name', 'test-secret', -1000);
   assert.equal(await verifySession(token, 'test-secret'), null);
 });
 

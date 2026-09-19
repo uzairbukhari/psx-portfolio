@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { env } from 'cloudflare:workers';
 import { readCookieValue, verifySession } from '@/lib/session';
 
-export type AuthUser = { email: string };
+export type AuthUser = { email: string; name: string | null };
 
 const LOGIN_PATH = '/api/auth/google/login';
 const LOGOUT_PATH = '/api/auth/logout';
@@ -16,8 +16,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!cookieHeader) return null;
   const token = readCookieValue(cookieHeader, SESSION_COOKIE);
   if (!token) return null;
-  const email = await verifySession(token, env.SESSION_SECRET);
-  return email ? { email } : null;
+  return verifySession(token, env.SESSION_SECRET);
 }
 
 export function signInPath(returnTo: string): string {

@@ -10,13 +10,16 @@ async function hmacKey(secret: string): Promise<CryptoKey> {
   );
 }
 
+export type SessionUser = { email: string; name: string | null };
+
 export async function signSession(
   email: string,
+  name: string | null,
   secret: string,
   ttlMs = 30 * 24 * 60 * 60 * 1000,
 ): Promise<string> {
   const payload = Buffer.from(
-    JSON.stringify({ email, exp: Date.now() + ttlMs }),
+    JSON.stringify({ email, name, exp: Date.now() + ttlMs }),
   ).toString('base64url');
   const key = await hmacKey(secret);
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
@@ -26,7 +29,7 @@ export async function signSession(
 export async function verifySession(
   token: string,
   secret: string,
-): Promise<string | null> {
+): Promise<SessionUser | null> {
   try {
     const [payload, signature] = token.split('.');
     if (!payload || !signature) return null;
@@ -40,11 +43,12 @@ export async function verifySession(
     if (!valid) return null;
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString()) as {
       email?: string;
+      name?: string | null;
       exp?: number;
     };
     if (!data.email || typeof data.exp !== 'number' || data.exp < Date.now())
       return null;
-    return data.email;
+    return { email: data.email, name: data.name ?? null };
   } catch {
     return null;
   }
