@@ -182,10 +182,8 @@ export default function PortfolioReports({
       <div className="reports-intro">
         <div>
           <p className="eyebrow">PORTFOLIO REPORTS</p>
-          <h2>See where your portfolio is concentrated.</h2>
           <p>
-            Current allocation uses your latest saved PSX prices. Purchase
-            activity uses recorded transactions, not estimated market history.
+            See where your portfolio is concentrated. Allocation uses your latest saved PSX prices; purchase activity is based on recorded transactions.
           </p>
         </div>
         <div className="reports-hero-stats">
@@ -287,7 +285,7 @@ export default function PortfolioReports({
         </article>
       </section>
 
-      <section className="panel report-panel">
+      <section className="panel report-panel" style={{ marginBottom: 20 }}>
         <div className="report-heading">
           <div>
             <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
