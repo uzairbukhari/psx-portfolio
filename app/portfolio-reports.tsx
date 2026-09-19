@@ -34,6 +34,7 @@ import {
 import { money, round, type Portfolio } from '@/lib/portfolio';
 import {
   portfolioReport,
+  type DividendCompanyPoint,
   type PerformancePoint,
   type SectorPoint,
 } from '@/lib/portfolio-reports';
@@ -53,6 +54,15 @@ const activityConfig = {
 
 const cumulativeConfig = {
   cumulative: { label: 'Cumulative invested', color: 'var(--primary)' },
+} satisfies ChartConfig;
+
+const dividendActivityConfig = {
+  net: { label: 'Net received', color: 'var(--primary)' },
+  gross: { label: 'Gross declared', color: '#7f93b8' },
+} satisfies ChartConfig;
+
+const dividendCompanyConfig = {
+  net: { label: 'Net received', color: 'var(--primary)' },
 } satisfies ChartConfig;
 
 const performanceConfig = {
@@ -82,6 +92,30 @@ function foldSectors(sectors: SectorPoint[], cap = sectorColors.length) {
       sector: 'Other',
       value: round(rest.reduce((total, item) => total + item.value, 0)),
       weight: round(rest.reduce((total, item) => total + item.weight, 0)),
+    },
+  ];
+}
+
+function foldDividendCompanies(
+  companies: DividendCompanyPoint[],
+  cap = 7,
+): DividendCompanyPoint[] {
+  if (companies.length <= cap) return companies;
+  const rest = companies.slice(cap);
+  const restNet = rest.some((item) => item.net === null)
+    ? null
+    : round(rest.reduce((total, item) => total + (item.net ?? 0), 0));
+  const restWeight = rest.some((item) => item.weight === null)
+    ? null
+    : round(rest.reduce((total, item) => total + (item.weight ?? 0), 0));
+  return [
+    ...companies.slice(0, cap),
+    {
+      ticker: 'Other',
+      name: 'Other companies',
+      gross: round(rest.reduce((total, item) => total + item.gross, 0)),
+      net: restNet,
+      weight: restWeight,
     },
   ];
 }
@@ -120,6 +154,19 @@ export default function PortfolioReports({
     label: monthLabel(item.month),
   }));
   const sectors = foldSectors(report.sectorAllocation);
+  const dividendActivity = report.dividendActivity.map((item) => ({
+    ...item,
+    label: monthLabel(item.month),
+  }));
+  const dividendCompanies = foldDividendCompanies(report.dividendByCompany);
+  const dividendPaymentCount = report.realized.dividends.length;
+  const totalDividendNet =
+    report.realized.totalDividendTax === null
+      ? null
+      : round(
+          report.realized.totalDividendIncomeGross -
+            report.realized.totalDividendTax,
+        );
   const maxAbsGain = Math.max(
     1,
     ...report.performance.map((item) => Math.abs(item.gainPercent)),
@@ -232,7 +279,7 @@ export default function PortfolioReports({
         <div className="report-heading">
           <div>
             <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
-            <h3>Sales and dividends</h3>
+            <h3>Realized sales</h3>
           </div>
           <span>Capital gains 15% filer / 30% non-filer</span>
         </div>
@@ -265,41 +312,320 @@ export default function PortfolioReports({
         ) : (
           <ReportEmpty>Record a sale to see realized gains here.</ReportEmpty>
         )}
-        {report.realized.dividends.length ? (
-          <>
-            <p className="report-source" style={{ marginTop: 16 }}>
-              Dividends
-            </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {['Date', 'Ticker', 'Gross', 'Tax', 'Net', 'Source'].map((x) => (
-                    <TableHead key={x}>{x}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.realized.dividends.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{d.date}</TableCell>
-                    <TableCell>{d.ticker}</TableCell>
-                    <TableCell>{money(d.grossAmount)}</TableCell>
-                    <TableCell>{d.tax === null ? '—' : money(d.tax)}</TableCell>
-                    <TableCell>{d.netAmount === null ? '—' : money(d.netAmount)}</TableCell>
-                    <TableCell>{d.source === 'import' ? 'CDC import' : 'Manual'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </>
-        ) : null}
         <p className="report-source">
-          Source: recorded sales and dividends · imported dividends keep their
-          own real, post-withholding tax
+          Source: recorded sales · realized gains only
         </p>
       </section>
 
       <div className="reports-grid">
+        <section className="panel report-panel">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">DIVIDEND INCOME</p>
+              <h3>Monthly gross vs net</h3>
+            </div>
+            <span>
+              {dividendPaymentCount} payment
+              {dividendPaymentCount === 1 ? '' : 's'} ·{' '}
+              {totalDividendNet === null ? '—' : money(totalDividendNet)} net
+              to date
+            </span>
+          </div>
+          {dividendActivity.length ? (
+            <ChartContainer
+              config={dividendActivityConfig}
+              className="report-chart report-chart--activity"
+            >
+              <BarChart
+                accessibilityLayer
+                data={dividendActivity}
+                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
+              >
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  label={{
+                    value: 'Dividend month',
+                    position: 'insideBottom',
+                    offset: -16,
+                  }}
+                />
+                <YAxis
+                  width={72}
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                  label={{
+                    value: 'Amount (PKR)',
+                    angle: -90,
+                    position: 'insideLeft',
+                  }}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name) => (
+                        <div className="report-tooltip-row">
+                          <span>
+                            {dividendActivityConfig[
+                              name as keyof typeof dividendActivityConfig
+                            ]?.label ?? name}
+                          </span>
+                          <b>
+                            {value === null ? '—' : money(Number(value))}
+                          </b>
+                        </div>
+                      )}
+                    />
+                  }
+                />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Bar
+                  dataKey="net"
+                  fill="var(--color-net)"
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={44}
+                />
+                <Bar
+                  dataKey="gross"
+                  fill="var(--color-gross)"
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={44}
+                />
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>Record a dividend to see monthly income.</ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded dividends · net requires a filer status in
+            Settings
+          </p>
+        </section>
+
+        <section className="panel report-panel">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">DIVIDEND TRAJECTORY</p>
+              <h3>Cumulative net received</h3>
+            </div>
+            <span>
+              {dividendActivity.length &&
+              dividendActivity[dividendActivity.length - 1].cumulativeNet !==
+                null
+                ? money(
+                    dividendActivity[dividendActivity.length - 1]
+                      .cumulativeNet as number,
+                  )
+                : '—'}{' '}
+              to date
+            </span>
+          </div>
+          {dividendActivity.length ? (
+            <ChartContainer
+              config={dividendActivityConfig}
+              className="report-chart report-chart--trend"
+            >
+              <AreaChart
+                accessibilityLayer
+                data={dividendActivity}
+                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="dividendCumulativeFill"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor="var(--primary)"
+                      stopOpacity={0.28}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="var(--primary)"
+                      stopOpacity={0.02}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  label={{
+                    value: 'Dividend month',
+                    position: 'insideBottom',
+                    offset: -16,
+                  }}
+                />
+                <YAxis
+                  width={72}
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value) => (
+                        <div className="report-tooltip-row">
+                          <span>Cumulative net</span>
+                          <b>
+                            {value === null ? '—' : money(Number(value))}
+                          </b>
+                        </div>
+                      )}
+                    />
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey="cumulativeNet"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  fill="url(#dividendCumulativeFill)"
+                  dot={false}
+                  connectNulls={false}
+                  activeDot={{
+                    r: 4,
+                    strokeWidth: 2,
+                    stroke: 'var(--background)',
+                  }}
+                />
+              </AreaChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>
+              Record dividends to see your income trajectory.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: running total of net dividend income · post-withholding
+          </p>
+        </section>
+
+        <section className="panel report-panel">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">TOP PAYERS</p>
+              <h3>Dividend income by company</h3>
+            </div>
+            <span>Net received, ranked</span>
+          </div>
+          {dividendCompanies.length ? (
+            <ChartContainer
+              config={dividendCompanyConfig}
+              className="report-chart"
+              style={{
+                height: Math.max(220, dividendCompanies.length * 34 + 70),
+              }}
+            >
+              <BarChart
+                accessibilityLayer
+                data={dividendCompanies}
+                layout="vertical"
+                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="dividendCompanyFill"
+                    x1="0"
+                    y1="0"
+                    x2="1"
+                    y2="0"
+                  >
+                    <stop offset="0%" stopColor="var(--primary)" />
+                    <stop offset="100%" stopColor="#7dd3fc" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid horizontal={false} />
+                <XAxis
+                  type="number"
+                  domain={[0, 'dataMax']}
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                  label={{
+                    value: 'Net dividend income (PKR)',
+                    position: 'insideBottom',
+                    offset: -12,
+                  }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="ticker"
+                  width={58}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  content={
+                    <ChartTooltipContent
+                      hideLabel
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as DividendCompanyPoint;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>{point.name}</span>
+                            <b>
+                              {point.net === null
+                                ? `${money(point.gross)} gross`
+                                : `${money(point.net)} net`}
+                              {point.weight === null
+                                ? ''
+                                : ` · ${point.weight.toFixed(1)}%`}
+                            </b>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey={(item: DividendCompanyPoint) =>
+                    item.net ?? item.gross
+                  }
+                  fill="url(#dividendCompanyFill)"
+                  radius={[0, 5, 5, 0]}
+                >
+                  <LabelList
+                    dataKey={(item: DividendCompanyPoint) =>
+                      item.net ?? item.gross
+                    }
+                    position="right"
+                    formatter={(value) =>
+                      new Intl.NumberFormat('en-PK', {
+                        notation: 'compact',
+                      }).format(Number(value))
+                    }
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>
+              Record dividends to see which companies pay the most.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded dividends, net where filer status is set ·
+            grouped by company
+          </p>
+        </section>
+
         <section className="panel report-panel">
           <div className="report-heading">
             <div>

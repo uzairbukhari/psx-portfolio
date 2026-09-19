@@ -42,12 +42,29 @@ export type PerformancePoint = {
   gainPercent: number;
 };
 
+export type DividendActivityPoint = {
+  month: string;
+  gross: number;
+  net: number | null;
+  cumulativeNet: number | null;
+};
+
+export type DividendCompanyPoint = {
+  ticker: string;
+  name: string;
+  gross: number;
+  net: number | null;
+  weight: number | null;
+};
+
 export type PortfolioReport = {
   companyAllocation: AllocationPoint[];
   sectorAllocation: SectorPoint[];
   targetComparison: TargetPoint[];
   monthlyActivity: ActivityPoint[];
   performance: PerformancePoint[];
+  dividendActivity: DividendActivityPoint[];
+  dividendByCompany: DividendCompanyPoint[];
   realized: {
     sales: TaxedSale[];
     dividends: TaxedDividend[];
@@ -170,12 +187,85 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
 
   const tax = taxSummary(portfolio);
 
+  const dividendMonths = new Map<
+    string,
+    { gross: number; net: number | null }
+  >();
+  for (const d of tax.dividends) {
+    const month = d.date.slice(0, 7);
+    const entry = dividendMonths.get(month) ?? { gross: 0, net: 0 };
+    dividendMonths.set(month, {
+      gross: round(entry.gross + d.grossAmount),
+      net:
+        entry.net === null || d.netAmount === null
+          ? null
+          : round(entry.net + d.netAmount),
+    });
+  }
+  let cumulativeNet: number | null = 0;
+  const dividendActivity: DividendActivityPoint[] = [...dividendMonths]
+    .map(([month, item]) => ({ month, ...item }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((item) => {
+      cumulativeNet =
+        cumulativeNet === null || item.net === null
+          ? null
+          : round(cumulativeNet + item.net);
+      return { ...item, cumulativeNet };
+    });
+
+  const companyNames = new Map(
+    portfolio.companies.map((c) => [c.ticker, c.name]),
+  );
+  const dividendCompanies = new Map<
+    string,
+    { gross: number; net: number | null }
+  >();
+  for (const d of tax.dividends) {
+    const entry = dividendCompanies.get(d.ticker) ?? { gross: 0, net: 0 };
+    dividendCompanies.set(d.ticker, {
+      gross: round(entry.gross + d.grossAmount),
+      net:
+        entry.net === null || d.netAmount === null
+          ? null
+          : round(entry.net + d.netAmount),
+    });
+  }
+  const totalDividendNet = [...dividendCompanies.values()].some(
+    (item) => item.net === null,
+  )
+    ? null
+    : round(
+        [...dividendCompanies.values()].reduce(
+          (total, item) => total + (item.net ?? 0),
+          0,
+        ),
+      );
+  const dividendByCompany: DividendCompanyPoint[] = [...dividendCompanies]
+    .map(([ticker, item]) => ({
+      ticker,
+      name: companyNames.get(ticker) ?? ticker,
+      gross: item.gross,
+      net: item.net,
+      weight:
+        item.net === null || totalDividendNet === null || totalDividendNet <= 0
+          ? null
+          : percentage(item.net, totalDividendNet),
+    }))
+    .sort(
+      (a, b) =>
+        (b.net ?? b.gross) - (a.net ?? a.gross) ||
+        a.ticker.localeCompare(b.ticker),
+    );
+
   return {
     companyAllocation,
     sectorAllocation,
     targetComparison,
     monthlyActivity,
     performance,
+    dividendActivity,
+    dividendByCompany,
     realized: {
       sales: tax.sales,
       dividends: tax.dividends,

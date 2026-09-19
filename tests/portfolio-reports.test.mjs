@@ -262,6 +262,67 @@ test('grand total return combines unrealized gain with net-of-tax realized gain 
   assert.equal(report.summary.grandTotalReturn, 17.7);
 });
 
+test('aggregates dividends by month with a running net cumulative total', () => {
+  const p = portfolio();
+  p.taxProfile = { filerStatus: 'filer' };
+  p.dividends = [
+    {
+      id: 'd1',
+      ticker: 'AAA',
+      date: '2026-03-05',
+      source: 'manual',
+      grossAmount: 100,
+      note: '',
+    },
+    {
+      id: 'd2',
+      ticker: 'BBB',
+      date: '2026-03-20',
+      source: 'manual',
+      grossAmount: 50,
+      note: '',
+    },
+    {
+      id: 'd3',
+      ticker: 'AAA',
+      date: '2026-04-01',
+      source: 'manual',
+      grossAmount: 200,
+      note: '',
+    },
+  ];
+  const report = portfolioReport(p);
+  assert.deepEqual(report.dividendActivity, [
+    { month: '2026-03', gross: 150, net: 127.5, cumulativeNet: 127.5 },
+    { month: '2026-04', gross: 200, net: 170, cumulativeNet: 297.5 },
+  ]);
+  assert.deepEqual(report.dividendByCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', gross: 300, net: 255, weight: 85.71 },
+    { ticker: 'BBB', name: 'Beta Foods', gross: 50, net: 42.5, weight: 14.29 },
+  ]);
+});
+
+test('dividend net and weight stay null without a filer status', () => {
+  const p = portfolio();
+  p.dividends = [
+    {
+      id: 'd1',
+      ticker: 'AAA',
+      date: '2026-03-05',
+      source: 'manual',
+      grossAmount: 100,
+      note: '',
+    },
+  ];
+  const report = portfolioReport(p);
+  assert.deepEqual(report.dividendActivity, [
+    { month: '2026-03', gross: 100, net: null, cumulativeNet: null },
+  ]);
+  assert.deepEqual(report.dividendByCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', gross: 100, net: null, weight: null },
+  ]);
+});
+
 test('reports incomplete quote coverage without presenting actual target weights', () => {
   const p = portfolio();
   delete p.quotes.BBB;
