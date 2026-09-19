@@ -23,6 +23,14 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from '@/components/ui/table';
 import { money, round, type Portfolio } from '@/lib/portfolio';
 import {
   portfolioReport,
@@ -118,6 +126,7 @@ export default function PortfolioReports({
   );
   const totalGain = report.summary.totalGain;
   const totalGainPercent = report.summary.totalGainPercent;
+  const grandTotalReturn = report.summary.grandTotalReturn;
   const cumulativeTotal = activity.length
     ? activity[activity.length - 1].cumulative
     : 0;
@@ -155,6 +164,21 @@ export default function PortfolioReports({
               {totalGainPercent === null
                 ? 'Add purchase prices to calculate'
                 : `${totalGainPercent >= 0 ? '+' : ''}${totalGainPercent.toFixed(1)}% vs cost basis`}
+            </small>
+          </div>
+          <div
+            className={`reports-priced-value ${grandTotalReturn === null ? '' : grandTotalReturn >= 0 ? 'pos' : 'neg'}`}
+          >
+            <span>Total return (net of tax)</span>
+            <strong>
+              {grandTotalReturn === null
+                ? '—'
+                : `${grandTotalReturn >= 0 ? '+' : ''}${money(grandTotalReturn)}`}
+            </strong>
+            <small>
+              {report.realized.totalCapitalGainsTax === null
+                ? 'Set your filer status in Settings to include tax'
+                : 'Unrealized + realized sales + dividends, after tax'}
             </small>
           </div>
         </div>
@@ -202,6 +226,77 @@ export default function PortfolioReports({
           <strong>{report.summary.quoteCoverage.percentage.toFixed(0)}%</strong>
           <small>Held companies with a saved price</small>
         </article>
+      </section>
+
+      <section className="panel report-panel">
+        <div className="report-heading">
+          <div>
+            <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
+            <h3>Sales and dividends</h3>
+          </div>
+          <span>Capital gains 15% filer / 30% non-filer</span>
+        </div>
+        {report.realized.sales.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {['Date', 'Ticker', 'Shares', 'Proceeds', 'Cost basis', 'Gain', 'Tax', 'Net'].map(
+                  (x) => (
+                    <TableHead key={x}>{x}</TableHead>
+                  ),
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.realized.sales.map((s) => (
+                <TableRow key={s.tradeId}>
+                  <TableCell>{s.date}</TableCell>
+                  <TableCell>{s.ticker}</TableCell>
+                  <TableCell>{s.shares.toLocaleString()}</TableCell>
+                  <TableCell>{money(s.proceeds)}</TableCell>
+                  <TableCell>{s.costBasis === null ? '—' : money(s.costBasis)}</TableCell>
+                  <TableCell>{s.realizedGain === null ? '—' : money(s.realizedGain)}</TableCell>
+                  <TableCell>{s.tax === null ? '—' : money(s.tax)}</TableCell>
+                  <TableCell>{s.net === null ? '—' : money(s.net)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <ReportEmpty>Record a sale to see realized gains here.</ReportEmpty>
+        )}
+        {report.realized.dividends.length ? (
+          <>
+            <p className="report-source" style={{ marginTop: 16 }}>
+              Dividends
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {['Date', 'Ticker', 'Gross', 'Tax', 'Net', 'Source'].map((x) => (
+                    <TableHead key={x}>{x}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {report.realized.dividends.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell>{d.date}</TableCell>
+                    <TableCell>{d.ticker}</TableCell>
+                    <TableCell>{money(d.grossAmount)}</TableCell>
+                    <TableCell>{d.tax === null ? '—' : money(d.tax)}</TableCell>
+                    <TableCell>{d.netAmount === null ? '—' : money(d.netAmount)}</TableCell>
+                    <TableCell>{d.source === 'import' ? 'CDC import' : 'Manual'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
+        ) : null}
+        <p className="report-source">
+          Source: recorded sales and dividends · imported dividends keep their
+          own real, post-withholding tax
+        </p>
       </section>
 
       <div className="reports-grid">

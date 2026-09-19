@@ -242,6 +242,26 @@ test('monthly activity carries a running cumulative total across months', () => 
   assert.equal(report.summary.totalGainPercent, 21.15);
 });
 
+test('realized sales report the sell trade gain, with null tax when no filer status is set', () => {
+  const report = portfolioReport(portfolio());
+  assert.equal(report.realized.sales.length, 1);
+  assert.equal(report.realized.sales[0].realizedGain, 2);
+  assert.equal(report.realized.totalRealizedGain, 2);
+  assert.equal(report.realized.totalCapitalGainsTax, null);
+  assert.equal(report.realized.netRealizedReturn, null);
+  assert.equal(report.summary.grandTotalReturn, null);
+});
+
+test('grand total return combines unrealized gain with net-of-tax realized gain once filer status is set', () => {
+  const p = portfolio();
+  p.taxProfile = { filerStatus: 'filer' };
+  const report = portfolioReport(p);
+  assert.equal(report.realized.totalCapitalGainsTax, 0.3);
+  assert.equal(report.realized.netRealizedReturn, 1.7);
+  assert.equal(report.summary.totalGain, 16);
+  assert.equal(report.summary.grandTotalReturn, 17.7);
+});
+
 test('reports incomplete quote coverage without presenting actual target weights', () => {
   const p = portfolio();
   delete p.quotes.BBB;

@@ -1,4 +1,11 @@
-import { holdings, round, type Portfolio } from './portfolio.ts';
+import {
+  holdings,
+  round,
+  taxSummary,
+  type Portfolio,
+  type TaxedSale,
+  type TaxedDividend,
+} from './portfolio.ts';
 
 export type AllocationPoint = {
   ticker: string;
@@ -41,6 +48,15 @@ export type PortfolioReport = {
   targetComparison: TargetPoint[];
   monthlyActivity: ActivityPoint[];
   performance: PerformancePoint[];
+  realized: {
+    sales: TaxedSale[];
+    dividends: TaxedDividend[];
+    totalRealizedGain: number;
+    totalCapitalGainsTax: number | null;
+    totalDividendIncomeGross: number;
+    totalDividendTax: number | null;
+    netRealizedReturn: number | null;
+  };
   summary: {
     pricedValue: number;
     largestHolding: AllocationPoint | null;
@@ -53,6 +69,7 @@ export type PortfolioReport = {
     };
     totalGain: number | null;
     totalGainPercent: number | null;
+    grandTotalReturn: number | null;
   };
 };
 
@@ -149,6 +166,9 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
   const totalValue = round(
     performance.reduce((total, item) => total + item.value, 0),
   );
+  const totalGain = performance.length ? round(totalValue - totalCost) : null;
+
+  const tax = taxSummary(portfolio);
 
   return {
     companyAllocation,
@@ -156,6 +176,15 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
     targetComparison,
     monthlyActivity,
     performance,
+    realized: {
+      sales: tax.sales,
+      dividends: tax.dividends,
+      totalRealizedGain: tax.totalRealizedGain,
+      totalCapitalGainsTax: tax.totalCapitalGainsTax,
+      totalDividendIncomeGross: tax.totalDividendIncomeGross,
+      totalDividendTax: tax.totalDividendTax,
+      netRealizedReturn: tax.netRealizedReturn,
+    },
     summary: {
       pricedValue,
       largestHolding: companyAllocation[0] ?? null,
@@ -172,11 +201,15 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
         held: held.length,
         percentage: percentage(priced.length, held.length),
       },
-      totalGain: performance.length ? round(totalValue - totalCost) : null,
+      totalGain,
       totalGainPercent:
         performance.length && totalCost > 0
           ? round(((totalValue - totalCost) / totalCost) * 100)
           : null,
+      grandTotalReturn:
+        totalGain === null || tax.netRealizedReturn === null
+          ? null
+          : round(totalGain + tax.netRealizedReturn),
     },
   };
 }
