@@ -37,10 +37,14 @@ import {
   round,
   validate,
   SECTORS,
+  sharesHeldOn,
+  taxSummary,
   type Portfolio,
   type Trade,
   type Company,
   type Sector,
+  type Dividend,
+  type TaxedDividend,
 } from '@/lib/portfolio';
 import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
@@ -199,6 +203,15 @@ const cashAmount = (t: Trade) =>
   t.price === null
     ? null
     : t.shares * t.price + (t.kind === 'sell' ? -t.fees : t.fees);
+const blankDividend = (ticker: string): Dividend => ({
+  id: crypto.randomUUID(),
+  ticker,
+  date: today(),
+  source: 'manual',
+  perShare: 0,
+  grossAmount: 0,
+  note: '',
+});
 const kindLabel = (t: Trade) =>
   t.kind === 'opening' ? 'Opening' : t.kind === 'sell' ? 'Sale' : 'Purchase';
 function ledgerGroups(trades: Trade[], ticker = '') {
@@ -268,6 +281,61 @@ function TradeHistoryTable({
     </Table>
   );
 }
+function DividendHistoryTable({
+  dividends,
+  taxed,
+  onCorrect,
+}: {
+  dividends: Dividend[];
+  taxed: TaxedDividend[];
+  onCorrect: (d: Dividend) => void;
+}) {
+  const byId = new Map(taxed.map((t) => [t.id, t]));
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {['Date', 'Per share', 'Gross', 'Tax', 'Net', 'Source', ''].map(
+            (x) => (
+              <TableHead key={x}>{x}</TableHead>
+            ),
+          )}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {dividends.map((d) => {
+          const t = byId.get(d.id);
+          return (
+            <TableRow key={d.id} style={{ opacity: d.voided ? 0.5 : 1 }}>
+              <TableCell>{d.date}</TableCell>
+              <TableCell>
+                {d.perShare === undefined ? '—' : money(d.perShare)}
+              </TableCell>
+              <TableCell>{t ? money(t.grossAmount) : '—'}</TableCell>
+              <TableCell>{t?.tax == null ? '—' : money(t.tax)}</TableCell>
+              <TableCell>
+                {t?.netAmount == null ? '—' : money(t.netAmount)}
+              </TableCell>
+              <TableCell>
+                {d.source === 'import' ? 'CDC import' : 'Manual'}
+              </TableCell>
+              <TableCell>
+                {!d.voided && (
+                  <button
+                    className="secondary compact"
+                    onClick={() => onCorrect(d)}
+                  >
+                    Correct
+                  </button>
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
 export default function Dashboard({ email }: { email: string | null }) {
   const initialPathname = usePathname();
   const [tab, setTabState] = useState(() => tabFromPathname(initialPathname));
@@ -295,6 +363,8 @@ export default function Dashboard({ email }: { email: string | null }) {
     [allowOld, setAllowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
     [editing, setEditing] = useState<string | null>(null),
+    [dividend, setDividend] = useState<Dividend | null>(null),
+    [editingDividend, setEditingDividend] = useState<string | null>(null),
     [company, setCompany] = useState<Company | null>(null),
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
@@ -477,6 +547,11 @@ export default function Dashboard({ email }: { email: string | null }) {
       .reduce((a, t) => a + t.shares * t.price! + t.fees, 0),
   );
   const historyGroups = ledgerGroups(p.trades, historyTicker);
+  const taxedDividends = taxSummary(p).dividends;
+  const dividendsByTicker = (ticker: string) =>
+    (p.dividends ?? [])
+      .filter((d) => d.ticker === ticker)
+      .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
   function openHistory(ticker: string) {
     setHistoryTicker(ticker);
     setTab('history');
@@ -484,6 +559,10 @@ export default function Dashboard({ email }: { email: string | null }) {
   function correctTrade(t: Trade) {
     setEditing(t.id);
     setTrade({ ...t });
+  }
+  function correctDividend(d: Dividend) {
+    setEditingDividend(d.id);
+    setDividend({ ...d });
   }
   async function refresh() {
     setBusy(true);
@@ -539,6 +618,38 @@ export default function Dashboard({ email }: { email: string | null }) {
     );
     setTrade(null);
     setEditing(null);
+    setHistoryTicker(entry.ticker);
+    setTab('history');
+  }
+  async function recordDividend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!dividend) return;
+    const next = clone(p!);
+    next.dividends = next.dividends ?? [];
+    if (editingDividend) {
+      const old = next.dividends.find((d) => d.id === editingDividend);
+      if (old) old.voided = true;
+    }
+    const entry: Dividend = {
+      ...dividend,
+      id: crypto.randomUUID(),
+      grossAmount: round(
+        (dividend.perShare ?? 0) *
+          sharesHeldOn(next, dividend.ticker, dividend.date),
+      ),
+    };
+    if (editingDividend) {
+      const index = next.dividends.findIndex((d) => d.id === editingDividend);
+      next.dividends.splice(index + 1, 0, entry);
+    } else next.dividends.push(entry);
+    await save(
+      next,
+      editingDividend
+        ? 'Correction saved. Previous dividend record retained as voided.'
+        : 'Dividend recorded.',
+    );
+    setDividend(null);
+    setEditingDividend(null);
     setHistoryTicker(entry.ticker);
     setTab('history');
   }
@@ -808,6 +919,17 @@ export default function Dashboard({ email }: { email: string | null }) {
                             }}
                           >
                             Sell
+                          </button>
+                        )}
+                        {h.shares > 0 && (
+                          <button
+                            className="secondary compact"
+                            onClick={() => {
+                              setEditingDividend(null);
+                              setDividend(blankDividend(h.ticker));
+                            }}
+                          >
+                            Dividend
                           </button>
                         )}
                         <button
@@ -1111,6 +1233,16 @@ export default function Dashboard({ email }: { email: string | null }) {
                     </button>
                   </div>
                   <TradeHistoryTable trades={rows} onCorrect={correctTrade} />
+                  {dividendsByTicker(ticker).length > 0 && (
+                    <>
+                      <p className="table-note">Dividends</p>
+                      <DividendHistoryTable
+                        dividends={dividendsByTicker(ticker)}
+                        taxed={taxedDividends}
+                        onCorrect={correctDividend}
+                      />
+                    </>
+                  )}
                 </section>
               );
             })
@@ -1409,6 +1541,118 @@ export default function Dashboard({ email }: { email: string | null }) {
                           true;
                         await save(next, 'Entry voided.');
                         setTrade(null);
+                      });
+                    }}
+                  >
+                    Void entry
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!dividend}
+        onOpenChange={(open) => {
+          if (!open) setDividend(null);
+        }}
+      >
+        <DialogContent className="form-dialog">
+          <DialogTitle>
+            {editingDividend ? 'Correct dividend' : 'Record a dividend'}
+          </DialogTitle>
+          <DialogDescription>
+            Enter the per-share amount from your dividend notice. The gross
+            amount is computed from the shares you held on the payment date.
+          </DialogDescription>
+          {dividend && (
+            <form onSubmit={(e) => attempt(() => recordDividend(e))}>
+              <div className="form-grid">
+                <label>
+                  Company symbol
+                  <input required disabled value={dividend.ticker} />
+                </label>
+                <label>
+                  Payment date
+                  <input
+                    type="date"
+                    max={today()}
+                    required
+                    value={dividend.date}
+                    onChange={(e) =>
+                      setDividend({ ...dividend, date: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Dividend per share (PKR)
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    value={dividend.perShare ?? 0}
+                    onChange={(e) =>
+                      setDividend({
+                        ...dividend,
+                        perShare: Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <label className="wide">
+                  Note
+                  <textarea
+                    maxLength={2000}
+                    value={dividend.note}
+                    onChange={(e) =>
+                      setDividend({ ...dividend, note: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              {(() => {
+                const shares = sharesHeldOn(p, dividend.ticker, dividend.date);
+                const gross = round((dividend.perShare ?? 0) * shares);
+                const rate = p.taxProfile
+                  ? p.taxProfile.filerStatus === 'filer'
+                    ? 0.15
+                    : 0.3
+                  : null;
+                return (
+                  <p>
+                    {shares} shares held on {dividend.date} · Gross{' '}
+                    {money(gross)}
+                    {rate === null
+                      ? ' · Set your filer status in Settings to estimate tax.'
+                      : ` · Tax ${money(round(gross * rate))} · Net ${money(round(gross * (1 - rate)))}`}
+                  </p>
+                );
+              })()}
+              <div className="row">
+                <button disabled={busy} type="submit">
+                  Save dividend
+                </button>
+                {editingDividend && (
+                  <button
+                    className="secondary"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          'Void this dividend record? Its audit record will remain.',
+                        )
+                      )
+                        return;
+                      attempt(async () => {
+                        const next = clone(p);
+                        next.dividends!.find(
+                          (d) => d.id === editingDividend,
+                        )!.voided = true;
+                        await save(next, 'Dividend record voided.');
+                        setDividend(null);
                       });
                     }}
                   >
