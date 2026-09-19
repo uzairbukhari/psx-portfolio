@@ -178,15 +178,19 @@ function download(name: string, data: string, type = 'application/json') {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-const blankTrade = (ticker = 'MEBL'): Trade => ({
+const blankTrade = (
+  ticker = 'MEBL',
+  kind: 'buy' | 'sell' = 'buy',
+  price: number | null = null,
+): Trade => ({
   id: crypto.randomUUID(),
   ticker,
-  kind: 'buy',
+  kind,
   date: today(),
   shares: 1,
-  price: null,
+  price,
   fees: 0,
-  month: today().slice(0, 7),
+  month: kind === 'buy' ? today().slice(0, 7) : '',
   note: '',
 });
 const cashAmount = (t: Trade) =>
@@ -786,6 +790,23 @@ export default function Dashboard({ email }: { email: string | null }) {
                         >
                           History
                         </button>
+                        {h.shares > 0 && (
+                          <button
+                            className="secondary compact"
+                            onClick={() => {
+                              setEditing(null);
+                              setTrade(
+                                blankTrade(
+                                  h.ticker,
+                                  'sell',
+                                  h.quote?.price ?? null,
+                                ),
+                              );
+                            }}
+                          >
+                            Sell
+                          </button>
+                        )}
                         <button
                           className="secondary compact"
                           onClick={() =>
@@ -1190,6 +1211,31 @@ export default function Dashboard({ email }: { email: string | null }) {
           </DialogDescription>
           {trade && (
             <form onSubmit={(e) => attempt(() => record(e))}>
+              {!editing && trade.kind !== 'opening' && (
+                <div className="row" style={{ marginBottom: 16 }}>
+                  <button
+                    type="button"
+                    className={trade.kind === 'buy' ? 'compact' : 'secondary compact'}
+                    onClick={() => setTrade({ ...trade, kind: 'buy', month: today().slice(0, 7) })}
+                  >
+                    Buy
+                  </button>
+                  <button
+                    type="button"
+                    className={trade.kind === 'sell' ? 'compact' : 'secondary compact'}
+                    onClick={() =>
+                      setTrade({
+                        ...trade,
+                        kind: 'sell',
+                        month: '',
+                        price: trade.price ?? p.quotes[trade.ticker]?.price ?? null,
+                      })
+                    }
+                  >
+                    Sell
+                  </button>
+                </div>
+              )}
               <div className="form-grid">
                 <label>
                   Company symbol
