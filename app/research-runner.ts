@@ -339,10 +339,22 @@ async function downloadReports(
 }
 
 function evidenceFrom(documents: RunnerDocument[], webSources: { title: string; url: string; text: string }[]) {
+  const valid = documents.filter((document) => document.status === 'downloaded_pdf_validated');
+  // Every annual report carries its own overlapping multi-year summary
+  // table; only the newest one's should compete for evidence space (see
+  // lib/research-evidence.mjs). "Newest" = highest year named in the title
+  // pdf.js's extraction already found (falls back to the first document).
+  const primaryIndex = valid.reduce((best, document, index) => {
+    const year = Number(document.title.match(/20\d{2}/)?.[0] ?? 0);
+    const bestYear = Number(valid[best].title.match(/20\d{2}/)?.[0] ?? 0);
+    return year > bestYear ? index : best;
+  }, 0);
   return selectEvidence(
-    documents
-      .filter((document) => document.status === 'downloaded_pdf_validated')
-      .map((document) => ({ ...document, text: document.text || '' })),
+    valid.map((document, index) => ({
+      ...document,
+      text: document.text || '',
+      isPrimary: index === primaryIndex,
+    })),
     webSources,
   );
 }
