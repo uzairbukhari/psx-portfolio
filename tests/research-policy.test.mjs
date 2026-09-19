@@ -133,6 +133,23 @@ test('leaves fiscal years unchanged when no FY-range or Annual Report year is ci
   assert.deepEqual(correctFiscalYearLabels(rows), rows);
 });
 
+test('does not collapse distinct years that correctly share one common report citation', () => {
+  // Five rows read off ONE multi-year table, all correctly citing that same
+  // report - the pattern this system explicitly asks the model to use. A
+  // real regression: this used to collapse to [2025,2025,2025,2022,2021]
+  // (3 distinct years) because a since-removed fallback rewrote any row's
+  // year to the report's own naming year whenever within 2 years of it.
+  const rows = [2025, 2024, 2023, 2022, 2021].map((year) => ({
+    ...annual(year),
+    source: 'Annual Report 2025',
+    basis: 'Company (unconsolidated) — six year performance table',
+  }));
+  assert.deepEqual(
+    correctFiscalYearLabels(rows).map((row) => row.year),
+    [2025, 2024, 2023, 2022, 2021],
+  );
+});
+
 test('recognizes the singular "Shareholders’ Fund" label used by real PSX six-year performance tables', () => {
   const evidence = 'Shareholders’ Fund\tRs in billion\t711\t770\t875\t1,083\t1,250\t1,348';
   assert.equal(financialValueSupported(evidence, FINANCIAL_VALUE_LABELS.equity, 1_250_000), true);
