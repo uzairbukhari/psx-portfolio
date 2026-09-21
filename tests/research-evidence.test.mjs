@@ -29,6 +29,26 @@ test('only the primary document\'s multi-year table competes for evidence space'
   assert.ok(output.includes('statement of cash flows'));
 });
 
+test('a Ratio Analysis page far from the highlights table still makes the evidence budget', () => {
+  // Real case (FFC, 496-page annual report): the audited "Cash Dividend
+  // per Share" figure lived on its own Ratio Analysis page, dozens of
+  // pages away from the six-year highlights table and any primary
+  // statement, surrounded only by generic prose. It scored no "tables" or
+  // "statements" bonus and too few generic keyword hits to survive the
+  // per-document budget against 100+ higher-priority statement pages in a
+  // real, long report, so the model's correct citation was verified
+  // against evidence that never actually contained it. This precisely
+  // fills the 60,000-char per-document budget with same-priority
+  // "statements" pages (zero bytes left over) so only the dividend-row
+  // priority bonus can still make room for the Ratio Analysis page.
+  const statementPage = (p) => `--- PDF PAGE ${p} ---\nstatement of cash flows `.padEnd(1500, 'x');
+  const noise = Array.from({ length: 45 }, (_, p) => statementPage(p + 1)).join('');
+  const ratioPage = '--- PDF PAGE 200 ---\nRatio Analysis\nCash dividend per share (interim & proposed final)   Rs   15.49   12.13\n';
+  const doc = { title: 'FFC Annual Report 2023', url: 'https://example.com/ffc.pdf', isPrimary: true, text: noise + ratioPage };
+  const output = selectEvidence([doc], []);
+  assert.ok(output.includes('Cash dividend per share'));
+});
+
 test('large annual reports cannot crowd out newer results or web research', () => {
   const docs = Array.from({length:12}, (_,i) => ({ title: `Report ${i}`, url: `https://example.com/${i}`, text:
     Array.from({length:100}, (_,p) => `--- PDF PAGE ${p+1} ---\nstatement of cash flows ${'earnings per share '.repeat(100)}`).join('\n') }));

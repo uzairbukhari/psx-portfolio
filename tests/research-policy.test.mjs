@@ -106,6 +106,36 @@ test('matches a chart caption to its data-point value on a different reconstruct
   assert.equal(financialValueSupported(evidence, /profit (?:for|after)|profit after taxation|net profit/i, 33_063), true);
 });
 
+test('matches revenue labelled "Turnover" instead of "Net Sales" or "Revenue"', () => {
+  // Real case (LUCK): the six-year "Financial Highlights" table's own
+  // profit/EPS/equity rows verified fine against the same page, but the
+  // top-line row was captioned "Turnover" (a common alternate label in
+  // Pakistani financial-statement tables) rather than "Net Sales",
+  // "Sales", "Revenue" or "Total income" - the only four synonyms
+  // FINANCIAL_VALUE_LABELS.revenue recognized, so a correctly-cited
+  // figure was rejected as unsupported on every self-correction attempt.
+  const evidence = 'Turnover 81,094';
+  assert.equal(financialValueSupported(evidence, FINANCIAL_VALUE_LABELS.revenue, 81_094), true);
+});
+
+test('matches a value printed as bare, unscaled Rupees on a raw statement page', () => {
+  // Real case: a company's Six/Five Year highlights table (the primary
+  // report's summary page) prints figures "Rupees in million" or
+  // "in billion", but its own primary financial statements - Statement of
+  // Financial Position, Profit or Loss - commonly print amounts as bare,
+  // unformatted Rupees with no "million"/"thousand" notation at all. Older
+  // fiscal years that fall outside the primary report's own summary table
+  // get sourced from exactly those raw-Rupee statement pages (see
+  // lib/research-evidence.mjs: only the primary document's highlights
+  // table gets the "tables" priority bonus; every other document's pages
+  // only surface via the "statements" regex). The dossier reports the
+  // figure correctly converted to PKR million, but the ratio between the
+  // raw evidence and the reported value is 1,000,000x, not 1,000x - a
+  // scale the matcher never tried, so a correct citation was rejected.
+  const evidence = 'Total equity 83,456,789,012';
+  assert.equal(financialValueSupported(evidence, FINANCIAL_VALUE_LABELS.equity, 83_457), true);
+});
+
 test('does not match a value from an unrelated, different page', () => {
   const evidence = '--- PDF PAGE 1 ---\nNet Sales 401.18\n--- PDF PAGE 2 ---\nUnrelated commentary 33.06';
   assert.equal(financialValueSupported(evidence, /net sales/i, 33_060), false);

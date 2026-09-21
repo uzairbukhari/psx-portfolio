@@ -220,19 +220,32 @@ async function discover(job: JobInput) {
   const directPdfs = links(financialPanel, psxUrl).filter(
     (url) => /\.pdf(?:$|\?)/i.test(url) || /\/download\/document\//i.test(url),
   );
-  let annualPdfs: string[] = [];
+  const annualPdfs: string[] = [];
+  const annualReportYears: Record<string, string> = {};
   try {
     const reportArchive = await fetchText(`https://dps.psx.com.pk/company/reports/${job.ticker}`);
-    annualPdfs = [...reportArchive.text.matchAll(/<tr>[\s\S]*?<\/tr>/gi)]
+    const annualRows = [...reportArchive.text.matchAll(/<tr>[\s\S]*?<\/tr>/gi)]
       .map((match) => match[0])
       .filter((row) => /<td>\s*<a[^>]*>Annual<\/a>/i.test(row))
-      .flatMap((row) => links(row, reportArchive.finalUrl))
       .reverse()
-      .slice(0, 5)
-      .map((url) => {
+      .slice(0, 5);
+    for (const row of annualRows) {
+      // The archive's own "Period Ended" column states the fiscal year as
+      // plain text right next to the link - far more reliable than
+      // re-deriving it from the PDF's own cover-page wording later, which
+      // fails outright for PSX's numeric document-id download URLs (no
+      // descriptive filename to fall back on either). Real case (LUCK):
+      // every one of 9 downloaded reports resolved to a bare numeric title
+      // like "282262", which the model could never cite consistently,
+      // breaking the source-manifest check on every financial row.
+      const year = row.match(/<\/a>\s*<\/td>\s*<td>\s*(\d{4})/i)?.[1];
+      for (const url of links(row, reportArchive.finalUrl)) {
         const id = new URL(url).searchParams.get('id');
-        return /^\d+$/.test(id || '') ? `https://dps.psx.com.pk/download/document/${id}.pdf` : url;
-      });
+        const resolvedUrl = /^\d+$/.test(id || '') ? `https://dps.psx.com.pk/download/document/${id}.pdf` : url;
+        annualPdfs.push(resolvedUrl);
+        if (year) annualReportYears[resolvedUrl] = year;
+      }
+    }
   } catch {
     // no annual-report archive page for this ticker; direct PDFs (if any) still apply
   }
@@ -293,6 +306,7 @@ async function discover(job: JobInput) {
     },
     webSources,
     urls: [...new Set(ranked)].slice(0, 12),
+    annualReportYears,
   };
 }
 
@@ -313,14 +327,17 @@ async function downloadReports(
       if (!hasPdfSignature(bytes)) throw Error('the fetched file was not a PDF');
       const { text } = await extractPdfText(bytes);
       if (text.replace(/\s/g, '').length < 300) throw Error('PDF text is unreadable or image-only');
+      const knownYear = found.annualReportYears[url];
       documents.push({
-        title: resolveDocumentTitle(text, filename, url),
+        title: knownYear ? `Annual Report ${knownYear}` : resolveDocumentTitle(text, filename, url),
         url,
-        kind: /annual/i.test(filename)
+        kind: knownYear
           ? 'Annual report'
-          : /interim|quarter|half|result/i.test(filename)
-            ? 'Interim / results'
-            : 'Official filing',
+          : /annual/i.test(filename)
+            ? 'Annual report'
+            : /interim|quarter|half|result/i.test(filename)
+              ? 'Interim / results'
+              : 'Official filing',
         date: '',
         bytes,
         text,
