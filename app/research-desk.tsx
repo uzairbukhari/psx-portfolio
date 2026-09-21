@@ -1,12 +1,35 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Download, Plus, Trash2, Upload, RotateCcw, Settings, X } from 'lucide-react';
+import {
+  Download,
+  Plus,
+  Trash2,
+  Upload,
+  RotateCcw,
+  Settings,
+  X,
+  MoreHorizontal,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import {
   DEFAULT_RESEARCH_SETTINGS,
   today,
@@ -46,6 +69,7 @@ type Job = {
   claimed: boolean;
 };
 type Event = { id: number; stage: string; message: string; created_at: string };
+type DeskSortKey = 'company' | 'status' | 'score' | 'reports' | 'updated';
 const STAGE_SEQUENCE = [
   'waiting',
   'verifying',
@@ -116,7 +140,11 @@ export default function ResearchDesk({
     [addOpen, setAddOpen] = useState(false),
     [ticker, setTicker] = useState(''),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [deskSort, setDeskSort] = useState<{
+      key: DeskSortKey;
+      dir: 'asc' | 'desc';
+    } | null>(null);
   const eventListRef = useRef<HTMLDivElement | null>(null);
   const settings = useMemo(
     () => portfolio.researchSettings ?? DEFAULT_RESEARCH_SETTINGS,
@@ -226,6 +254,40 @@ export default function ResearchDesk({
       company: portfolio.companies.find((item) => item.ticker === value),
     }));
   }, [research, jobs, latestJob, portfolio.companies]);
+  const deskSortAccessor: Record<
+    DeskSortKey,
+    (row: (typeof rows)[number]) => number | string
+  > = {
+    company: (row) => row.job?.companyName || row.company?.name || row.ticker,
+    status: (row) => row.job?.status || row.dossier?.status || 'Queue',
+    score: (row) => row.dossier?.score ?? -Infinity,
+    reports: (row) => row.job?.reportsFound ?? row.dossier?.sources.length ?? 0,
+    updated: (row) =>
+      row.job?.updatedAt || row.dossier?.updatedAt || '',
+  };
+  const sortedRows = deskSort
+    ? rows.slice().sort((a, b) => {
+        const acc = deskSortAccessor[deskSort.key],
+          av = acc(a),
+          bv = acc(b),
+          cmp =
+            typeof av === 'string'
+              ? av.localeCompare(bv as string)
+              : (av as number) - (bv as number);
+        return deskSort.dir === 'asc' ? cmp : -cmp;
+      })
+    : rows;
+  function toggleDeskSort(key: DeskSortKey) {
+    setDeskSort((prev) =>
+      prev && prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'desc' },
+    );
+  }
+  function deskSortIndicator(key: DeskSortKey) {
+    if (!deskSort || deskSort.key !== key) return null;
+    return deskSort.dir === 'asc' ? ' ▲' : ' ▼';
+  }
   const save = async (value = draft) => {
     if (!value) return;
     const next = structuredClone(portfolio);
@@ -516,97 +578,128 @@ export default function ResearchDesk({
         </article>
       </section>
       <section className="panel table-panel">
-        <div className="scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Status</th>
-                <th>Score</th>
-                <th>Reports</th>
-                <th>Last activity</th>
-                <th>
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ ticker: value, dossier, job, company }) => {
-                const active =
-                  job && !['complete', 'cancelled'].includes(job.status);
-                const needsAttention =
-                  job?.status === 'needs_attention' ||
-                  dossier?.status === 'Update needed';
-                return (
-                  <tr key={value} className={needsAttention ? 'row-attention' : ''}>
-                    <td>
-                      <span className="ticker">{value}</span>
-                      <small>{job?.companyName || company?.name}</small>
-                    </td>
-                    <td>
-                      <span
-                        className={`tag status-${job?.status || dossier?.status.toLowerCase().replace(' ', '-')}`}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {(
+                [
+                  ['company', 'Company'],
+                  ['status', 'Status'],
+                  ['score', 'Score'],
+                  ['reports', 'Reports'],
+                  ['updated', 'Last activity'],
+                ] as [DeskSortKey, string][]
+              ).map(([key, label]) => (
+                <TableHead key={key}>
+                  <button
+                    type="button"
+                    className="sort-head"
+                    onClick={() => toggleDeskSort(key)}
+                  >
+                    {label}
+                    {deskSortIndicator(key)}
+                  </button>
+                </TableHead>
+              ))}
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedRows.map(({ ticker: value, dossier, job, company }) => {
+              const active =
+                job && !['complete', 'cancelled'].includes(job.status);
+              const needsAttention =
+                job?.status === 'needs_attention' ||
+                dossier?.status === 'Update needed';
+              return (
+                <TableRow
+                  key={value}
+                  className={needsAttention ? 'row-attention' : ''}
+                >
+                  <TableCell>
+                    <span className="ticker">{value}</span>
+                    <small>{job?.companyName || company?.name}</small>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`tag status-${job?.status || dossier?.status.toLowerCase().replace(' ', '-')}`}
+                    >
+                      {active
+                        ? stageLabel[job.stage] || job.message
+                        : dossier?.status ||
+                          stageLabel[job?.stage || ''] ||
+                          'Queue'}
+                    </span>
+                    {active && !job.claimed && (
+                      <small className="helper-offline">
+                        Open Research desk to process
+                      </small>
+                    )}
+                  </TableCell>
+                  <TableCell className="amount">
+                    {dossier?.score ?? '—'}
+                  </TableCell>
+                  <TableCell className="amount">
+                    {job?.reportsFound ?? dossier?.sources.length ?? 0}
+                  </TableCell>
+                  <TableCell>
+                    {job?.updatedAt.slice(0, 16).replace('T', ' ') ||
+                      dossier?.updatedAt ||
+                      '—'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="row">
+                      <button
+                        className="secondary compact"
+                        onClick={() => {
+                          if (active || job?.status === 'needs_attention') {
+                            setJobOpen(job!);
+                            void loadJobs(job!.id);
+                          } else open(value);
+                        }}
                       >
-                        {active
-                          ? stageLabel[job.stage] || job.message
-                          : dossier?.status ||
-                            stageLabel[job?.stage || ''] ||
-                            'Queue'}
-                      </span>
-                      {active && !job.claimed && (
-                        <small className="helper-offline">
-                          Open Research desk to process
-                        </small>
+                        {active || job?.status === 'needs_attention'
+                          ? 'View progress'
+                          : 'Open'}
+                      </button>
+                      {(!active ||
+                        (dossier?.status === 'Complete' && !active)) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className="secondary compact icon-btn"
+                            aria-label={`More actions for ${value}`}
+                          >
+                            <MoreHorizontal size={16} />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {dossier?.status === 'Complete' && !active && (
+                              <DropdownMenuItem
+                                disabled={busy}
+                                onClick={() => void startResearch(value)}
+                              >
+                                <RotateCcw size={14} /> Refresh research
+                              </DropdownMenuItem>
+                            )}
+                            {!active && (
+                              <DropdownMenuItem
+                                disabled={busy}
+                                onClick={() => void deleteResearch(value)}
+                              >
+                                <Trash2 size={14} /> Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
-                    </td>
-                    <td>{dossier?.score ?? '—'}</td>
-                    <td>{job?.reportsFound ?? dossier?.sources.length ?? 0}</td>
-                    <td>
-                      {job?.updatedAt.slice(0, 16).replace('T', ' ') ||
-                        dossier?.updatedAt ||
-                        '—'}
-                    </td>
-                    <td>
-                      <div className="row">
-                        <button
-                          className="secondary compact"
-                          onClick={() => {
-                            if (active || job?.status === 'needs_attention') {
-                              setJobOpen(job!);
-                              void loadJobs(job!.id);
-                            } else open(value);
-                          }}
-                        >
-                          {active || job?.status === 'needs_attention'
-                            ? 'View progress'
-                            : 'Open'}
-                        </button>
-                        {dossier?.status === 'Complete' && !active && (
-                          <button
-                            className="secondary compact"
-                            disabled={busy}
-                            onClick={() => void startResearch(value)}
-                          >
-                            <RotateCcw size={14} /> Refresh research
-                          </button>
-                        )}
-                        {!active && (
-                          <button
-                            className="secondary compact"
-                            disabled={busy}
-                            onClick={() => void deleteResearch(value)}
-                          >
-                            <Trash2 size={14} /> Delete
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </section>
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="form-dialog">
