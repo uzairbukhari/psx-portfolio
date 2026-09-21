@@ -222,6 +222,33 @@ test('recognizes the singular "Shareholders’ Fund" label used by real PSX six-
   assert.equal(financialValueSupported(evidence, FINANCIAL_VALUE_LABELS.equity, 1_083_000), true);
 });
 
+test('allows a bank\'s operating cash flow to exceed revenue several times over', () => {
+  // Real case (MEBL, Meezan Bank): OCF of Rs 881bn vs Total Income of
+  // Rs 285bn (~3.1x) is normal for a deposit-taking bank - its operating
+  // cash flow is dominated by customer deposit/placement/advance
+  // movements that have nothing to do with revenue's magnitude. The
+  // ocf > revenue*2 sanity check exists to catch a genuine PKR
+  // billion/thousand unit-conversion mistake, but that heuristic only
+  // holds for a non-financial company; applied to a bank it rejected a
+  // correct, fully cited dossier on every self-correction attempt.
+  const base = {
+    financials: [2025, 2024, 2023, 2022, 2021].map(annual),
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: [
+      { name: 'Bear', eps: 30, multiple: 5 }, { name: 'Base', eps: 35, multiple: 6 }, { name: 'Bull', eps: 40, multiple: 7 },
+    ],
+  };
+  const bank = {
+    ...base,
+    sector: 'Commercial Banks (Islamic)',
+    financials: base.financials.map((row, i) => (i === 0 ? { ...row, revenue: 285_104, ocf: 881_296 } : row)),
+  };
+  assert.doesNotThrow(() => validateInvestmentDossier(bank, 200, 2026));
+  const nonBank = { ...bank, sector: 'Cement' };
+  assert.throws(() => validateInvestmentDossier(nonBank, 200, 2026), /units are internally inconsistent/);
+});
+
 test('rejects stale fiscal labels, broken units, and missing latest DPS', () => {
   const base = {
     financials: [2024, 2023, 2022, 2021, 2020].map(annual),
