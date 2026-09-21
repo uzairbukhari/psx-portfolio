@@ -353,35 +353,40 @@ function TradeHistoryTable({
     <Table>
       <TableHeader>
         <TableRow>
-          {[
-            'Date',
-            'Type',
-            'Shares',
-            'Price',
-            'Fees',
-            'Cash amount',
-            'SIP month',
-            '',
-          ].map((x) => (
-            <TableHead key={x}>{x}</TableHead>
-          ))}
+          {['Date', 'Type', 'Shares', 'Price', 'Fees', 'Cash amount', ''].map(
+            (x) => (
+              <TableHead key={x}>{x}</TableHead>
+            ),
+          )}
         </TableRow>
       </TableHeader>
       <TableBody>
         {trades.map((t) => (
-          <TableRow key={t.id} style={{ opacity: t.voided ? 0.5 : 1 }}>
+          <TableRow key={t.id} className={t.voided ? 'row-voided' : ''}>
             <TableCell>{t.date}</TableCell>
             <TableCell>
-              {t.voided ? 'Voided · ' : ''}
-              {kindLabel(t)}
+              <span
+                className={
+                  t.kind === 'opening'
+                    ? 'tag status-cancelled'
+                    : t.kind === 'sell'
+                      ? 'tag kind-sell'
+                      : 'tag'
+                }
+              >
+                {kindLabel(t)}
+              </span>
+              {t.voided && <span className="tag status-cancelled">Voided</span>}
+              {t.month && <small>{t.month}</small>}
             </TableCell>
-            <TableCell>{t.shares.toLocaleString()}</TableCell>
-            <TableCell>{money(t.price)}</TableCell>
-            <TableCell>{money(t.fees)}</TableCell>
-            <TableCell>
+            <TableCell className="amount">
+              {t.shares.toLocaleString()}
+            </TableCell>
+            <TableCell className="amount">{money(t.price)}</TableCell>
+            <TableCell className="amount">{money(t.fees)}</TableCell>
+            <TableCell className="amount">
               {cashAmount(t) === null ? 'Unknown' : money(cashAmount(t))}
             </TableCell>
-            <TableCell>{t.month || '—'}</TableCell>
             <TableCell>
               {!t.voided && (
                 <button
@@ -423,18 +428,25 @@ function DividendHistoryTable({
         {dividends.map((d) => {
           const t = byId.get(d.id);
           return (
-            <TableRow key={d.id} style={{ opacity: d.voided ? 0.5 : 1 }}>
+            <TableRow key={d.id} className={d.voided ? 'row-voided' : ''}>
               <TableCell>{d.date}</TableCell>
-              <TableCell>
+              <TableCell className="amount">
                 {d.perShare === undefined ? '—' : money(d.perShare)}
               </TableCell>
-              <TableCell>{t ? money(t.grossAmount) : '—'}</TableCell>
-              <TableCell>{t?.tax == null ? '—' : money(t.tax)}</TableCell>
-              <TableCell>
+              <TableCell className="amount">
+                {t ? money(t.grossAmount) : '—'}
+              </TableCell>
+              <TableCell className="amount">
+                {t?.tax == null ? '—' : money(t.tax)}
+              </TableCell>
+              <TableCell className="amount">
                 {t?.netAmount == null ? '—' : money(t.netAmount)}
               </TableCell>
               <TableCell>
-                {d.source === 'import' ? 'CDC import' : 'Manual'}
+                <span className="tag">
+                  {d.source === 'import' ? 'CDC import' : 'Manual'}
+                </span>
+                {d.voided && <span className="tag status-cancelled">Voided</span>}
               </TableCell>
               <TableCell>
                 {!d.voided && (

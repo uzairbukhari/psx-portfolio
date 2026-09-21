@@ -343,6 +343,9 @@ button.review-step[data-status=upcoming]{cursor:pointer}
 }
 
 .review-evidence-table{margin-top:4px}
+.row-voided{opacity:.5}
+.tag.kind-sell{color:var(--success);background:rgba(34,224,160,.14)}
+.ledger-group td small{margin-top:4px}
 .ledger-summary-chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
 .ledger-summary-chip{font-size:12px;color:var(--muted-foreground);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:20px;padding:4px 10px}
 .ledger-summary-chip b{font-weight:600;color:var(--foreground);font-variant-numeric:tabular-nums}
