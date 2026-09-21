@@ -23,19 +23,12 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from '@/components/ui/table';
 import { money, round, type Portfolio } from '@/lib/portfolio';
 import {
   portfolioReport,
   type DividendCompanyPoint,
   type PerformancePoint,
+  type RealizedCompanyPoint,
   type SectorPoint,
 } from '@/lib/portfolio-reports';
 
@@ -63,6 +56,14 @@ const dividendActivityConfig = {
 
 const dividendCompanyConfig = {
   net: { label: 'Net received', color: 'var(--primary)' },
+} satisfies ChartConfig;
+
+const realizedActivityConfig = {
+  net: { label: 'Net realized gain', color: 'var(--primary)' },
+} satisfies ChartConfig;
+
+const realizedCompanyConfig = {
+  net: { label: 'Net realized gain', color: 'var(--primary)' },
 } satisfies ChartConfig;
 
 const performanceConfig = {
@@ -132,6 +133,32 @@ function performanceBarShape(props: BarShapeProps) {
   );
 }
 
+function realizedCompanyBarShape(props: BarShapeProps) {
+  const { payload, ...rest } = props;
+  const point = payload as RealizedCompanyPoint;
+  const amount = point.net ?? point.gain;
+  return (
+    <Rectangle
+      {...rest}
+      radius={4}
+      fill={amount >= 0 ? 'var(--success)' : 'var(--danger)'}
+    />
+  );
+}
+
+function realizedMonthBarShape(props: BarShapeProps) {
+  const { payload, ...rest } = props;
+  const point = payload as { net: number | null; gain: number };
+  const amount = point.net ?? point.gain;
+  return (
+    <Rectangle
+      {...rest}
+      radius={[3, 3, 3, 3]}
+      fill={amount >= 0 ? 'var(--success)' : 'var(--danger)'}
+    />
+  );
+}
+
 const monthLabel = (month: string) => {
   const [year, value] = month.split('-').map(Number);
   return new Intl.DateTimeFormat('en-PK', {
@@ -159,6 +186,11 @@ export default function PortfolioReports({
     label: monthLabel(item.month),
   }));
   const dividendCompanies = foldDividendCompanies(report.dividendByCompany);
+  const realizedActivity = report.realizedActivity.map((item) => ({
+    ...item,
+    label: monthLabel(item.month),
+  }));
+  const realizedCompanies = report.realizedByCompany.slice(0, 8);
   const totalDividendNet =
     report.realized.totalDividendTax === null
       ? null
@@ -180,7 +212,7 @@ export default function PortfolioReports({
   return (
     <div className="reports">
       <div className="reports-intro">
-        <div>
+        <div className="reports-intro-header">
           <p className="eyebrow">PORTFOLIO REPORTS</p>
           <p>
             See where your portfolio is concentrated. Allocation uses your latest saved PSX prices; purchase activity is based on recorded transactions.
@@ -285,47 +317,176 @@ export default function PortfolioReports({
         </article>
       </section>
 
-      <section className="panel report-panel" style={{ marginBottom: 20 }}>
-        <div className="report-heading">
-          <div>
-            <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
-            <h3>Realized sales</h3>
+      <div className="reports-grid" style={{ marginBottom: 20 }}>
+        <section className="panel report-panel">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
+              <h3>Realized gains by month</h3>
+            </div>
+            <span>Capital gains 15% filer / 30% non-filer</span>
           </div>
-          <span>Capital gains 15% filer / 30% non-filer</span>
-        </div>
-        {report.realized.sales.length ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {['Date', 'Ticker', 'Shares', 'Proceeds', 'Cost basis', 'Gain', 'Tax', 'Net'].map(
-                  (x) => (
-                    <TableHead key={x}>{x}</TableHead>
-                  ),
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {report.realized.sales.map((s) => (
-                <TableRow key={s.tradeId}>
-                  <TableCell>{s.date}</TableCell>
-                  <TableCell>{s.ticker}</TableCell>
-                  <TableCell>{s.shares.toLocaleString()}</TableCell>
-                  <TableCell>{money(s.proceeds)}</TableCell>
-                  <TableCell>{s.costBasis === null ? '—' : money(s.costBasis)}</TableCell>
-                  <TableCell>{s.realizedGain === null ? '—' : money(s.realizedGain)}</TableCell>
-                  <TableCell>{s.tax === null ? '—' : money(s.tax)}</TableCell>
-                  <TableCell>{s.net === null ? '—' : money(s.net)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <ReportEmpty>Record a sale to see realized gains here.</ReportEmpty>
-        )}
-        <p className="report-source">
-          Source: recorded sales · realized gains only
-        </p>
-      </section>
+          {realizedActivity.length ? (
+            <ChartContainer
+              config={realizedActivityConfig}
+              className="report-chart report-chart--trend"
+            >
+              <BarChart
+                accessibilityLayer
+                data={realizedActivity}
+                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
+              >
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  label={{
+                    value: 'Sale month',
+                    position: 'insideBottom',
+                    offset: -16,
+                  }}
+                />
+                <YAxis
+                  width={72}
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                />
+                <ReferenceLine y={0} stroke="var(--border)" />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  content={
+                    <ChartTooltipContent
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as (typeof realizedActivity)[number];
+                        const amount = point.net ?? point.gain;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>
+                              {point.net === null ? 'Gross gain' : 'Net gain'}
+                            </span>
+                            <b>{money(amount)}</b>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey={(item: (typeof realizedActivity)[number]) =>
+                    item.net ?? item.gain
+                  }
+                  shape={realizedMonthBarShape}
+                />
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>Record a sale to see realized gains here.</ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded sales · realized gains only
+          </p>
+        </section>
+
+        <section className="panel report-panel">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
+              <h3>Realized gain / loss by company</h3>
+            </div>
+            <span>Net of capital gains tax</span>
+          </div>
+          {realizedCompanies.length ? (
+            <ChartContainer
+              config={realizedCompanyConfig}
+              className="report-chart"
+              style={{
+                height: Math.max(220, realizedCompanies.length * 34 + 70),
+              }}
+            >
+              <BarChart
+                accessibilityLayer
+                data={realizedCompanies}
+                layout="vertical"
+                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
+              >
+                <CartesianGrid horizontal={false} />
+                <XAxis
+                  type="number"
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                  label={{
+                    value: 'Realized gain / loss (PKR)',
+                    position: 'insideBottom',
+                    offset: -12,
+                  }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="ticker"
+                  width={58}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <ReferenceLine x={0} stroke="var(--border)" />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  content={
+                    <ChartTooltipContent
+                      hideLabel
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as RealizedCompanyPoint;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>{point.name}</span>
+                            <b>
+                              {point.net === null
+                                ? `${money(point.gain)} gross`
+                                : `${money(point.net)} net`}
+                              {point.weight === null
+                                ? ''
+                                : ` · ${point.weight.toFixed(1)}%`}
+                            </b>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey={(item: RealizedCompanyPoint) =>
+                    item.net ?? item.gain
+                  }
+                  shape={realizedCompanyBarShape}
+                >
+                  <LabelList
+                    dataKey={(item: RealizedCompanyPoint) =>
+                      item.net ?? item.gain
+                    }
+                    position="right"
+                    formatter={(value) =>
+                      new Intl.NumberFormat('en-PK', {
+                        notation: 'compact',
+                      }).format(Number(value))
+                    }
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>Record a sale to see realized gains here.</ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded sales, ranked by absolute gain / loss
+          </p>
+        </section>
+      </div>
 
       <div className="reports-grid">
         <section className="panel report-panel">

@@ -36,6 +36,7 @@ import {
   LogOut,
   Settings,
   ChevronDown,
+  MoreHorizontal,
 } from 'lucide-react';
 import {
   holdings,
@@ -188,6 +189,14 @@ type QuoteRefreshResponse = {
   reasons?: Record<string, string>;
   error?: string;
 };
+type HoldingsSortKey =
+  | 'name'
+  | 'shares'
+  | 'average'
+  | 'price'
+  | 'value'
+  | 'gain'
+  | 'weight';
 const clone = (p: Portfolio): Portfolio => JSON.parse(JSON.stringify(p));
 function download(name: string, data: string, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -498,6 +507,12 @@ export default function Dashboard({
       outputTokens: number;
       costUsd: number;
     } | null>(null);
+  const [holdingsSort, setHoldingsSort] = useState<{
+      key: HoldingsSortKey;
+      dir: 'asc' | 'desc';
+    } | null>(null),
+    [sectorFilter, setSectorFilter] = useState<Sector | ''>(''),
+    [showSoldOut, setShowSoldOut] = useState(false);
   function notify(s: string, error = false) {
     setMessage(s);
     setFailed(error);
@@ -687,6 +702,55 @@ export default function Dashboard({
       .filter((t) => t.kind === 'buy' && !t.voided)
       .reduce((a, t) => a + t.shares * t.price! + t.fees, 0),
   );
+  const soldOut = hs.filter(
+      (h) =>
+        h.shares === 0 &&
+        p.trades.some(
+          (t) => t.ticker === h.ticker && t.kind === 'buy' && !t.voided,
+        ),
+    ),
+    sectorsInUse = Array.from(
+      new Set(hs.map((h) => h.sector).filter((s): s is Sector => !!s)),
+    ),
+    rowsBase = showSoldOut ? held.concat(soldOut) : held,
+    rowsFiltered = sectorFilter
+      ? rowsBase.filter((h) => h.sector === sectorFilter)
+      : rowsBase,
+    holdingsSortAccessor: Record<
+      HoldingsSortKey,
+      (h: (typeof hs)[number]) => number | string
+    > = {
+      name: (h) => h.name || h.ticker,
+      shares: (h) => h.shares,
+      average: (h) => h.average ?? -Infinity,
+      price: (h) => h.quote?.price ?? -Infinity,
+      value: (h) => h.value ?? -Infinity,
+      gain: (h) => h.gain ?? -Infinity,
+      weight: (h) => (value > 0 ? (h.value ?? 0) / value : -Infinity),
+    },
+    displayedHoldings = holdingsSort
+      ? rowsFiltered.slice().sort((a, b) => {
+          const acc = holdingsSortAccessor[holdingsSort.key],
+            av = acc(a),
+            bv = acc(b),
+            cmp =
+              typeof av === 'string'
+                ? av.localeCompare(bv as string)
+                : (av as number) - (bv as number);
+          return holdingsSort.dir === 'asc' ? cmp : -cmp;
+        })
+      : rowsFiltered;
+  function toggleHoldingsSort(key: HoldingsSortKey) {
+    setHoldingsSort((prev) =>
+      prev && prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'desc' },
+    );
+  }
+  function sortIndicator(key: HoldingsSortKey) {
+    if (!holdingsSort || holdingsSort.key !== key) return null;
+    return holdingsSort.dir === 'asc' ? ' ▲' : ' ▼';
+  }
   const historyGroups = ledgerGroups(p.trades, historyTicker);
   const taxedDividends = taxSummary(p).dividends;
   const dividendsByTicker = (ticker: string) =>
@@ -972,8 +1036,11 @@ export default function Dashboard({
             <div>
               <h2>Your companies</h2>
               <p>
-                Opening quantities: CDC statement, 9 September 2026. Statement
-                value: Rs 788,743.
+                {held.length} {held.length === 1 ? 'holding' : 'holdings'}
+                {sectorFilter ? ` · filtered to ${sectorFilter}` : ''}
+                {showSoldOut && soldOut.length
+                  ? ` · ${soldOut.length} sold out shown`
+                  : ''}
               </p>
             </div>
             <button
@@ -994,26 +1061,64 @@ export default function Dashboard({
               <Plus size={16} /> Add company
             </button>
           </div>
+          <div className="holdings-toolbar">
+            <label className="holdings-toolbar-filter">
+              Sector
+              <select
+                value={sectorFilter}
+                onChange={(e) =>
+                  setSectorFilter(e.target.value as Sector | '')
+                }
+              >
+                <option value="">All sectors</option>
+                {sectorsInUse.map((sector) => (
+                  <option key={sector} value={sector}>
+                    {sector}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {soldOut.length > 0 && (
+              <label className="check-row">
+                <Checkbox
+                  checked={showSoldOut}
+                  onCheckedChange={(v) => setShowSoldOut(!!v)}
+                />{' '}
+                Show companies fully sold ({soldOut.length})
+              </label>
+            )}
+          </div>
           <section className="panel table-panel">
             <Table>
               <TableHeader>
                 <TableRow>
-                  {[
-                    'Company',
-                    'Shares',
-                    'Avg. cost',
-                    'Latest price',
-                    'Market value',
-                    'Gain / loss',
-                    'Portfolio weight',
-                    '',
-                  ].map((x) => (
-                    <TableHead key={x}>{x}</TableHead>
+                  {(
+                    [
+                      ['name', 'Company'],
+                      ['shares', 'Shares'],
+                      ['average', 'Avg. cost'],
+                      ['price', 'Latest price'],
+                      ['value', 'Market value'],
+                      ['gain', 'Gain / loss'],
+                      ['weight', 'Portfolio weight'],
+                    ] as [HoldingsSortKey, string][]
+                  ).map(([key, label]) => (
+                    <TableHead key={key}>
+                      <button
+                        type="button"
+                        className="sort-head"
+                        onClick={() => toggleHoldingsSort(key)}
+                      >
+                        {label}
+                        {sortIndicator(key)}
+                      </button>
+                    </TableHead>
                   ))}
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {held.map((h) => (
+                {displayedHoldings.map((h) => (
                   <TableRow key={h.ticker}>
                     <TableCell>
                       <button
@@ -1089,54 +1194,58 @@ export default function Dashboard({
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="row">
-                        <button
-                          className="secondary compact"
-                          onClick={() => openHistory(h.ticker)}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className="secondary compact icon-btn"
+                          aria-label={`Actions for ${h.ticker}`}
                         >
-                          History
-                        </button>
-                        {h.shares > 0 && (
-                          <button
-                            className="secondary compact"
-                            onClick={() => {
-                              setEditing(null);
-                              setTrade(
-                                blankTrade(
-                                  h.ticker,
-                                  'sell',
-                                  h.quote?.price ?? null,
-                                ),
-                              );
-                            }}
+                          <MoreHorizontal size={16} />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => openHistory(h.ticker)}
                           >
-                            Sell
-                          </button>
-                        )}
-                        {h.shares > 0 && (
-                          <button
-                            className="secondary compact"
-                            onClick={() => {
-                              setEditingDividend(null);
-                              setDividend(blankDividend(h.ticker));
-                            }}
+                            History
+                          </DropdownMenuItem>
+                          {h.shares > 0 && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditing(null);
+                                setTrade(
+                                  blankTrade(
+                                    h.ticker,
+                                    'sell',
+                                    h.quote?.price ?? null,
+                                  ),
+                                );
+                              }}
+                            >
+                              Sell
+                            </DropdownMenuItem>
+                          )}
+                          {h.shares > 0 && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingDividend(null);
+                                setDividend(blankDividend(h.ticker));
+                              }}
+                            >
+                              Dividend
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setCompany({
+                                ...p.companies.find(
+                                  (c) => c.ticker === h.ticker,
+                                )!,
+                              })
+                            }
                           >
-                            Dividend
-                          </button>
-                        )}
-                        <button
-                          className="secondary compact"
-                          onClick={() =>
-                            setCompany({
-                              ...p.companies.find(
-                                (c) => c.ticker === h.ticker,
-                              )!,
-                            })
-                          }
-                        >
-                          Edit
-                        </button>
-                      </div>
+                            Edit
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1405,13 +1514,21 @@ export default function Dashboard({
               const s = companySummary(historyTicker);
               return (
                 <div className="metrics company-summary">
-                  <article>
-                    <span>Invested</span>
-                    <strong>{s.cost === null ? '—' : money(s.cost)}</strong>
-                  </article>
-                  <article>
-                    <span>Current value</span>
-                    <strong>{s.value === null ? '—' : money(s.value)}</strong>
+                  <article className="invested-vs-current">
+                    <span>Invested vs. current value</span>
+                    <div className="invested-vs-current-row">
+                      <div>
+                        <small>Invested</small>
+                        <strong>{s.cost === null ? '—' : money(s.cost)}</strong>
+                      </div>
+                      <ArrowUpRight size={16} className="invested-vs-current-arrow" />
+                      <div>
+                        <small>Current</small>
+                        <strong>
+                          {s.value === null ? '—' : money(s.value)}
+                        </strong>
+                      </div>
+                    </div>
                   </article>
                   <article>
                     <span>Profit / loss</span>
@@ -1436,11 +1553,17 @@ export default function Dashboard({
                     </strong>
                   </article>
                   <article>
-                    <span>Dividends earned (gross → net)</span>
+                    <span>Dividends earned</span>
                     <strong>
-                      {money(s.dividendGross)} →{' '}
-                      {s.dividendNet === null ? '—' : money(s.dividendNet)}
+                      {s.dividendNet === null
+                        ? money(s.dividendGross)
+                        : money(s.dividendNet)}
                     </strong>
+                    <small>
+                      {s.dividendNet === null
+                        ? 'Gross · set filer status in Settings for net'
+                        : `Net of tax · ${money(s.dividendGross)} gross`}
+                    </small>
                   </article>
                 </div>
               );
@@ -1471,6 +1594,7 @@ export default function Dashboard({
               const purchases = live.filter((t) => t.kind === 'buy').length;
               const effectiveView = historyTicker ? 'all' : historyView;
               const groupDividends = dividendsByTicker(ticker);
+              const cs = !historyTicker ? companySummary(ticker) : null;
               return (
                 <section
                   className="panel table-panel ledger-group"
@@ -1488,6 +1612,35 @@ export default function Dashboard({
                           ? ` · ${purchases} purchase${purchases === 1 ? '' : 's'}`
                           : ''}
                       </p>
+                      {cs && (
+                        <div className="ledger-summary-chips">
+                          <span
+                            className={
+                              'ledger-summary-chip' +
+                              (cs.gain === null
+                                ? ''
+                                : cs.gain >= 0
+                                  ? ' pos'
+                                  : ' neg')
+                            }
+                          >
+                            P/L{' '}
+                            <b>
+                              {cs.gain === null ? '—' : money(cs.gain)}
+                              {cs.gainPercent !== null &&
+                                ` (${cs.gainPercent >= 0 ? '+' : ''}${cs.gainPercent.toFixed(1)}%)`}
+                            </b>
+                          </span>
+                          <span className="ledger-summary-chip">
+                            Dividends{' '}
+                            <b>
+                              {cs.dividendNet === null
+                                ? money(cs.dividendGross)
+                                : money(cs.dividendNet)}
+                            </b>
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <button
                       className="secondary compact"

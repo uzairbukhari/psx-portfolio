@@ -57,6 +57,21 @@ export type DividendCompanyPoint = {
   weight: number | null;
 };
 
+export type RealizedActivityPoint = {
+  month: string;
+  gain: number;
+  net: number | null;
+  cumulativeNet: number | null;
+};
+
+export type RealizedCompanyPoint = {
+  ticker: string;
+  name: string;
+  gain: number;
+  net: number | null;
+  weight: number | null;
+};
+
 export type PortfolioReport = {
   companyAllocation: AllocationPoint[];
   sectorAllocation: SectorPoint[];
@@ -65,6 +80,8 @@ export type PortfolioReport = {
   performance: PerformancePoint[];
   dividendActivity: DividendActivityPoint[];
   dividendByCompany: DividendCompanyPoint[];
+  realizedActivity: RealizedActivityPoint[];
+  realizedByCompany: RealizedCompanyPoint[];
   realized: {
     sales: TaxedSale[];
     dividends: TaxedDividend[];
@@ -258,6 +275,63 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
         a.ticker.localeCompare(b.ticker),
     );
 
+  const realizedMonths = new Map<string, { gain: number; net: number | null }>();
+  for (const s of tax.sales) {
+    const month = s.date.slice(0, 7);
+    const entry = realizedMonths.get(month) ?? { gain: 0, net: 0 };
+    realizedMonths.set(month, {
+      gain: round(entry.gain + (s.realizedGain ?? 0)),
+      net: entry.net === null || s.net === null ? null : round(entry.net + s.net),
+    });
+  }
+  let cumulativeRealizedNet: number | null = 0;
+  const realizedActivity: RealizedActivityPoint[] = [...realizedMonths]
+    .map(([month, item]) => ({ month, ...item }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((item) => {
+      cumulativeRealizedNet =
+        cumulativeRealizedNet === null || item.net === null
+          ? null
+          : round(cumulativeRealizedNet + item.net);
+      return { ...item, cumulativeNet: cumulativeRealizedNet };
+    });
+
+  const realizedCompanies = new Map<
+    string,
+    { gain: number; net: number | null }
+  >();
+  for (const s of tax.sales) {
+    const entry = realizedCompanies.get(s.ticker) ?? { gain: 0, net: 0 };
+    realizedCompanies.set(s.ticker, {
+      gain: round(entry.gain + (s.realizedGain ?? 0)),
+      net: entry.net === null || s.net === null ? null : round(entry.net + s.net),
+    });
+  }
+  const totalRealizedNet = [...realizedCompanies.values()].some(
+    (item) => item.net === null,
+  )
+    ? null
+    : round(
+        [...realizedCompanies.values()].reduce(
+          (total, item) => total + (item.net ?? 0),
+          0,
+        ),
+      );
+  const realizedByCompany: RealizedCompanyPoint[] = [...realizedCompanies]
+    .map(([ticker, item]) => ({
+      ticker,
+      name: companyNames.get(ticker) ?? ticker,
+      gain: item.gain,
+      net: item.net,
+      weight:
+        item.net === null ||
+        totalRealizedNet === null ||
+        totalRealizedNet <= 0
+          ? null
+          : percentage(item.net, totalRealizedNet),
+    }))
+    .sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain) || a.ticker.localeCompare(b.ticker));
+
   return {
     companyAllocation,
     sectorAllocation,
@@ -266,6 +340,8 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
     performance,
     dividendActivity,
     dividendByCompany,
+    realizedActivity,
+    realizedByCompany,
     realized: {
       sales: tax.sales,
       dividends: tax.dividends,
