@@ -61,6 +61,7 @@ import {
   type TaxedDividend,
 } from '@/lib/portfolio';
 import PortfolioReports from './portfolio-reports';
+import PolicyPreview from './policy-preview';
 import ResearchDesk from './research-desk';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import AiReview from './ai-review';
@@ -1476,6 +1477,7 @@ export default function Dashboard({
                 </button>
               ))}
           </div>
+          <PolicyPreview portfolio={p} save={save} busy={busy} />
         </TabsContent>
         <TabsContent value="history">
           <div className="section-top">
