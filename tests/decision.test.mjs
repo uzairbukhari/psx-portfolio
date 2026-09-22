@@ -68,6 +68,23 @@ test('a same-day dossier re-save that bumps the revision counter still counts as
   assert.ok(a.exclusionReasons.some((r) => r.includes('Unresolved')));
 });
 
+test('research that has never had a version explicitly approved excludes, even when every other condition is satisfied', () => {
+  const p = basePortfolio();
+  p.companies[0].approvedResearchVersion = null;
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.ok(a.exclusionReasons.some((r) => /has not been approved/i.test(r)));
+});
+
+test('research flagged "Update needed" is an unresolved critical condition, even with a stale Consider stance', () => {
+  const p = basePortfolio();
+  p.research[0].status = 'Update needed';
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.ok(a.criticalConditions.some((c) => /not Complete/i.test(c)));
+  assert.ok(a.exclusionReasons.some((r) => r.includes('Unresolved') && /not Complete/i.test(r)));
+});
+
 test('a failed or overdue screening excludes; a missing screening excludes', () => {
   const failed = basePortfolio();
   failed.companies[0].screening.status = 'Fail';
@@ -90,6 +107,30 @@ test('a Pending screening excludes with a reason distinct from Fail and from mis
   assert.ok(a.exclusionReasons.some((r) => /pending/i.test(r)));
   assert.ok(!a.exclusionReasons.some((r) => /failed shariah/i.test(r)));
   assert.ok(!a.exclusionReasons.some((r) => /no recorded/i.test(r)));
+});
+
+test('a screening with an empty source excludes, even with valid status and dates', () => {
+  const p = basePortfolio();
+  p.companies[0].screening.source = '';
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.ok(a.exclusionReasons.some((r) => /screening source/i.test(r)));
+});
+
+test('a screening with an empty effective date excludes', () => {
+  const p = basePortfolio();
+  p.companies[0].screening.effectiveDate = '';
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.ok(a.exclusionReasons.some((r) => /effective date/i.test(r)));
+});
+
+test('a screening with a future effective date excludes as not yet in effect', () => {
+  const p = basePortfolio();
+  p.companies[0].screening.effectiveDate = '2099-01-01';
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.ok(a.exclusionReasons.some((r) => /not yet in effect/i.test(r)));
 });
 
 test('a quote priced above the approved maximum excludes; a missing quote excludes under a today-only policy', () => {

@@ -465,6 +465,11 @@ export default function ResearchDesk({
         fairValueLow: valuation.low,
         fairValueHigh: valuation.high,
         valuationProvenance: valuation.provenance === 'unavailable' ? undefined : valuation.provenance,
+        stance: ['Consider', 'Watchlist', 'Avoid', 'Research incomplete'].includes(
+          textValue(company.investmentStance),
+        )
+          ? (textValue(company.investmentStance) as ResearchCompany['stance'])
+          : undefined,
         thesis: textValue(company.thesis),
         risks: textValue(company.risk),
         catalysts: textValue(company.catalyst),

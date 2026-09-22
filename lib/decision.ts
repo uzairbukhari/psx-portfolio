@@ -95,6 +95,11 @@ export function assessCompany(
   const effectiveQuote = effectiveQuoteFor(p, ticker, policy, today);
   const screening = c.screening ?? null;
   const criticalConditions: string[] = [];
+  // A company with research that has never had a version explicitly
+  // approved is its own exclusion reason (pushed into `reasons` below),
+  // not a critical condition — silence here would let a company qualify
+  // without the approval step ever having happened.
+  const researchNeverApproved = !!research && c.approvedResearchVersion == null;
   if (
     c.approvedResearchVersion != null &&
     research &&
@@ -102,6 +107,10 @@ export function assessCompany(
   )
     criticalConditions.push(
       `Research updated since approval (approved revision ${c.approvedResearchVersion}, current revision ${research.researchRevision ?? 0}) — re-review required.`,
+    );
+  if (research && research.status !== 'Complete')
+    criticalConditions.push(
+      `Research status is "${research.status}", not Complete.`,
     );
   const approvedMaxPrice = c.approvedMaxPrice ?? null;
   const valuation: CompanyAssessment['valuation'] = {
@@ -117,12 +126,22 @@ export function assessCompany(
   if (c.target <= 0) reasons.push('No positive target set.');
   if (stance !== 'Consider')
     reasons.push(`Research stance is "${stance}", not Consider.`);
+  if (researchNeverApproved)
+    reasons.push(
+      'Current research version has not been approved for contributions.',
+    );
   for (const cond of criticalConditions) reasons.push('Unresolved: ' + cond);
   if (!screening) reasons.push('No recorded Shariah screening evidence.');
+  else if (!screening.source.trim())
+    reasons.push('No Shariah screening source recorded.');
   else if (screening.status === 'Fail')
     reasons.push('Failed Shariah screening.');
   else if (screening.status === 'Pending')
     reasons.push('Shariah screening is pending, not yet passed.');
+  else if (!screening.effectiveDate)
+    reasons.push('No screening effective date recorded.');
+  else if (screening.effectiveDate > today)
+    reasons.push('Screening is not yet in effect.');
   else if (!screening.reviewDueDate)
     reasons.push('No screening review due date set.');
   else if (screening.reviewDueDate < today)

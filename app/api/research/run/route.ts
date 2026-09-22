@@ -71,6 +71,10 @@ async function completeJob(
   const priorResearch = portfolio.research?.find(
     (company) => company.ticker === row.ticker,
   );
+  // stance is intentionally left unset here — an AI-generated dossier's
+  // investmentStance has not been human-reviewed, so it must not silently
+  // promote to a top-level stance that assessCompany treats as
+  // approval-eligible.
   const research: ResearchCompany = {
     ticker: row.ticker,
     status: 'Complete',
