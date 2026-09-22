@@ -27,6 +27,11 @@ import {
   money,
   safeUrl,
 } from './research-data';
+import {
+  scenarioValue,
+  upsideDownsidePct,
+  discountToValuePct,
+} from '@/lib/valuation';
 export function Choice({
   value,
   options,
@@ -515,16 +520,12 @@ export function Dossier({
             </p>
             <div className="scenario-grid">
               {c.scenarios.map((s, i) => {
-                const fair =
-                  s.eps != null &&
-                  s.eps > 0 &&
-                  s.multiple != null &&
-                  s.multiple > 0
-                    ? s.eps * s.multiple
-                    : null;
+                const result = scenarioValue(s);
+                const fair = result.value;
+                const isBase = s.name.trim().toLowerCase() === 'base';
                 return (
                   <div
-                    className={'scenario ' + (i === 1 ? 'base' : '')}
+                    className={'scenario ' + (isBase ? 'base' : '')}
                     key={s.name}
                   >
                     <span className="eyebrow">{s.name.toUpperCase()} CASE</span>
@@ -562,14 +563,25 @@ export function Dossier({
                       />
                     </label>
                     <p className="help">Implied fair value · PKR</p>
-                    <strong>{money(fair)}</strong>
+                    <strong>
+                      {fair === null ? (
+                        <span
+                          className="unavailable"
+                          title={result.reason ?? undefined}
+                        >
+                          Unavailable
+                        </span>
+                      ) : (
+                        money(fair)
+                      )}
+                    </strong>
                     <div
                       className={
                         fair && c.price && fair >= c.price ? 'green' : 'subtle'
                       }
                     >
                       {fair && c.price
-                        ? money((fair / c.price - 1) * 100) +
+                        ? money(upsideDownsidePct(fair, c.price)) +
                           '% vs reference price'
                         : 'Add positive EPS, P/E and price'}
                     </div>
@@ -577,6 +589,29 @@ export function Dossier({
                 );
               })}
             </div>
+            {(() => {
+              const baseScenario = c.scenarios.find(
+                (s) => s.name.trim().toLowerCase() === 'base',
+              );
+              const baseResult = scenarioValue(
+                baseScenario ?? { name: 'Base', eps: null, multiple: null },
+              );
+              const upside = upsideDownsidePct(baseResult.value, c.price);
+              const discount = discountToValuePct(baseResult.value, c.price);
+              if (upside === null || discount === null) return null;
+              return (
+                <p className="valuation-summary">
+                  {upside >= 0
+                    ? `Undervalued ${upside}%`
+                    : `Overvalued ${Math.abs(upside)}%`}{' '}
+                  vs. base-case value
+                  {' · '}
+                  {discount >= 0
+                    ? `${discount}% discount to base-case value`
+                    : `${Math.abs(discount)}% premium to base-case value`}
+                </p>
+              );
+            })()}
             {c.valuationNotes && (
               <div className="research-narrative mt">
                 <h3>Valuation reasoning and assumptions</h3>
