@@ -52,6 +52,7 @@ import {
   RESEARCH_MODELS,
   REASONING_EFFORTS,
   DEFAULT_RESEARCH_SETTINGS,
+  confirmedFunds,
   type ResearchSettings,
   type Portfolio,
   type Trade,
@@ -59,6 +60,8 @@ import {
   type Sector,
   type Dividend,
   type TaxedDividend,
+  type FundingSource,
+  type FundingEntry,
 } from '@/lib/portfolio';
 import PortfolioReports from './portfolio-reports';
 import PolicyPreview from './policy-preview';
@@ -503,6 +506,11 @@ export default function Dashboard({
     [dividend, setDividend] = useState<Dividend | null>(null),
     [editingDividend, setEditingDividend] = useState<string | null>(null),
     [company, setCompany] = useState<Company | null>(null),
+    [fundingDraft, setFundingDraft] = useState<{
+      amount: string;
+      source: FundingSource;
+      note: string;
+    }>({ amount: '', source: 'manual', note: '' }),
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
     [quoteDate, setQuoteDate] = useState(today()),
@@ -1375,6 +1383,143 @@ export default function Dashboard({
               ))}
             </div>
           )}
+          <section className="panel funding-manager">
+            <p className="eyebrow">CONFIRMED FUNDS</p>
+            <h3>Money actually available to spend this month.</h3>
+            <p className="muted">
+              Separate from your monthly budget target above. Add a
+              confirmed amount — a bank balance you&apos;ve checked, or a
+              balance carried forward from a prior month — before treating
+              it as spendable.
+            </p>
+            <div className="mini-stat">
+              <span>Confirmed funds this month</span>
+              <b>{money(confirmedFunds(p, month))}</b>
+            </div>
+            <form
+              className="form-grid"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const amount = Number(fundingDraft.amount);
+                if (!amount || amount <= 0) return;
+                attempt(async () => {
+                  const next = clone(p);
+                  next.funding = [
+                    ...(next.funding ?? []),
+                    {
+                      id: crypto.randomUUID(),
+                      month,
+                      source: fundingDraft.source,
+                      amount,
+                      note: fundingDraft.note,
+                      createdAt: new Date().toISOString(),
+                    },
+                  ];
+                  await save(next, 'Confirmed funding entry added.');
+                  setFundingDraft({ amount: '', source: 'manual', note: '' });
+                });
+              }}
+            >
+              <label>
+                Source
+                <select
+                  value={fundingDraft.source}
+                  onChange={(e) =>
+                    setFundingDraft({
+                      ...fundingDraft,
+                      source: e.target.value as FundingSource,
+                    })
+                  }
+                >
+                  <option value="manual">Confirmed balance</option>
+                  <option value="carry-forward">
+                    Carried forward from a prior month
+                  </option>
+                </select>
+              </label>
+              <label>
+                Amount (PKR)
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={fundingDraft.amount}
+                  onChange={(e) =>
+                    setFundingDraft({ ...fundingDraft, amount: e.target.value })
+                  }
+                />
+              </label>
+              <label className="wide">
+                Note
+                <input
+                  maxLength={2000}
+                  value={fundingDraft.note}
+                  onChange={(e) =>
+                    setFundingDraft({ ...fundingDraft, note: e.target.value })
+                  }
+                />
+              </label>
+              <button disabled={busy} type="submit">
+                Add confirmed funds
+              </button>
+            </form>
+            {(() => {
+              const monthFunding: FundingEntry[] = (p.funding ?? []).filter(
+                (f) => f.month === month && !f.voided,
+              );
+              if (!monthFunding.length) return null;
+              return (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {['Source', 'Amount', 'Note', ''].map((x) => (
+                        <TableHead key={x}>{x}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {monthFunding.map((f) => (
+                      <TableRow key={f.id}>
+                        <TableCell>
+                          {f.source === 'dividend-reinvestment'
+                            ? 'Reinvested dividend'
+                            : f.source === 'carry-forward'
+                              ? 'Carried forward'
+                              : 'Confirmed balance'}
+                        </TableCell>
+                        <TableCell>{money(f.amount)}</TableCell>
+                        <TableCell>{f.note}</TableCell>
+                        <TableCell>
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={busy}
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  'Void this funding entry? Its audit record will remain.',
+                                )
+                              )
+                                return;
+                              attempt(async () => {
+                                const next = clone(p);
+                                next.funding!.find(
+                                  (x) => x.id === f.id,
+                                )!.voided = true;
+                                await save(next, 'Funding entry voided.');
+                              });
+                            }}
+                          >
+                            Void
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              );
+            })()}
+          </section>
           <div className="section-top">
             <div>
               <h2>Suggested purchase breakdown</h2>
