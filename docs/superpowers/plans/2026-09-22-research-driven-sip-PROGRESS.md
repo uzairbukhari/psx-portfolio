@@ -32,7 +32,16 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
   - [x] Task 6: fix name-based scenario display + upside/discount in original-dossier.tsx (commit 0febd47)
   - [x] Task 7: effective quotes in portfolio GET + AI-review cache fingerprint (DB migration) (commit bb8dbbb; migration `drizzle/0009_puzzling_greymalkin.sql` applied to local dev D1 after explicit user confirmation)
   - [x] Task 8: scope evidence verification to cited document/page; bank N/A distinction (commit c31cc6d)
-  - [x] Task 9: verification sweep, browser check, PROGRESS/README update — see below
+  - [x] Task 9: verification sweep, browser check, PROGRESS/README update (commit 30d60c7)
+  - [x] Final whole-branch review (opus): Ready to merge = Yes, 0 Critical, 3 Important, 6 Minor.
+    2 Important findings fixed + scoped-re-reviewed clean (commit cc1e6b8: `valuationProvenance`
+    wasn't set at the AI-run-completion write site, and dossier save could mislabel a cleared
+    scenario model's own prior output as "legacy"). 3rd Important finding (evidence-scoping now
+    hard-fails synthesis on an unselected-but-cited page) confirmed to need no code change — the
+    existing self-correction retry loop already surfaces the new error back to the model; flagged
+    as an operational watch-item, not a defect. Minor findings deferred (see SDD ledger) — none
+    block merge or change any saved holding/target/approval/research conclusion.
+  - **Final commit: `cc1e6b8`**
 - [ ] **Milestone 2 — Research-driven monthly plan**
   - [ ] Shared decision contract + single assessment function
   - [ ] Policy preview and defaults (20%/30% caps, dated-quote opt-in, side-by-side preview)
