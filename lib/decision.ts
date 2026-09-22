@@ -10,7 +10,7 @@ export type CompanyAssessment = {
   ticker: string;
   eligible: boolean;
   exclusionReasons: string[];
-  researchVersionReviewed: string | null;
+  researchVersionReviewed: number | null;
   stance: 'Consider' | 'Watchlist' | 'Avoid' | 'Research incomplete' | 'None';
   criticalConditions: string[];
   screening: Screening | null;
@@ -57,6 +57,13 @@ function sectorExposurePct(
   return (value / totalValue) * 100;
 }
 
+function sectorHasUnpricedHolding(p: Portfolio, sector: string): boolean {
+  if (!sector) return false;
+  return holdings(p).some(
+    (h) => h.sector === sector && h.shares > 0 && h.value === null,
+  );
+}
+
 export function assessCompany(
   p: Portfolio,
   policy: ResearchPolicy,
@@ -76,21 +83,25 @@ export function assessCompany(
     ? ((holding?.value ?? 0) / totalValue) * 100
     : 0;
   const targetExposurePct = c.target;
-  const targetHeadroomPct = targetExposurePct - currentExposurePct;
-  const companyHeadroomPct = policy.companyCapPct - currentExposurePct;
-  const sectorHeadroomPct = c.sector
-    ? policy.sectorCapPct - sectorExposurePct(p, c.sector, totalValue)
-    : null;
+  const targetHeadroomPct = round(targetExposurePct - currentExposurePct);
+  const companyHeadroomPct = round(policy.companyCapPct - currentExposurePct);
+  const sectorUnpriced = c.sector ? sectorHasUnpricedHolding(p, c.sector) : false;
+  const sectorHeadroomPctRaw =
+    !c.sector || sectorUnpriced
+      ? null
+      : policy.sectorCapPct - sectorExposurePct(p, c.sector, totalValue);
+  const sectorHeadroomPct =
+    sectorHeadroomPctRaw === null ? null : round(sectorHeadroomPctRaw);
   const effectiveQuote = effectiveQuoteFor(p, ticker, policy, today);
   const screening = c.screening ?? null;
   const criticalConditions: string[] = [];
   if (
-    c.approvedResearchVersion &&
+    c.approvedResearchVersion != null &&
     research &&
-    c.approvedResearchVersion !== research.updatedAt
+    c.approvedResearchVersion !== (research.researchRevision ?? 0)
   )
     criticalConditions.push(
-      `Research updated since approval (approved ${c.approvedResearchVersion}, current ${research.updatedAt}) — re-review required.`,
+      `Research updated since approval (approved revision ${c.approvedResearchVersion}, current revision ${research.researchRevision ?? 0}) — re-review required.`,
     );
   const approvedMaxPrice = c.approvedMaxPrice ?? null;
   const valuation: CompanyAssessment['valuation'] = {
@@ -102,14 +113,16 @@ export function assessCompany(
       (research?.fairValue != null ? 'legacy' : 'unavailable'),
   };
   const reasons: string[] = [];
-  if (!c.approved || c.target <= 0)
-    reasons.push('Not approved for contributions, or no positive target set.');
+  if (!c.approved) reasons.push('Not approved for contributions.');
+  if (c.target <= 0) reasons.push('No positive target set.');
   if (stance !== 'Consider')
     reasons.push(`Research stance is "${stance}", not Consider.`);
   for (const cond of criticalConditions) reasons.push('Unresolved: ' + cond);
   if (!screening) reasons.push('No recorded Shariah screening evidence.');
   else if (screening.status === 'Fail')
     reasons.push('Failed Shariah screening.');
+  else if (screening.status === 'Pending')
+    reasons.push('Shariah screening is pending, not yet passed.');
   else if (!screening.reviewDueDate)
     reasons.push('No screening review due date set.');
   else if (screening.reviewDueDate < today)
@@ -128,6 +141,10 @@ export function assessCompany(
     reasons.push('Already at or above the company allocation limit.');
   if (!c.sector)
     reasons.push('Sector not classified; allocation blocked until classified.');
+  else if (sectorUnpriced)
+    reasons.push(
+      'Sector exposure cannot be confirmed: a holding in this sector has no current price.',
+    );
   else if (sectorHeadroomPct !== null && sectorHeadroomPct <= 0)
     reasons.push('Sector already at or above the sector allocation limit.');
   return {
@@ -143,8 +160,8 @@ export function assessCompany(
     approvedMaxPrice,
     currentExposurePct: round(currentExposurePct),
     targetExposurePct,
-    companyHeadroomPct: round(companyHeadroomPct),
-    sectorHeadroomPct: sectorHeadroomPct === null ? null : round(sectorHeadroomPct),
+    companyHeadroomPct,
+    sectorHeadroomPct,
   };
 }
 

@@ -213,13 +213,15 @@ test('validate accepts a numeric or null approvedMaxPrice, rejects zero/negative
   p.companies[0].approvedMaxPrice=Infinity;
   assert.throws(()=>validate(p));
 });
-test('validate accepts a string or null approvedResearchVersion',()=>{
+test('validate accepts a number or null approvedResearchVersion, rejects a non-integer',()=>{
   const p=fresh();
-  p.companies[0].approvedResearchVersion=date;
+  p.companies[0].approvedResearchVersion=1;
   validate(p);
   p.companies[0].approvedResearchVersion=null;
   validate(p);
-  p.companies[0].approvedResearchVersion=42;
+  p.companies[0].approvedResearchVersion=1.5;
+  assert.throws(()=>validate(p));
+  p.companies[0].approvedResearchVersion={};
   assert.throws(()=>validate(p));
 });
 test('DEFAULT_RESEARCH_POLICY is inactive with the brief\'s initial caps and requires today\'s quote',()=>{

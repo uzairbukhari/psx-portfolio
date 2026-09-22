@@ -22,7 +22,7 @@ export type Company = {
   note: string;
   screening?: Screening;
   approvedMaxPrice?: number | null;
-  approvedResearchVersion?: string | null;
+  approvedResearchVersion?: number | null;
 };
 export type Trade = {
   id: string;
@@ -139,6 +139,7 @@ export type ResearchCompany = {
     debt: number | null;
   }[];
   updatedAt: string;
+  researchRevision?: number;
   details?: Record<string, unknown>;
 };
 export const today = () =>
@@ -476,6 +477,8 @@ export function validate(p: Portfolio) {
           !['Consider', 'Watchlist', 'Avoid', 'Research incomplete'].includes(
             r.stance,
           )) ||
+        (r.researchRevision !== undefined &&
+          (!Number.isInteger(r.researchRevision) || r.researchRevision < 0)) ||
         ![r.thesis, r.risks, r.catalysts, r.conversationUrl, r.updatedAt].every(
           (v) => typeof v === 'string',
         ) ||
@@ -525,7 +528,7 @@ export function validate(p: Portfolio) {
           c.approvedMaxPrice > 1e8)) ||
       (c.approvedResearchVersion !== undefined &&
         c.approvedResearchVersion !== null &&
-        typeof c.approvedResearchVersion !== 'string')
+        !Number.isInteger(c.approvedResearchVersion))
     )
       throw Error('Invalid or duplicate company.');
     tickers.add(c.ticker);

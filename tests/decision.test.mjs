@@ -9,11 +9,11 @@ const basePortfolio = () => ({
     ticker: 'TEST', name: 'Test', sector: 'Bank', target: 10, approved: true,
     screenDate: date, note: '',
     screening: { source: 'PSX index', status: 'Pass', effectiveDate: date, reviewDueDate: date },
-    approvedMaxPrice: 100, approvedResearchVersion: date,
+    approvedMaxPrice: 100, approvedResearchVersion: 1,
   }],
   trades: [], quotes: { TEST: { price: 90, date, asOf: date, source: 'https://dps.psx.com.pk/company/TEST', fetchedAt: new Date().toISOString() } },
   budgets: {},
-  research: [{ ticker: 'TEST', status: 'Complete', score: 80, fairValue: 120, fairValueLow: 100, fairValueHigh: 140, valuationProvenance: 'scenario-model', stance: 'Consider', thesis: '', risks: '', catalysts: '', conversationUrl: '', sources: [], financials: [], updatedAt: date }],
+  research: [{ ticker: 'TEST', status: 'Complete', score: 80, fairValue: 120, fairValueLow: 100, fairValueHigh: 140, valuationProvenance: 'scenario-model', stance: 'Consider', thesis: '', risks: '', catalysts: '', conversationUrl: '', sources: [], financials: [], updatedAt: date, researchRevision: 1 }],
 });
 
 test('a fully qualifying company is eligible with no exclusion reasons', () => {
@@ -49,7 +49,19 @@ test('Watchlist, Avoid, Research incomplete and no-dossier stances all exclude',
 
 test('a superseded research approval is an unresolved critical condition', () => {
   const p = basePortfolio();
-  p.research[0].updatedAt = '2026-09-25';
+  p.research[0].researchRevision = 2;
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.equal(a.criticalConditions.length, 1);
+  assert.ok(a.exclusionReasons.some((r) => r.includes('Unresolved')));
+});
+
+test('a same-day dossier re-save that bumps the revision counter still counts as superseded, even though updatedAt is unchanged', () => {
+  const p = basePortfolio();
+  // Same updatedAt as the approved snapshot, but the revision counter moved on
+  // (e.g. the dossier was edited and saved again later the same day).
+  p.research[0].updatedAt = date;
+  p.research[0].researchRevision = 2;
   const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
   assert.equal(a.eligible, false);
   assert.equal(a.criticalConditions.length, 1);
@@ -68,6 +80,16 @@ test('a failed or overdue screening excludes; a missing screening excludes', () 
   const a = assessCompany(missing, DEFAULT_RESEARCH_POLICY, 'TEST', date);
   assert.equal(a.eligible, false);
   assert.equal(a.screening, null);
+});
+
+test('a Pending screening excludes with a reason distinct from Fail and from missing screening', () => {
+  const p = basePortfolio();
+  p.companies[0].screening.status = 'Pending';
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.ok(a.exclusionReasons.some((r) => /pending/i.test(r)));
+  assert.ok(!a.exclusionReasons.some((r) => /failed shariah/i.test(r)));
+  assert.ok(!a.exclusionReasons.some((r) => /no recorded/i.test(r)));
 });
 
 test('a quote priced above the approved maximum excludes; a missing quote excludes under a today-only policy', () => {
@@ -106,6 +128,20 @@ test('an unclassified sector blocks eligibility even when otherwise qualifying',
   assert.equal(a.eligible, false);
   assert.equal(a.sectorHeadroomPct, null);
   assert.ok(a.exclusionReasons.some((r) => /sector not classified/i.test(r)));
+});
+
+test('an unpriced holding in the same sector blocks eligibility even when a naive calculation would show headroom', () => {
+  const p = basePortfolio();
+  p.companies.push({
+    ticker: 'OTHERBANK', name: 'Other Bank', sector: 'Bank', target: 0,
+    approved: false, screenDate: '', note: '',
+  });
+  // OTHERBANK has shares but no quote entry at all, so holdings() reports value: null for it.
+  p.trades.push({ id: '2', ticker: 'OTHERBANK', kind: 'opening', date, shares: 50, price: null, fees: 0, month: '', note: '' });
+  const a = assessCompany(p, DEFAULT_RESEARCH_POLICY, 'TEST', date);
+  assert.equal(a.eligible, false);
+  assert.equal(a.sectorHeadroomPct, null);
+  assert.ok(a.exclusionReasons.some((r) => /cannot be confirmed/i.test(r)));
 });
 
 test('being at or above target, company cap or sector cap excludes on headroom, computed from real holdings', () => {
