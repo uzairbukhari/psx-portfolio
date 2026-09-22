@@ -99,11 +99,20 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
         new one from Task 3, a stray unused import, caught here and fixed directly — commit f8b626b), build
         succeeds. No interactive browser check this sub-plan, per standing instruction (deferred to the
         consolidated pass after 2b-iii).
-    - [ ] **2b-iii — AI role + Monthly SIP UI wiring** (plan: `2026-09-22-m2b-iii-ai-role-and-ui-wiring.md`, 4 tasks, in progress)
-      - [ ] Task 1: AI role — remove 5-8 cap, supply assessments + comparison candidates
-      - [ ] Task 2: wire researchPlan() into the Monthly SIP "Suggested purchase breakdown" table + summary panel
-      - [ ] Task 3: "Save plan" button + read-only saved-plans list
-      - [ ] Task 4: consolidated verification for all of 2b (automated + deferred browser check + deferred final whole-branch review covering 2b-i+2b-ii+2b-iii together)
+    - [x] **2b-iii — AI role + Monthly SIP UI wiring** (COMPLETE 2026-09-23 — plan: `2026-09-22-m2b-iii-ai-role-and-ui-wiring.md`, 4 tasks, all reviewed clean)
+      - SDD ledger: `.superpowers/sdd/2026-09-22-m2b-iii-ai-role-and-ui-wiring/progress.md`
+      - [x] Task 1: AI role — remove 5-8 cap, supply assessments + comparison candidates (commits 4757c9c..856b01d, 1 fix round: an `instructions:` addendum sentence was left ungated on `usingResearchPlan`, same class as the deviation the implementer already caught for `comparisonCandidates`)
+      - [x] Task 2: wire researchPlan() into the Monthly SIP "Suggested purchase breakdown" table + summary panel (commit fd5aca5)
+      - [x] Task 3: "Save plan" button + read-only saved-plans list, folded-in export-plan fix (commit 9f774c8)
+      - [x] Task 4: consolidated verification for all of 2b — 146/146 tests, tsc clean, 26 pre-existing lint errors, build succeeds. Deferred interactive browser check (real account, read-only): Monthly SIP tab renders byte-identical to pre-milestone when the policy is inactive (the real account's current state); found and fixed stale policy-preview copy claiming the allocator wasn't wired yet (commit b336947).
+      - [x] Final whole-branch review (opus, range `9a13431..b336947`, 20 commits): Ready to merge = "With fixes", 0 Critical, 4 Important, 6 Minor, plus 2 findings against the plans themselves (not the implementation — noted, no code change needed). Independently fuzzed `researchPlan` 4,000 more portfolios (0 breaches) and confirmed the byte-identical-when-inactive guarantee end-to-end. All 4 Important findings fixed directly (commit a136821, no further subagent review round — session was near its weekly usage budget, so verified via the full automated suite instead of a scoped re-review):
+        1. Correcting or voiding a reinvested dividend threw a validation error with no UI recovery (the non-voided-dividend check applied even to voided funding entries); fixed by scoping that check to non-voided entries and auto-voiding the linked funding entry when its dividend is voided/corrected.
+        2. AI review accepted a shortlist of 1-4 companies, guaranteed to fail `validateReview`'s 20%-per-company cap after a paid OpenAI call; added an upfront guard tied to `WEIGHT_CAP` (now exported from `lib/portfolio.ts`).
+        3. Two AI-facing surfaces (`read_psx_portfolio` MCP tool, `reviewPrompt`'s embedded plan JSON) still always used the legacy budget-only `plan()`, ignoring the research policy when active; both now use `researchPlan()` when `researchPolicy.enabled`.
+        4. The policy-activation toast still said activation "does not change today's SIP suggestions yet" — stale since 2b-ii/2b-iii actually wired the allocator; fixed alongside the same-class Minor copy sweep (fee/cap description, dated-quotes checkbox, table note) in the Monthly SIP tab.
+        Minor findings 6-10 (AI `compact` context redundant eligibility signals, "Mark as reinvested" month ambiguity, `stale` flag unsurfaced, saved-plans append-only cap, README drift) deferred — none block merge or touch real account data.
+      - **Final commit: `a136821`**
+  - **Milestone 2 complete.**
 - [ ] **Milestone 3 — Decision board, comparison and learning tab**
   - [ ] Decision board + compare 2–4 companies
   - [ ] Sector-specific checklists (bank / E&P / industrial / REIT-ETF-takaful-holding)
