@@ -26,12 +26,13 @@ export default function PolicyPreview({ portfolio, save, busy }: Props) {
     <section className="policy-preview">
       <h3>Research-driven policy preview</h3>
       <p className="muted">
-        This is a preview only — nothing here changes today&apos;s SIP
-        suggestions above. The research-driven column adds stance, Shariah
-        screening, an approved maximum price and sector limits on top of the
-        existing target gaps. Activating it only saves this setting for later
-        use; it does not touch your saved holdings, targets or research, and
-        it does not change how the SIP plan is calculated today.
+        This preview uses the settings below, not your saved policy — nothing
+        here changes today&apos;s SIP suggestions above until you activate it.
+        The research-driven column adds stance, Shariah screening, an
+        approved maximum price and sector limits on top of the existing
+        target gaps. Activating it switches the Monthly SIP tab to this
+        research-driven eligibility and allocation; it never touches your
+        saved holdings, targets or research conclusions.
       </p>
       <div className="form-grid">
         <label>
@@ -104,8 +105,8 @@ export default function PolicyPreview({ portfolio, save, busy }: Props) {
       </p>
       <p className="muted">
         {active
-          ? 'The research-driven policy is currently active as a saved setting. Actual SIP allocation still uses the target-based calculation above until a later update wires this policy into it.'
-          : 'The research-driven policy is not active. Activating it only saves this setting for later use — it will not change the SIP suggestions above until a later update wires it into the allocator.'}
+          ? 'The research-driven policy is active. The Monthly SIP tab above now uses this eligibility and allocation instead of the plain target-based calculation.'
+          : 'The research-driven policy is not active. Activating it saves this setting and switches the Monthly SIP tab above from the plain target-based calculation to this eligibility and allocation.'}
       </p>
       <button
         disabled={busy}
