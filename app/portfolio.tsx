@@ -411,10 +411,14 @@ function DividendHistoryTable({
   dividends,
   taxed,
   onCorrect,
+  onReinvest,
+  linkedDividendIds,
 }: {
   dividends: Dividend[];
   taxed: TaxedDividend[];
   onCorrect: (d: Dividend) => void;
+  onReinvest: (d: Dividend) => void;
+  linkedDividendIds: Set<string>;
 }) {
   const byId = new Map(taxed.map((t) => [t.id, t]));
   return (
@@ -431,6 +435,7 @@ function DividendHistoryTable({
       <TableBody>
         {dividends.map((d) => {
           const t = byId.get(d.id);
+          const reinvested = linkedDividendIds.has(d.id);
           return (
             <TableRow key={d.id} className={d.voided ? 'row-voided' : ''}>
               <TableCell>{d.date}</TableCell>
@@ -451,6 +456,9 @@ function DividendHistoryTable({
                   {d.source === 'import' ? 'CDC import' : 'Manual'}
                 </span>
                 {d.voided && <span className="tag status-cancelled">Voided</span>}
+                {reinvested && (
+                  <span className="tag status-complete">Reinvested</span>
+                )}
               </TableCell>
               <TableCell>
                 {!d.voided && (
@@ -459,6 +467,14 @@ function DividendHistoryTable({
                     onClick={() => onCorrect(d)}
                   >
                     Correct
+                  </button>
+                )}
+                {!d.voided && !reinvested && (
+                  <button
+                    className="secondary compact"
+                    onClick={() => onReinvest(d)}
+                  >
+                    Mark as reinvested
                   </button>
                 )}
               </TableCell>
@@ -774,6 +790,11 @@ export default function Dashboard({
   }
   const historyGroups = ledgerGroups(p.trades, historyTicker);
   const taxedDividends = taxSummary(p).dividends;
+  const linkedDividendIds = new Set(
+    (p.funding ?? [])
+      .filter((f) => !f.voided && f.linkedDividendId)
+      .map((f) => f.linkedDividendId as string),
+  );
   const dividendsByTicker = (ticker: string) =>
     (p.dividends ?? [])
       .filter((d) => d.ticker === ticker)
@@ -808,6 +829,32 @@ export default function Dashboard({
   function correctDividend(d: Dividend) {
     setEditingDividend(d.id);
     setDividend({ ...d });
+  }
+  function reinvestDividend(d: Dividend) {
+    attempt(async () => {
+      const netAmount = taxedDividends.find((td) => td.id === d.id)?.netAmount;
+      if (netAmount == null || netAmount <= 0) {
+        notify(
+          'This dividend has no known net amount to reinvest (set a filer status in Settings, or check the recorded amount).',
+          true,
+        );
+        return;
+      }
+      const next = clone(p!);
+      next.funding = [
+        ...(next.funding ?? []),
+        {
+          id: crypto.randomUUID(),
+          month,
+          source: 'dividend-reinvestment',
+          amount: netAmount,
+          note: `Reinvested dividend: ${d.ticker} ${d.date}`,
+          linkedDividendId: d.id,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      await save(next, 'Dividend marked as reinvested — added to confirmed funds.');
+    });
   }
   async function refresh() {
     setBusy(true);
@@ -1824,6 +1871,8 @@ export default function Dashboard({
                         dividends={groupDividends}
                         taxed={taxedDividends}
                         onCorrect={correctDividend}
+                        onReinvest={reinvestDividend}
+                        linkedDividendIds={linkedDividendIds}
                       />
                     </div>
                   )}
