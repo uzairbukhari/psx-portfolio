@@ -13,9 +13,11 @@ import {
   normalizeValuationScenarios,
   financialValueSupported,
   FINANCIAL_VALUE_LABELS,
+  notApplicableFinancialFields,
   researchReserveMicros,
   validateInvestmentDossier,
 } from '@/lib/research-policy.mjs';
+import { citedPageText } from '@/lib/research-evidence.mjs';
 
 const SCORE_RUBRIC = [
   { name: 'Business quality', max: 20 },
@@ -390,16 +392,22 @@ Explain findings simply. The narrative must cover the business, industry and mac
             financialIssues.push(`${financial.year} cites a source absent from the manifest.`);
             continue;
           }
+          const citedPage = citedPageText(evidence, financial.source, financial.page, documents);
+          if (citedPage === null) {
+            financialIssues.push(`${financial.year} cites page ${financial.page || 'unspecified'}, which is not present in the supplied evidence for that source.`);
+            continue;
+          }
           for (const [key, labels] of Object.entries(FINANCIAL_VALUE_LABELS)) {
             const value = financial[key as keyof typeof FINANCIAL_VALUE_LABELS];
             // A null equity/ocf/debt/dividend means the model reported the figure
             // as genuinely unavailable; nothing to verify against evidence.
             if (value == null) continue;
-            if (!financialValueSupported(evidence, labels, value))
-              financialIssues.push(`${financial.year} ${key} is not supported by a matching labelled source line.`);
+            if (!financialValueSupported(citedPage, labels, value))
+              financialIssues.push(`${financial.year} ${key} is not supported by a matching labelled source line on the cited page.`);
           }
-          // The helper validates PDF signatures and extracts page-marked text. Once a
-          // row points back to that manifest and a page, verification is deterministic.
+          // Verification is now scoped to the row's own cited document and
+          // page rather than the whole evidence blob (see
+          // lib/research-evidence.mjs#citedPageText).
           financial.verified = true;
         }
         if (financialIssues.length) throw Error(financialIssues.join(' '));
@@ -411,15 +419,19 @@ Explain findings simply. The narrative must cover the business, industry and mac
         if (uncitedAssessments.length)
           throw Error(`These assessments cite a source absent from the manifest: ${uncitedAssessments.join(', ')}.`);
         const dataGaps = [
-          ...describeNullFinancialFields(analysis.financials),
+          ...describeNullFinancialFields(analysis.financials, analysis.sector || row.sector),
           ...SCORE_RUBRIC.filter(({ name }) => assessments[name].score == null).map(({ name }) => `${name} score`),
         ];
+        const notApplicable = notApplicableFinancialFields(analysis.financials, analysis.sector || row.sector);
         const missingInformation = Array.isArray(analysis.missingInformation)
           ? [...(analysis.missingInformation as string[])]
           : [];
         for (const gap of dataGaps)
           if (!missingInformation.some((item) => String(item).includes(gap)))
             missingInformation.push(`${gap} could not be verified from the supplied sources and was left blank.`);
+        for (const na of notApplicable)
+          if (!missingInformation.some((item) => String(item).includes(na)))
+            missingInformation.push(na);
         const decisionSummary = dataGaps.length
           ? `Note: this evaluation was generated with missing data (${dataGaps.join(', ')}); treat the score and verdict accordingly. ${String(analysis.decisionSummary)}`
           : String(analysis.decisionSummary);

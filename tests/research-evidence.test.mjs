@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectEvidence } from '../lib/research-evidence.mjs';
+import { selectEvidence, citedPageText } from '../lib/research-evidence.mjs';
 
 test('retains annual tables, adjacent pages and external evidence without duplicate windows', () => {
   const doc = { title: 'Annual Report 2025', url: 'https://example.com/annual.pdf', text:
@@ -56,4 +56,21 @@ test('large annual reports cannot crowd out newer results or web research', () =
   assert.ok(output.includes('LATEST INDUSTRY EVIDENCE'));
   assert.ok(output.includes('SOURCE: Report 11'));
   assert.ok(output.length < 850001);
+});
+
+test('citedPageText returns only the cited document\'s cited page, ignoring the same number on other pages/documents', () => {
+  const docA = { title: 'Annual Report 2025', url: 'https://example.com/a.pdf', text:
+    '--- PDF PAGE 1 ---\nContents\n' +
+    '--- PDF PAGE 66 ---\nSIX YEAR PERFORMANCE 2024-25 2023-24\nNet Sales 401.18\n' +
+    '--- PDF PAGE 67 ---\nUnrelated Net Sales 401.18 elsewhere\n' };
+  const docB = { title: 'Annual Report 2024', url: 'https://example.com/b.pdf', text:
+    '--- PDF PAGE 66 ---\nNet Sales 401.18 also here but wrong document\n' };
+  const evidence = selectEvidence([docA, docB], []);
+  const onCitedPage = citedPageText(evidence, 'Annual Report 2025', '66', [docA, docB]);
+  assert.ok(onCitedPage.includes('SIX YEAR PERFORMANCE'));
+  assert.ok(!onCitedPage.includes('Unrelated Net Sales'));
+  const wrongPage = citedPageText(evidence, 'Annual Report 2025', '999', [docA, docB]);
+  assert.equal(wrongPage, null);
+  const wrongDocument = citedPageText(evidence, 'A document not in the manifest', '66', [docA, docB]);
+  assert.equal(wrongDocument, null);
 });

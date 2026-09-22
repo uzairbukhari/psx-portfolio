@@ -15,6 +15,7 @@ import {
   validPsxTicker,
   validScorecard,
 } from '../lib/research-policy.mjs';
+import { citedPageText } from '../lib/research-evidence.mjs';
 
 test('research reservation remains below the per-company cap for the bounded request', () => {
   const reserve = researchReserveMicros(900_000, 14_000);
@@ -332,4 +333,39 @@ test('describes which year and field is missing when a financial value is null',
   assert.deepEqual(describeNullFinancialFields(financials), ['2025 dividend', '2024 equity', '2024 ocf']);
   assert.deepEqual(describeNullFinancialFields([]), []);
   assert.deepEqual(describeNullFinancialFields(null), []);
+});
+
+test('a financial value present only on the wrong page of the same document is not verified', () => {
+  const evidence =
+    'SOURCE: Annual Report 2025 | https://example.com/a.pdf\n' +
+    '--- PDF PAGE 10 ---\nUnrelated prose only\n' +
+    '--- PDF PAGE 66 ---\nNet Sales 401.18\n';
+  const documents = [{ title: 'Annual Report 2025', url: 'https://example.com/a.pdf' }];
+  const wrongPageText = citedPageText(evidence, 'Annual Report 2025', '10', documents);
+  assert.equal(financialValueSupported(wrongPageText ?? '', FINANCIAL_VALUE_LABELS.revenue, 401.18), false);
+  const rightPageText = citedPageText(evidence, 'Annual Report 2025', '66', documents);
+  assert.equal(financialValueSupported(rightPageText ?? '', FINANCIAL_VALUE_LABELS.revenue, 401.18), true);
+});
+
+test('a financial value present only in a different document is not verified even if the page number matches', () => {
+  const evidence =
+    'SOURCE: Annual Report 2025 | https://example.com/a.pdf\n--- PDF PAGE 66 ---\nNo revenue figure here.\n\n' +
+    'SOURCE: Annual Report 2024 | https://example.com/b.pdf\n--- PDF PAGE 66 ---\nNet Sales 401.18\n';
+  const documents = [
+    { title: 'Annual Report 2025', url: 'https://example.com/a.pdf' },
+    { title: 'Annual Report 2024', url: 'https://example.com/b.pdf' },
+  ];
+  const scopedToWrongDoc = citedPageText(evidence, 'Annual Report 2025', '66', documents);
+  assert.equal(financialValueSupported(scopedToWrongDoc ?? '', FINANCIAL_VALUE_LABELS.revenue, 401.18), false);
+});
+
+test('describeNullFinancialFields labels debt/ocf as not applicable for a bank instead of a verification gap', () => {
+  const financials = [{ year: 2025, equity: null, dividend: 5, ocf: null, debt: null }];
+  const bankGaps = describeNullFinancialFields(financials, 'Bank');
+  assert.ok(bankGaps.some((g) => g.includes('2025 equity')));
+  assert.ok(!bankGaps.some((g) => g.includes('2025 debt')));
+  assert.ok(!bankGaps.some((g) => g.includes('2025 ocf')));
+  const industrialGaps = describeNullFinancialFields(financials, 'Cement');
+  assert.ok(industrialGaps.some((g) => g.includes('2025 debt')));
+  assert.ok(industrialGaps.some((g) => g.includes('2025 ocf')));
 });
