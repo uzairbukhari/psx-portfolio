@@ -239,6 +239,8 @@ test('validate accepts a well-formed researchPolicy and rejects an inconsistent 
   validate(p);
   p.researchPolicy={...DEFAULT_RESEARCH_POLICY,quoteFreshness:'dated',maxQuoteAgeDays:null};
   assert.throws(()=>validate(p),/dated/);
+  p.researchPolicy={...DEFAULT_RESEARCH_POLICY,quoteFreshness:'today',maxQuoteAgeDays:5};
+  assert.throws(()=>validate(p),/today/);
   p.researchPolicy={...DEFAULT_RESEARCH_POLICY,companyCapPct:150};
   assert.throws(()=>validate(p));
   p.researchPolicy={...DEFAULT_RESEARCH_POLICY,quoteFreshness:'weekly'};
