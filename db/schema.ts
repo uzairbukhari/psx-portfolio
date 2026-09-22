@@ -14,6 +14,7 @@ export const reviews = sqliteTable(
     month: text('month').notNull(),
     status: text('status').notNull(),
     payload: text('payload'),
+    quoteFingerprint: text('quote_fingerprint').notNull().default(''),
     createdAt: text('created_at').notNull(),
   },
   (table) => [

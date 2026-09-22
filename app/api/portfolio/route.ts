@@ -1,5 +1,6 @@
 import { db, identity, failure } from '@/lib/server';
 import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
+import { mergeEffectiveQuotes, type QuoteCacheRow } from '@/lib/quotes';
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
@@ -20,16 +21,15 @@ export async function GET(req: Request) {
         source: string;
         fetched_at: string;
       }>();
-    for (const cached of cache.results) {
-      if (portfolio.quotes[cached.ticker]?.manual) continue;
-      portfolio.quotes[cached.ticker] = {
-        price: cached.price,
-        asOf: cached.as_of,
-        date: cached.quote_date,
-        source: cached.source,
-        fetchedAt: cached.fetched_at,
-      };
-    }
+    const cacheRows: QuoteCacheRow[] = cache.results.map((c) => ({
+      ticker: c.ticker,
+      price: c.price,
+      asOf: c.as_of,
+      quoteDate: c.quote_date,
+      source: c.source,
+      fetchedAt: c.fetched_at,
+    }));
+    portfolio.quotes = mergeEffectiveQuotes(portfolio.quotes, cacheRows);
     return Response.json(
       { portfolio, revision: row?.revision ?? 0 },
       { headers: { 'Cache-Control': 'no-store' } },

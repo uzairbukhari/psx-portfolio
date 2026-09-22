@@ -1,0 +1,1 @@
+ALTER TABLE `ai_reviews` ADD `quote_fingerprint` text DEFAULT '' NOT NULL;

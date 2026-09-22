@@ -10,7 +10,24 @@ import {
   validateReview,
   type Portfolio,
 } from '@/lib/portfolio';
+import { mergeEffectiveQuotes, type QuoteCacheRow } from '@/lib/quotes';
 const MODEL = 'gpt-5-nano';
+async function quoteFingerprint(portfolio: Portfolio, tickers: string[]) {
+  const relevant = tickers
+    .map((ticker) => [
+      ticker,
+      portfolio.quotes[ticker]?.price ?? null,
+      portfolio.quotes[ticker]?.date ?? null,
+    ])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(JSON.stringify(relevant)),
+  );
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 export async function GET(req: Request) {
   try {
     await identity(req);
@@ -47,6 +64,25 @@ export async function POST(req: Request) {
     const portfolio: Portfolio = row
       ? JSON.parse(row.payload)
       : blankPortfolio();
+    const quoteCache = await db()
+      .prepare('SELECT * FROM quote_refreshes')
+      .all<{
+        ticker: string;
+        price: number;
+        as_of: string;
+        quote_date: string;
+        source: string;
+        fetched_at: string;
+      }>();
+    const cacheRows: QuoteCacheRow[] = quoteCache.results.map((c) => ({
+      ticker: c.ticker,
+      price: c.price,
+      asOf: c.as_of,
+      quoteDate: c.quote_date,
+      source: c.source,
+      fetchedAt: c.fetched_at,
+    }));
+    portfolio.quotes = mergeEffectiveQuotes(portfolio.quotes, cacheRows);
     const tickers = portfolio.companies
       .filter((c) => c.target > 0)
       .map((c) => c.ticker);
@@ -54,11 +90,12 @@ export async function POST(req: Request) {
       throw Error(
         'Keep five to eight companies in the shortlist for an AI allocation review.',
       );
+    const fingerprint = await quoteFingerprint(portfolio, tickers);
     const cached = await db()
       .prepare(
-        "SELECT id,payload,created_at FROM ai_reviews WHERE user_id=? AND revision=? AND month=? AND status='completed' AND created_at>=? ORDER BY created_at DESC LIMIT 1",
+        "SELECT id,payload,created_at FROM ai_reviews WHERE user_id=? AND revision=? AND month=? AND quote_fingerprint=? AND status='completed' AND created_at>=? ORDER BY created_at DESC LIMIT 1",
       )
-      .bind(owner, revision, month, today() + 'T00:00:00')
+      .bind(owner, revision, month, fingerprint, today() + 'T00:00:00')
       .first<{ id: string; payload: string; created_at: string }>();
     if (cached) {
       const stored = JSON.parse(cached.payload);
@@ -81,9 +118,9 @@ export async function POST(req: Request) {
       since = new Date(Date.now() - 60000).toISOString();
     const limit = await db()
       .prepare(
-        "INSERT INTO ai_reviews (id,user_id,revision,month,status,created_at) SELECT ?,?,?,?,'pending',? WHERE NOT EXISTS (SELECT 1 FROM ai_reviews WHERE user_id=? AND created_at>?)",
+        "INSERT INTO ai_reviews (id,user_id,revision,month,status,quote_fingerprint,created_at) SELECT ?,?,?,?,'pending',?,? WHERE NOT EXISTS (SELECT 1 FROM ai_reviews WHERE user_id=? AND created_at>?)",
       )
-      .bind(id, owner, revision, month, now, owner, since)
+      .bind(id, owner, revision, month, fingerprint, now, owner, since)
       .run();
     if (!limit.meta.changes) {
       id = null;
