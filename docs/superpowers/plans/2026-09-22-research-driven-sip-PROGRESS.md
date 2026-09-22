@@ -43,7 +43,7 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
     block merge or change any saved holding/target/approval/research conclusion.
   - **Final commit: `cc1e6b8`**
 - [ ] **Milestone 2 — Research-driven monthly plan** (split into 2a/2b — 2a covers the decision contract & policy, 2b covers allocation/cash/AI role since those need 2a's assessment function first)
-  - [x] **2a — Shared decision contract + policy preview** (plan: `2026-09-22-m2a-decision-contract-and-policy.md`, 7 tasks, all reviewed clean; final whole-branch review pending)
+  - [x] **2a — Shared decision contract + policy preview** (COMPLETE 2026-09-22 — plan: `2026-09-22-m2a-decision-contract-and-policy.md`, 7 tasks, all reviewed clean)
     - SDD ledger: `.superpowers/sdd/2026-09-22-m2a-decision-contract-and-policy/progress.md`
     - [x] Task 1: sync dossier stance onto ResearchCompany (commit 8bddf3a)
     - [x] Task 2: Shariah screening evidence + approved max price on Company (commit a27148a)
@@ -52,6 +52,17 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
     - [x] Task 5: company dialog UI for screening/max price/research-version approval (commit 6c8a8ba)
     - [x] Task 6: policy preview UI with explicit activation (commit 2ff7962)
     - [x] Task 7: verification sweep (125/125 tests, tsc clean, 26 pre-existing lint errors confirmed unrelated, build succeeds), browser-verified read-only against the real account: policy preview renders with correct per-company exclusion reasons (0/25 eligible — expected, since screening/stance/max-price are all-new empty fields nobody has populated yet), company dialog's 5 new fields render correctly. Did not click "Activate" (would flip a real saved setting) or save any company edit.
+    - [x] Final whole-branch review (opus): Ready to merge = "With fixes", 0 Critical, 4 Important, 11 Minor.
+      All 4 Important findings fixed + scoped-re-reviewed clean (commit 10dc30b): screening `source`/`effectiveDate`
+      were never checked (a record with a blank source and no effective date passed), the supersession check was
+      inert for every never-explicitly-approved company (i.e. every company on the real account today — fixed
+      with a distinct "not yet approved" exclusion reason), `ResearchCompany.status` was ignored (a dossier
+      flagged "Update needed" with a stale Consider stance still passed), and `stance` promotion was inconsistent
+      across the 3 write sites with no stated rationale (now explicit: legacy import carries it through as prior
+      human research, the AI-run route deliberately does not, with a comment explaining why). 11 Minor findings
+      deferred (NaN policy-arg guard, floating-promise activate handler, draft-state resync on reload, cosmetic
+      styling, etc.) — none block merge, none affect real account data today (still 0/25 eligible either way).
+    - **Final commit: `10dc30b`**
   - [ ] **2b — Allocation and cash + AI role** (plan not yet written — depends on 2a landing)
     - [ ] Shared assessment-driven allocator (replaces plan()'s eligibility rule when policy active)
     - [ ] Funding/carry-forward records, confirmed-funds vs planned-budget separation
