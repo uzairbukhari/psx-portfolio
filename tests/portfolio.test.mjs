@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,reviewPrompt,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
+import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,reviewPrompt,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,DEFAULT_RESEARCH_POLICY,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
@@ -220,5 +220,27 @@ test('validate accepts a string or null approvedResearchVersion',()=>{
   p.companies[0].approvedResearchVersion=null;
   validate(p);
   p.companies[0].approvedResearchVersion=42;
+  assert.throws(()=>validate(p));
+});
+test('DEFAULT_RESEARCH_POLICY is inactive with the brief\'s initial caps and requires today\'s quote',()=>{
+  assert.equal(DEFAULT_RESEARCH_POLICY.enabled,false);
+  assert.equal(DEFAULT_RESEARCH_POLICY.companyCapPct,20);
+  assert.equal(DEFAULT_RESEARCH_POLICY.sectorCapPct,30);
+  assert.equal(DEFAULT_RESEARCH_POLICY.quoteFreshness,'today');
+  assert.equal(DEFAULT_RESEARCH_POLICY.maxQuoteAgeDays,null);
+});
+test('validate accepts a well-formed researchPolicy and rejects an inconsistent one',()=>{
+  const p=fresh();
+  p.researchPolicy=DEFAULT_RESEARCH_POLICY;
+  validate(p);
+  p.researchPolicy={...DEFAULT_RESEARCH_POLICY,enabled:true,sectorCapPct:35};
+  validate(p);
+  p.researchPolicy={...DEFAULT_RESEARCH_POLICY,quoteFreshness:'dated',maxQuoteAgeDays:5};
+  validate(p);
+  p.researchPolicy={...DEFAULT_RESEARCH_POLICY,quoteFreshness:'dated',maxQuoteAgeDays:null};
+  assert.throws(()=>validate(p),/dated/);
+  p.researchPolicy={...DEFAULT_RESEARCH_POLICY,companyCapPct:150};
+  assert.throws(()=>validate(p));
+  p.researchPolicy={...DEFAULT_RESEARCH_POLICY,quoteFreshness:'weekly'};
   assert.throws(()=>validate(p));
 });

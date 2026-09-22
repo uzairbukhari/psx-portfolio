@@ -84,6 +84,21 @@ export const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
   budgetUsd: 0.5,
   maxAttempts: 3,
 };
+export type QuoteFreshness = 'today' | 'dated';
+export type ResearchPolicy = {
+  enabled: boolean;
+  companyCapPct: number;
+  sectorCapPct: number;
+  quoteFreshness: QuoteFreshness;
+  maxQuoteAgeDays: number | null;
+};
+export const DEFAULT_RESEARCH_POLICY: ResearchPolicy = {
+  enabled: false,
+  companyCapPct: 20,
+  sectorCapPct: 30,
+  quoteFreshness: 'today',
+  maxQuoteAgeDays: null,
+};
 export type Portfolio = {
   companies: Company[];
   trades: Trade[];
@@ -93,6 +108,7 @@ export type Portfolio = {
   taxProfile?: TaxProfile;
   research?: ResearchCompany[];
   researchSettings?: ResearchSettings;
+  researchPolicy?: ResearchPolicy;
   aiReview?: {
     summary: string;
     weights: Record<string, number>;
@@ -604,6 +620,36 @@ export function validate(p: Portfolio) {
       s.maxAttempts > 5
     )
       throw Error('Invalid research settings.');
+  }
+  if (p.researchPolicy !== undefined) {
+    const policy = p.researchPolicy;
+    if (
+      !policy ||
+      typeof policy.enabled !== 'boolean' ||
+      !Number.isFinite(policy.companyCapPct) ||
+      policy.companyCapPct <= 0 ||
+      policy.companyCapPct > 100 ||
+      !Number.isFinite(policy.sectorCapPct) ||
+      policy.sectorCapPct <= 0 ||
+      policy.sectorCapPct > 100 ||
+      !['today', 'dated'].includes(policy.quoteFreshness)
+    )
+      throw Error('Invalid research policy.');
+    if (
+      policy.quoteFreshness === 'dated' &&
+      (!Number.isFinite(policy.maxQuoteAgeDays) ||
+        (policy.maxQuoteAgeDays as number) <= 0)
+    )
+      throw Error(
+        'A dated-quote research policy requires a positive maximum quote age in days.',
+      );
+    if (
+      policy.quoteFreshness === 'today' &&
+      policy.maxQuoteAgeDays !== null
+    )
+      throw Error(
+        'A today-only research policy must not set a maximum quote age.',
+      );
   }
   if (p.dividends !== undefined) {
     if (!Array.isArray(p.dividends) || p.dividends.length > 20000)
