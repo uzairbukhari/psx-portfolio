@@ -6,7 +6,6 @@ import {
   type ResearchPolicy,
   type Screening,
   type SavedPlan,
-  type SavedPlanRow,
 } from './portfolio.ts';
 
 export type CompanyAssessment = {
