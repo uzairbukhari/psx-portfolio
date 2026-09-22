@@ -2415,6 +2415,136 @@ export default function Dashboard({
                     }
                   />
                 </label>
+                <label>
+                  Shariah screening source
+                  <input
+                    maxLength={500}
+                    value={company.screening?.source ?? ''}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        screening: {
+                          source: e.target.value,
+                          status: company.screening?.status ?? 'Pending',
+                          effectiveDate: company.screening?.effectiveDate ?? '',
+                          reviewDueDate: company.screening?.reviewDueDate ?? '',
+                        },
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  Screening status
+                  <select
+                    value={company.screening?.status ?? 'Pending'}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        screening: {
+                          source: company.screening?.source ?? '',
+                          status: e.target.value as 'Pass' | 'Fail' | 'Pending',
+                          effectiveDate: company.screening?.effectiveDate ?? '',
+                          reviewDueDate: company.screening?.reviewDueDate ?? '',
+                        },
+                      })
+                    }
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Pass">Pass</option>
+                    <option value="Fail">Fail</option>
+                  </select>
+                </label>
+                <label>
+                  Screening effective date
+                  <input
+                    type="date"
+                    max={today()}
+                    value={company.screening?.effectiveDate ?? ''}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        screening: {
+                          source: company.screening?.source ?? '',
+                          status: company.screening?.status ?? 'Pending',
+                          effectiveDate: e.target.value,
+                          reviewDueDate: company.screening?.reviewDueDate ?? '',
+                        },
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  Screening review due date
+                  <input
+                    type="date"
+                    value={company.screening?.reviewDueDate ?? ''}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        screening: {
+                          source: company.screening?.source ?? '',
+                          status: company.screening?.status ?? 'Pending',
+                          effectiveDate: company.screening?.effectiveDate ?? '',
+                          reviewDueDate: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  Approved maximum purchase price (PKR)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={company.approvedMaxPrice ?? ''}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        approvedMaxPrice:
+                          e.target.value === '' ? null : Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+                {company.ticker &&
+                  (() => {
+                    const research = p?.research?.find(
+                      (r) => r.ticker === company.ticker,
+                    );
+                    if (!research)
+                      return (
+                        <p className="muted wide">
+                          No dossier found for this ticker yet.
+                        </p>
+                      );
+                    const currentRevision = research.researchRevision ?? 0;
+                    const current =
+                      company.approvedResearchVersion === currentRevision;
+                    return (
+                      <div className="wide approval-row">
+                        <p className="muted">
+                          {current
+                            ? `Approved against research revision ${currentRevision} (updated ${research.updatedAt}).`
+                            : company.approvedResearchVersion != null
+                              ? `Research updated since approval (approved revision ${company.approvedResearchVersion}, current revision ${currentRevision}).`
+                              : 'Not yet approved against current research.'}
+                        </p>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() =>
+                            setCompany({
+                              ...company,
+                              approvedResearchVersion: currentRevision,
+                            })
+                          }
+                        >
+                          Approve current research version
+                        </button>
+                      </div>
+                    );
+                  })()}
               </div>
               <p className="muted">
                 Screens older than 183 days pause new allocations. Total targets
