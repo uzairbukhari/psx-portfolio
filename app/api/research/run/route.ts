@@ -77,6 +77,7 @@ async function completeJob(
     fairValue,
     fairValueLow,
     fairValueHigh,
+    valuationProvenance: 'scenario-model',
     thesis: textValue(details.thesis).slice(0, 5000),
     risks: textValue(details.risk).slice(0, 5000),
     catalysts: textValue(details.catalyst).slice(0, 5000),
