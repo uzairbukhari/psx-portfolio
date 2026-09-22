@@ -250,20 +250,62 @@ test('fixture 4: an overweight holding and an overweight sector receive no new c
 });
 
 test('fixture 8: multiple eligible companies in one sector, expensive shares, fees, small budget, deterministic ties, no cap breach, no negative residual', () => {
-  const p = { companies: [], trades: [], quotes: {}, budgets: { [date.slice(0, 7)]: 5000 }, research: [] };
+  const month = date.slice(0, 7);
+  // Budget large enough that the default 20% company cap can clear at least
+  // one fee-inclusive share (so the test genuinely allocates rather than
+  // short-circuiting on either an unfunded month or an uncapturable cap),
+  // while still small relative to full target satisfaction, exercising both
+  // the proportional first pass and the greedy leftover pass.
+  const budget = 20000;
+  const p = { companies: [], trades: [], quotes: {}, budgets: { [month]: budget }, research: [] };
+  p.funding = [{ id: 'f1', month, source: 'manual', amount: budget, note: '', createdAt: new Date().toISOString() }];
+  const targets = { A: 34, B: 33, C: 33 };
   for (const ticker of ['A', 'B', 'C']) {
-    p.companies.push({ ticker, name: ticker, sector: 'Bank', target: 33.34, approved: true, screenDate: date, note: '', screening: { source: 'x', status: 'Pass', effectiveDate: date, reviewDueDate: date }, approvedMaxPrice: 5000, approvedResearchVersion: 1 });
+    p.companies.push({ ticker, name: ticker, sector: 'Bank', target: targets[ticker], approved: true, screenDate: date, note: '', screening: { source: 'x', status: 'Pass', effectiveDate: date, reviewDueDate: date }, approvedMaxPrice: 5000, approvedResearchVersion: 1 });
     p.quotes[ticker] = { price: 1200, date, asOf: date, source: `https://dps.psx.com.pk/company/${ticker}`, fetchedAt: new Date().toISOString() };
     p.research.push({ ticker, status: 'Complete', score: 90, fairValue: 1500, fairValueLow: 1300, fairValueHigh: 1700, valuationProvenance: 'scenario-model', stance: 'Consider', researchRevision: 1, thesis: '', risks: '', catalysts: '', conversationUrl: '', sources: [], financials: [], updatedAt: date });
   }
-  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 1.5, date);
-  assert.ok(r.invested <= 5000);
+  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, month, 1.5, date);
+  assert.equal(r.errors.length, 0);
+  assert.ok(r.invested > 0);
+  assert.ok(r.invested <= budget);
   assert.ok(r.leftover >= 0);
   assert.equal(round(r.invested + r.leftover), round(r.availableToSpend));
   for (const row of r.rows) assert.ok(Number.isInteger(row.shares));
+  const post = r.total + r.availableToSpend;
+  const sectorCapAmount = (DEFAULT_RESEARCH_POLICY.sectorCapPct / 100) * post;
+  assert.ok(r.rows.reduce((a, row) => a + row.amount, 0) <= sectorCapAmount + 1e-9);
   // Run twice with identical inputs — deterministic tie-breaking means identical output.
-  const r2 = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 1.5, date);
+  const r2 = researchPlan(p, DEFAULT_RESEARCH_POLICY, month, 1.5, date);
   assert.deepEqual(r.rows.map((x) => x.shares), r2.rows.map((x) => x.shares));
+});
+
+test('a tight sector cap that binds across multiple eligible companies splits fairly rather than first-come-first-served, and never breaches the cap', () => {
+  const month = date.slice(0, 7);
+  const policy = { ...DEFAULT_RESEARCH_POLICY, companyCapPct: 50, sectorCapPct: 20 };
+  const p = { companies: [], trades: [], quotes: {}, budgets: { [month]: 100000 }, research: [] };
+  p.funding = [{ id: 'f1', month, source: 'manual', amount: 100000, note: '', createdAt: new Date().toISOString() }];
+  for (const ticker of ['X', 'Y']) {
+    p.companies.push({ ticker, name: ticker, sector: 'Bank', target: 50, approved: true, screenDate: date, note: '', screening: { source: 'x', status: 'Pass', effectiveDate: date, reviewDueDate: date }, approvedMaxPrice: 100, approvedResearchVersion: 1 });
+    p.quotes[ticker] = { price: 10, date, asOf: date, source: `https://dps.psx.com.pk/company/${ticker}`, fetchedAt: new Date().toISOString() };
+    p.research.push({ ticker, status: 'Complete', score: 90, fairValue: 15, fairValueLow: 12, fairValueHigh: 18, valuationProvenance: 'scenario-model', stance: 'Consider', researchRevision: 1, thesis: '', risks: '', catalysts: '', conversationUrl: '', sources: [], financials: [], updatedAt: date });
+  }
+  const r = researchPlan(p, policy, month, 0, date);
+  const x = r.rows.find((row) => row.ticker === 'X');
+  const y = r.rows.find((row) => row.ticker === 'Y');
+  const post = r.total + r.availableToSpend;
+  const sectorCapAmount = (policy.sectorCapPct / 100) * post;
+  const sectorSpend = x.amount + y.amount;
+  assert.ok(sectorSpend <= sectorCapAmount + 1e-9);
+  assert.ok(x.shares > 0, 'X should not be starved to zero purely by list order');
+  assert.ok(y.shares > 0, 'Y should not be starved to zero purely by list order');
+  // Reversing company order must not change who gets allocated what.
+  const reversed = { ...p, companies: [...p.companies].reverse() };
+  const r2 = researchPlan(reversed, policy, month, 0, date);
+  const x2 = r2.rows.find((row) => row.ticker === 'X');
+  const y2 = r2.rows.find((row) => row.ticker === 'Y');
+  assert.equal(x2.shares, x.shares);
+  assert.equal(y2.shares, y.shares);
 });
 
 test('availableToSpend is bounded by the lesser of remaining budget and remaining confirmed funds', () => {

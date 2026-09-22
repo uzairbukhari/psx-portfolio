@@ -267,26 +267,61 @@ export function researchPlan(
     .filter((h) => h.quote && h.quote.date !== todayDate)
     .map((h) => h.ticker);
 
-  // Per-company cap, tracked separately from the row's reported `gap` — the
-  // reported `gap` bakes in a one-time snapshot of sector headroom (useful as
-  // a display value), but the ALLOCATION ceiling below must re-check sector
-  // headroom live as sibling companies in the same sector consume it, in both
-  // the proportional first pass and the greedy second pass. Using the static
-  // per-row `gap` as the allocation ceiling in the first pass would let every
-  // company in a sector independently claim up to the full sector cap,
-  // multiplying it by however many companies share that sector.
+  // Per-company cap (sector ignored), and a ticker -> sector lookup so the
+  // up-to-10,000-iteration greedy loop below doesn't re-scan `hs` every time.
   const companyGaps = new Map<string, number>();
+  const tickerSector = new Map<string, string>();
   const sectorCap = (policy.sectorCapPct / 100) * post;
+  for (const h of candidates) {
+    const companyCap = (Math.min(h.target, policy.companyCapPct) / 100) * post;
+    companyGaps.set(h.ticker, Math.max(0, companyCap - (h.value ?? 0)));
+    if (h.sector) tickerSector.set(h.ticker, h.sector);
+  }
+
+  // Each sector's total remaining headroom, taken as a ONE-TIME snapshot from
+  // current holdings (before any purchases are simulated) — this is the fixed
+  // pie each sector's eligible candidates split fairly below, not something
+  // recomputed live during allocation (that would make the split order-
+  // dependent — see sectorTotals, which *does* track live spend for the caps
+  // actually enforced during allocation).
+  const sectorHeadroom = new Map<string, number>();
+  for (const [sector, currentTotal] of sectorTotals)
+    sectorHeadroom.set(sector, Math.max(0, sectorCap - currentTotal));
+
+  // Sum of company-level gaps across eligible candidates sharing a sector —
+  // the denominator each eligible company's pro-rata slice of that sector's
+  // headroom is measured against.
+  const sectorGapSum = new Map<string, number>();
+  for (const h of candidates) {
+    if (!h.sector || !assessments.get(h.ticker)!.eligible) continue;
+    const companyGap = companyGaps.get(h.ticker)!;
+    sectorGapSum.set(
+      h.sector,
+      (sectorGapSum.get(h.sector) ?? 0) + companyGap,
+    );
+  }
 
   const rows: ResearchPlanRow[] = candidates.map((h) => {
     const a = assessments.get(h.ticker)!;
-    const companyCap = (Math.min(h.target, policy.companyCapPct) / 100) * post;
-    const companyGap = Math.max(0, companyCap - (h.value ?? 0));
-    companyGaps.set(h.ticker, companyGap);
-    const sectorRemaining = h.sector
-      ? Math.max(0, sectorCap - (sectorTotals.get(h.sector) ?? 0))
-      : 0;
-    const gap = a.eligible ? Math.min(companyGap, sectorRemaining) : 0;
+    const companyGap = companyGaps.get(h.ticker)!;
+    // Each eligible company's gap is capped not by a first-come-first-served
+    // claim on its sector's headroom, but by a FAIR, PRO-RATA slice of it —
+    // proportional to how much company-level room it individually has,
+    // relative to every other eligible company sharing that sector — computed
+    // once, simultaneously, from the fixed sectorHeadroom pie above. This
+    // keeps allocation order-independent: reordering `p.companies` never
+    // changes who gets what.
+    let gap = 0;
+    if (a.eligible) {
+      if (!h.sector) gap = companyGap; // unreachable in practice: assessCompany already excludes an unclassified sector.
+      else {
+        const headroom = sectorHeadroom.get(h.sector) ?? 0;
+        const gapSum = sectorGapSum.get(h.sector) ?? 0;
+        const proRataShare =
+          gapSum > 0 ? headroom * (companyGap / gapSum) : 0;
+        gap = Math.min(companyGap, proRataShare);
+      }
+    }
     return {
       ticker: h.ticker,
       name: h.name,
@@ -306,28 +341,30 @@ export function researchPlan(
     let cash = availableToSpend;
     const active = rows.filter((r) => r.eligible && r.gap > 0);
     const gapsTotal = active.reduce((a, r) => a + r.gap, 0);
+    // First pass: each company's ceiling is its already-fair, pro-rata `gap`
+    // (computed once, above, from the fixed sector headroom pie) — no
+    // re-deriving a "live remaining sector" ceiling mid-pass here, since that
+    // would reintroduce order-dependence (whichever row is processed first
+    // would see the whole, unconsumed sector headroom).
     for (const r of active) {
-      const h = hs.find((x) => x.ticker === r.ticker)!;
       const price = r.price!;
       const unit = Math.ceil(price * (1 + feePct / 100) * 100) / 100;
-      const companyGap = companyGaps.get(r.ticker)!;
-      const sectorRemainingLive = h.sector
-        ? Math.max(0, sectorCap - (sectorTotals.get(h.sector) ?? 0))
-        : Infinity;
-      const ceiling = Math.min(companyGap, sectorRemainingLive);
-      const proportional = gapsTotal
-        ? (availableToSpend * r.gap) / gapsTotal
-        : 0;
-      const allocation = Math.min(ceiling, proportional);
+      const allocation = Math.min(
+        r.gap,
+        gapsTotal ? (availableToSpend * r.gap) / gapsTotal : 0,
+      );
       r.shares = Math.floor(allocation / unit);
       r.amount = round(r.shares * unit);
       cash = round(cash - r.amount);
-      if (h.sector)
-        sectorTotals.set(
-          h.sector,
-          (sectorTotals.get(h.sector) ?? 0) + r.amount,
-        );
+      const sector = tickerSector.get(r.ticker);
+      if (sector)
+        sectorTotals.set(sector, (sectorTotals.get(sector) ?? 0) + r.amount);
     }
+    // Greedy second pass: distributes whole-share rounding leftovers. Its
+    // company-level check uses the true companyGap (not the sector-shrunk
+    // `r.gap`), and its sector-level check reads the LIVE sectorTotals map on
+    // every iteration, so it can never push a sector over its cap even after
+    // the first pass's fair split, regardless of rounding.
     for (let i = 0; i < 10000; i++) {
       const next = active
         .filter((r) => {
@@ -335,23 +372,23 @@ export function researchPlan(
           const u = Math.ceil(price * (1 + feePct / 100) * 100) / 100;
           const companyGap = companyGaps.get(r.ticker)!;
           if (u > cash || r.amount + u > companyGap) return false;
-          const h = hs.find((x) => x.ticker === r.ticker)!;
-          if (h.sector) {
-            const sectorUsed = sectorTotals.get(h.sector) ?? 0;
+          const sector = tickerSector.get(r.ticker);
+          if (sector) {
+            const sectorUsed = sectorTotals.get(sector) ?? 0;
             if (sectorUsed + u > sectorCap) return false;
           }
           return true;
         })
         .sort((a, b) => b.gap - b.amount - (a.gap - a.amount))[0];
       if (!next) break;
-      const h = hs.find((x) => x.ticker === next.ticker)!;
+      const sector = tickerSector.get(next.ticker);
       const price = next.price!;
       const unit = Math.ceil(price * (1 + feePct / 100) * 100) / 100;
       next.shares++;
       next.amount = round(next.amount + unit);
       cash = round(cash - unit);
-      if (h.sector)
-        sectorTotals.set(h.sector, (sectorTotals.get(h.sector) ?? 0) + unit);
+      if (sector)
+        sectorTotals.set(sector, (sectorTotals.get(sector) ?? 0) + unit);
     }
   }
 
