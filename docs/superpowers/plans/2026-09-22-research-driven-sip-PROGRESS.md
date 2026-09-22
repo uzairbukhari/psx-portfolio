@@ -85,10 +85,11 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
         2b-i's `confirmedFunds`, 2b-iii on 2b-ii's allocator) and reviewing them together catches the
         same cross-task issues a per-sub-plan review would, without re-covering already-settled ground
         three times.
-    - [ ] **2b-ii — Research-driven allocator + Save plan** (plan not yet written — depends on 2b-i's confirmedFunds)
-      - [ ] Sector-aware allocator using assessCompany for eligibility (replaces plan()'s rule when policy active)
-      - [ ] Reconcile assessCompany's current-exposure headroom (eligibility gate) with plan()'s post-contribution-basis cap (sizing) — deliberate two-stage design, not a bug
-      - [ ] Save plan snapshot (immutable, point-in-time)
+    - [ ] **2b-ii — Research-driven allocator + Save plan** (plan: `2026-09-22-m2b-ii-allocator-and-save-plan.md`, 4 tasks, in progress)
+      - [ ] Task 1: `researchPlan()` sector-aware allocator in lib/decision.ts (uses current-exposure headroom from assessCompany as the eligibility gate, post-contribution-basis cap for sizing — same reconciliation plan() already uses, deliberate two-stage design)
+      - [ ] Task 2: `SavedPlan` type + `Portfolio.savedPlans?` + validation
+      - [ ] Task 3: `saveResearchPlanSnapshot()` capture function
+      - [ ] Task 4: verification sweep (automated only — interactive browser check deferred), docs
     - [ ] **2b-iii — AI role + Monthly SIP UI wiring** (plan not yet written — depends on 2b-ii's allocator)
       - [ ] AI role: explanation-only, comparison candidates outside shortlist, remove 5–8 company cap
       - [ ] Wire the research-driven plan into the Monthly SIP tab display when policy is active
