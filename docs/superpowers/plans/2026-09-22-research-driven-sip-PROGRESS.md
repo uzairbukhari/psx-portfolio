@@ -42,11 +42,21 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
     as an operational watch-item, not a defect. Minor findings deferred (see SDD ledger) — none
     block merge or change any saved holding/target/approval/research conclusion.
   - **Final commit: `cc1e6b8`**
-- [ ] **Milestone 2 — Research-driven monthly plan**
-  - [ ] Shared decision contract + single assessment function
-  - [ ] Policy preview and defaults (20%/30% caps, dated-quote opt-in, side-by-side preview)
-  - [ ] Allocation and cash (funding/carry-forward, sector headroom, save plan snapshot)
-  - [ ] AI role (explanation only, comparison candidates, remove 5–8 company cap)
+- [ ] **Milestone 2 — Research-driven monthly plan** (split into 2a/2b — 2a covers the decision contract & policy, 2b covers allocation/cash/AI role since those need 2a's assessment function first)
+  - [ ] **2a — Shared decision contract + policy preview** (plan: `2026-09-22-m2a-decision-contract-and-policy.md`, 7 tasks, in progress)
+    - [ ] Task 1: sync dossier stance onto ResearchCompany
+    - [ ] Task 2: Shariah screening evidence + approved max price on Company
+    - [ ] Task 3: ResearchPolicy type + inactive-by-default settings
+    - [ ] Task 4: `lib/decision.ts` — assessCompany/assessAll (the single assessment function)
+    - [ ] Task 5: company dialog UI for screening/max price/research-version approval
+    - [ ] Task 6: policy preview UI with explicit activation
+    - [ ] Task 7: verification sweep, browser check, docs
+  - [ ] **2b — Allocation and cash + AI role** (plan not yet written — depends on 2a landing)
+    - [ ] Shared assessment-driven allocator (replaces plan()'s eligibility rule when policy active)
+    - [ ] Funding/carry-forward records, confirmed-funds vs planned-budget separation
+    - [ ] Save plan snapshot (immutable, point-in-time)
+    - [ ] AI role: explanation-only, comparison candidates, remove 5–8 company cap
+    - [ ] Monthly SIP tab UI wiring of the research-driven plan
 - [ ] **Milestone 3 — Decision board, comparison and learning tab**
   - [ ] Decision board + compare 2–4 companies
   - [ ] Sector-specific checklists (bank / E&P / industrial / REIT-ETF-takaful-holding)
