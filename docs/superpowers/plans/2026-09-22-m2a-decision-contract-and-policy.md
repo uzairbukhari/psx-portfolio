@@ -132,7 +132,7 @@ git commit -m "feat: sync dossier investment stance onto ResearchCompany"
 - Test: `tests/portfolio.test.mjs`
 
 **Interfaces:**
-- Produces: `export type ScreeningStatus = 'Pass' | 'Fail' | 'Pending'`, `export type Screening = { source: string; status: ScreeningStatus; effectiveDate: string; reviewDueDate: string }`, `Company.screening?: Screening`, `Company.approvedMaxPrice?: number | null`, `Company.approvedResearchVersion?: string | null` (Task 4 of this plan reads all three by these exact names).
+- Produces: `export type ScreeningStatus = 'Pass' | 'Fail' | 'Pending'`, `export type Screening = { source: string; status: ScreeningStatus; effectiveDate: string; reviewDueDate: string }`, `Company.screening?: Screening`, `Company.approvedMaxPrice?: number | null`, `Company.approvedResearchVersion?: string | null` (Task 4 of this plan reads all three by these exact names). **Superseded during Task 4's review:** `approvedResearchVersion`'s type was changed from `string | null` (a date, compared against `research.updatedAt`) to `number | null` (a monotonic `research.researchRevision` counter) — a date-only comparison let a same-day dossier edit silently defeat the supersession check. The type shown above and this task's own already-executed code use the OLD (string) design; if resuming or re-reading this task's history, the actual shipped code differs — see `lib/portfolio.ts`'s real `Company`/`ResearchCompany` types and Task 4/Task 5's corrected text for the current, correct design.
 
 - [ ] **Step 1: Write failing tests**
 
