@@ -821,15 +821,16 @@ Immediately after that new block (still before the trailing `<p className="muted
                           No dossier found for this ticker yet.
                         </p>
                       );
+                    const currentRevision = research.researchRevision ?? 0;
                     const current =
-                      company.approvedResearchVersion === research.updatedAt;
+                      company.approvedResearchVersion === currentRevision;
                     return (
                       <div className="wide approval-row">
                         <p className="muted">
                           {current
-                            ? `Approved against research updated ${research.updatedAt}.`
-                            : company.approvedResearchVersion
-                              ? `Research updated since approval (approved ${company.approvedResearchVersion}, current ${research.updatedAt}).`
+                            ? `Approved against research revision ${currentRevision} (updated ${research.updatedAt}).`
+                            : company.approvedResearchVersion != null
+                              ? `Research updated since approval (approved revision ${company.approvedResearchVersion}, current revision ${currentRevision}).`
                               : 'Not yet approved against current research.'}
                         </p>
                         <button
@@ -838,7 +839,7 @@ Immediately after that new block (still before the trailing `<p className="muted
                           onClick={() =>
                             setCompany({
                               ...company,
-                              approvedResearchVersion: research.updatedAt,
+                              approvedResearchVersion: currentRevision,
                             })
                           }
                         >
@@ -849,7 +850,7 @@ Immediately after that new block (still before the trailing `<p className="muted
                   })()}
 ```
 
-(`p` — the outer `Dashboard` component's loaded `Portfolio` state — and `today` are already in scope in this file; no new imports needed. `company`'s type is `Company`, already extended by Task 2, so `company.screening`/`approvedMaxPrice`/`approvedResearchVersion` type-check without casts.)
+(`p` — the outer `Dashboard` component's loaded `Portfolio` state — and `today` are already in scope in this file; no new imports needed. `company`'s type is `Company`, already extended by Task 2, so `company.screening`/`approvedMaxPrice`/`approvedResearchVersion` type-check without casts. **Note:** during Task 4's review, `approvedResearchVersion` was redesigned from `string | null` (a date, comparable against `research.updatedAt`) to `number | null` — a monotonic `research.researchRevision` counter — because date-only comparison let a same-day dossier edit silently defeat the supersession check. This step already reflects that redesign; do not compare against `research.updatedAt`.)
 
 - [ ] **Step 3: Type-check**
 
