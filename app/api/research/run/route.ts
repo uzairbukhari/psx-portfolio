@@ -2,12 +2,12 @@ import { db, failure, identity } from '@/lib/server';
 import { validateInvestmentDossier } from '@/lib/research-policy.mjs';
 import {
   blankPortfolio,
-  round,
   today,
   validate,
   type Portfolio,
   type ResearchCompany,
 } from '@/lib/portfolio';
+import { scenarioValues, findScenario } from '@/lib/valuation';
 import {
   addEvent,
   publicJob,
@@ -60,12 +60,14 @@ async function completeJob(
     : blankPortfolio();
   const scores = details.scores as Array<number | null>;
   const scenarios = details.scenarios as Array<{
+    name: string;
     eps: number;
     multiple: number;
   }>;
-  const [fairValueLow, fairValue, fairValueHigh] = scenarios.map((s) =>
-    round(s.eps * s.multiple),
-  );
+  const scenarioResults = scenarioValues(scenarios);
+  const fairValueLow = findScenario(scenarioResults, 'Bear')?.value ?? null;
+  const fairValue = findScenario(scenarioResults, 'Base')?.value ?? null;
+  const fairValueHigh = findScenario(scenarioResults, 'Bull')?.value ?? null;
   const research: ResearchCompany = {
     ticker: row.ticker,
     status: 'Complete',

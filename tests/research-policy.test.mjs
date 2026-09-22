@@ -161,6 +161,19 @@ test('accepts a cited five-year dossier with ordered valuation and strict scores
   }, 200));
 });
 
+test('validateInvestmentDossier computes fair values via the shared scenario module, not raw positional multiplication', () => {
+  assert.doesNotThrow(() => validateInvestmentDossier({
+    financials: [2025, 2024, 2023, 2022, 2021].map(annual),
+    scores: [16, 15, 10, 7, 8, 9, 6],
+    scoreNotes: Array(7).fill(scoreNote),
+    scenarios: [
+      { name: 'Bear', eps: 8, multiple: 13 },
+      { name: 'Base', eps: 10, multiple: 16 },
+      { name: 'Bull', eps: 12, multiple: 19 },
+    ],
+  }, 150));
+});
+
 test('rejects shallow score explanations and identifies their categories', () => {
   assert.throws(() => validateInvestmentDossier({
     financials: [2025, 2024, 2023, 2022, 2021].map(annual),
