@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessCompany, assessAll } from '../lib/decision.ts';
-import { DEFAULT_RESEARCH_POLICY, today } from '../lib/portfolio.ts';
+import { assessCompany, assessAll, researchPlan } from '../lib/decision.ts';
+import { DEFAULT_RESEARCH_POLICY, today, round } from '../lib/portfolio.ts';
 
 const date = today();
 const basePortfolio = () => ({
@@ -201,4 +201,86 @@ test('assessAll returns one assessment per company, in company order', () => {
   const all = assessAll(p, DEFAULT_RESEARCH_POLICY, date);
   assert.equal(all.length, 2);
   assert.deepEqual(all.map((a) => a.ticker), ['TEST', 'OTHER']);
+});
+
+test('a single eligible company gets shares up to its target gap, bounded by availableToSpend', () => {
+  const p = basePortfolio();
+  // basePortfolio's single TEST company defaults to a 10% target (fine for
+  // the assessCompany-only tests above), which on its own fails researchPlan's
+  // target-weights-must-total-100% check, and basePortfolio sets no funding
+  // entries, which per confirmedFunds() leaves availableToSpend at 0 — both
+  // would keep shares at 0 regardless of eligibility, so set them here for a
+  // realistic single-company scenario.
+  p.companies[0].target = 100;
+  p.budgets = { [date.slice(0, 7)]: 100000 };
+  p.funding = [{ id: 'f1', month: date.slice(0, 7), source: 'manual', amount: 100000, note: '', createdAt: new Date().toISOString() }];
+  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, date);
+  const row = r.rows.find((x) => x.ticker === 'TEST');
+  assert.equal(row.eligible, true);
+  assert.ok(row.shares > 0);
+  assert.equal(r.errors.length, 0);
+});
+
+test('fixture 1: five Watchlist companies at 20% target, priced at 2x fair value, allocate zero with reasons', () => {
+  const p = { companies: [], trades: [], quotes: {}, budgets: { [date.slice(0, 7)]: 500000 }, research: [] };
+  for (const ticker of ['A', 'B', 'C', 'D', 'E']) {
+    p.companies.push({ ticker, name: ticker, sector: 'Bank', target: 20, approved: true, screenDate: date, note: '', screening: { source: 'x', status: 'Pass', effectiveDate: date, reviewDueDate: date }, approvedMaxPrice: 1000, approvedResearchVersion: 1 });
+    p.quotes[ticker] = { price: 200, date, asOf: date, source: `https://dps.psx.com.pk/company/${ticker}`, fetchedAt: new Date().toISOString() };
+    p.research.push({ ticker, status: 'Complete', score: 50, fairValue: 100, fairValueLow: 80, fairValueHigh: 120, valuationProvenance: 'scenario-model', stance: 'Watchlist', researchRevision: 1, thesis: '', risks: '', catalysts: '', conversationUrl: '', sources: [], financials: [], updatedAt: date });
+  }
+  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, date);
+  for (const row of r.rows) {
+    assert.equal(row.eligible, false);
+    assert.equal(row.shares, 0);
+    assert.ok(row.exclusionReasons.some((x) => /not Consider/i.test(x)));
+  }
+  assert.equal(r.invested, 0);
+});
+
+test('fixture 4: an overweight holding and an overweight sector receive no new contribution, no sell suggested', () => {
+  const p = basePortfolio();
+  p.trades = [{ id: 'op', ticker: 'TEST', kind: 'opening', date, shares: 1000, price: null, fees: 0, month: '', note: '' }];
+  p.companies[0].target = 5;
+  p.budgets = { [date.slice(0, 7)]: 100000 };
+  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, date);
+  const row = r.rows.find((x) => x.ticker === 'TEST');
+  assert.equal(row.gap, 0);
+  assert.equal(row.shares, 0);
+  assert.ok(!r.rows.some((x) => x.shares < 0));
+});
+
+test('fixture 8: multiple eligible companies in one sector, expensive shares, fees, small budget, deterministic ties, no cap breach, no negative residual', () => {
+  const p = { companies: [], trades: [], quotes: {}, budgets: { [date.slice(0, 7)]: 5000 }, research: [] };
+  for (const ticker of ['A', 'B', 'C']) {
+    p.companies.push({ ticker, name: ticker, sector: 'Bank', target: 33.34, approved: true, screenDate: date, note: '', screening: { source: 'x', status: 'Pass', effectiveDate: date, reviewDueDate: date }, approvedMaxPrice: 5000, approvedResearchVersion: 1 });
+    p.quotes[ticker] = { price: 1200, date, asOf: date, source: `https://dps.psx.com.pk/company/${ticker}`, fetchedAt: new Date().toISOString() };
+    p.research.push({ ticker, status: 'Complete', score: 90, fairValue: 1500, fairValueLow: 1300, fairValueHigh: 1700, valuationProvenance: 'scenario-model', stance: 'Consider', researchRevision: 1, thesis: '', risks: '', catalysts: '', conversationUrl: '', sources: [], financials: [], updatedAt: date });
+  }
+  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 1.5, date);
+  assert.ok(r.invested <= 5000);
+  assert.ok(r.leftover >= 0);
+  assert.equal(round(r.invested + r.leftover), round(r.availableToSpend));
+  for (const row of r.rows) assert.ok(Number.isInteger(row.shares));
+  // Run twice with identical inputs — deterministic tie-breaking means identical output.
+  const r2 = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 1.5, date);
+  assert.deepEqual(r.rows.map((x) => x.shares), r2.rows.map((x) => x.shares));
+});
+
+test('availableToSpend is bounded by the lesser of remaining budget and remaining confirmed funds', () => {
+  const p = basePortfolio();
+  p.budgets = { [date.slice(0, 7)]: 100000 };
+  p.funding = [{ id: 'f1', month: date.slice(0, 7), source: 'manual', amount: 150, note: '', createdAt: new Date().toISOString() }];
+  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, date);
+  assert.equal(r.confirmedFunds, 150);
+  assert.equal(r.availableToSpend, 150);
+  assert.ok(r.invested <= 150);
+});
+
+test('target weights not summing to 100% blocks allocation with an error, same as plan()', () => {
+  const p = basePortfolio();
+  p.companies[0].target = 50;
+  p.budgets = { [date.slice(0, 7)]: 100000 };
+  const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, date);
+  assert.ok(r.errors.some((e) => /100%/.test(e)));
+  assert.equal(r.invested, 0);
 });

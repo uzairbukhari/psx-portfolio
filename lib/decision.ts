@@ -1,6 +1,7 @@
 import {
   holdings,
   round,
+  confirmedFunds,
   type Portfolio,
   type ResearchPolicy,
   type Screening,
@@ -190,4 +191,182 @@ export function assessAll(
   today: string,
 ): CompanyAssessment[] {
   return p.companies.map((c) => assessCompany(p, policy, c.ticker, today));
+}
+
+export type ResearchPlanRow = {
+  ticker: string;
+  name: string;
+  price: number | null;
+  asOf: string;
+  currentWeight: number;
+  target: number;
+  eligible: boolean;
+  exclusionReasons: string[];
+  gap: number;
+  shares: number;
+  amount: number;
+};
+
+export type ResearchPlanResult = {
+  budget: number;
+  already: number;
+  remaining: number;
+  confirmedFunds: number;
+  availableToSpend: number;
+  total: number;
+  invested: number;
+  leftover: number;
+  errors: string[];
+  stale: string[];
+  rows: ResearchPlanRow[];
+};
+
+export function researchPlan(
+  p: Portfolio,
+  policy: ResearchPolicy,
+  month: string,
+  feePct: number,
+  todayDate: string,
+): ResearchPlanResult {
+  const hs = holdings(p);
+  const budget = p.budgets[month] ?? 100000;
+  const already = round(
+    p.trades
+      .filter((t) => !t.voided && t.kind === 'buy' && t.month === month)
+      .reduce((a, t) => a + t.shares * t.price! + t.fees, 0),
+  );
+  const remaining = Math.max(0, round(budget - already));
+  const funds = confirmedFunds(p, month);
+  const remainingFunds = Math.max(0, round(funds - already));
+  const availableToSpend = Math.min(remaining, remainingFunds);
+
+  const candidates = hs.filter((h) => h.target > 0);
+  const totalTarget = candidates.reduce((a, h) => a + h.target, 0);
+  const errors: string[] = [];
+  if (Math.abs(totalTarget - 100) > 0.01)
+    errors.push('Target weights must total 100%.');
+  if (!Number.isFinite(feePct) || feePct < 0 || feePct > 10)
+    errors.push('Fee estimate must be between 0% and 10%.');
+
+  const total = hs.reduce((a, h) => a + (h.value ?? 0), 0);
+  const post = total + availableToSpend;
+
+  const assessments = new Map(
+    assessAll(p, policy, todayDate).map((a) => [a.ticker, a]),
+  );
+
+  const sectorTotals = new Map<string, number>();
+  for (const h of hs)
+    if (h.sector)
+      sectorTotals.set(
+        h.sector,
+        (sectorTotals.get(h.sector) ?? 0) + (h.value ?? 0),
+      );
+
+  const stale = candidates
+    .filter((h) => h.quote && h.quote.date !== todayDate)
+    .map((h) => h.ticker);
+
+  // Per-company cap, tracked separately from the row's reported `gap` — the
+  // reported `gap` bakes in a one-time snapshot of sector headroom (useful as
+  // a display value), but the ALLOCATION ceiling below must re-check sector
+  // headroom live as sibling companies in the same sector consume it, in both
+  // the proportional first pass and the greedy second pass. Using the static
+  // per-row `gap` as the allocation ceiling in the first pass would let every
+  // company in a sector independently claim up to the full sector cap,
+  // multiplying it by however many companies share that sector.
+  const companyGaps = new Map<string, number>();
+  const sectorCap = (policy.sectorCapPct / 100) * post;
+
+  const rows: ResearchPlanRow[] = candidates.map((h) => {
+    const a = assessments.get(h.ticker)!;
+    const companyCap = (Math.min(h.target, policy.companyCapPct) / 100) * post;
+    const companyGap = Math.max(0, companyCap - (h.value ?? 0));
+    companyGaps.set(h.ticker, companyGap);
+    const sectorRemaining = h.sector
+      ? Math.max(0, sectorCap - (sectorTotals.get(h.sector) ?? 0))
+      : 0;
+    const gap = a.eligible ? Math.min(companyGap, sectorRemaining) : 0;
+    return {
+      ticker: h.ticker,
+      name: h.name,
+      price: a.effectiveQuote?.price ?? null,
+      asOf: h.quote?.asOf ?? '',
+      currentWeight: total ? ((h.value ?? 0) / total) * 100 : 0,
+      target: h.target,
+      eligible: a.eligible,
+      exclusionReasons: a.exclusionReasons,
+      gap,
+      shares: 0,
+      amount: 0,
+    };
+  });
+
+  if (!errors.length && availableToSpend > 0) {
+    let cash = availableToSpend;
+    const active = rows.filter((r) => r.eligible && r.gap > 0);
+    const gapsTotal = active.reduce((a, r) => a + r.gap, 0);
+    for (const r of active) {
+      const h = hs.find((x) => x.ticker === r.ticker)!;
+      const price = r.price!;
+      const unit = Math.ceil(price * (1 + feePct / 100) * 100) / 100;
+      const companyGap = companyGaps.get(r.ticker)!;
+      const sectorRemainingLive = h.sector
+        ? Math.max(0, sectorCap - (sectorTotals.get(h.sector) ?? 0))
+        : Infinity;
+      const ceiling = Math.min(companyGap, sectorRemainingLive);
+      const proportional = gapsTotal
+        ? (availableToSpend * r.gap) / gapsTotal
+        : 0;
+      const allocation = Math.min(ceiling, proportional);
+      r.shares = Math.floor(allocation / unit);
+      r.amount = round(r.shares * unit);
+      cash = round(cash - r.amount);
+      if (h.sector)
+        sectorTotals.set(
+          h.sector,
+          (sectorTotals.get(h.sector) ?? 0) + r.amount,
+        );
+    }
+    for (let i = 0; i < 10000; i++) {
+      const next = active
+        .filter((r) => {
+          const price = r.price!;
+          const u = Math.ceil(price * (1 + feePct / 100) * 100) / 100;
+          const companyGap = companyGaps.get(r.ticker)!;
+          if (u > cash || r.amount + u > companyGap) return false;
+          const h = hs.find((x) => x.ticker === r.ticker)!;
+          if (h.sector) {
+            const sectorUsed = sectorTotals.get(h.sector) ?? 0;
+            if (sectorUsed + u > sectorCap) return false;
+          }
+          return true;
+        })
+        .sort((a, b) => b.gap - b.amount - (a.gap - a.amount))[0];
+      if (!next) break;
+      const h = hs.find((x) => x.ticker === next.ticker)!;
+      const price = next.price!;
+      const unit = Math.ceil(price * (1 + feePct / 100) * 100) / 100;
+      next.shares++;
+      next.amount = round(next.amount + unit);
+      cash = round(cash - unit);
+      if (h.sector)
+        sectorTotals.set(h.sector, (sectorTotals.get(h.sector) ?? 0) + unit);
+    }
+  }
+
+  const invested = round(rows.reduce((a, r) => a + r.amount, 0));
+  return {
+    budget,
+    already,
+    remaining,
+    confirmedFunds: funds,
+    availableToSpend,
+    total,
+    invested,
+    leftover: round(availableToSpend - invested),
+    errors,
+    stale,
+    rows,
+  };
 }
