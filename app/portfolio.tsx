@@ -63,6 +63,7 @@ import {
   type FundingSource,
   type FundingEntry,
 } from '@/lib/portfolio';
+import { researchPlan } from '@/lib/decision';
 import PortfolioReports from './portfolio-reports';
 import PolicyPreview from './policy-preview';
 import ResearchDesk from './research-desk';
@@ -733,6 +734,9 @@ export default function Dashboard({
       : round(held.reduce((a, h) => a + (h.cost ?? 0), 0)),
     gain = cost === null || missing.length ? null : round(value - cost),
     calc = plan(p, month, fees, allowOld),
+    researchCalc = p.researchPolicy?.enabled
+      ? researchPlan(p, p.researchPolicy, month, fees, today())
+      : null,
     budget = p.budgets[month] ?? 100000;
   const newBuys = round(
     p.trades
@@ -1402,15 +1406,33 @@ export default function Dashboard({
             </section>
             <aside className="panel accent">
               <p className="eyebrow">AVAILABLE THIS MONTH</p>
-              <div className="big-number">{money(calc.remaining)}</div>
+              <div className="big-number">
+                {money(researchCalc ? researchCalc.availableToSpend : calc.remaining)}
+              </div>
+              {researchCalc && (
+                <p className="tag status-complete">
+                  Research-driven policy active — spendable amount is capped by
+                  confirmed funds, not just the budget target.
+                </p>
+              )}
               <div className="split-stats">
+                {researchCalc && (
+                  <div>
+                    <small>Confirmed funds</small>
+                    <strong>{money(researchCalc.confirmedFunds)}</strong>
+                  </div>
+                )}
                 <div>
                   <small>Planned purchases</small>
-                  <strong>{money(calc.invested)}</strong>
+                  <strong>
+                    {money(researchCalc ? researchCalc.invested : calc.invested)}
+                  </strong>
                 </div>
                 <div>
                   <small>Cash left over</small>
-                  <strong>{money(calc.leftover)}</strong>
+                  <strong>
+                    {money(researchCalc ? researchCalc.leftover : calc.leftover)}
+                  </strong>
                 </div>
               </div>
               <p>
@@ -1423,9 +1445,9 @@ export default function Dashboard({
               </button>
             </aside>
           </div>
-          {calc.errors.length > 0 && (
+          {(researchCalc ?? calc).errors.length > 0 && (
             <div role="alert" className="notice">
-              {calc.errors.map((e) => (
+              {(researchCalc ?? calc).errors.map((e) => (
                 <p key={e}>{e}</p>
               ))}
             </div>
@@ -1570,8 +1592,14 @@ export default function Dashboard({
           <div className="section-top">
             <div>
               <h2>Suggested purchase breakdown</h2>
+              {researchCalc && (
+                <p className="tag status-complete">
+                  Research-driven policy active — eligibility, screening and
+                  sector limits now govern this list.
+                </p>
+              )}
               <p>
-                {calc.errors.length
+                {(researchCalc ?? calc).errors.length
                   ? 'Resolve the checks above to calculate quantities.'
                   : 'Automatically recalculates as your holdings, prices and targets change.'}
               </p>
@@ -1614,7 +1642,7 @@ export default function Dashboard({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {calc.rows.map((r) => (
+                {(researchCalc ?? calc).rows.map((r) => (
                   <TableRow key={r.ticker}>
                     <TableCell className="ticker">{r.ticker}</TableCell>
                     <TableCell>
@@ -1625,11 +1653,21 @@ export default function Dashboard({
                       {money(r.price)}
                       <small>{r.asOf}</small>
                     </TableCell>
-                    <TableCell>{calc.errors.length ? '—' : r.shares}</TableCell>
                     <TableCell>
-                      {calc.errors.length ? '—' : money(r.amount)}
+                      {(researchCalc ?? calc).errors.length ? '—' : r.shares}
                     </TableCell>
-                    <TableCell>{r.reason}</TableCell>
+                    <TableCell>
+                      {(researchCalc ?? calc).errors.length
+                        ? '—'
+                        : money(r.amount)}
+                    </TableCell>
+                    <TableCell>
+                      {'reason' in r
+                        ? r.reason
+                        : r.eligible
+                          ? 'Eligible'
+                          : r.exclusionReasons.join(' ')}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
