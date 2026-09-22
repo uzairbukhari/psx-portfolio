@@ -68,6 +68,9 @@ async function completeJob(
   const fairValueLow = findScenario(scenarioResults, 'Bear')?.value ?? null;
   const fairValue = findScenario(scenarioResults, 'Base')?.value ?? null;
   const fairValueHigh = findScenario(scenarioResults, 'Bull')?.value ?? null;
+  const priorResearch = portfolio.research?.find(
+    (company) => company.ticker === row.ticker,
+  );
   const research: ResearchCompany = {
     ticker: row.ticker,
     status: 'Complete',
@@ -96,6 +99,7 @@ async function completeJob(
       }),
     ),
     updatedAt: today(),
+    researchRevision: (priorResearch?.researchRevision ?? 0) + 1,
     details,
   };
   if (!portfolio.companies.some((company) => company.ticker === row.ticker))

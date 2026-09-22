@@ -441,8 +441,12 @@ export default function ResearchDesk({
           legacyBase: typeof company.fairValue === 'number' ? company.fairValue : null,
           legacyHigh: typeof company.fairValueHigh === 'number' ? company.fairValueHigh : null,
         });
+        const ticker = textValue(company.ticker).toUpperCase();
+        const priorResearch = portfolio.research?.find(
+          (item) => item.ticker === ticker,
+        );
         return {
-        ticker: textValue(company.ticker).toUpperCase(),
+        ticker,
         status: ['Queue', 'Researching', 'Complete', 'Update needed'].includes(
           textValue(company.status),
         )
@@ -488,6 +492,7 @@ export default function ResearchDesk({
             })
           : [],
         updatedAt: textValue(company.week, today()),
+        researchRevision: (priorResearch?.researchRevision ?? 0) + 1,
         details: company,
         };
       })
