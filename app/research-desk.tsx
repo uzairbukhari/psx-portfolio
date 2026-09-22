@@ -39,6 +39,7 @@ import {
 import DossierExperience from './dossier-experience';
 import { onRunnerEvent, startResearchRunner, getRunArchive } from './research-runner';
 import { downloadRunSources } from './research-zip';
+import { resolveValuation } from '@/lib/valuation';
 
 type Props = {
   portfolio: Portfolio;
@@ -426,7 +427,21 @@ export default function ResearchDesk({
       throw Error('Choose a PSX Research Desk backup with schema version 1.');
     const next = structuredClone(portfolio);
     const imported: ResearchCompany[] = data.companies
-      .map((company) => ({
+      .map((company) => {
+        const rawScenarios = Array.isArray(company.scenarios)
+          ? (company.scenarios as Array<Record<string, unknown>>).map((s) => ({
+              name: textValue(s.name),
+              eps: typeof s.eps === 'number' ? s.eps : null,
+              multiple: typeof s.multiple === 'number' ? s.multiple : null,
+            }))
+          : [];
+        const valuation = resolveValuation({
+          scenarios: rawScenarios,
+          legacyLow: typeof company.fairValueLow === 'number' ? company.fairValueLow : null,
+          legacyBase: typeof company.fairValue === 'number' ? company.fairValue : null,
+          legacyHigh: typeof company.fairValueHigh === 'number' ? company.fairValueHigh : null,
+        });
+        return {
         ticker: textValue(company.ticker).toUpperCase(),
         status: ['Queue', 'Researching', 'Complete', 'Update needed'].includes(
           textValue(company.status),
@@ -442,9 +457,10 @@ export default function ResearchDesk({
                 0,
               )
             : null,
-        fairValue: null,
-        fairValueLow: null,
-        fairValueHigh: null,
+        fairValue: valuation.base,
+        fairValueLow: valuation.low,
+        fairValueHigh: valuation.high,
+        valuationProvenance: valuation.provenance === 'unavailable' ? undefined : valuation.provenance,
         thesis: textValue(company.thesis),
         risks: textValue(company.risk),
         catalysts: textValue(company.catalyst),
@@ -473,7 +489,8 @@ export default function ResearchDesk({
           : [],
         updatedAt: textValue(company.week, today()),
         details: company,
-      }))
+        };
+      })
       .filter((item) => /^[A-Z0-9]{2,12}$/.test(item.ticker));
     for (const company of data.companies) {
       const value = textValue(company.ticker).toUpperCase();
