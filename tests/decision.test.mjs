@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessCompany, assessAll, researchPlan } from '../lib/decision.ts';
+import { assessCompany, assessAll, researchPlan, saveResearchPlanSnapshot } from '../lib/decision.ts';
 import { DEFAULT_RESEARCH_POLICY, today, round } from '../lib/portfolio.ts';
 
 const date = today();
@@ -325,4 +325,18 @@ test('target weights not summing to 100% blocks allocation with an error, same a
   const r = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, date);
   assert.ok(r.errors.some((e) => /100%/.test(e)));
   assert.equal(r.invested, 0);
+});
+
+test('saveResearchPlanSnapshot freezes a plain, independent copy of the plan result', () => {
+  const p = basePortfolio();
+  p.budgets = { [date.slice(0, 7)]: 100000 };
+  const result = researchPlan(p, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, date);
+  const snap = saveResearchPlanSnapshot(result, DEFAULT_RESEARCH_POLICY, date.slice(0, 7), 0, new Date().toISOString());
+  assert.equal(snap.month, date.slice(0, 7));
+  assert.equal(snap.invested, result.invested);
+  assert.equal(snap.rows.length, result.rows.length);
+  assert.deepEqual(snap.policySnapshot, DEFAULT_RESEARCH_POLICY);
+  // Mutating the original result must not affect the already-captured snapshot.
+  result.rows[0].shares = 999999;
+  assert.notEqual(snap.rows[0].shares, 999999);
 });

@@ -5,6 +5,8 @@ import {
   type Portfolio,
   type ResearchPolicy,
   type Screening,
+  type SavedPlan,
+  type SavedPlanRow,
 } from './portfolio.ts';
 
 export type CompanyAssessment = {
@@ -405,5 +407,34 @@ export function researchPlan(
     errors,
     stale,
     rows,
+  };
+}
+
+export function saveResearchPlanSnapshot(
+  result: ResearchPlanResult,
+  policy: ResearchPolicy,
+  month: string,
+  feePct: number,
+  savedAt: string,
+): SavedPlan {
+  return {
+    id: crypto.randomUUID(),
+    month,
+    savedAt,
+    policySnapshot: { ...policy },
+    budget: result.budget,
+    confirmedFunds: result.confirmedFunds,
+    feePct,
+    invested: result.invested,
+    leftover: result.leftover,
+    rows: result.rows.map((r) => ({
+      ticker: r.ticker,
+      name: r.name,
+      price: r.price,
+      shares: r.shares,
+      amount: r.amount,
+      eligible: r.eligible,
+      exclusionReasons: [...r.exclusionReasons],
+    })),
   };
 }
