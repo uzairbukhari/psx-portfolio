@@ -28,6 +28,7 @@ Only previous research and explicitly supplied quote data are available to this 
 
 - Node >=22.13; install with npm and preserve package-lock.json.
 - Before the first local run, execute `npm run db:migrate:local` once to create the local D1 tables. Then `npm run dev` starts the Vinext preview.
+- Local sign-in bypass: put `DEV_AUTH_EMAIL=dev@localhost` (optionally `DEV_AUTH_NAME`) in a git-ignored `.dev.vars` and `npm run dev` treats every request as that user, skipping Google OAuth — no `GOOGLE_CLIENT_SECRET`/`SESSION_SECRET` needed locally. `lib/auth.ts` only honours it when the request's `Host` is `localhost`, `127.0.0.1` or `[::1]`, and `.dev.vars` is never deployed, so the deployed Worker still requires a real signed session. Change the email to switch which local portfolio row you load.
 - `node --test 'tests/*.test.mjs'` runs all tests: portfolio cost accounting, sales, missing data, dates, monthly budgets, allocation limits and AI weights (`tests/portfolio.test.mjs`), plus session cookie signing/verification (`tests/session.test.mjs`).
 - `npx tsc --noEmit` checks types; `npm run build` builds the Cloudflare Worker.
 - D1 schema is in `db/schema.ts`; generate append-only migrations with `npm run db:generate`. Apply local migrations with `--local --persist-to .wrangler/state`; apply them to your own deployed database with `wrangler d1 migrations apply DB --remote`.

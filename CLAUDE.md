@@ -43,4 +43,5 @@ Full product/domain rules (cost-basis accounting, SIP allocation limits, AI revi
 
 - Path alias `@/*` maps to the project root (see `tsconfig.json`) — e.g. `@/lib/portfolio`, `@/components/ui/tabs`.
 - oxlint runs with `typeAware`/`typeCheck` on and treats the `correctness` category as errors; `no-explicit-any`, `no-deprecated`, and `react/rules-of-hooks` are enforced.
+- Local dev auth bypass: `lib/auth.ts#getCurrentUser()` returns a fixed user when `env.DEV_AUTH_EMAIL` is set **and** the request `Host` is loopback (`localhost`/`127.0.0.1`/`[::1]`). Set it in a git-ignored `.dev.vars`; never add it to `wrangler.jsonc` `vars` or `wrangler secret put` it. Keep both guards if you touch this function.
 - `.env.local` is git-ignored; `OPENAI_API_KEY`, `GOOGLE_CLIENT_SECRET`, and `SESSION_SECRET` are server-only secrets (never exposed client-side or committed) — set them with `wrangler secret put <NAME>` for the deployed Worker.

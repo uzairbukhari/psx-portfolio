@@ -17,3 +17,11 @@ declare namespace Cloudflare {
     SESSION_SECRET?: string;
   }
 }
+declare namespace Cloudflare {
+  interface Env {
+    // Local development only (set in git-ignored `.dev.vars`): bypasses Google
+    // OAuth for requests on a loopback host. Never set on the deployed Worker.
+    DEV_AUTH_EMAIL?: string;
+    DEV_AUTH_NAME?: string;
+  }
+}
