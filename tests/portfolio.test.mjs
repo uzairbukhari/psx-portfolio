@@ -302,3 +302,19 @@ test('confirmedFunds is zero with no funding array at all, never throws',()=>{
   const p=fresh();
   assert.equal(confirmedFunds(p,month),0);
 });
+test('fixture 9: unknown cash stays unconfirmed, a confirmed carry-forward and a reinvested dividend both count once, a voided purchase frees its spend back up',()=>{
+  const p=fresh();
+  p.trades=[trade('opening',100,10,'opening')];
+  p.dividends=[{id:'d1',ticker:'TEST',date,source:'manual',perShare:5,grossAmount:500,note:''}];
+  assert.equal(confirmedFunds(p,month),0);
+  p.funding=[
+    fundingEntry({id:'carry',source:'carry-forward',amount:10000}),
+    fundingEntry({id:'div',source:'dividend-reinvestment',linkedDividendId:'d1',amount:500}),
+  ];
+  validate(p);
+  assert.equal(confirmedFunds(p,month),10500);
+  p.trades=[trade('t1',10,50,'buy',5)];
+  assert.equal(confirmedFunds(p,month),10500);
+  p.trades[0].voided=true;
+  assert.equal(confirmedFunds(p,month),10500);
+});

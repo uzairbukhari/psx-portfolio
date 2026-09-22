@@ -64,12 +64,27 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
       styling, etc.) — none block merge, none affect real account data today (still 0/25 eligible either way).
     - **Final commit: `10dc30b`**
   - [ ] **2b — Allocation and cash + AI role** (split into 2b-i/2b-ii/2b-iii)
-    - [ ] **2b-i — Funding and cash model** (plan: `2026-09-22-m2b-i-funding-and-cash.md`, 5 tasks, in progress)
-      - [ ] Task 1: FundingEntry type + Portfolio.funding? + validation
-      - [ ] Task 2: confirmedFunds pure derived function
-      - [ ] Task 3: funding entry manager UI in Monthly SIP tab
-      - [ ] Task 4: "Mark as reinvested" action on dividends
-      - [ ] Task 5: regression fixture 9, verification sweep, browser check, docs
+    - [x] **2b-i — Funding and cash model** (COMPLETE 2026-09-22 — plan: `2026-09-22-m2b-i-funding-and-cash.md`, 5 tasks, all reviewed clean; final whole-branch review not yet run — see note below)
+      - SDD ledger: `.superpowers/sdd/2026-09-22-m2b-i-funding-and-cash/progress.md`
+      - [x] Task 1: FundingEntry type + Portfolio.funding? + validation (commit 724c152)
+      - [x] Task 2: confirmedFunds pure derived function (commit ad63ace)
+      - [x] Task 3: funding entry manager UI in Monthly SIP tab (commit 77a2fa4)
+      - [x] Task 4: "Mark as reinvested" action on dividends (commit 3862309)
+      - [x] Task 5: regression fixture 9 (commit pending), 136/136 tests, tsc clean, 26 pre-existing
+        lint errors confirmed unrelated, build succeeds. Browser-verified once (real account, read-only):
+        "Confirmed funds" section renders correctly (Rs 0, as expected — no entries yet), "Mark as
+        reinvested" button renders on real MEBL dividend rows with correct computed net amounts. Did
+        not click either action against the real account.
+      - **Note (2026-09-22):** per explicit user instruction, per-task/per-subplan interactive browser
+        checks are now DEFERRED to one consolidated pass later — automated verification (`node --test`,
+        `tsc`, lint, build) and the per-task subagent code reviews continue unchanged at every task and
+        every sub-plan (these are fast/automated and are how correctness gets verified along the way,
+        not what was asked to be deferred). Each sub-plan's own **final whole-branch review** is also
+        rolled up: rather than one per sub-plan, a single final whole-branch review will cover 2b-i+2b-ii+
+        2b-iii together once 2b-iii lands, since they're tightly sequential (2b-ii builds directly on
+        2b-i's `confirmedFunds`, 2b-iii on 2b-ii's allocator) and reviewing them together catches the
+        same cross-task issues a per-sub-plan review would, without re-covering already-settled ground
+        three times.
     - [ ] **2b-ii — Research-driven allocator + Save plan** (plan not yet written — depends on 2b-i's confirmedFunds)
       - [ ] Sector-aware allocator using assessCompany for eligibility (replaces plan()'s rule when policy active)
       - [ ] Reconcile assessCompany's current-exposure headroom (eligibility gate) with plan()'s post-contribution-basis cap (sizing) — deliberate two-stage design, not a bug
