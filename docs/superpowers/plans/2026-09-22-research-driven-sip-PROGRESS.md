@@ -99,9 +99,11 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
         new one from Task 3, a stray unused import, caught here and fixed directly — commit f8b626b), build
         succeeds. No interactive browser check this sub-plan, per standing instruction (deferred to the
         consolidated pass after 2b-iii).
-    - [ ] **2b-iii — AI role + Monthly SIP UI wiring** (plan not yet written — depends on 2b-ii's allocator)
-      - [ ] AI role: explanation-only, comparison candidates outside shortlist, remove 5–8 company cap
-      - [ ] Wire the research-driven plan into the Monthly SIP tab display when policy is active
+    - [ ] **2b-iii — AI role + Monthly SIP UI wiring** (plan: `2026-09-22-m2b-iii-ai-role-and-ui-wiring.md`, 4 tasks, in progress)
+      - [ ] Task 1: AI role — remove 5-8 cap, supply assessments + comparison candidates
+      - [ ] Task 2: wire researchPlan() into the Monthly SIP "Suggested purchase breakdown" table + summary panel
+      - [ ] Task 3: "Save plan" button + read-only saved-plans list
+      - [ ] Task 4: consolidated verification for all of 2b (automated + deferred browser check + deferred final whole-branch review covering 2b-i+2b-ii+2b-iii together)
 - [ ] **Milestone 3 — Decision board, comparison and learning tab**
   - [ ] Decision board + compare 2–4 companies
   - [ ] Sector-specific checklists (bank / E&P / industrial / REIT-ETF-takaful-holding)
