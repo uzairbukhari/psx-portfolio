@@ -63,7 +63,7 @@ import {
   type FundingSource,
   type FundingEntry,
 } from '@/lib/portfolio';
-import { researchPlan } from '@/lib/decision';
+import { researchPlan, saveResearchPlanSnapshot } from '@/lib/decision';
 import PortfolioReports from './portfolio-reports';
 import PolicyPreview from './policy-preview';
 import ResearchDesk from './research-desk';
@@ -1611,7 +1611,7 @@ export default function Dashboard({
                   `sip-${month}.json`,
                   JSON.stringify(
                     {
-                      ...calc,
+                      ...(researchCalc ?? calc),
                       month,
                       feePct: fees,
                       createdAt: new Date().toISOString(),
@@ -1676,7 +1676,65 @@ export default function Dashboard({
               This is a target-based calculator, not an AI recommendation or an
               order. Record the actual execution price after purchasing.
             </p>
+            {researchCalc && researchCalc.errors.length === 0 && (
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() =>
+                  attempt(async () => {
+                    const next = clone(p);
+                    const snapshot = saveResearchPlanSnapshot(
+                      researchCalc,
+                      p.researchPolicy!,
+                      month,
+                      fees,
+                      new Date().toISOString(),
+                    );
+                    next.savedPlans = [...(next.savedPlans ?? []), snapshot];
+                    await save(
+                      next,
+                      'Plan saved. This snapshot will not change as prices or holdings move.',
+                    );
+                  })
+                }
+              >
+                Save this plan
+              </button>
+            )}
           </section>
+          {(p.savedPlans ?? []).length > 0 && (
+            <section className="panel">
+              <p className="eyebrow">SAVED PLANS</p>
+              <h3>Past snapshots, frozen at the time they were saved.</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {['Saved', 'Month', 'Invested', 'Leftover', 'Companies'].map(
+                      (x) => (
+                        <TableHead key={x}>{x}</TableHead>
+                      ),
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...(p.savedPlans ?? [])]
+                    .sort((a, b) => b.savedAt.localeCompare(a.savedAt))
+                    .map((sp) => (
+                      <TableRow key={sp.id}>
+                        <TableCell>{sp.savedAt.slice(0, 10)}</TableCell>
+                        <TableCell>{sp.month}</TableCell>
+                        <TableCell>{money(sp.invested)}</TableCell>
+                        <TableCell>{money(sp.leftover)}</TableCell>
+                        <TableCell>
+                          {sp.rows.filter((r) => r.shares > 0).length} funded ·{' '}
+                          {sp.rows.filter((r) => !r.eligible).length} excluded
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </section>
+          )}
           <div className="section-top">
             <h2>SIP targets & purchase eligibility</h2>
             <span>
