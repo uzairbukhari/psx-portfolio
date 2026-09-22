@@ -98,6 +98,7 @@ export type ResearchCompany = {
   fairValueLow: number | null;
   fairValueHigh: number | null;
   valuationProvenance?: 'scenario-model' | 'legacy';
+  stance?: 'Consider' | 'Watchlist' | 'Avoid' | 'Research incomplete';
   thesis: string;
   risks: string;
   catalysts: string;
@@ -445,6 +446,10 @@ export function validate(p: Portfolio) {
         ) ||
         (r.valuationProvenance !== undefined &&
           !['scenario-model', 'legacy'].includes(r.valuationProvenance)) ||
+        (r.stance !== undefined &&
+          !['Consider', 'Watchlist', 'Avoid', 'Research incomplete'].includes(
+            r.stance,
+          )) ||
         ![r.thesis, r.risks, r.catalysts, r.conversationUrl, r.updatedAt].every(
           (v) => typeof v === 'string',
         ) ||

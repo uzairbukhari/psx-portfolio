@@ -180,3 +180,12 @@ test('reviewPrompt reflects the current dossier snapshot instead of a fixed hist
   mebl.thesis='Updated thesis for this test run.';
   assert.ok(reviewPrompt(p,month).includes('Updated thesis for this test run.'));
 });
+test('validate accepts every stance value and rejects an invalid one',()=>{
+  const p=fresh();
+  for(const stance of ['Consider','Watchlist','Avoid','Research incomplete']){
+    p.research=[{ticker:'TEST',status:'Complete',score:null,fairValue:null,fairValueLow:null,fairValueHigh:null,thesis:'',risks:'',catalysts:'',conversationUrl:'',sources:[],financials:[],updatedAt:date,stance}];
+    validate(p);
+  }
+  p.research[0].stance='Bullish';
+  assert.throws(()=>validate(p));
+});

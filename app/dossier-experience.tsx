@@ -11,7 +11,7 @@ export default function DossierExperience({draft,company,onChange,onBack,onSave}
  const updated={...c,history:[...c.history,{date:new Date().toISOString(),text:message}]};
  const trustLegacy=draft.valuationProvenance!=='scenario-model';
  const valuation=resolveValuation({scenarios:c.scenarios,legacyLow:trustLegacy?draft.fairValueLow:null,legacyBase:trustLegacy?draft.fairValue:null,legacyHigh:trustLegacy?draft.fairValueHigh:null});
- const next:ResearchCompany={...draft,details:updated,status:c.status==='Queued'?'Queue':c.status as ResearchCompany['status'],score:score(c),fairValue:valuation.base,fairValueLow:valuation.low,fairValueHigh:valuation.high,valuationProvenance:valuation.provenance==='unavailable'?undefined:valuation.provenance,thesis:c.thesis,risks:c.risk,catalysts:c.catalyst,conversationUrl:c.conversation,sources:c.documents.map(d=>d.url),financials:c.financials.map(f=>({...f,year:String(f.year),roe:null})),updatedAt:new Date().toISOString().slice(0,10)};
+ const next:ResearchCompany={...draft,details:updated,status:c.status==='Queued'?'Queue':c.status as ResearchCompany['status'],score:score(c),fairValue:valuation.base,fairValueLow:valuation.low,fairValueHigh:valuation.high,valuationProvenance:valuation.provenance==='unavailable'?undefined:valuation.provenance,stance:c.investmentStance,thesis:c.thesis,risks:c.risk,catalysts:c.catalyst,conversationUrl:c.conversation,sources:c.documents.map(d=>d.url),financials:c.financials.map(f=>({...f,year:String(f.year),roe:null})),updatedAt:new Date().toISOString().slice(0,10)};
  await onSave(next);onChange(next);
  }}/></div>;
 }
