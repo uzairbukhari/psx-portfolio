@@ -4,26 +4,13 @@ import {
   blankPortfolio,
   holdings,
   plan,
-  researchInsights,
+  researchContext,
   researchWeightProfile,
   today,
   validateReview,
   type Portfolio,
 } from '@/lib/portfolio';
 const MODEL = 'gpt-5-nano';
-function researchContext(p: Portfolio, tickers: string[]) {
-  return researchInsights(p, tickers)
-    .map((r) => {
-      if (r.status !== 'Complete')
-        return `${r.ticker}: ${r.status === 'None' ? 'no dossier yet' : r.status.toLowerCase()}, shortlist-only, no score or fair value available.`;
-      const valuation =
-        r.valuationPct === null
-          ? 'valuation unavailable (no current price)'
-          : `${r.valuationPct >= 0 ? 'undervalued' : 'overvalued'} ${Math.abs(r.valuationPct)}% vs base-case fair value`;
-      return `${r.ticker}: score ${r.score}/100, ${valuation} (fair value range ${r.fairValueLow}-${r.fairValueHigh}, base ${r.fairValue}, price ${r.price ?? 'unknown'}). Thesis: ${r.thesis.slice(0, 200)} Risks: ${r.risks.slice(0, 200)} Catalysts: ${r.catalysts.slice(0, 200)} Dossier updated ${r.updatedAt}.`;
-    })
-    .join('\n');
-}
 export async function GET(req: Request) {
   try {
     await identity(req);

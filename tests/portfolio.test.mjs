@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
+import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,reviewPrompt,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
@@ -155,4 +155,28 @@ test('researchWeightProfile rewards higher scores and undervaluation, penalizes 
   assert.ok(w.HIGH>w.C);
   assert.ok(w.C>w.LOW);
   assert.ok(w.LOW>w.UNRESEARCHED);
+});
+test('researchInsights valuationPct matches the shared upside/downside formula',()=>{
+  const p=fresh();
+  p.research=[{ticker:'TEST',status:'Complete',score:80,fairValue:500,fairValueLow:400,fairValueHigh:600,thesis:'',risks:'',catalysts:'',conversationUrl:'',sources:[],financials:[],updatedAt:date}];
+  p.quotes.TEST={price:550.98,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()};
+  const insight=researchInsights(p,['TEST'])[0];
+  assert.equal(insight.valuationPct,-9.25);
+});
+test('validate accepts a valuationProvenance of scenario-model or legacy, rejects any other value',()=>{
+  const p=fresh();
+  p.research=[{ticker:'TEST',status:'Complete',score:null,fairValue:null,fairValueLow:null,fairValueHigh:null,thesis:'',risks:'',catalysts:'',conversationUrl:'',sources:[],financials:[],updatedAt:date,valuationProvenance:'scenario-model'}];
+  validate(p);
+  p.research[0].valuationProvenance='legacy';
+  validate(p);
+  p.research[0].valuationProvenance='made-up';
+  assert.throws(()=>validate(p));
+});
+test('reviewPrompt reflects the current dossier snapshot instead of a fixed historical paragraph',()=>{
+  const p=initialPortfolio();
+  const withNote=reviewPrompt(p,month);
+  assert.ok(!withNote.includes('Prior research as of 2026-09-10'));
+  const mebl=p.research.find(r=>r.ticker==='MEBL');
+  mebl.thesis='Updated thesis for this test run.';
+  assert.ok(reviewPrompt(p,month).includes('Updated thesis for this test run.'));
 });
