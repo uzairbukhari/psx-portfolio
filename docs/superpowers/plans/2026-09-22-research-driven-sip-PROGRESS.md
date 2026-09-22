@@ -85,11 +85,20 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
         2b-i's `confirmedFunds`, 2b-iii on 2b-ii's allocator) and reviewing them together catches the
         same cross-task issues a per-sub-plan review would, without re-covering already-settled ground
         three times.
-    - [ ] **2b-ii — Research-driven allocator + Save plan** (plan: `2026-09-22-m2b-ii-allocator-and-save-plan.md`, 4 tasks, in progress)
-      - [ ] Task 1: `researchPlan()` sector-aware allocator in lib/decision.ts (uses current-exposure headroom from assessCompany as the eligibility gate, post-contribution-basis cap for sizing — same reconciliation plan() already uses, deliberate two-stage design)
-      - [ ] Task 2: `SavedPlan` type + `Portfolio.savedPlans?` + validation
-      - [ ] Task 3: `saveResearchPlanSnapshot()` capture function
-      - [ ] Task 4: verification sweep (automated only — interactive browser check deferred), docs
+    - [x] **2b-ii — Research-driven allocator + Save plan** (COMPLETE 2026-09-22 — plan: `2026-09-22-m2b-ii-allocator-and-save-plan.md`, 4 tasks, all reviewed clean)
+      - SDD ledger: `.superpowers/sdd/2026-09-22-m2b-ii-allocator-and-save-plan/progress.md`
+      - [x] Task 1: `researchPlan()` sector-aware allocator in lib/decision.ts (commit e83c6ae, 1 fix round — real
+        money-allocation bugs found and closed in the plan's own sample code: a sector cap that could be
+        doubled by two same-sector companies in the first pass, and a fairness bug where identical companies
+        got wildly unequal shares (200/100/0/0) purely from list order. Verified with unusually deep rigor:
+        two independent high-scrutiny reviews, each reconstructing the pre-fix code to prove new tests
+        actually catch the bugs, plus 12,000+ fuzzed portfolios with zero cap breaches across both rounds.)
+      - [x] Task 2: `SavedPlan` type + `Portfolio.savedPlans?` + validation (commit fa3400f)
+      - [x] Task 3: `saveResearchPlanSnapshot()` capture function (commit fcc29ab)
+      - [x] Task 4: verification sweep — 146/146 tests, tsc clean, 26 pre-existing lint errors (one genuine
+        new one from Task 3, a stray unused import, caught here and fixed directly — commit f8b626b), build
+        succeeds. No interactive browser check this sub-plan, per standing instruction (deferred to the
+        consolidated pass after 2b-iii).
     - [ ] **2b-iii — AI role + Monthly SIP UI wiring** (plan not yet written — depends on 2b-ii's allocator)
       - [ ] AI role: explanation-only, comparison candidates outside shortlist, remove 5–8 company cap
       - [ ] Wire the research-driven plan into the Monthly SIP tab display when policy is active
