@@ -35,6 +35,7 @@ import {
   validateReview,
   type Portfolio,
 } from '@/lib/portfolio';
+import { researchPlan } from '@/lib/decision';
 
 type Props = {
   portfolio: Portfolio;
@@ -109,6 +110,9 @@ export default function AiReview({
     setFailed(error);
   }
 
+  const currentPlan = p.researchPolicy?.enabled
+    ? researchPlan(p, p.researchPolicy, month, 0, today())
+    : undefined;
   const budget = p.budgets[month] ?? 100000;
   const shortlistTickers = p.companies
     .filter((c) => c.target > 0)
@@ -624,13 +628,13 @@ export default function AiReview({
             aria-label="Portfolio review prompt"
             readOnly
             rows={12}
-            value={reviewPrompt(p, month)}
+            value={reviewPrompt(p, month, currentPlan)}
           />
           <div className="row">
             <button
               onClick={() => {
                 navigator.clipboard
-                  .writeText(reviewPrompt(p, month))
+                  .writeText(reviewPrompt(p, month, currentPlan))
                   .then(() =>
                     notify(
                       'Review prompt copied. Paste it into your research conversation.',
@@ -646,7 +650,7 @@ export default function AiReview({
               onClick={() =>
                 download(
                   `psx-ai-review-${today()}.txt`,
-                  reviewPrompt(p, month),
+                  reviewPrompt(p, month, currentPlan),
                   'text/plain',
                 )
               }

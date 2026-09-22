@@ -114,8 +114,8 @@ export default function PolicyPreview({ portfolio, save, busy }: Props) {
           save(
             { ...portfolio, researchPolicy: { ...draft, enabled: !active } },
             active
-              ? 'Research-driven policy deactivated.'
-              : 'Research-driven policy setting activated. This does not change today’s SIP suggestions yet.',
+              ? 'Research-driven policy deactivated. The Monthly SIP tab is back to the plain target-based calculation.'
+              : 'Research-driven policy activated. The Monthly SIP tab now uses this eligibility and allocation.',
           )
         }
       >

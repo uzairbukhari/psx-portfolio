@@ -8,6 +8,7 @@ import {
   researchWeightProfile,
   today,
   validateReview,
+  WEIGHT_CAP,
   type Portfolio,
 } from '@/lib/portfolio';
 import { mergeEffectiveQuotes, type QuoteCacheRow } from '@/lib/quotes';
@@ -90,6 +91,10 @@ export async function POST(req: Request) {
     if (tickers.length === 0)
       throw Error(
         'Add at least one shortlisted company (a positive target weight) before requesting an AI review.',
+      );
+    if (tickers.length * WEIGHT_CAP < 100)
+      throw Error(
+        `Shortlist at least ${Math.ceil(100 / WEIGHT_CAP)} companies — the ${WEIGHT_CAP}% per-company weight cap makes a smaller shortlist impossible to weight to 100%.`,
       );
     const fingerprint = await quoteFingerprint(portfolio, tickers);
     const cached = await db()

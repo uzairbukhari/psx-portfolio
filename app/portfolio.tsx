@@ -645,7 +645,12 @@ export default function Dashboard({
             const m = (input as { month: string })?.month;
             if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m))
               throw Error('Invalid month');
-            return { holdings: holdings(p), plan: plan(p, m, fees, allowOld) };
+            return {
+              holdings: holdings(p),
+              plan: p.researchPolicy?.enabled
+                ? researchPlan(p, p.researchPolicy, m, fees, today())
+                : plan(p, m, fees, allowOld),
+            };
           },
         },
         { signal: abort.signal },
@@ -834,6 +839,19 @@ export default function Dashboard({
     setEditingDividend(d.id);
     setDividend({ ...d });
   }
+  function voidLinkedFunding(next: Portfolio, dividendId: string) {
+    let voided = false;
+    for (const f of next.funding ?? [])
+      if (
+        f.source === 'dividend-reinvestment' &&
+        f.linkedDividendId === dividendId &&
+        !f.voided
+      ) {
+        f.voided = true;
+        voided = true;
+      }
+    return voided;
+  }
   function reinvestDividend(d: Dividend) {
     attempt(async () => {
       const netAmount = taxedDividends.find((td) => td.id === d.id)?.netAmount;
@@ -923,9 +941,11 @@ export default function Dashboard({
     if (!dividend) return;
     const next = clone(p!);
     next.dividends = next.dividends ?? [];
+    let unfunded = false;
     if (editingDividend) {
       const old = next.dividends.find((d) => d.id === editingDividend);
       if (old) old.voided = true;
+      unfunded = voidLinkedFunding(next, editingDividend);
     }
     const entry: Dividend = {
       ...dividend,
@@ -942,7 +962,10 @@ export default function Dashboard({
     await save(
       next,
       editingDividend
-        ? 'Correction saved. Previous dividend record retained as voided.'
+        ? 'Correction saved. Previous dividend record retained as voided.' +
+            (unfunded
+              ? ' Its linked confirmed-funds entry was voided too — re-mark as reinvested if still applicable.'
+              : '')
         : 'Dividend recorded.',
     );
     setDividend(null);
@@ -1393,15 +1416,18 @@ export default function Dashboard({
               <label className="check-row">
                 <Checkbox
                   checked={allowOld}
+                  disabled={!!researchCalc}
                   onCheckedChange={(v) => setAllowOld(!!v)}
                 />{' '}
                 Allow dated, latest-available quotes when today’s quotes are
                 unavailable
+                {researchCalc &&
+                  ' (controlled by the research-driven policy’s quote freshness setting instead, while it is active)'}
               </label>
               <p className="muted">
-                Uses remaining SIP budget and all priced holdings to fill target
-                gaps. New purchases are capped at 20% per company; whole shares
-                and estimated fees stay within your budget.
+                {researchCalc
+                  ? 'Uses whichever is smaller of remaining SIP budget or confirmed funds, and only companies eligible under the research-driven policy, to fill target gaps. New purchases are capped at the policy’s company and sector limits; whole shares and estimated fees stay within your budget.'
+                  : 'Uses remaining SIP budget and all priced holdings to fill target gaps. New purchases are capped at 20% per company; whole shares and estimated fees stay within your budget.'}
               </p>
             </section>
             <aside className="panel accent">
@@ -1673,8 +1699,10 @@ export default function Dashboard({
               </TableBody>
             </Table>
             <p className="table-note">
-              This is a target-based calculator, not an AI recommendation or an
-              order. Record the actual execution price after purchasing.
+              {researchCalc
+                ? 'This is a research-driven eligibility and allocation calculator, not an AI recommendation or an order.'
+                : 'This is a target-based calculator, not an AI recommendation or an order.'}{' '}
+              Record the actual execution price after purchasing.
             </p>
             {researchCalc && researchCalc.errors.length === 0 && (
               <button
@@ -2584,7 +2612,17 @@ export default function Dashboard({
                         next.dividends!.find(
                           (d) => d.id === editingDividend,
                         )!.voided = true;
-                        await save(next, 'Dividend record voided.');
+                        const unfunded = voidLinkedFunding(
+                          next,
+                          editingDividend,
+                        );
+                        await save(
+                          next,
+                          'Dividend record voided.' +
+                            (unfunded
+                              ? ' Its linked confirmed-funds entry was voided too.'
+                              : ''),
+                        );
                         setDividend(null);
                       });
                     }}
