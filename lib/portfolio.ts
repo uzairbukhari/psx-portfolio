@@ -20,6 +20,9 @@ export type Company = {
   approved: boolean;
   screenDate: string;
   note: string;
+  screening?: Screening;
+  approvedMaxPrice?: number | null;
+  approvedResearchVersion?: string | null;
 };
 export type Trade = {
   id: string;
@@ -55,6 +58,13 @@ export type Quote = {
   source: string;
   fetchedAt: string;
   manual?: boolean;
+};
+export type ScreeningStatus = 'Pass' | 'Fail' | 'Pending';
+export type Screening = {
+  source: string;
+  status: ScreeningStatus;
+  effectiveDate: string;
+  reviewDueDate: string;
 };
 export const RESEARCH_MODELS = ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'] as const;
 export type ResearchModel = (typeof RESEARCH_MODELS)[number];
@@ -482,7 +492,24 @@ export function validate(p: Portfolio) {
       typeof c.note !== 'string' ||
       c.note.length > 2000 ||
       typeof c.screenDate !== 'string' ||
-      (c.screenDate && !dateOK(c.screenDate))
+      (c.screenDate && !dateOK(c.screenDate)) ||
+      (c.screening !== undefined &&
+        c.screening !== null &&
+        (typeof c.screening.source !== 'string' ||
+          c.screening.source.length > 500 ||
+          !['Pass', 'Fail', 'Pending'].includes(c.screening.status) ||
+          (c.screening.effectiveDate !== '' &&
+            !dateOK(c.screening.effectiveDate)) ||
+          (c.screening.reviewDueDate !== '' &&
+            !dateOK(c.screening.reviewDueDate)))) ||
+      (c.approvedMaxPrice !== undefined &&
+        c.approvedMaxPrice !== null &&
+        (!Number.isFinite(c.approvedMaxPrice) ||
+          c.approvedMaxPrice <= 0 ||
+          c.approvedMaxPrice > 1e8)) ||
+      (c.approvedResearchVersion !== undefined &&
+        c.approvedResearchVersion !== null &&
+        typeof c.approvedResearchVersion !== 'string')
     )
       throw Error('Invalid or duplicate company.');
     tickers.add(c.ticker);

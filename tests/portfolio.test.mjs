@@ -189,3 +189,36 @@ test('validate accepts every stance value and rejects an invalid one',()=>{
   p.research[0].stance='Bullish';
   assert.throws(()=>validate(p));
 });
+test('validate accepts a well-formed screening record and rejects a bad status or date',()=>{
+  const p=fresh();
+  p.companies[0].screening={source:'PSX Shariah index',status:'Pass',effectiveDate:date,reviewDueDate:date};
+  validate(p);
+  p.companies[0].screening={source:'',status:'Pending',effectiveDate:'',reviewDueDate:''};
+  validate(p);
+  p.companies[0].screening={source:'x',status:'Maybe',effectiveDate:date,reviewDueDate:date};
+  assert.throws(()=>validate(p));
+  p.companies[0].screening={source:'x',status:'Pass',effectiveDate:'not-a-date',reviewDueDate:date};
+  assert.throws(()=>validate(p));
+});
+test('validate accepts a numeric or null approvedMaxPrice, rejects zero/negative/non-finite',()=>{
+  const p=fresh();
+  p.companies[0].approvedMaxPrice=150.5;
+  validate(p);
+  p.companies[0].approvedMaxPrice=null;
+  validate(p);
+  p.companies[0].approvedMaxPrice=0;
+  assert.throws(()=>validate(p));
+  p.companies[0].approvedMaxPrice=-5;
+  assert.throws(()=>validate(p));
+  p.companies[0].approvedMaxPrice=Infinity;
+  assert.throws(()=>validate(p));
+});
+test('validate accepts a string or null approvedResearchVersion',()=>{
+  const p=fresh();
+  p.companies[0].approvedResearchVersion=date;
+  validate(p);
+  p.companies[0].approvedResearchVersion=null;
+  validate(p);
+  p.companies[0].approvedResearchVersion=42;
+  assert.throws(()=>validate(p));
+});
