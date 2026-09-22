@@ -248,3 +248,44 @@ test('validate accepts a well-formed researchPolicy and rejects an inconsistent 
   p.researchPolicy={...DEFAULT_RESEARCH_POLICY,quoteFreshness:'weekly'};
   assert.throws(()=>validate(p));
 });
+const fundingEntry=(over={})=>({id:crypto.randomUUID(),month,source:'manual',amount:5000,note:'',createdAt:new Date().toISOString(),...over});
+test('validate accepts a well-formed funding entry and rejects a bad source, month, or amount',()=>{
+  const p=fresh();
+  p.funding=[fundingEntry()];
+  validate(p);
+  p.funding=[fundingEntry({source:'carry-forward'})];
+  validate(p);
+  p.funding=[fundingEntry({source:'bogus'})];
+  assert.throws(()=>validate(p));
+  p.funding=[fundingEntry({month:'2026-13'})];
+  assert.throws(()=>validate(p));
+  p.funding=[fundingEntry({amount:0})];
+  assert.throws(()=>validate(p));
+  p.funding=[fundingEntry({amount:-5})];
+  assert.throws(()=>validate(p));
+});
+test('validate requires linkedDividendId only for dividend-reinvestment, referencing a real non-voided dividend',()=>{
+  const p=fresh();
+  p.trades=[trade('1',10,10,'buy')];
+  p.dividends=[{id:'d1',ticker:'TEST',date,source:'manual',perShare:2,grossAmount:200,note:''}];
+  p.funding=[fundingEntry({source:'dividend-reinvestment',linkedDividendId:'d1',amount:200})];
+  validate(p);
+  p.funding=[fundingEntry({source:'dividend-reinvestment'})];
+  assert.throws(()=>validate(p));
+  p.funding=[fundingEntry({source:'dividend-reinvestment',linkedDividendId:'missing'})];
+  assert.throws(()=>validate(p));
+  p.funding=[fundingEntry({source:'manual',linkedDividendId:'d1'})];
+  assert.throws(()=>validate(p));
+});
+test('validate rejects two non-voided funding entries linked to the same dividend, but allows it once one is voided',()=>{
+  const p=fresh();
+  p.trades=[trade('1',10,10,'buy')];
+  p.dividends=[{id:'d1',ticker:'TEST',date,source:'manual',perShare:2,grossAmount:200,note:''}];
+  p.funding=[
+    fundingEntry({id:'f1',source:'dividend-reinvestment',linkedDividendId:'d1',amount:100}),
+    fundingEntry({id:'f2',source:'dividend-reinvestment',linkedDividendId:'d1',amount:100}),
+  ];
+  assert.throws(()=>validate(p));
+  p.funding[0].voided=true;
+  validate(p);
+});

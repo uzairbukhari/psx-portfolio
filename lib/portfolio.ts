@@ -49,6 +49,17 @@ export type Dividend = {
   note: string;
   voided?: boolean;
 };
+export type FundingSource = 'carry-forward' | 'dividend-reinvestment' | 'manual';
+export type FundingEntry = {
+  id: string;
+  month: string;
+  source: FundingSource;
+  amount: number;
+  note: string;
+  linkedDividendId?: string;
+  createdAt: string;
+  voided?: boolean;
+};
 export const TAX_RATES = { filer: 0.15, 'non-filer': 0.3 } as const;
 export type TaxProfile = { filerStatus: keyof typeof TAX_RATES };
 export type Quote = {
@@ -105,6 +116,7 @@ export type Portfolio = {
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   dividends?: Dividend[];
+  funding?: FundingEntry[];
   taxProfile?: TaxProfile;
   research?: ResearchCompany[];
   researchSettings?: ResearchSettings;
@@ -709,6 +721,41 @@ export function validate(p: Portfolio) {
           }
         }
       }
+    }
+  }
+  if (p.funding !== undefined) {
+    if (!Array.isArray(p.funding) || p.funding.length > 20000)
+      throw Error('Portfolio exceeds supported size.');
+    const fundingIds = new Set<string>();
+    const linkedDividends = new Set<string>();
+    const dividendIds = new Set((p.dividends ?? []).filter((d) => !d.voided).map((d) => d.id));
+    for (const f of p.funding) {
+      if (
+        typeof f.id !== 'string' ||
+        fundingIds.has(f.id) ||
+        !/^\d{4}-(0[1-9]|1[0-2])$/.test(f.month) ||
+        !['carry-forward', 'dividend-reinvestment', 'manual'].includes(f.source) ||
+        !Number.isFinite(f.amount) ||
+        f.amount <= 0 ||
+        f.amount > 1e9 ||
+        typeof f.note !== 'string' ||
+        f.note.length > 2000 ||
+        typeof f.createdAt !== 'string' ||
+        (f.voided !== undefined && typeof f.voided !== 'boolean')
+      )
+        throw Error('Invalid funding entry.');
+      if (f.source === 'dividend-reinvestment') {
+        if (typeof f.linkedDividendId !== 'string' || !dividendIds.has(f.linkedDividendId))
+          throw Error('A dividend-reinvestment funding entry must reference an existing, non-voided dividend.');
+        if (!f.voided) {
+          if (linkedDividends.has(f.linkedDividendId))
+            throw Error('A dividend can fund at most one non-voided funding entry.');
+          linkedDividends.add(f.linkedDividendId);
+        }
+      } else if (f.linkedDividendId !== undefined) {
+        throw Error('Only a dividend-reinvestment funding entry may reference a dividend.');
+      }
+      fundingIds.add(f.id);
     }
   }
   if (
