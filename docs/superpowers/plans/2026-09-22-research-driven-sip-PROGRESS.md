@@ -63,12 +63,20 @@ superpowers:subagent-driven-development or superpowers:executing-plans.
       deferred (NaN policy-arg guard, floating-promise activate handler, draft-state resync on reload, cosmetic
       styling, etc.) — none block merge, none affect real account data today (still 0/25 eligible either way).
     - **Final commit: `10dc30b`**
-  - [ ] **2b — Allocation and cash + AI role** (plan not yet written — depends on 2a landing)
-    - [ ] Shared assessment-driven allocator (replaces plan()'s eligibility rule when policy active)
-    - [ ] Funding/carry-forward records, confirmed-funds vs planned-budget separation
-    - [ ] Save plan snapshot (immutable, point-in-time)
-    - [ ] AI role: explanation-only, comparison candidates, remove 5–8 company cap
-    - [ ] Monthly SIP tab UI wiring of the research-driven plan
+  - [ ] **2b — Allocation and cash + AI role** (split into 2b-i/2b-ii/2b-iii)
+    - [ ] **2b-i — Funding and cash model** (plan: `2026-09-22-m2b-i-funding-and-cash.md`, 5 tasks, in progress)
+      - [ ] Task 1: FundingEntry type + Portfolio.funding? + validation
+      - [ ] Task 2: confirmedFunds pure derived function
+      - [ ] Task 3: funding entry manager UI in Monthly SIP tab
+      - [ ] Task 4: "Mark as reinvested" action on dividends
+      - [ ] Task 5: regression fixture 9, verification sweep, browser check, docs
+    - [ ] **2b-ii — Research-driven allocator + Save plan** (plan not yet written — depends on 2b-i's confirmedFunds)
+      - [ ] Sector-aware allocator using assessCompany for eligibility (replaces plan()'s rule when policy active)
+      - [ ] Reconcile assessCompany's current-exposure headroom (eligibility gate) with plan()'s post-contribution-basis cap (sizing) — deliberate two-stage design, not a bug
+      - [ ] Save plan snapshot (immutable, point-in-time)
+    - [ ] **2b-iii — AI role + Monthly SIP UI wiring** (plan not yet written — depends on 2b-ii's allocator)
+      - [ ] AI role: explanation-only, comparison candidates outside shortlist, remove 5–8 company cap
+      - [ ] Wire the research-driven plan into the Monthly SIP tab display when policy is active
 - [ ] **Milestone 3 — Decision board, comparison and learning tab**
   - [ ] Decision board + compare 2–4 companies
   - [ ] Sector-specific checklists (bank / E&P / industrial / REIT-ETF-takaful-holding)
