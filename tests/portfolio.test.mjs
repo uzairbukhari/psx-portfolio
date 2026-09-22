@@ -318,3 +318,26 @@ test('fixture 9: unknown cash stays unconfirmed, a confirmed carry-forward and a
   p.trades[0].voided=true;
   assert.equal(confirmedFunds(p,month),10500);
 });
+const savedPlanRow=(over={})=>({ticker:'TEST',name:'Test',price:20,shares:5,amount:100,eligible:true,exclusionReasons:[],...over});
+const savedPlan=(over={})=>({
+  id:crypto.randomUUID(),month,savedAt:new Date().toISOString(),
+  policySnapshot:DEFAULT_RESEARCH_POLICY,budget:10000,confirmedFunds:5000,
+  feePct:0.5,invested:100,leftover:4900,rows:[savedPlanRow()],...over,
+});
+test('validate accepts a well-formed saved plan and rejects a malformed one',()=>{
+  const p=fresh();
+  p.savedPlans=[savedPlan()];
+  validate(p);
+  p.savedPlans=[savedPlan({month:'2026-13'})];
+  assert.throws(()=>validate(p));
+  p.savedPlans=[savedPlan({rows:[savedPlanRow({shares:-1})]})];
+  assert.throws(()=>validate(p));
+  p.savedPlans=[savedPlan({invested:-5})];
+  assert.throws(()=>validate(p));
+});
+test('validate accepts an empty savedPlans array and treats the field as fully optional',()=>{
+  const p=fresh();
+  validate(p);
+  p.savedPlans=[];
+  validate(p);
+});

@@ -110,6 +110,27 @@ export const DEFAULT_RESEARCH_POLICY: ResearchPolicy = {
   quoteFreshness: 'today',
   maxQuoteAgeDays: null,
 };
+export type SavedPlanRow = {
+  ticker: string;
+  name: string;
+  price: number | null;
+  shares: number;
+  amount: number;
+  eligible: boolean;
+  exclusionReasons: string[];
+};
+export type SavedPlan = {
+  id: string;
+  month: string;
+  savedAt: string;
+  policySnapshot: ResearchPolicy;
+  budget: number;
+  confirmedFunds: number;
+  feePct: number;
+  invested: number;
+  leftover: number;
+  rows: SavedPlanRow[];
+};
 export type Portfolio = {
   companies: Company[];
   trades: Trade[];
@@ -127,6 +148,7 @@ export type Portfolio = {
     generatedAt: string;
     snapshot: string;
   };
+  savedPlans?: SavedPlan[];
 };
 export type ResearchCompany = {
   ticker: string;
@@ -665,6 +687,48 @@ export function validate(p: Portfolio) {
       throw Error(
         'A today-only research policy must not set a maximum quote age.',
       );
+  }
+  if (p.savedPlans !== undefined) {
+    if (!Array.isArray(p.savedPlans) || p.savedPlans.length > 2000)
+      throw Error('Portfolio exceeds supported size.');
+    const planIds = new Set<string>();
+    for (const sp of p.savedPlans) {
+      if (
+        typeof sp.id !== 'string' ||
+        planIds.has(sp.id) ||
+        !/^\d{4}-(0[1-9]|1[0-2])$/.test(sp.month) ||
+        typeof sp.savedAt !== 'string' ||
+        !Number.isFinite(sp.budget) ||
+        sp.budget < 0 ||
+        !Number.isFinite(sp.confirmedFunds) ||
+        sp.confirmedFunds < 0 ||
+        !Number.isFinite(sp.feePct) ||
+        sp.feePct < 0 ||
+        sp.feePct > 10 ||
+        !Number.isFinite(sp.invested) ||
+        sp.invested < 0 ||
+        !Number.isFinite(sp.leftover) ||
+        sp.leftover < 0 ||
+        !Array.isArray(sp.rows) ||
+        sp.rows.length > 200
+      )
+        throw Error('Invalid saved plan.');
+      for (const row of sp.rows) {
+        if (
+          typeof row.ticker !== 'string' ||
+          typeof row.name !== 'string' ||
+          (row.price !== null && !Number.isFinite(row.price)) ||
+          !Number.isInteger(row.shares) ||
+          row.shares < 0 ||
+          !Number.isFinite(row.amount) ||
+          row.amount < 0 ||
+          typeof row.eligible !== 'boolean' ||
+          !Array.isArray(row.exclusionReasons)
+        )
+          throw Error('Invalid saved plan row.');
+      }
+      planIds.add(sp.id);
+    }
   }
   if (p.dividends !== undefined) {
     if (!Array.isArray(p.dividends) || p.dividends.length > 20000)
