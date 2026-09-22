@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,reviewPrompt,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,DEFAULT_RESEARCH_POLICY,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
+import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,reviewPrompt,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,DEFAULT_RESEARCH_POLICY,sharesHeldOn,realizedSales,taxSummary,confirmedFunds} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
@@ -288,4 +288,17 @@ test('validate rejects two non-voided funding entries linked to the same dividen
   assert.throws(()=>validate(p));
   p.funding[0].voided=true;
   validate(p);
+});
+test('confirmedFunds sums non-voided entries for the given month only, excluding other months and voided entries',()=>{
+  const p=fresh();
+  p.funding=[
+    fundingEntry({month,amount:3000}),
+    fundingEntry({month,amount:2000,voided:true}),
+    fundingEntry({month:'2020-01',amount:9000}),
+  ];
+  assert.equal(confirmedFunds(p,month),3000);
+});
+test('confirmedFunds is zero with no funding array at all, never throws',()=>{
+  const p=fresh();
+  assert.equal(confirmedFunds(p,month),0);
 });

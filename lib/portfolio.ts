@@ -776,6 +776,13 @@ export function dateOK(s: string) {
     new Date(s).toISOString().slice(0, 10) === s
   );
 }
+export function confirmedFunds(p: Portfolio, month: string): number {
+  return round(
+    (p.funding ?? [])
+      .filter((f) => !f.voided && f.month === month)
+      .reduce((a, f) => a + f.amount, 0),
+  );
+}
 export function plan(
   p: Portfolio,
   month: string,
