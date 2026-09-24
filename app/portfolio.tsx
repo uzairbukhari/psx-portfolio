@@ -31,7 +31,6 @@ import {
   RefreshCw,
   Plus,
   Download,
-  Sparkles,
   Wallet,
   LogOut,
   Settings,
@@ -63,7 +62,7 @@ import {
 import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
-import AiReview from './ai-review';
+import MonthlyPicks from './monthly-picks';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -71,7 +70,6 @@ const TAB_PATHS: Record<string, string> = {
   sip: '/sip',
   history: '/history',
   'research-desk': '/research-desk',
-  research: '/research',
   settings: '/settings',
 };
 const PATH_TABS: Record<string, string> = Object.fromEntries(
@@ -496,7 +494,7 @@ export default function Dashboard({
     [failed, setFailed] = useState(false),
     [month, setMonth] = useState(today().slice(0, 7)),
     [fees, setFees] = useState(0),
-    [allowOld, setAllowOld] = useState(false);
+    [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
     [editing, setEditing] = useState<string | null>(null),
     [dividend, setDividend] = useState<Dividend | null>(null),
@@ -505,11 +503,6 @@ export default function Dashboard({
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
     [quoteDate, setQuoteDate] = useState(today()),
-    [proposal, setProposal] = useState<{
-      summary: string;
-      weights: Record<string, number>;
-    } | null>(null),
-    [reviewBusy, setReviewBusy] = useState(false),
     [historyTicker, setHistoryTicker] = useState(''),
     [historyView, setHistoryView] = useState<'all' | 'trades' | 'dividends'>(
       'all',
@@ -564,7 +557,7 @@ export default function Dashboard({
     next: Portfolio,
     success = 'Saved to your private portfolio.',
   ) {
-    if (busy || reviewBusy)
+    if (busy)
       throw Error('Wait for the current operation to finish.');
     validate(next);
     setBusy(true);
@@ -578,7 +571,6 @@ export default function Dashboard({
       if (!r.ok) throw Error(d.error);
       setP(next);
       setRevision(d.revision);
-      setProposal(null);
       notify(success);
     } catch (e) {
       notify(String(e), true);
@@ -706,9 +698,7 @@ export default function Dashboard({
     cost = unknown.length
       ? null
       : round(held.reduce((a, h) => a + (h.cost ?? 0), 0)),
-    gain = cost === null || missing.length ? null : round(value - cost),
-    calc = plan(p, month, fees, allowOld),
-    budget = p.budgets[month] ?? 100000;
+    gain = cost === null || missing.length ? null : round(value - cost);
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -823,7 +813,6 @@ export default function Dashboard({
       if (!s.ok) throw Error(saved.error);
       setP(next);
       setRevision(saved.revision);
-      setProposal(null);
       notify(
         `${Object.keys(d.quotes).length} PSX prices refreshed.${d.errors.length ? ' Unavailable: ' + d.errors.join(', ') + '. Previous quotes retained.' + (d.reasons ? ' Reason: ' + [...new Set(Object.values(d.reasons))].join(' | ') : '') : ''}`,
         !!d.errors.length,
@@ -957,7 +946,7 @@ export default function Dashboard({
           <div className="row">
             <button
               className="secondary"
-              disabled={busy || reviewBusy}
+              disabled={busy}
               onClick={refresh}
             >
               <RefreshCw size={16} /> Refresh PSX prices
@@ -987,10 +976,9 @@ export default function Dashboard({
           <TabsList>
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="sip">Monthly SIP</TabsTrigger>
+            <TabsTrigger value="sip">Monthly Picks</TabsTrigger>
             <TabsTrigger value="history">Purchase log</TabsTrigger>
             <TabsTrigger value="research-desk">Research desk</TabsTrigger>
-            <TabsTrigger value="research">AI review</TabsTrigger>
           </TabsList>
         )}
         <TabsContent value="holdings">
@@ -1273,209 +1261,21 @@ export default function Dashboard({
           <PortfolioReports portfolio={p} />
         </TabsContent>
         <TabsContent value="sip">
-          <div className="two-col">
-            <section className="panel">
-              <p className="eyebrow">MONTHLY CONTRIBUTION</p>
-              <h2>Make room for your next investment.</h2>
-              <div className="form-grid">
-                <label>
-                  SIP month
-                  <input
-                    type="month"
-                    value={month}
-                    disabled={reviewBusy}
-                    onChange={(e) => {
-                      setMonth(e.target.value || today().slice(0, 7));
-                      setProposal(null);
-                    }}
-                  />
-                </label>
-                <label>
-                  Monthly budget (PKR)
-                  <input
-                    key={month + '-' + budget}
-                    type="number"
-                    min="0"
-                    max="1000000000"
-                    step="0.01"
-                    defaultValue={budget}
-                    onBlur={(e) => {
-                      const amount = Number(e.target.value);
-                      if (amount !== budget)
-                        attempt(() =>
-                          save(
-                            {
-                              ...p,
-                              budgets: { ...p.budgets, [month]: amount },
-                            },
-                            'Monthly budget saved.',
-                          ),
-                        );
-                    }}
-                  />
-                </label>
-                <label>
-                  Estimated fees (%)
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.01"
-                    value={fees}
-                    onChange={(e) => setFees(Number(e.target.value))}
-                  />
-                </label>
-                <div className="mini-stat">
-                  <span>Already purchased this month</span>
-                  <b>{money(calc.already)}</b>
-                </div>
-              </div>
-              <label className="check-row">
-                <Checkbox
-                  checked={allowOld}
-                  onCheckedChange={(v) => setAllowOld(!!v)}
-                />{' '}
-                Allow dated, latest-available quotes when today’s quotes are
-                unavailable
-              </label>
-              <p className="muted">
-                Uses remaining SIP budget and all priced holdings to fill target
-                gaps. New purchases are capped at 20% per company; whole shares
-                and estimated fees stay within your budget.
-              </p>
-            </section>
-            <aside className="panel accent">
-              <p className="eyebrow">AVAILABLE THIS MONTH</p>
-              <div className="big-number">{money(calc.remaining)}</div>
-              <div className="split-stats">
-                <div>
-                  <small>Planned purchases</small>
-                  <strong>{money(calc.invested)}</strong>
-                </div>
-                <div>
-                  <small>Cash left over</small>
-                  <strong>{money(calc.leftover)}</strong>
-                </div>
-              </div>
-              <p>
-                Overweight positions receive no new allocation. Unused cash
-                stays unallocated when targets, screening, or whole-share prices
-                prevent a purchase.
-              </p>
-              <button className="light-btn" onClick={() => setTab('research')}>
-                <Sparkles size={16} /> Review with AI <ArrowUpRight size={16} />
-              </button>
-            </aside>
-          </div>
-          {calc.errors.length > 0 && (
-            <div role="alert" className="notice">
-              {calc.errors.map((e) => (
-                <p key={e}>{e}</p>
-              ))}
-            </div>
-          )}
-          <div className="section-top">
-            <div>
-              <h2>Suggested purchase breakdown</h2>
-              <p>
-                {calc.errors.length
-                  ? 'Resolve the checks above to calculate quantities.'
-                  : 'Automatically recalculates as your holdings, prices and targets change.'}
-              </p>
-            </div>
-            <button
-              className="secondary"
-              onClick={() =>
-                download(
-                  `sip-${month}.json`,
-                  JSON.stringify(
-                    {
-                      ...calc,
-                      month,
-                      feePct: fees,
-                      createdAt: new Date().toISOString(),
-                    },
-                    null,
-                    2,
-                  ),
-                )
-              }
-            >
-              <Download size={16} /> Export plan
-            </button>
-          </div>
-          <section className="panel table-panel">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {[
-                    'Company',
-                    'Current → target',
-                    'Price used',
-                    'Whole shares',
-                    'Estimated spend',
-                    'Why',
-                  ].map((x) => (
-                    <TableHead key={x}>{x}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {calc.rows.map((r) => (
-                  <TableRow key={r.ticker}>
-                    <TableCell className="ticker">{r.ticker}</TableCell>
-                    <TableCell>
-                      {missing.length ? '?' : r.currentWeight.toFixed(1)}% →{' '}
-                      {r.target}%
-                    </TableCell>
-                    <TableCell>
-                      {money(r.price)}
-                      <small>{r.asOf}</small>
-                    </TableCell>
-                    <TableCell>{calc.errors.length ? '—' : r.shares}</TableCell>
-                    <TableCell>
-                      {calc.errors.length ? '—' : money(r.amount)}
-                    </TableCell>
-                    <TableCell>{r.reason}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <p className="table-note">
-              This is a target-based calculator, not an AI recommendation or an
-              order. Record the actual execution price after purchasing.
-            </p>
-          </section>
-          <div className="section-top">
-            <h2>SIP targets & purchase eligibility</h2>
-            <span>
-              Total target:{' '}
-              {p.companies.reduce((s, c) => s + c.target, 0).toFixed(1)}%
-            </span>
-          </div>
-          <div className="target-grid">
-            {p.companies
-              .filter((c) => c.target > 0)
-              .map((c) => (
-                <button
-                  className="target-card"
-                  key={c.ticker}
-                  onClick={() => setCompany({ ...c })}
-                >
-                  <span className="row">
-                    <b>{c.ticker}</b>
-                    <b>{c.target}%</b>
-                  </span>
-                  <small>
-                    {c.approved ? 'Eligible under saved screen' : 'Paused'} ·{' '}
-                    {c.sector || 'No sector'} ·{' '}
-                    {c.screenDate || 'No screen date'}
-                  </small>
-                  <p>{c.note}</p>
-                  <span>Edit target & screening →</span>
-                </button>
-              ))}
-          </div>
+          <MonthlyPicks
+            portfolio={p}
+            month={month}
+            setMonth={setMonth}
+            feePct={fees}
+            setFeePct={setFees}
+            busy={busy}
+            onSave={save}
+            onRefreshPrices={refresh}
+            onManualPrice={(ticker) => {
+              setQuoteTicker(ticker);
+              setQuotePrice(String(p.quotes[ticker]?.price ?? ''));
+              setQuoteDate(p.quotes[ticker]?.date ?? today());
+            }}
+          />
         </TabsContent>
         <TabsContent value="history">
           <div className="section-top">
@@ -1690,20 +1490,6 @@ export default function Dashboard({
             portfolio={p}
             onSave={save}
             onOpenSettings={() => setTab('settings')}
-          />
-        </TabsContent>
-        <TabsContent value="research">
-          <AiReview
-            portfolio={p}
-            revision={revision}
-            month={month}
-            busy={busy}
-            reviewBusy={reviewBusy}
-            setReviewBusy={setReviewBusy}
-            proposal={proposal}
-            setProposal={setProposal}
-            onSave={save}
-            onApplied={() => setTab('sip')}
           />
         </TabsContent>
         <TabsContent value="settings">

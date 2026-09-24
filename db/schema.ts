@@ -21,6 +21,35 @@ export const reviews = sqliteTable(
   ],
 );
 
+export const monthlyRecommendations = sqliteTable(
+  'monthly_recommendations',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    month: text('month').notNull(),
+    amount: real('amount').notNull(),
+    feePct: real('fee_pct').notNull().default(0),
+    shortlist: text('shortlist').notNull(),
+    status: text('status').notNull(),
+    providerResponseId: text('provider_response_id'),
+    result: text('result'),
+    sources: text('sources'),
+    error: text('error'),
+    model: text('model').notNull(),
+    estimatedCostUsd: real('estimated_cost_usd'),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('idx_monthly_recommendations_user_created').on(
+      table.userId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const researchJobs = sqliteTable(
   'research_jobs',
   {
@@ -98,4 +127,3 @@ export const marketSummaryRefreshes = sqliteTable('market_summary_refreshes', {
   fetchedAt: text('fetched_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
-

@@ -1,15 +1,14 @@
 # PSX Portfolio & SIP
 
-Multi-user investment ledger with D1 persistence, official PSX quote refresh (manual and automatic twice-daily), and a low-cost GPT-5 nano review. Any Google account can sign in; each account gets its own fully isolated portfolio, starting empty. (The original owner's account was seeded from a private CDC statement before this app became multi-user — that seed data is not applied to new accounts.)
+Multi-user investment ledger with D1 persistence, official PSX quote refresh (manual and automatic twice-daily), and sourced Monthly Picks research. Any Google account can sign in; each account gets its own fully isolated portfolio, starting empty. (The original owner's account was seeded from a private CDC statement before this app became multi-user — that seed data is not applied to new accounts.)
 
 ## User workflow
 
 1. Sign in with Google. New accounts start with an empty ledger — add holdings via recorded purchases or an imported backup.
 2. Record actual purchases (ticker, date, integer shares, price, fees, optional SIP month). Correct an opening entry to add a known average cost. Corrections void the prior entry, retaining its audit record.
 3. PSX prices refresh automatically at 12:00 and 16:00 PKT on weekdays (see `workers/quote-refresh/`); refresh on demand with the "Refresh PSX prices" button, or enter a verified manual quote and date. Every held company and target company needs a price for a complete SIP calculation.
-4. Set a monthly budget, fee estimate, company targets and screening dates. Target weights total 100%. Contributions already recorded against the SIP month reduce its remaining budget. Sales do not reset this contribution budget.
-5. Inspect the whole-share plan. It fills target gaps using new contributions and excludes paused, overdue-screen and overweight names. Unspent cash remains unallocated; plans never create trades automatically.
-6. Request an AI review if helpful, inspect the reasoning and explicitly apply its target weights. AI cannot change purchase eligibility or record trades.
+4. In Monthly Picks, select up to 15 saved companies, choose a month and enter fresh investment money. The shortlist is treated as user-approved eligibility.
+5. Request sourced 60–90 day research. It ranks up to five companies, proposes a rupee split, and estimates affordable whole shares from dated PSX quotes. It never records trades automatically.
 7. Export a full portfolio backup periodically. This schema is distinct from the company-research dashboard's JSON import; restoring replaces only this ledger and requires confirmation.
 
 ## Calculation boundaries
@@ -18,11 +17,9 @@ Weighted average cost includes purchase fees. Sales remove shares at the average
 
 Market values exclude cash, dividends and unrecorded corporate actions. Returns are unrealised changes in the remaining holdings, not a total-return or tax report. The estimate allocates integer shares, rounds fee-inclusive unit costs upward to the paisa and remains within the remaining monthly budget. New allocation gaps are capped using 20% of priced holdings plus the remaining contribution. There is no recommendation to sell an existing overweight position. Targets and 183-day screening expiry are editable planning assumptions, not formal Shariah certification.
 
-## Low-cost AI
+## Monthly Picks research
 
-Uses `gpt-5-nano` to select between validated current-target and equal-weight profiles and explain its choice. This bounded comparison avoids unreliable model-generated arithmetic. It uses minimal reasoning, an 1,800-token total output ceiling, compact current holdings and a short prior-research summary. No paid tools, web search, automatic retries or background runs. Unchanged same-day portfolio/month reviews are cached in D1; repeated reads make no OpenAI call. Token usage and estimated USD cost are stored with successful reviews. Price assumptions verified 10 September 2026: $0.05/M input, $0.005/M cached input, $0.40/M output, including reasoning. The estimate is not an account balance or billing guarantee. No silent upgrade to a pricier model.
-
-Only previous research and explicitly supplied quote data are available to this low-cost review; it cannot claim to have read new filings. For deeper research, export the portfolio prompt to the company's existing ChatGPT conversation and import reviewed target weights.
+Uses `gpt-5-mini` with OpenAI web search and background Responses. Each run is limited to six web searches and 12,000 output tokens under a server-enforced $1 maximum. The request contains only the selected company identities, contribution month, amount, and current date; holdings, transactions, targets, and Research Desk dossiers are excluded. Completed results and source links are stored in D1, and explicit reruns are the only way to start another paid request. Token and search usage is estimated and recorded after successful completion.
 
 ## Development & deployment
 
@@ -38,4 +35,4 @@ Only previous research and explicitly supplied quote data are available to this 
 
 ## Validation
 
-Calculation tests and type/build checks are required. Validate local saving, reload, stale-write rejection, PSX quote refresh and the AI response/cache path. Browser visual QA was not requested. WebMCP read tool is feature-detected; no supported WebMCP execution context was available, so its browser contract remains unverified.
+Calculation tests and type/build checks are required. Validate local saving, reload, stale-write rejection, PSX quote refresh, recommendation polling, saved history, and cached-result reuse.

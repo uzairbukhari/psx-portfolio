@@ -1,8 +1,8 @@
 import { getCurrentUser } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
-  title: 'Monthly SIP | PSX Portfolio',
-  description: 'Monthly SIP budget and whole-share allocation plan.',
+  title: 'Monthly Picks | PSX Portfolio',
+  description: 'Sourced 60–90 day research for your PSX shortlist.',
 };
 export default async function SipPage() {
   const user = await getCurrentUser();

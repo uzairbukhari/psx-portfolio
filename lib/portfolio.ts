@@ -78,6 +78,7 @@ export type Portfolio = {
   trades: Trade[];
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
+  monthlyPicksShortlist?: string[];
   dividends?: Dividend[];
   taxProfile?: TaxProfile;
   research?: ResearchCompany[];
@@ -542,6 +543,15 @@ export function validate(p: Portfolio) {
       budget > 1e9
     )
       throw Error('Invalid monthly budget.');
+  if (p.monthlyPicksShortlist !== undefined) {
+    if (
+      !Array.isArray(p.monthlyPicksShortlist) ||
+      p.monthlyPicksShortlist.length > 15 ||
+      new Set(p.monthlyPicksShortlist).size !== p.monthlyPicksShortlist.length ||
+      p.monthlyPicksShortlist.some((ticker) => !tickers.has(ticker))
+    )
+      throw Error('Invalid Monthly Picks shortlist.');
+  }
   if (
     p.aiReview &&
     (typeof p.aiReview.summary !== 'string' ||
