@@ -15,7 +15,7 @@ const RESERVED_COST_USD =
   (MODEL_CONTEXT_TOKENS * 0.25 + MAX_OUTPUT_TOKENS * 2) / 1_000_000 +
   MAX_TOOL_CALLS * 0.01;
 
-const schema = {
+const schemaFor = (shortlist: string[]) => ({
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -27,14 +27,14 @@ const schema = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ticker: { type: 'string' },
+          ticker: { type: 'string', enum: shortlist },
           name: { type: 'string' },
           allocationPct: { type: 'number' },
           confidence: { type: 'string', enum: ['High', 'Medium', 'Low'] },
           thesis: { type: 'string' },
           catalysts: { type: 'array', items: { type: 'string' } },
           risks: { type: 'array', items: { type: 'string' } },
-          sourceUrls: { type: 'array', items: { type: 'string' } },
+          sourceUrls: { type: 'array', minItems: 1, items: { type: 'string' } },
         },
         required: [
           'ticker', 'name', 'allocationPct', 'confidence', 'thesis',
@@ -48,13 +48,13 @@ const schema = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          ticker: { type: 'string' },
+          ticker: { type: 'string', enum: shortlist },
           outlook: {
             type: 'string',
             enum: ['Positive', 'Neutral', 'Negative', 'Insufficient evidence'],
           },
           summary: { type: 'string' },
-          sourceUrls: { type: 'array', items: { type: 'string' } },
+          sourceUrls: { type: 'array', minItems: 1, items: { type: 'string' } },
         },
         required: ['ticker', 'outlook', 'summary', 'sourceUrls'],
       },
@@ -62,7 +62,7 @@ const schema = {
     unallocatedPct: { type: 'number' },
   },
   required: ['marketOutlook', 'picks', 'coverage', 'unallocatedPct'],
-} as const;
+}) as const;
 
 type RecommendationRow = {
   id: string;
@@ -363,7 +363,7 @@ export async function POST(req: Request) {
             type: 'json_schema',
             name: 'monthly_psx_picks',
             strict: true,
-            schema,
+            schema: schemaFor(shortlist),
           },
         },
         }),

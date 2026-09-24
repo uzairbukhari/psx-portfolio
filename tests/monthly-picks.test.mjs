@@ -61,6 +61,27 @@ test('validates complete shortlist coverage and discovered source URLs', () => {
   );
 });
 
+test('normalizes shortlist tickers and harmless source URL variations', () => {
+  const varied = structuredClone(research);
+  varied.picks[0].ticker = ' aaa ';
+  varied.picks[0].sourceUrls = ['https://www.psx.com.pk/example/?utm_source=openai#results'];
+  varied.coverage[0].ticker = 'aaa';
+  varied.coverage[0].sourceUrls = ['https://www.psx.com.pk/example#company'];
+  const validated = validateMonthlyPicksResearch(varied, ['AAA', 'BBB'], new Set([source]));
+  assert.equal(validated.picks[0].ticker, 'AAA');
+  assert.deepEqual(validated.picks[0].sourceUrls, [source]);
+  assert.equal(validated.coverage[0].ticker, 'AAA');
+});
+
+test('rejects unrelated sources with a specific validation error', () => {
+  const invalid = structuredClone(research);
+  invalid.picks[0].sourceUrls = ['https://www.psx.com.pk/different'];
+  assert.throws(
+    () => validateMonthlyPicksResearch(invalid, ['AAA', 'BBB'], new Set([source])),
+    /unverified or missing source for AAA/,
+  );
+});
+
 test('whole-share estimates include fees and stay within each allocation', () => {
   const [pick] = estimateMonthlyPicks(research, portfolio, 100000, 1);
   assert.equal(pick.allocationPkr, 60000);

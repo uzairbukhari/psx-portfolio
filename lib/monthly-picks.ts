@@ -82,6 +82,7 @@ export function validateMonthlyPicksResearch(
   allowedSources: Set<string>,
 ): MonthlyPicksResearch {
   const result = value as MonthlyPicksResearch;
+  const canonicalTickers = new Map(shortlist.map((ticker) => [ticker.toUpperCase(), ticker]));
   if (!result || typeof result.marketOutlook !== 'string')
     throw Error('The research response is incomplete.');
   if (!Array.isArray(result.picks) || result.picks.length > 5)
@@ -93,43 +94,80 @@ export function validateMonthlyPicksResearch(
   if (!Number.isFinite(total) || total < 0 || total > 100)
     throw Error('Invalid unallocated percentage.');
   for (const pick of result.picks) {
+    const ticker =
+      typeof pick.ticker === 'string'
+        ? canonicalTickers.get(pick.ticker.trim().toUpperCase())
+        : undefined;
+    if (!ticker) throw Error(`The recommendation contains a company outside the shortlist.`);
+    if (pickTickers.has(ticker)) throw Error(`The recommendation repeats ${ticker}.`);
+    if (!Number.isFinite(pick.allocationPct) || pick.allocationPct <= 0 || pick.allocationPct > 100)
+      throw Error(`The recommendation contains an invalid allocation for ${ticker}.`);
     if (
-      !shortlist.includes(pick.ticker) ||
-      pickTickers.has(pick.ticker) ||
-      !Number.isFinite(pick.allocationPct) ||
-      pick.allocationPct <= 0 ||
-      pick.allocationPct > 100 ||
       !['High', 'Medium', 'Low'].includes(pick.confidence) ||
       typeof pick.thesis !== 'string' ||
       !Array.isArray(pick.catalysts) ||
-      !Array.isArray(pick.risks) ||
-      !validSources(pick.sourceUrls, allowedSources)
+      !Array.isArray(pick.risks)
     )
-      throw Error('The recommendation contains an invalid pick.');
+      throw Error(`The recommendation contains incomplete analysis for ${ticker}.`);
+    const sourceUrls = validatedSources(pick.sourceUrls, allowedSources);
+    if (!sourceUrls)
+      throw Error(`The recommendation contains an unverified or missing source for ${ticker}.`);
+    pick.ticker = ticker;
+    pick.sourceUrls = sourceUrls;
     total += pick.allocationPct;
-    pickTickers.add(pick.ticker);
+    pickTickers.add(ticker);
   }
   const covered = new Set<string>();
   for (const item of result.coverage) {
+    const ticker =
+      typeof item.ticker === 'string'
+        ? canonicalTickers.get(item.ticker.trim().toUpperCase())
+        : undefined;
+    const sourceUrls = validatedSources(item.sourceUrls, allowedSources);
     if (
-      !shortlist.includes(item.ticker) ||
-      covered.has(item.ticker) ||
+      !ticker ||
+      covered.has(ticker) ||
       !['Positive', 'Neutral', 'Negative', 'Insufficient evidence'].includes(item.outlook) ||
       typeof item.summary !== 'string' ||
-      !validSources(item.sourceUrls, allowedSources)
+      !sourceUrls
     )
       throw Error('The recommendation contains invalid company coverage.');
-    covered.add(item.ticker);
+    item.ticker = ticker;
+    item.sourceUrls = sourceUrls;
+    covered.add(ticker);
   }
   if (Math.abs(total - 100) > 0.01)
     throw Error('Recommended allocations and cash must total 100%.');
   return result;
 }
 
-function validSources(urls: unknown, allowed: Set<string>) {
-  return (
-    Array.isArray(urls) &&
-    urls.length > 0 &&
-    urls.every((url) => typeof url === 'string' && allowed.has(url))
+function validatedSources(urls: unknown, allowed: Set<string>) {
+  if (!Array.isArray(urls) || urls.length === 0) return null;
+  const allowedByKey = new Map<string, string>();
+  for (const url of allowed) {
+    const key = sourceKey(url);
+    if (key) allowedByKey.set(key, url);
+  }
+  const matched = urls.map((url) =>
+    typeof url === 'string' ? allowedByKey.get(sourceKey(url) ?? '') : undefined,
   );
+  return matched.every((url): url is string => Boolean(url)) ? [...new Set(matched)] : null;
+}
+
+function sourceKey(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') return null;
+    url.hash = '';
+    url.hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+    url.pathname = url.pathname.replace(/\/$/, '') || '/';
+    const trackingKeys = Array.from(url.searchParams.keys()).filter((key) =>
+      /^(utm_|fbclid$|gclid$)/i.test(key),
+    );
+    for (const key of trackingKeys) url.searchParams.delete(key);
+    url.searchParams.sort();
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
