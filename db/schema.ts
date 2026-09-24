@@ -127,3 +127,19 @@ export const marketSummaryRefreshes = sqliteTable('market_summary_refreshes', {
   fetchedAt: text('fetched_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+// Durable provider attempts: retain evidence and charge each request once.
+export const recommendationAttempts = sqliteTable('recommendation_attempts', {
+  id: text('id').primaryKey(),
+  recommendationId: text('recommendation_id').notNull(),
+  phase: text('phase').notNull(),
+  cycle: integer('cycle').notNull(),
+  state: text('state').notNull(),
+  providerResponseId: text('provider_response_id'),
+  request: text('request').notNull(),
+  response: text('response'),
+  reservedUsd: real('reserved_usd').notNull(),
+  costUsd: real('cost_usd'),
+  error: text('error'),
+  createdAt: text('created_at').notNull(),
+}, (t) => [index('idx_recommendation_attempts_run').on(t.recommendationId)]);

@@ -9,6 +9,7 @@ export type MonthlyPick = {
   catalysts: string[];
   risks: string[];
   sourceUrls: string[];
+  evidenceStatus?: 'ready' | 'needs_repair';
 };
 
 export type CompanyOutlook = {
@@ -16,6 +17,7 @@ export type CompanyOutlook = {
   outlook: 'Positive' | 'Neutral' | 'Negative' | 'Insufficient evidence';
   summary: string;
   sourceUrls: string[];
+  evidenceStatus?: 'ready' | 'needs_repair';
 };
 
 export type MonthlyPicksResearch = {
@@ -23,6 +25,7 @@ export type MonthlyPicksResearch = {
   picks: MonthlyPick[];
   coverage: CompanyOutlook[];
   unallocatedPct: number;
+  evidenceIssues?: string[];
 };
 
 export type MonthlyPickEstimate = MonthlyPick & {
@@ -48,10 +51,10 @@ export function estimateMonthlyPicks(
   if (!Number.isFinite(feePct) || feePct < 0 || feePct > 10)
     throw Error('Fee estimate must be between 0% and 10%.');
   return result.picks.map((pick) => {
-    const allocationPkr = round((amount * pick.allocationPct) / 100);
+    const allocationPkr = Math.floor(Math.floor(amount * 100) * pick.allocationPct / 100) / 100;
     const quote = portfolio.quotes[pick.ticker];
-    const fresh = quote && dateOK(quote.date) && ageDays(quote.date) <= 7;
-    if (!fresh)
+    const fresh = quote && Number.isFinite(quote.price) && quote.price > 0 && dateOK(quote.date) && ageDays(quote.date) >= 0 && ageDays(quote.date) <= 7;
+    if (!fresh || result.evidenceIssues?.length)
       return {
         ...pick,
         allocationPkr,
@@ -81,7 +84,8 @@ export function validateMonthlyPicksResearch(
   shortlist: string[],
   allowedSources: Set<string>,
 ): MonthlyPicksResearch {
-  const result = value as MonthlyPicksResearch;
+  const result = structuredClone(value) as MonthlyPicksResearch;
+  const evidenceIssues: string[] = [];
   const canonicalTickers = new Map(shortlist.map((ticker) => [ticker.toUpperCase(), ticker]));
   if (!result || typeof result.marketOutlook !== 'string')
     throw Error('The research response is incomplete.');
@@ -89,12 +93,13 @@ export function validateMonthlyPicksResearch(
     throw Error('The recommendation must contain no more than five picks.');
   if (!Array.isArray(result.coverage) || result.coverage.length !== shortlist.length)
     throw Error('The research must cover every shortlisted company.');
-  let unallocatedPct = Number(result.unallocatedPct);
+  const unallocatedPct = result.unallocatedPct;
   if (!Number.isFinite(unallocatedPct) || unallocatedPct < 0 || unallocatedPct > 100)
     throw Error('Invalid unallocated percentage.');
   const covered = new Set<string>();
   const coverageSources = new Map<string, string[]>();
   for (const item of result.coverage) {
+    if (!item || typeof item !== 'object') throw Error('Invalid company coverage.');
     const ticker =
       typeof item.ticker === 'string'
         ? canonicalTickers.get(item.ticker.trim().toUpperCase())
@@ -112,15 +117,16 @@ export function validateMonthlyPicksResearch(
       item.sourceUrls = sourceUrls;
       coverageSources.set(ticker, sourceUrls);
     } else {
-      item.outlook = 'Insufficient evidence';
-      item.summary = 'No verified source was returned, so this company is not eligible for a recommendation.';
+      evidenceIssues.push(`${ticker}: citations need repair; the outlook has not been changed.`);
       item.sourceUrls = [];
     }
+    item.evidenceStatus = sourceUrls ? 'ready' : 'needs_repair';
     covered.add(ticker);
   }
   const pickTickers = new Set<string>();
-  const verifiedPicks: MonthlyPick[] = [];
+
   for (const pick of result.picks) {
+    if (!pick || typeof pick !== 'object') throw Error('Invalid pick.');
     const ticker =
       typeof pick.ticker === 'string'
         ? canonicalTickers.get(pick.ticker.trim().toUpperCase())
@@ -131,9 +137,10 @@ export function validateMonthlyPicksResearch(
       throw Error(`The recommendation contains an invalid allocation for ${ticker}.`);
     if (
       !['High', 'Medium', 'Low'].includes(pick.confidence) ||
-      typeof pick.thesis !== 'string' ||
+      typeof pick.thesis !== 'string' || typeof pick.name !== 'string' ||
       !Array.isArray(pick.catalysts) ||
-      !Array.isArray(pick.risks)
+      !Array.isArray(pick.risks) ||
+      !pick.catalysts.every(v => typeof v === 'string') || !pick.risks.every(v => typeof v === 'string')
     )
       throw Error(`The recommendation contains incomplete analysis for ${ticker}.`);
     const sourceUrls =
@@ -142,14 +149,16 @@ export function validateMonthlyPicksResearch(
     pickTickers.add(ticker);
     if (sourceUrls) {
       pick.sourceUrls = sourceUrls;
-      verifiedPicks.push(pick);
+      pick.evidenceStatus = 'ready';
     } else {
-      unallocatedPct += pick.allocationPct;
+      pick.sourceUrls = [];
+      pick.evidenceStatus = 'needs_repair';
+      evidenceIssues.push(`${ticker}: proposed pick needs citation repair.`);
     }
   }
-  result.picks = verifiedPicks;
-  result.unallocatedPct = unallocatedPct;
-  const total = unallocatedPct + verifiedPicks.reduce((sum, pick) => sum + pick.allocationPct, 0);
+  if (evidenceIssues.length) result.evidenceIssues = evidenceIssues;
+  else delete result.evidenceIssues;
+  const total = unallocatedPct + result.picks.reduce((sum, pick) => sum + pick.allocationPct, 0);
   if (Math.abs(total - 100) > 0.01)
     throw Error('Recommended allocations and cash must total 100%.');
   return result;
@@ -171,10 +180,9 @@ function validatedSources(urls: unknown, allowed: Set<string>) {
 function sourceKey(value: string) {
   try {
     const url = new URL(value);
-    if (url.protocol !== 'https:') return null;
+    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return null;
     url.hash = '';
-    url.hostname = url.hostname.toLowerCase().replace(/^www\./, '');
-    url.pathname = url.pathname.replace(/\/$/, '') || '/';
+    url.hostname = url.hostname.toLowerCase();
     const trackingKeys = Array.from(url.searchParams.keys()).filter((key) =>
       /^(utm_|fbclid$|gclid$)/i.test(key),
     );

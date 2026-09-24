@@ -19,7 +19,13 @@ Market values exclude cash, dividends and unrecorded corporate actions. Returns 
 
 ## Monthly Picks research
 
-Uses `gpt-5-mini` with OpenAI web search and background Responses. Each run is limited to six web searches and 12,000 output tokens under a server-enforced $1 maximum. The request contains only the selected company identities, contribution month, amount, and current date; holdings, transactions, targets, and Research Desk dossiers are excluded. Completed results and source links are stored in D1, and explicit reruns are the only way to start another paid request. Token and search usage is estimated and recorded after successful completion.
+Uses `gpt-5-mini` in two saved background stages: (1) web research with native citations for every shortlisted company, then (2) a structured comparison selecting app-assigned source IDs from provider metadata. Each research stage permits at most 12 search calls and 12,000 output tokens; the comparison has no tools and the same output cap. The full-context reservation is $0.368 per cycle. One explicitly requested repair cycle fits inside the original $1 cap; unknown submission outcomes keep their reservations and never automatically retry.
+
+A missing or mismatched citation never deletes a company, changes its outlook, or moves its proposed allocation to cash. The full result becomes `needs_evidence`, retaining every provisional pick and the original percentages. All share quantities are withheld until the entire comparison is ready. The user can explicitly repair missing/stale/conflicting evidence; repair reconsiders the entire shortlist. Source provenance is not a guarantee that a claim or forecast is correct.
+
+`recommendation_attempts` retains request snapshots, provider IDs, raw outputs, source metadata, failures, cost reservations and actual usage. Duplicate polling uses deterministic usage IDs. Legacy failed responses can be retrieved and revalidated without a new generation. A submission timeout becomes `needs_attention`, preserving data and budget. No API key or portfolio holdings, trades, targets or Research Desk dossiers enter these requests.
+
+Production for this checkout is `https://psx-portfolio-sip.suzairbukhari.workers.dev`. The older ChatGPT Sites publication is a separate deployment, not proof that this Worker has been updated. Apply migration `0010_recommendation_evidence.sql` before deploying this version.
 
 ## Development & deployment
 

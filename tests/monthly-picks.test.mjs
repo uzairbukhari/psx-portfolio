@@ -43,7 +43,7 @@ const portfolio = {
 test('validates complete shortlist coverage and discovered source URLs', () => {
   assert.deepEqual(
     validateMonthlyPicksResearch(research, ['AAA', 'BBB'], new Set([source])),
-    research,
+    { ...research, picks: research.picks.map(p => ({ ...p, evidenceStatus: 'ready' })), coverage: research.coverage.map(c => ({ ...c, evidenceStatus: 'ready' })) },
   );
   assert.throws(() =>
     validateMonthlyPicksResearch(
@@ -57,7 +57,7 @@ test('validates complete shortlist coverage and discovered source URLs', () => {
 test('normalizes shortlist tickers and harmless source URL variations', () => {
   const varied = structuredClone(research);
   varied.picks[0].ticker = ' aaa ';
-  varied.picks[0].sourceUrls = ['https://www.psx.com.pk/example/?utm_source=openai#results'];
+  varied.picks[0].sourceUrls = ['https://www.psx.com.pk/example?utm_source=openai#results'];
   varied.coverage[0].ticker = 'aaa';
   varied.coverage[0].sourceUrls = ['https://www.psx.com.pk/example#company'];
   const validated = validateMonthlyPicksResearch(varied, ['AAA', 'BBB'], new Set([source]));
@@ -73,7 +73,7 @@ test('uses verified company coverage when a pick repeats an unrelated URL', () =
   assert.deepEqual(validated.picks[0].sourceUrls, [source]);
 });
 
-test('withholds an unsupported pick and leaves its allocation uninvested', () => {
+test('preserves unsupported picks, outlook and allocations as a draft', () => {
   const unsupported = structuredClone(research);
   unsupported.picks[0].sourceUrls = ['https://invented.invalid/company'];
   unsupported.coverage[0].sourceUrls = ['https://invented.invalid/company'];
@@ -82,9 +82,14 @@ test('withholds an unsupported pick and leaves its allocation uninvested', () =>
     ['AAA', 'BBB'],
     new Set([source]),
   );
-  assert.deepEqual(validated.picks, []);
-  assert.equal(validated.unallocatedPct, 100);
-  assert.equal(validated.coverage[0].outlook, 'Insufficient evidence');
+  assert.equal(validated.picks[0].ticker, 'AAA');
+  assert.equal(validated.picks[0].allocationPct, 60);
+  assert.equal(validated.unallocatedPct, 40);
+  assert.equal(validated.coverage[0].outlook, 'Positive');
+  assert.equal(validated.coverage[0].summary, research.coverage[0].summary);
+  assert.ok(validated.evidenceIssues.length);
+  assert.equal(estimateMonthlyPicks(validated, portfolio, 20000, 0)[0].shares, null);
+  assert.deepEqual(unsupported.picks[0].sourceUrls, ['https://invented.invalid/company']);
   assert.deepEqual(validated.coverage[0].sourceUrls, []);
 });
 

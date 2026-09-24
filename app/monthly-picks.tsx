@@ -15,7 +15,7 @@ type Recommendation = {
   amount: number;
   feePct: number;
   shortlist: string[];
-  status: 'queued' | 'in_progress' | 'completed' | 'failed';
+  status: 'queued' | 'in_progress' | 'completed' | 'failed' | 'needs_evidence' | 'needs_attention';
   result: MonthlyPicksResearch | null;
   sources: { url: string; title: string }[];
   error: string | null;
@@ -23,6 +23,11 @@ type Recommendation = {
   estimatedCostUsd: number | null;
   createdAt: string;
   updatedAt: string;
+  canRecover?: boolean;
+  canRepair?: boolean;
+  repairMaxCostUsd?: number;
+  researchNotes?: string;
+  phase?: string;
 };
 
 type Props = {
@@ -97,20 +102,23 @@ export default function MonthlyPicks({
   useEffect(() => {
     if (!activeId) return;
     let cancelled = false;
+    let polling = false;
     const poll = async () => {
+      if (polling) return;
+      polling = true;
       try {
         const response = await fetch(`/api/recommendations?id=${encodeURIComponent(activeId)}`);
         const data = (await response.json()) as Recommendation & { error?: string };
         if (!response.ok) throw Error(data.error);
         if (cancelled) return;
         setCurrent(data);
-        if (data.status === 'completed' || data.status === 'failed') {
+        if (!['queued', 'in_progress'].includes(data.status)) {
           setActiveId(null);
           setFailed(data.status === 'failed');
           setMessage(
             data.status === 'completed'
               ? `Research ready · estimated API cost $${(data.estimatedCostUsd ?? 0).toFixed(4)}.`
-              : data.error ?? 'Research did not complete.',
+              : data.error ?? 'Research needs attention; your draft is saved.',
           );
           await loadHistory();
         }
@@ -120,7 +128,7 @@ export default function MonthlyPicks({
           setFailed(true);
           setMessage(error instanceof Error ? error.message : String(error));
         }
-      }
+      } finally { polling = false; }
     };
     void poll();
     const timer = window.setInterval(() => void poll(), 4000);
@@ -183,14 +191,38 @@ export default function MonthlyPicks({
     if (data.status === 'completed') {
       setMessage('Saved recommendation loaded · no new API charge.');
       await loadHistory();
-    } else {
+    } else if (['queued', 'in_progress'].includes(data.status)) {
       setMessage('Research started. You can leave this page and return later.');
       setActiveId(data.id);
+    } else {
+      setMessage(data.error ?? 'Saved draft loaded. Review the evidence gaps below.');
+      await loadHistory();
+    }
+  }
+
+  async function repairResearch(action: 'recover' | 'repair') {
+    if (!current) return;
+    setActiveId(current.id);
+    try {
+      const response = await fetch('/api/recommendations', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: current.id, action, confirmPaidRepair: action === 'repair' }),
+      });
+      const data = await response.json() as Recommendation;
+      if (!response.ok) throw Error(data.error ?? 'Could not repair research.');
+      setCurrent(data);
+      setMessage(action === 'recover' ? 'Saved response reprocessed; no new generation.' : 'Research repair started.');
+      if (!['queued', 'in_progress'].includes(data.status)) setActiveId(null);
+      await loadHistory();
+    } catch (error) {
+      setActiveId(null);
+      setFailed(true);
+      setMessage(error instanceof Error ? error.message : String(error));
     }
   }
 
   const estimates = current?.result
-    ? estimateMonthlyPicks(current.result, portfolio, current.amount, current.feePct)
+    ? estimateMonthlyPicks(current.status === 'completed' ? current.result : { ...current.result, evidenceIssues: ['Draft'] }, portfolio, current.amount, current.feePct)
     : [];
   const allocated = estimates.reduce((sum, pick) => sum + pick.allocationPkr, 0);
   const currentMatches =
@@ -198,7 +230,7 @@ export default function MonthlyPicks({
     current.month === month &&
     current.amount === amount &&
     current.feePct === feePct &&
-    JSON.stringify(current.shortlist) === JSON.stringify(shortlist);
+    JSON.stringify([...current.shortlist].sort()) === JSON.stringify([...shortlist].sort());
 
   return (
     <div className="monthly-picks">
@@ -303,13 +335,28 @@ export default function MonthlyPicks({
         {message && <div className={`notice ${failed ? 'error' : 'success'}`}>{message}</div>}
       </section>
 
-      {current?.status === 'completed' && current.result && (
+      {current && ['failed', 'needs_evidence', 'needs_attention'].includes(current.status) && (
+        <section className="panel" aria-live="polite">
+          <h2>Draft — evidence needs repair</h2>
+          <p>No company has been removed or downgraded because of a citation problem. The whole comparison remains provisional.</p>
+          <p>{current.error}</p>
+          <ul>{current.result?.evidenceIssues?.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+          <div className="row">
+            {current.canRecover && <button className="secondary" disabled={!!activeId} onClick={() => void repairResearch('recover')}>Recover saved response · no new generation</button>}
+            {current.canRepair && <button disabled={!!activeId} onClick={() => void repairResearch('repair')}>Repair research · up to ${(current.repairMaxCostUsd ?? 0).toFixed(2)} within $1 cap</button>}
+          </div>
+          {current.researchNotes && <details><summary>Preserved research notes</summary><p style={{ whiteSpace: 'pre-wrap' }}>{current.researchNotes}</p></details>}
+        </section>
+      )}
+
+      {current?.result && (
         <>
           <section className="panel picks-summary">
             <div className="section-top">
               <div>
                 <p className="eyebrow">{current.month} RECOMMENDATION</p>
-                <h2>{money(allocated)} allocated across {estimates.length} picks</h2>
+                <h2>{current.status === 'completed' ? 'Recommendation' : 'Provisional comparison'} · {estimates.length} picks</h2>
+                <p>{money(allocated)} {current.status === 'completed' ? 'allocated' : 'proposed; not ready for execution'}</p>
               </div>
               <div className="row">
                 <button className="secondary compact" onClick={() => void onRefreshPrices()}>
@@ -348,7 +395,7 @@ export default function MonthlyPicks({
                 <div className="pick-quantity">
                   {pick.shares === null ? (
                     <>
-                      <span>Current dated price needed for share estimate.</span>
+                      <span>{current.status !== 'completed' ? 'Share estimates withheld until the full comparison is ready.' : 'Current dated price needed for share estimate.'}</span>
                       <button className="secondary compact" onClick={() => onManualPrice(pick.ticker)}>
                         Enter dated price
                       </button>
@@ -374,12 +421,13 @@ export default function MonthlyPicks({
 
           <section className="panel picks-coverage">
             <h2>Every shortlisted company</h2>
-            <p className="muted">Why each company was selected or left out.</p>
+            <p className="muted">Investment outlook and evidence status are separate. A citation gap is not a negative outlook.</p>
             {current.result.coverage.map((company) => (
               <details key={company.ticker}>
                 <summary>
                   <b>{company.ticker}</b>
                   <span className="tag">{company.outlook}</span>
+                  {company.evidenceStatus === 'needs_repair' && <span className="tag">Citation repair needed</span>}
                 </summary>
                 <p>{company.summary}</p>
                 <div className="source-links">

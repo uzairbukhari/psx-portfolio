@@ -29,9 +29,11 @@ type RunnerEvent = {
   reportsFound: number;
 };
 
-const runnerId =
-  (typeof crypto !== 'undefined' && crypto.randomUUID?.()) ||
-  Math.random().toString(36).slice(2);
+// Imported during SSR: defer browser identity creation until the runner is used.
+let runnerId: string | undefined;
+function getRunnerId() {
+  return runnerId ??= crypto.randomUUID();
+}
 
 const listeners = new Set<(event: RunnerEvent) => void>();
 export function onRunnerEvent(listener: (event: RunnerEvent) => void) {
@@ -382,7 +384,7 @@ function evidenceFrom(documents: RunnerDocument[], webSources: { title: string; 
 
 async function processJob(job: JobInput) {
   const heartbeat = window.setInterval(
-    () => void call('/api/research/run', { action: 'heartbeat', runnerId, id: job.id }).catch(() => {}),
+    () => void call('/api/research/run', { action: 'heartbeat', runnerId: getRunnerId(), id: job.id }).catch(() => {}),
     30_000,
   );
   let checkpoint: Record<string, unknown> = job.checkpoint || {};
@@ -390,7 +392,7 @@ async function processJob(job: JobInput) {
     emit({ jobId: job.id, stage, message, reportsFound });
     await call('/api/research/run', {
       action: 'progress',
-      runnerId,
+      runnerId: getRunnerId(),
       id: job.id,
       stage,
       message,
@@ -406,7 +408,7 @@ async function processJob(job: JobInput) {
       dossier.name = found.companyName;
       await call('/api/research/run', {
         action: 'complete',
-        runnerId,
+        runnerId: getRunnerId(),
         id: job.id,
         dossier,
         companyName: found.companyName,
@@ -472,7 +474,7 @@ async function processJob(job: JobInput) {
     const evidence = evidenceFrom(documents, found.webSources);
     const synthesis = (await call('/api/research/synthesize', {
       id: job.id,
-      runnerId,
+      runnerId: getRunnerId(),
       ticker: job.ticker,
       companyName: found.companyName,
       market: found.market,
@@ -501,7 +503,7 @@ async function processJob(job: JobInput) {
     await progress('saving', 'Dossier validated; saving to your portfolio', valid.length, checkpoint);
     await call('/api/research/run', {
       action: 'complete',
-      runnerId,
+      runnerId: getRunnerId(),
       id: job.id,
       dossier: synthesis.dossier,
       companyName: found.companyName,
@@ -512,7 +514,7 @@ async function processJob(job: JobInput) {
     try {
       await call('/api/research/run', {
         action: 'attention',
-        runnerId,
+        runnerId: getRunnerId(),
         id: job.id,
         error: error instanceof Error ? error.message : String(error),
         checkpoint,
@@ -532,7 +534,7 @@ async function tick() {
   if (loopRunning) return;
   loopRunning = true;
   try {
-    const data = (await call('/api/research/run', { action: 'claim', runnerId })) as {
+    const data = (await call('/api/research/run', { action: 'claim', runnerId: getRunnerId() })) as {
       job: JobInput | null;
     };
     if (data.job) await processJob(data.job);
