@@ -52,13 +52,6 @@ test('validates complete shortlist coverage and discovered source URLs', () => {
       new Set([source]),
     ),
   );
-  assert.throws(() =>
-    validateMonthlyPicksResearch(
-      { ...research, picks: [{ ...research.picks[0], sourceUrls: ['https://invented.invalid'] }] },
-      ['AAA', 'BBB'],
-      new Set([source]),
-    ),
-  );
 });
 
 test('normalizes shortlist tickers and harmless source URL variations', () => {
@@ -73,13 +66,26 @@ test('normalizes shortlist tickers and harmless source URL variations', () => {
   assert.equal(validated.coverage[0].ticker, 'AAA');
 });
 
-test('rejects unrelated sources with a specific validation error', () => {
+test('uses verified company coverage when a pick repeats an unrelated URL', () => {
   const invalid = structuredClone(research);
   invalid.picks[0].sourceUrls = ['https://www.psx.com.pk/different'];
-  assert.throws(
-    () => validateMonthlyPicksResearch(invalid, ['AAA', 'BBB'], new Set([source])),
-    /unverified or missing source for AAA/,
+  const validated = validateMonthlyPicksResearch(invalid, ['AAA', 'BBB'], new Set([source]));
+  assert.deepEqual(validated.picks[0].sourceUrls, [source]);
+});
+
+test('withholds an unsupported pick and leaves its allocation uninvested', () => {
+  const unsupported = structuredClone(research);
+  unsupported.picks[0].sourceUrls = ['https://invented.invalid/company'];
+  unsupported.coverage[0].sourceUrls = ['https://invented.invalid/company'];
+  const validated = validateMonthlyPicksResearch(
+    unsupported,
+    ['AAA', 'BBB'],
+    new Set([source]),
   );
+  assert.deepEqual(validated.picks, []);
+  assert.equal(validated.unallocatedPct, 100);
+  assert.equal(validated.coverage[0].outlook, 'Insufficient evidence');
+  assert.deepEqual(validated.coverage[0].sourceUrls, []);
 });
 
 test('whole-share estimates include fees and stay within each allocation', () => {

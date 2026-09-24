@@ -89,16 +89,43 @@ export function validateMonthlyPicksResearch(
     throw Error('The recommendation must contain no more than five picks.');
   if (!Array.isArray(result.coverage) || result.coverage.length !== shortlist.length)
     throw Error('The research must cover every shortlisted company.');
-  const pickTickers = new Set<string>();
-  let total = Number(result.unallocatedPct);
-  if (!Number.isFinite(total) || total < 0 || total > 100)
+  let unallocatedPct = Number(result.unallocatedPct);
+  if (!Number.isFinite(unallocatedPct) || unallocatedPct < 0 || unallocatedPct > 100)
     throw Error('Invalid unallocated percentage.');
+  const covered = new Set<string>();
+  const coverageSources = new Map<string, string[]>();
+  for (const item of result.coverage) {
+    const ticker =
+      typeof item.ticker === 'string'
+        ? canonicalTickers.get(item.ticker.trim().toUpperCase())
+        : undefined;
+    if (
+      !ticker ||
+      covered.has(ticker) ||
+      !['Positive', 'Neutral', 'Negative', 'Insufficient evidence'].includes(item.outlook) ||
+      typeof item.summary !== 'string'
+    )
+      throw Error('The recommendation contains invalid company coverage.');
+    const sourceUrls = validatedSources(item.sourceUrls, allowedSources);
+    item.ticker = ticker;
+    if (sourceUrls) {
+      item.sourceUrls = sourceUrls;
+      coverageSources.set(ticker, sourceUrls);
+    } else {
+      item.outlook = 'Insufficient evidence';
+      item.summary = 'No verified source was returned, so this company is not eligible for a recommendation.';
+      item.sourceUrls = [];
+    }
+    covered.add(ticker);
+  }
+  const pickTickers = new Set<string>();
+  const verifiedPicks: MonthlyPick[] = [];
   for (const pick of result.picks) {
     const ticker =
       typeof pick.ticker === 'string'
         ? canonicalTickers.get(pick.ticker.trim().toUpperCase())
         : undefined;
-    if (!ticker) throw Error(`The recommendation contains a company outside the shortlist.`);
+    if (!ticker) throw Error('The recommendation contains a company outside the shortlist.');
     if (pickTickers.has(ticker)) throw Error(`The recommendation repeats ${ticker}.`);
     if (!Number.isFinite(pick.allocationPct) || pick.allocationPct <= 0 || pick.allocationPct > 100)
       throw Error(`The recommendation contains an invalid allocation for ${ticker}.`);
@@ -109,33 +136,20 @@ export function validateMonthlyPicksResearch(
       !Array.isArray(pick.risks)
     )
       throw Error(`The recommendation contains incomplete analysis for ${ticker}.`);
-    const sourceUrls = validatedSources(pick.sourceUrls, allowedSources);
-    if (!sourceUrls)
-      throw Error(`The recommendation contains an unverified or missing source for ${ticker}.`);
+    const sourceUrls =
+      validatedSources(pick.sourceUrls, allowedSources) ?? coverageSources.get(ticker);
     pick.ticker = ticker;
-    pick.sourceUrls = sourceUrls;
-    total += pick.allocationPct;
     pickTickers.add(ticker);
+    if (sourceUrls) {
+      pick.sourceUrls = sourceUrls;
+      verifiedPicks.push(pick);
+    } else {
+      unallocatedPct += pick.allocationPct;
+    }
   }
-  const covered = new Set<string>();
-  for (const item of result.coverage) {
-    const ticker =
-      typeof item.ticker === 'string'
-        ? canonicalTickers.get(item.ticker.trim().toUpperCase())
-        : undefined;
-    const sourceUrls = validatedSources(item.sourceUrls, allowedSources);
-    if (
-      !ticker ||
-      covered.has(ticker) ||
-      !['Positive', 'Neutral', 'Negative', 'Insufficient evidence'].includes(item.outlook) ||
-      typeof item.summary !== 'string' ||
-      !sourceUrls
-    )
-      throw Error('The recommendation contains invalid company coverage.');
-    item.ticker = ticker;
-    item.sourceUrls = sourceUrls;
-    covered.add(ticker);
-  }
+  result.picks = verifiedPicks;
+  result.unallocatedPct = unallocatedPct;
+  const total = unallocatedPct + verifiedPicks.reduce((sum, pick) => sum + pick.allocationPct, 0);
   if (Math.abs(total - 100) > 0.01)
     throw Error('Recommended allocations and cash must total 100%.');
   return result;
