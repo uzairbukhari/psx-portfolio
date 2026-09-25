@@ -12,6 +12,9 @@ declare namespace Cloudflare {
 declare namespace Cloudflare {
   interface Env {
     ALLOWED_EMAILS?: string;
+    PYPSX_API_KEY_ID?: string;
+    PYPSX_API_SECRET_KEY?: string;
+    PYPSX_OWNER_EMAIL?: string;
     GOOGLE_CLIENT_ID?: string;
     GOOGLE_CLIENT_SECRET?: string;
     SESSION_SECRET?: string;

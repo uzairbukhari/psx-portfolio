@@ -35,6 +35,15 @@ export type Trade = {
   externalId?: string;
   voided?: boolean;
 };
+export type StockSplit = {
+  id: string;
+  ticker: string;
+  date: string;
+  oldShares: number;
+  newShares: number;
+  note: string;
+  voided?: boolean;
+};
 export type Dividend = {
   id: string;
   ticker: string;
@@ -79,6 +88,7 @@ export const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
 export type Portfolio = {
   companies: Company[];
   trades: Trade[];
+  stockSplits?: StockSplit[];
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
@@ -243,11 +253,58 @@ function tradesFor(p: Portfolio, ticker: string) {
         (a.kind === 'opening' ? -1 : b.kind === 'opening' ? 1 : 0),
     );
 }
+function splitsFor(p: Portfolio, ticker: string) {
+  return (p.stockSplits ?? [])
+    .filter((s) => s.ticker === ticker && !s.voided)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+}
+type LedgerEvent =
+  | { type: 'split'; value: StockSplit }
+  | { type: 'trade'; value: Trade };
+function ledgerEventsFor(p: Portfolio, ticker: string, throughDate?: string) {
+  const events: LedgerEvent[] = [
+    ...splitsFor(p, ticker).map((value): LedgerEvent => ({ type: 'split', value })),
+    ...tradesFor(p, ticker).map((value): LedgerEvent => ({ type: 'trade', value })),
+  ];
+  return events
+    .filter((event) => !throughDate || event.value.date <= throughDate)
+    .sort((a, b) => {
+      const byDate = a.value.date.localeCompare(b.value.date);
+      if (byDate) return byDate;
+      if (a.type !== b.type) return a.type === 'split' ? -1 : 1;
+      if (a.type === 'trade' && b.type === 'trade') {
+        if (a.value.kind === 'opening' && b.value.kind !== 'opening') return -1;
+        if (a.value.kind !== 'opening' && b.value.kind === 'opening') return 1;
+      }
+      return a.value.id.localeCompare(b.value.id);
+    });
+}
+function applySplit(shares: number, split: StockSplit) {
+  const adjusted = (shares * split.newShares) / split.oldShares;
+  if (!Number.isSafeInteger(adjusted))
+    throw Error(
+      `${split.ticker}: ${split.newShares}-for-${split.oldShares} split on ${split.date} produces fractional shares.`,
+    );
+  return adjusted;
+}
 export function sharesHeldOn(p: Portfolio, ticker: string, date: string) {
   let shares = 0;
-  for (const t of tradesFor(p, ticker)) {
-    if (t.date > date) break;
-    shares += t.kind === 'sell' ? -t.shares : t.shares;
+  for (const event of ledgerEventsFor(p, ticker, date)) {
+    if (event.type === 'split') shares = applySplit(shares, event.value);
+    else
+      shares +=
+        event.value.kind === 'sell' ? -event.value.shares : event.value.shares;
+  }
+  return shares;
+}
+export function sharesHeldBefore(p: Portfolio, ticker: string, date: string) {
+  let shares = 0;
+  for (const event of ledgerEventsFor(p, ticker)) {
+    if (event.value.date >= date) break;
+    if (event.type === 'split') shares = applySplit(shares, event.value);
+    else
+      shares +=
+        event.value.kind === 'sell' ? -event.value.shares : event.value.shares;
   }
   return shares;
 }
@@ -265,7 +322,12 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
   for (const c of p.companies) {
     let shares = 0,
       cost: number | null = 0;
-    for (const t of tradesFor(p, c.ticker)) {
+    for (const event of ledgerEventsFor(p, c.ticker)) {
+      if (event.type === 'split') {
+        shares = applySplit(shares, event.value);
+        continue;
+      }
+      const t = event.value;
       if (t.kind === 'sell') {
         if (t.shares > shares)
           throw Error(c.ticker + ': sale exceeds shares held on ' + t.date);
@@ -385,7 +447,12 @@ export function holdings(p: Portfolio) {
     let shares = 0,
       cost: number | null = 0,
       realized: number | null = 0;
-    for (const t of tradesFor(p, c.ticker)) {
+    for (const event of ledgerEventsFor(p, c.ticker)) {
+      if (event.type === 'split') {
+        shares = applySplit(shares, event.value);
+        continue;
+      }
+      const t = event.value;
       if (t.kind === 'sell') {
         if (t.shares > shares)
           throw Error(c.ticker + ': sale exceeds shares held on ' + t.date);
@@ -405,7 +472,12 @@ export function holdings(p: Portfolio) {
             : cost + t.shares * t.price + t.fees;
       }
     }
-    const q = p.quotes[c.ticker];
+    const latestSplit = splitsFor(p, c.ticker).at(-1);
+    const savedQuote = p.quotes[c.ticker];
+    const q =
+      savedQuote && (!latestSplit || savedQuote.date >= latestSplit.date)
+        ? savedQuote
+        : undefined;
     const value = shares === 0 ? 0 : q ? round(shares * q.price) : null;
     return {
       ...c,
@@ -537,6 +609,42 @@ export function validate(p: Portfolio) {
         throw Error(`Duplicate ${t.source === 'ahl' ? 'AHL' : 'Finqalab'} trade import.`);
       brokerImportIds.add(brokerKey);
     }
+  }
+  if (p.stockSplits !== undefined) {
+    if (!Array.isArray(p.stockSplits) || p.stockSplits.length > 20000)
+      throw Error('Portfolio exceeds supported size.');
+    const splitIds = new Set<string>(),
+      activeDates = new Set<string>();
+    for (const s of p.stockSplits) {
+      if (
+        typeof s.id !== 'string' ||
+        splitIds.has(s.id) ||
+        !tickers.has(s.ticker) ||
+        !dateOK(s.date) ||
+        s.date > today() ||
+        !Number.isSafeInteger(s.oldShares) ||
+        !Number.isSafeInteger(s.newShares) ||
+        s.oldShares <= 0 ||
+        s.newShares <= s.oldShares ||
+        s.newShares > 1e9 ||
+        typeof s.note !== 'string' ||
+        s.note.length > 2000 ||
+        (s.voided !== undefined && typeof s.voided !== 'boolean')
+      )
+        throw Error('Invalid stock split. Use a forward split with whole-share ratios.');
+      splitIds.add(s.id);
+      if (!s.voided) {
+        const key = `${s.ticker}:${s.date}`;
+        if (activeDates.has(key))
+          throw Error(`${s.ticker}: duplicate stock split on ${s.date}.`);
+        activeDates.add(key);
+      }
+    }
+    for (const s of p.stockSplits.filter((entry) => !entry.voided))
+      if (sharesHeldBefore(p, s.ticker, s.date) <= 0)
+        throw Error(
+          `${s.ticker}: no shares were held before the stock split on ${s.date}.`,
+        );
   }
   for (const [t, q] of Object.entries(p.quotes)) {
     if (

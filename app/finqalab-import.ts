@@ -1,4 +1,4 @@
-import { type Company, type Portfolio, type Trade } from '@/lib/portfolio';
+import { type Company, type Portfolio, type Trade } from '../lib/portfolio.ts';
 
 export type FinqalabTrade = {
   ticker: string;

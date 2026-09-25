@@ -1,4 +1,4 @@
-import { type Company, type Portfolio, type Trade } from '@/lib/portfolio';
+import { type Company, type Portfolio, type Trade } from '../lib/portfolio.ts';
 
 export type AhlTrade = {
   ticker: string;
@@ -81,6 +81,34 @@ function sameManualTrade(existing: Trade, incoming: AhlTrade) {
   );
 }
 
+function ahlSharesOn(
+  portfolio: Portfolio,
+  ticker: string,
+  rows: AhlTrade[],
+  throughDate: string,
+) {
+  let shares = 0;
+  const dates = new Set([
+    ...rows.filter((row) => row.date <= throughDate).map((row) => row.date),
+    ...(portfolio.stockSplits ?? [])
+      .filter(
+        (split) =>
+          !split.voided && split.ticker === ticker && split.date <= throughDate,
+      )
+      .map((split) => split.date),
+  ]);
+  for (const date of [...dates].sort()) {
+    const split = (portfolio.stockSplits ?? []).find(
+      (entry) =>
+        !entry.voided && entry.ticker === ticker && entry.date === date,
+    );
+    if (split) shares = (shares * split.newShares) / split.oldShares;
+    for (const row of rows.filter((entry) => entry.date === date))
+      shares += row.kind === 'buy' ? row.shares : -row.shares;
+  }
+  return shares;
+}
+
 export function importAhlTrades(
   portfolio: Portfolio,
   incoming: AhlTrade[],
@@ -136,9 +164,12 @@ export function importAhlTrades(
   )) {
     const rows = historyByTicker.get(opening.ticker);
     if (!rows) continue;
-    const sharesOnDate = rows
-      .filter((row) => row.date <= opening.date)
-      .reduce((sum, row) => sum + (row.kind === 'buy' ? row.shares : -row.shares), 0);
+    const sharesOnDate = ahlSharesOn(
+      portfolio,
+      opening.ticker,
+      rows,
+      opening.date,
+    );
     if (sharesOnDate === opening.shares) voidedTradeIds.add(opening.id);
   }
 
@@ -166,7 +197,19 @@ export function importAhlTrades(
   const desiredAdjustments = new Map<string, { ticker: string; date: string; shares: number }>();
   for (const [ticker, dates] of deltas) {
     let balance = 0;
-    for (const [date, delta] of [...dates].sort(([a], [b]) => a.localeCompare(b))) {
+    const eventDates = new Set([
+      ...dates.keys(),
+      ...(portfolio.stockSplits ?? [])
+        .filter((split) => !split.voided && split.ticker === ticker)
+        .map((split) => split.date),
+    ]);
+    for (const date of [...eventDates].sort()) {
+      const split = (portfolio.stockSplits ?? []).find(
+        (entry) =>
+          !entry.voided && entry.ticker === ticker && entry.date === date,
+      );
+      if (split) balance = (balance * split.newShares) / split.oldShares;
+      const delta = dates.get(date) ?? 0;
       balance += delta;
       if (balance >= 0) continue;
       const shares = -balance;

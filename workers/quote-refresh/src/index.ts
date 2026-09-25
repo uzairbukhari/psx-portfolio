@@ -1,9 +1,8 @@
 import { fetchPsxQuote } from '../../../lib/psx-quotes';
 import {
   fetchPsxIndexSummary,
-  fetchPsxTopMovers,
   fetchPsxIndexSeries,
-  fetchPsxSectorPerformance,
+  fetchPsxMarketWatch,
 } from '../../../lib/psx-market';
 import type { Portfolio } from '../../../lib/portfolio';
 
@@ -78,13 +77,12 @@ async function refreshQuotes(env: Env) {
 }
 
 async function refreshMarketSummary(env: Env) {
-  const [index, movers, series, sectors] = await Promise.all([
+  const [index, series, quotes] = await Promise.all([
     fetchPsxIndexSummary('KSE100'),
-    fetchPsxTopMovers(),
     fetchPsxIndexSeries('KSE100'),
-    fetchPsxSectorPerformance(),
+    fetchPsxMarketWatch(),
   ]);
-  const payload = JSON.stringify({ index, movers, series, sectors });
+  const payload = JSON.stringify({ index, series, quotes });
   const now = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO market_summary_refreshes (id,payload,fetched_at,updated_at)

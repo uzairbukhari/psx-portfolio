@@ -46,6 +46,7 @@ import {
   validate,
   SECTORS,
   sharesHeldOn,
+  sharesHeldBefore,
   taxSummary,
   dateOK,
   RESEARCH_MODELS,
@@ -57,6 +58,7 @@ import {
   type Company,
   type Sector,
   type Dividend,
+  type StockSplit,
   type TaxedDividend,
 } from '@/lib/portfolio';
 import PortfolioReports from './portfolio-reports';
@@ -236,6 +238,14 @@ const blankDividend = (ticker: string): Dividend => ({
   grossAmount: 0,
   note: '',
 });
+const blankStockSplit = (ticker: string): StockSplit => ({
+  id: crypto.randomUUID(),
+  ticker,
+  date: today(),
+  oldShares: 1,
+  newShares: 2,
+  note: '',
+});
 function parseCdcAmount(v: unknown): number {
   return typeof v === 'string' ? Number(v.replace(/,/g, '')) : Number(v);
 }
@@ -333,8 +343,10 @@ function importCdcDividends(
 }
 const kindLabel = (t: Trade) =>
   t.kind === 'opening' ? 'Opening' : t.kind === 'sell' ? 'Sale' : 'Purchase';
-function ledgerGroups(trades: Trade[], ticker = '') {
+function ledgerGroups(trades: Trade[], ticker = '', extraTickers: string[] = []) {
   const groups = new Map<string, Trade[]>();
+  for (const extraTicker of extraTickers)
+    if (!ticker || extraTicker === ticker) groups.set(extraTicker, []);
   for (const t of [...trades]
     .filter((entry) => !ticker || entry.ticker === ticker)
     .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))) {
@@ -343,6 +355,52 @@ function ledgerGroups(trades: Trade[], ticker = '') {
     groups.set(t.ticker, rows);
   }
   return [...groups.entries()];
+}
+function StockSplitHistoryTable({
+  splits,
+  onCorrect,
+}: {
+  splits: StockSplit[];
+  onCorrect: (split: StockSplit) => void;
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {['Effective date', 'Ratio', 'Note', ''].map((label) => (
+            <TableHead key={label}>{label}</TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {splits.map((split) => (
+          <TableRow
+            key={split.id}
+            className={split.voided ? 'row-voided' : ''}
+          >
+            <TableCell>{split.date}</TableCell>
+            <TableCell className="amount">
+              {split.newShares}-for-{split.oldShares}
+              {split.voided && (
+                <span className="tag status-cancelled">Voided</span>
+              )}
+            </TableCell>
+            <TableCell>{split.note || '—'}</TableCell>
+            <TableCell>
+              {!split.voided && (
+                <button
+                  className="secondary compact"
+                  onClick={() => onCorrect(split)}
+                >
+                  Correct
+                </button>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 }
 function TradeHistoryTable({
   trades,
@@ -501,6 +559,8 @@ export default function Dashboard({
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
     [editing, setEditing] = useState<string | null>(null),
+    [stockSplit, setStockSplit] = useState<StockSplit | null>(null),
+    [editingStockSplit, setEditingStockSplit] = useState<string | null>(null),
     [dividend, setDividend] = useState<Dividend | null>(null),
     [editingDividend, setEditingDividend] = useState<string | null>(null),
     [company, setCompany] = useState<Company | null>(null),
@@ -758,7 +818,10 @@ export default function Dashboard({
     if (!holdingsSort || holdingsSort.key !== key) return null;
     return holdingsSort.dir === 'asc' ? ' ▲' : ' ▼';
   }
-  const historyGroups = ledgerGroups(p.trades, historyTicker);
+  const historyGroups = ledgerGroups(p.trades, historyTicker, [
+    ...(p.stockSplits ?? []).map((split) => split.ticker),
+    ...(p.dividends ?? []).map((dividend) => dividend.ticker),
+  ]);
   const taxedDividends = taxSummary(p).dividends;
   const dividendsByTicker = (ticker: string) =>
     (p.dividends ?? [])
@@ -794,6 +857,10 @@ export default function Dashboard({
   function correctDividend(d: Dividend) {
     setEditingDividend(d.id);
     setDividend({ ...d });
+  }
+  function correctStockSplit(entry: StockSplit) {
+    setEditingStockSplit(entry.id);
+    setStockSplit({ ...entry });
   }
   async function refresh() {
     setBusy(true);
@@ -849,6 +916,35 @@ export default function Dashboard({
     );
     setTrade(null);
     setEditing(null);
+    setHistoryTicker(entry.ticker);
+    setTab('history');
+  }
+  async function recordStockSplit(e: { preventDefault(): void }) {
+    e.preventDefault();
+    if (!stockSplit) return;
+    const next = clone(p!);
+    next.stockSplits ??= [];
+    if (editingStockSplit) {
+      const old = next.stockSplits.find(
+        (entry) => entry.id === editingStockSplit,
+      );
+      if (old) old.voided = true;
+    }
+    const entry = { ...stockSplit, id: crypto.randomUUID() };
+    if (editingStockSplit) {
+      const index = next.stockSplits.findIndex(
+        (item) => item.id === editingStockSplit,
+      );
+      next.stockSplits.splice(index + 1, 0, entry);
+    } else next.stockSplits.push(entry);
+    await save(
+      next,
+      editingStockSplit
+        ? 'Stock split correction saved. Previous entry retained as voided.'
+        : 'Stock split saved. Shares and average costs were recalculated.',
+    );
+    setStockSplit(null);
+    setEditingStockSplit(null);
     setHistoryTicker(entry.ticker);
     setTab('history');
   }
@@ -998,7 +1094,7 @@ export default function Dashboard({
           </TabsList>
         )}
         <TabsContent value="holdings">
-          <PsxMarketPulse ref={pulseRef} />
+          <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
           <div className="metrics">
             <article>
               <span>
@@ -1319,6 +1415,17 @@ export default function Dashboard({
                   ))}
                 </select>
               </label>
+              {historyTicker && (
+                <button
+                  className="secondary compact"
+                  onClick={() => {
+                    setEditingStockSplit(null);
+                    setStockSplit(blankStockSplit(historyTicker));
+                  }}
+                >
+                  Record stock split
+                </button>
+              )}
               {!historyTicker && (
                 <label className="history-filter">
                   Show
@@ -1331,7 +1438,7 @@ export default function Dashboard({
                     }
                   >
                     <option value="all">All activity</option>
-                    <option value="trades">Transactions only</option>
+                    <option value="trades">Transactions & splits</option>
                     <option value="dividends">Dividends only</option>
                   </select>
                 </label>
@@ -1424,6 +1531,12 @@ export default function Dashboard({
               const purchases = live.filter((t) => t.kind === 'buy').length;
               const effectiveView = historyTicker ? 'all' : historyView;
               const groupDividends = dividendsByTicker(ticker);
+              const groupSplits = (p.stockSplits ?? [])
+                .filter((split) => split.ticker === ticker)
+                .sort(
+                  (a, b) =>
+                    b.date.localeCompare(a.date) || a.id.localeCompare(b.id),
+                );
               const cs = !historyTicker ? companySummary(ticker) : null;
               return (
                 <section
@@ -1472,15 +1585,26 @@ export default function Dashboard({
                         </div>
                       )}
                     </div>
-                    <button
-                      className="secondary compact"
-                      onClick={() => {
-                        setEditing(null);
-                        setTrade(blankTrade(ticker));
-                      }}
-                    >
-                      <Plus size={14} /> Add purchase
-                    </button>
+                    <div className="row">
+                      <button
+                        className="secondary compact"
+                        onClick={() => {
+                          setEditingStockSplit(null);
+                          setStockSplit(blankStockSplit(ticker));
+                        }}
+                      >
+                        Record stock split
+                      </button>
+                      <button
+                        className="secondary compact"
+                        onClick={() => {
+                          setEditing(null);
+                          setTrade(blankTrade(ticker));
+                        }}
+                      >
+                        <Plus size={14} /> Add purchase
+                      </button>
+                    </div>
                   </div>
                   {effectiveView !== 'dividends' && (
                     <TradeHistoryTable
@@ -1495,6 +1619,15 @@ export default function Dashboard({
                         dividends={groupDividends}
                         taxed={taxedDividends}
                         onCorrect={correctDividend}
+                      />
+                    </div>
+                  )}
+                  {effectiveView !== 'dividends' && groupSplits.length > 0 && (
+                    <div className="dividends-block stock-splits-block">
+                      <p className="dividends-block-heading">Stock splits</p>
+                      <StockSplitHistoryTable
+                        splits={groupSplits}
+                        onCorrect={correctStockSplit}
                       />
                     </div>
                   )}
@@ -1804,10 +1937,6 @@ export default function Dashboard({
                         }
                         const next = clone(p);
                         next.companies = result.companies;
-                        for (const trade of next.trades) {
-                          if (result.voidedTradeIds.includes(trade.id))
-                            trade.voided = true;
-                        }
                         next.trades = [...next.trades, ...result.trades];
                         await save(
                           next,
@@ -1838,6 +1967,10 @@ export default function Dashboard({
                         }
                         const next = clone(p);
                         next.companies = result.companies;
+                        for (const trade of next.trades) {
+                          if (result.voidedTradeIds.includes(trade.id))
+                            trade.voided = true;
+                        }
                         next.trades = [...next.trades, ...result.trades];
                         await save(
                           next,
@@ -2065,6 +2198,166 @@ export default function Dashboard({
                           true;
                         await save(next, 'Entry voided.');
                         setTrade(null);
+                      });
+                    }}
+                  >
+                    Void entry
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!stockSplit}
+        onOpenChange={(open) => {
+          if (!open) {
+            setStockSplit(null);
+            setEditingStockSplit(null);
+          }
+        }}
+      >
+        <DialogContent className="form-dialog">
+          <DialogTitle>
+            {editingStockSplit ? 'Correct stock split' : 'Record stock split'}
+          </DialogTitle>
+          <DialogDescription>
+            A split changes the number of shares held before its effective date.
+            Total purchase cost stays unchanged.
+          </DialogDescription>
+          {stockSplit && (
+            <form onSubmit={(e) => attempt(() => recordStockSplit(e))}>
+              <div className="form-grid">
+                <label>
+                  Company symbol
+                  <input required disabled value={stockSplit.ticker} />
+                </label>
+                <label>
+                  Effective date
+                  <input
+                    type="date"
+                    max={today()}
+                    required
+                    value={stockSplit.date}
+                    onChange={(e) =>
+                      setStockSplit({ ...stockSplit, date: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Old shares
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    value={stockSplit.oldShares}
+                    onChange={(e) =>
+                      setStockSplit({
+                        ...stockSplit,
+                        oldShares: Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  New shares
+                  <input
+                    type="number"
+                    min={stockSplit.oldShares + 1}
+                    step="1"
+                    required
+                    value={stockSplit.newShares}
+                    onChange={(e) =>
+                      setStockSplit({
+                        ...stockSplit,
+                        newShares: Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <label className="wide">
+                  Note
+                  <textarea
+                    maxLength={2000}
+                    placeholder="For example: Face value changed from PKR 10 to PKR 2."
+                    value={stockSplit.note}
+                    onChange={(e) =>
+                      setStockSplit({ ...stockSplit, note: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              {(() => {
+                try {
+                  const base = clone(p);
+                  if (editingStockSplit) {
+                    const old = (base.stockSplits ?? []).find(
+                      (entry) => entry.id === editingStockSplit,
+                    );
+                    if (old) old.voided = true;
+                  }
+                  const before = sharesHeldBefore(
+                    base,
+                    stockSplit.ticker,
+                    stockSplit.date,
+                  );
+                  const after =
+                    (before * stockSplit.newShares) / stockSplit.oldShares;
+                  const preview = clone(base);
+                  preview.stockSplits ??= [];
+                  preview.stockSplits.push(stockSplit);
+                  validate(preview);
+                  const result = holdings(preview).find(
+                    (entry) => entry.ticker === stockSplit.ticker,
+                  );
+                  return (
+                    <div className="mini-stat split-preview">
+                      <span>Preview</span>
+                      <b>
+                        {before.toLocaleString()} → {after.toLocaleString()} shares
+                        on {stockSplit.date}
+                      </b>
+                      <small>
+                        Current: {result?.shares.toLocaleString() ?? '—'} shares ·
+                        Total cost {result?.cost === null ? 'unknown' : money(result?.cost ?? null)} ·
+                        Average {result?.average === null ? 'unknown' : money(result?.average ?? null)}
+                      </small>
+                    </div>
+                  );
+                } catch (error) {
+                  return (
+                    <p className="notice error">
+                      {error instanceof Error ? error.message : String(error)}
+                    </p>
+                  );
+                }
+              })()}
+              <div className="row">
+                <button disabled={busy} type="submit">
+                  Save stock split
+                </button>
+                {editingStockSplit && (
+                  <button
+                    className="secondary"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          'Void this stock split? Its audit record will remain.',
+                        )
+                      )
+                        return;
+                      attempt(async () => {
+                        const next = clone(p);
+                        next.stockSplits!.find(
+                          (entry) => entry.id === editingStockSplit,
+                        )!.voided = true;
+                        await save(next, 'Stock split voided.');
+                        setStockSplit(null);
+                        setEditingStockSplit(null);
                       });
                     }}
                   >

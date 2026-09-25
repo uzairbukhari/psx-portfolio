@@ -87,6 +87,41 @@ export interface SectorPerformance {
   companyCount: number;
 }
 
+export interface MarketWatchQuote {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  high: number;
+  low: number;
+  sourceTimestamp: string | null;
+  retrievedAt: string;
+}
+
+export interface MarketState {
+  isOpen: boolean;
+  label: 'Open' | 'Closed' | 'Friday break';
+  estimated: boolean;
+  timeZone: 'Asia/Karachi';
+}
+
+export interface ShortlistPerformance {
+  ticker: string;
+  name: string;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  high: number | null;
+  low: number | null;
+  previousClose: number | null;
+  sourceTimestamp: string | null;
+  retrievedAt: string | null;
+  intraday: IndexPoint[];
+}
+
 export interface IndexPoint {
   time: number;
   value: number;
@@ -199,6 +234,113 @@ export function parseSectorPerformance(html: string): SectorPerformance[] {
       companyCount: count,
     }))
     .sort((a, b) => b.changePercent - a.changePercent);
+}
+
+export function parseMarketWatch(
+  html: string,
+  retrievedAt = new Date().toISOString(),
+): MarketWatchQuote[] {
+  const rows: MarketWatchQuote[] = [];
+  for (const match of html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+    const row = match[1];
+    const symbolMatch = row.match(
+      /data-search="([A-Z0-9]+)"[\s\S]*?data-title="([^"]*)"/,
+    );
+    if (!symbolMatch) continue;
+    const values = [...row.matchAll(/data-order="(-?[\d.]+)"/g)].map((item) =>
+      num(item[1]),
+    );
+    if (values.length < 8 || values.some((value) => !Number.isFinite(value)))
+      continue;
+    const [, _open, high, low, price, change, changePercent, volume] = values;
+    if (price < 0 || high < 0 || low < 0 || volume < 0) continue;
+    rows.push({
+      symbol: symbolMatch[1],
+      name: symbolMatch[2],
+      price,
+      change,
+      changePercent,
+      volume,
+      high,
+      low,
+      sourceTimestamp: null,
+      retrievedAt,
+    });
+  }
+  if (!rows.length)
+    throw Error(`Unexpected PSX market-watch markup (${html.length} bytes)`);
+  return rows;
+}
+
+export async function fetchPsxMarketWatch(): Promise<MarketWatchQuote[]> {
+  const response = await fetchPsx('https://dps.psx.com.pk/market-watch');
+  const retrievedAt = new Date().toISOString();
+  return parseMarketWatch(await response.text(), retrievedAt);
+}
+
+export function pakistanMarketState(at = new Date()): MarketState {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Karachi',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? '';
+  const weekday = part('weekday');
+  const minutes = Number(part('hour')) * 60 + Number(part('minute'));
+  if (weekday === 'Fri') {
+    const morning = minutes >= 9 * 60 + 17 && minutes < 12 * 60;
+    const afternoon = minutes >= 14 * 60 + 32 && minutes < 16 * 60 + 30;
+    return {
+      isOpen: morning || afternoon,
+      label:
+        minutes >= 12 * 60 && minutes < 14 * 60 + 32
+          ? 'Friday break'
+          : morning || afternoon
+            ? 'Open'
+            : 'Closed',
+      estimated: true,
+      timeZone: 'Asia/Karachi',
+    };
+  }
+  const weekdayOpen = ['Mon', 'Tue', 'Wed', 'Thu'].includes(weekday);
+  const isOpen = weekdayOpen && minutes >= 9 * 60 + 32 && minutes < 15 * 60 + 30;
+  return {
+    isOpen,
+    label: isOpen ? 'Open' : 'Closed',
+    estimated: true,
+    timeZone: 'Asia/Karachi',
+  };
+}
+
+export function selectShortlistPerformance(
+  shortlist: string[],
+  companies: { ticker: string; name: string }[],
+  quotes: MarketWatchQuote[],
+  fallback: Record<string, { price: number; asOf: string; fetchedAt: string }> = {},
+): ShortlistPerformance[] {
+  const names = new Map(companies.map((company) => [company.ticker, company.name]));
+  const byTicker = new Map(quotes.map((quote) => [quote.symbol, quote]));
+  return shortlist.map((ticker) => {
+    const quote = byTicker.get(ticker);
+    const cached = fallback[ticker];
+    return {
+      ticker,
+      name: names.get(ticker) ?? quote?.name ?? ticker,
+      price: quote?.price ?? cached?.price ?? null,
+      change: quote?.change ?? null,
+      changePercent: quote?.changePercent ?? null,
+      volume: quote?.volume ?? null,
+      high: quote?.high ?? null,
+      low: quote?.low ?? null,
+      previousClose: quote ? quote.price - quote.change : null,
+      sourceTimestamp: quote?.sourceTimestamp ?? cached?.asOf ?? null,
+      retrievedAt: quote?.retrievedAt ?? cached?.fetchedAt ?? null,
+      intraday: [],
+    };
+  });
 }
 
 export async function fetchPsxSectorPerformance(): Promise<SectorPerformance[]> {

@@ -9,6 +9,66 @@ test('weighted average includes buy fees and partial sales preserve average',()=
 test('unknown opening cost stays unknown after purchases, resets after exit',()=>{const p=fresh();p.trades=[trade('0',10,null,'opening'),trade('1',10,20)];assert.equal(holdings(p)[0].cost,null);p.trades.push(trade('2',20,30,'sell'),trade('3',5,25));assert.equal(holdings(p)[0].cost,125);assert.equal(holdings(p)[0].realized,null)});
 test('reject overselling, negative fees, future or impossible dates and duplicates',()=>{for(const entry of [trade('1',1,1,'sell'),{...trade('1',1,1),fees:-1},{...trade('1',1,1),date:'2099-01-01'},{...trade('1',1,1),date:'2026-02-30'}]){const p=fresh();p.trades=[entry];assert.throws(()=>validate(p))}const p=fresh();p.companies.push(p.companies[0]);assert.throws(()=>validate(p))});
 test('voided trades are excluded without deleting their audit entries',()=>{const p=fresh();p.trades=[{...trade('1',10,10),voided:true},trade('2',20,20)];assert.equal(holdings(p)[0].shares,20);assert.equal(p.trades.length,2)});
+test('SYS 5-for-1 split adjusts only pre-split shares and preserves total cost',()=>{
+  const p=fresh();
+  p.companies[0]={...p.companies[0],ticker:'SYS',name:'Systems'};
+  p.quotes={SYS:{price:120,date,asOf:date,source:'https://dps.psx.com.pk/company/SYS',fetchedAt:new Date().toISOString()}};
+  p.trades=[
+    {id:'1',ticker:'SYS',kind:'buy',date:'2025-02-06',shares:10,price:566,fees:9.8135,month:'2025-02',note:''},
+    {id:'2',ticker:'SYS',kind:'buy',date:'2025-02-17',shares:5,price:550,fees:4.7687,month:'2025-02',note:''},
+    {id:'3',ticker:'SYS',kind:'buy',date:'2025-04-08',shares:5,price:514,fees:4.4582,month:'2025-04',note:''},
+    {id:'4',ticker:'SYS',kind:'buy',date:'2025-05-13',shares:20,price:535,fees:18.5575,month:'2025-05',note:''},
+    {id:'5',ticker:'SYS',kind:'buy',date:'2025-10-08',shares:140,price:154,fees:37.891,month:'2025-10',note:''},
+    {id:'6',ticker:'SYS',kind:'buy',date:'2025-10-22',shares:6,price:161,fees:2.415,month:'2025-10',note:''},
+  ];
+  p.stockSplits=[{id:'split',ticker:'SYS',date:'2025-06-02',oldShares:1,newShares:5,note:''}];
+  validate(p);
+  const h=holdings(p)[0];
+  assert.equal(h.shares,346);
+  assert.equal(h.cost,44283.9);
+  assert.equal(Math.round(h.average*100),12799);
+});
+test('splits precede same-day trades, support multiple events, sales, and historical dividends',()=>{
+  const p=fresh();
+  p.trades=[
+    {...trade('1',10,100),date:'2025-01-01',month:'2025-01'},
+    {...trade('2',5,40),date:'2025-02-01',month:'2025-02'},
+    {...trade('3',15,50,'sell'),date:'2025-03-01',month:''},
+  ];
+  p.stockSplits=[
+    {id:'s1',ticker:'TEST',date:'2025-02-01',oldShares:1,newShares:2,note:''},
+    {id:'s2',ticker:'TEST',date:'2025-03-01',oldShares:1,newShares:3,note:''},
+  ];
+  p.dividends=[{id:'d',ticker:'TEST',date:'2025-02-01',source:'manual',perShare:1,grossAmount:25,note:''}];
+  validate(p);
+  assert.equal(sharesHeldOn(p,'TEST','2025-02-01'),25);
+  assert.equal(holdings(p)[0].shares,60);
+  assert.equal(taxSummary(p).dividends[0].grossAmount,25);
+  assert.equal(realizedSales(p)[0].costBasis,240);
+});
+test('split validation, voiding, unknown cost, and post-split quote dates are enforced',()=>{
+  const p=fresh();
+  p.trades=[{...trade('0',10,null,'opening'),date:'2025-01-01',month:''}];
+  p.stockSplits=[{id:'s',ticker:'TEST',date:'2025-06-02',oldShares:1,newShares:5,note:''}];
+  p.quotes.TEST={...p.quotes.TEST,date:'2025-06-01'};
+  validate(p);
+  assert.equal(holdings(p)[0].shares,50);
+  assert.equal(holdings(p)[0].cost,null);
+  assert.equal(holdings(p)[0].quote,undefined);
+  p.stockSplits[0].voided=true;
+  assert.equal(holdings(p)[0].shares,10);
+  for(const bad of [
+    {id:'x',ticker:'TEST',date:'2025-06-02',oldShares:1,newShares:1,note:''},
+    {id:'x',ticker:'TEST',date:'2099-01-01',oldShares:1,newShares:5,note:''},
+  ]) assert.throws(()=>validate({...p,stockSplits:[bad]}));
+  assert.throws(()=>validate({...p,stockSplits:[
+    {id:'a',ticker:'TEST',date:'2025-06-02',oldShares:1,newShares:5,note:''},
+    {id:'b',ticker:'TEST',date:'2025-06-02',oldShares:1,newShares:5,note:''},
+  ]}));
+  assert.throws(()=>validate({...p,trades:[{...trade('0',3,10),date:'2025-01-01'}],stockSplits:[
+    {id:'fractional',ticker:'TEST',date:'2025-06-02',oldShares:2,newShares:3,note:''},
+  ]}));
+});
 test('Finqalab imports may predate an AHL opening balance, but active broker keys stay unique',()=>{
   const p=fresh();
   p.trades=[

@@ -49,3 +49,22 @@ test('AHL import skips exact manual matches and rejects an invalid row', () => {
   assert.equal(importAhlTrades(p, [row]).skippedManualMatch, 1);
   assert.throws(() => parseAhlHistory([{ ...history[0], quantity: 0 }]));
 });
+
+test('AHL reconciliation applies stock splits before later trades and snapshots', () => {
+  const p = portfolio();
+  p.companies.push({ ticker: 'SYS', name: 'Systems', sector: 'Technology', target: 0, approved: false, screenDate: '', note: '' });
+  p.stockSplits = [{ id: 'split', ticker: 'SYS', date: '2025-06-02', oldShares: 1, newShares: 5, note: '' }];
+  p.trades.push({ id: 'opening', ticker: 'SYS', kind: 'opening', date: '2025-10-01', shares: 56, price: null, fees: 0, month: '', note: '' });
+  const rows = [
+    { ticker: 'SYS', date: '2025-02-01', kind: 'buy', price: 500, shares: 10, fees: 1, externalId: 'ahl:pre' },
+    { ticker: 'SYS', date: '2025-09-01', kind: 'buy', price: 150, shares: 6, fees: 1, externalId: 'ahl:post' },
+  ];
+  const result = importAhlTrades(p, rows);
+  assert.deepEqual(result.voidedTradeIds, ['opening']);
+
+  const closed = importAhlTrades({ ...p, trades: [] }, [
+    rows[0],
+    { ticker: 'SYS', date: '2025-09-01', kind: 'sell', price: 150, shares: 50, fees: 1, externalId: 'ahl:sale' },
+  ]);
+  assert.equal(closed.trades.filter((entry) => entry.kind === 'opening').length, 0);
+});
