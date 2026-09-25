@@ -11,6 +11,7 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt",
+    "deploy:prod": "npm run build && wrangler deploy --config dist/server/wrangler.json && npm run quote-refresh:deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "WRANGLER_LOG_PATH=.wrangler/logs wrangler d1 migrations apply DB --local --persist-to .wrangler/state",
     "quote-refresh:dev": "wrangler dev --config workers/quote-refresh/wrangler.jsonc --test-scheduled --persist-to ../../.wrangler/state",

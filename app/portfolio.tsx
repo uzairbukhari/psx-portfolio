@@ -63,6 +63,10 @@ import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import MonthlyPicks from './monthly-picks';
+import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
+import { extractPdfText } from './research-pdf';
+import { importAhlTrades, parseAhlHistory } from './ahl-import';
+import { verifyPsxSymbol } from './psx-symbol';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -500,6 +504,7 @@ export default function Dashboard({
     [dividend, setDividend] = useState<Dividend | null>(null),
     [editingDividend, setEditingDividend] = useState<string | null>(null),
     [company, setCompany] = useState<Company | null>(null),
+    [creatingCompany, setCreatingCompany] = useState(false),
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
     [quoteDate, setQuoteDate] = useState(today()),
@@ -884,10 +889,21 @@ export default function Dashboard({
     if (!company) return;
     const next = clone(p!);
     const at = next.companies.findIndex((c) => c.ticker === company.ticker);
+    if (creatingCompany) {
+      if (at >= 0) throw Error(`${company.ticker} is already in your portfolio.`);
+      const quote = await verifyPsxSymbol(company.ticker);
+      next.quotes[company.ticker] = quote;
+    }
     if (at >= 0) next.companies[at] = company;
     else next.companies.push(company);
-    await save(next);
+    await save(
+      next,
+      creatingCompany
+        ? `${company.ticker} confirmed on PSX and added to your portfolio.`
+        : undefined,
+    );
     setCompany(null);
+    setCreatingCompany(false);
   }
   return (
     <main className="desk">
@@ -1046,7 +1062,8 @@ export default function Dashboard({
             <button
               className="secondary"
               disabled={busy}
-              onClick={() =>
+              onClick={() => {
+                setCreatingCompany(true);
                 setCompany({
                   ticker: '',
                   name: '',
@@ -1055,8 +1072,8 @@ export default function Dashboard({
                   approved: false,
                   screenDate: '',
                   note: '',
-                })
-              }
+                });
+              }}
             >
               <Plus size={16} /> Add company
             </button>
@@ -1234,13 +1251,14 @@ export default function Dashboard({
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
-                            onClick={() =>
+                            onClick={() => {
+                              setCreatingCompany(false);
                               setCompany({
                                 ...p.companies.find(
                                   (c) => c.ticker === h.ticker,
                                 )!,
-                              })
-                            }
+                              });
+                            }}
                           >
                             Edit
                           </DropdownMenuItem>
@@ -1761,11 +1779,90 @@ export default function Dashboard({
                     }}
                   />
                 </label>
+                <label className="import-label">
+                  Import trades (Finqalab PDF)
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      attempt(async () => {
+                        if (f.type && f.type !== 'application/pdf')
+                          throw Error('Choose a PDF report from Finqalab.');
+                        const { text } = await extractPdfText(
+                          new Uint8Array(await f.arrayBuffer()),
+                        );
+                        const rows = parseFinqalabReport(text);
+                        const result = importFinqalabTrades(p, rows);
+                        if (!result.imported) {
+                          notify(
+                            `No Finqalab trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
+                            true,
+                          );
+                          return;
+                        }
+                        const next = clone(p);
+                        next.companies = result.companies;
+                        for (const trade of next.trades) {
+                          if (result.voidedTradeIds.includes(trade.id))
+                            trade.voided = true;
+                        }
+                        next.trades = [...next.trades, ...result.trades];
+                        await save(
+                          next,
+                          `${result.imported} Finqalab trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}`,
+                        );
+                      });
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <label className="import-label">
+                  Import trades (AHL JSON)
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      attempt(async () => {
+                        const rows = parseAhlHistory(JSON.parse(await f.text()));
+                        const result = importAhlTrades(p, rows);
+                        if (!result.imported) {
+                          notify(
+                            `No AHL trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
+                            true,
+                          );
+                          return;
+                        }
+                        const next = clone(p);
+                        next.companies = result.companies;
+                        next.trades = [...next.trades, ...result.trades];
+                        await save(
+                          next,
+                          `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}`,
+                        );
+                      });
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
               </div>
               <p className="muted">
                 Import expects the CDC Access dividend export JSON (an array, or
                 an object with a <code>data</code> array). Only Paid rows are
                 imported; personal and bank fields are never read or stored.
+              </p>
+              <p className="muted">
+                Finqalab import accepts its Periodic Trade Details Report PDF.
+                It reads only trade details and ignores subtotal rows. Re-uploading
+                a report or an overlapping partial report will not duplicate trades.
+              </p>
+              <p className="muted">
+                AHL import accepts its trade history JSON. Execution date, quantity,
+                gross rate and net amount are used to reconstruct each trade and fee;
+                repeated uploads and overlapping files are deduplicated.
               </p>
             </section>
           </div>
@@ -2094,7 +2191,10 @@ export default function Dashboard({
       <Dialog
         open={!!company}
         onOpenChange={(open) => {
-          if (!open) setCompany(null);
+          if (!open) {
+            setCompany(null);
+            setCreatingCompany(false);
+          }
         }}
       >
         <DialogContent className="form-dialog">
@@ -2112,10 +2212,7 @@ export default function Dashboard({
                     required
                     pattern="[A-Z0-9]{2,12}"
                     value={company.ticker}
-                    readOnly={
-                      p.companies.some((c) => c.ticker === company.ticker) &&
-                      company.name !== ''
-                    }
+                    readOnly={!creatingCompany}
                     onChange={(e) =>
                       setCompany({
                         ...company,
@@ -2203,6 +2300,9 @@ export default function Dashboard({
                 </label>
               </div>
               <p className="muted">
+                {creatingCompany
+                  ? 'The symbol is checked against PSX before this company is saved.'
+                  : 'This existing symbol has already been created in your portfolio.'}{' '}
                 Screens older than 183 days pause new allocations. Total targets
                 must equal 100%; calculator caps new exposure at 20% per
                 company.

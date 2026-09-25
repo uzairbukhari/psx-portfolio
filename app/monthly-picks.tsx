@@ -15,7 +15,7 @@ type Recommendation = {
   amount: number;
   feePct: number;
   shortlist: string[];
-  status: 'queued' | 'in_progress' | 'completed' | 'failed' | 'needs_evidence' | 'needs_attention';
+  status: 'queued' | 'in_progress' | 'completed' | 'completed_partial' | 'failed' | 'needs_evidence' | 'needs_attention';
   result: MonthlyPicksResearch | null;
   sources: { url: string; title: string }[];
   error: string | null;
@@ -28,6 +28,9 @@ type Recommendation = {
   repairMaxCostUsd?: number;
   researchNotes?: string;
   phase?: string;
+  workflowVersion?: number;
+  batchProgress?: { completed: number; total: number };
+  budgetCommittedUsd?: number;
 };
 
 type Props = {
@@ -41,6 +44,9 @@ type Props = {
   onRefreshPrices: () => Promise<void>;
   onManualPrice: (ticker: string) => void;
 };
+
+const secondarySource = (url: string, sourceType?: string) => sourceType === 'secondary' ||
+  /(?:ksealert|marketscreener|visapathway|financialfilings|finhisaab|investegate|psxterminal|brecorder|dawn|profit\.pakistantoday|mettisglobal|tribune)\./i.test(new URL(url).hostname);
 
 export default function MonthlyPicks({
   portfolio,
@@ -222,11 +228,19 @@ export default function MonthlyPicks({
   }
 
   const estimates = current?.result
-    ? estimateMonthlyPicks(current.status === 'completed' ? current.result : { ...current.result, evidenceIssues: ['Draft'] }, portfolio, current.amount, current.feePct)
+    ? estimateMonthlyPicks(
+        (current.workflowVersion ?? 1) >= 2 && ['completed', 'completed_partial'].includes(current.status)
+          ? current.result
+          : { ...current.result, picks: current.result.picks.map((pick) => ({ ...pick, evidenceStatus: 'needs_repair' as const })) },
+        portfolio,
+        current.amount,
+        current.feePct,
+      )
     : [];
   const allocated = estimates.reduce((sum, pick) => sum + pick.allocationPkr, 0);
   const currentMatches =
-    current?.status === 'completed' &&
+    current !== null &&
+    ['completed', 'completed_partial'].includes(current.status) &&
     current.month === month &&
     current.amount === amount &&
     current.feePct === feePct &&
@@ -331,21 +345,33 @@ export default function MonthlyPicks({
                 : 'Give me recommendation'}
           </button>
           <span className="muted">Maximum API cost: $1 per new run.</span>
+          {activeId && current?.batchProgress && (
+            <span className="muted">Evidence batches: {current.batchProgress.completed}/{current.batchProgress.total}</span>
+          )}
         </div>
         {message && <div className={`notice ${failed ? 'error' : 'success'}`}>{message}</div>}
       </section>
 
       {current && ['failed', 'needs_evidence', 'needs_attention'].includes(current.status) && (
         <section className="panel" aria-live="polite">
-          <h2>Draft — evidence needs repair</h2>
-          <p>No company has been removed or downgraded because of a citation problem. The whole comparison remains provisional.</p>
+          <h2>Research needs attention</h2>
+          <p>Companies with missing evidence remain unassessed; they are not treated as negative opportunities.</p>
           <p>{current.error}</p>
-          <ul>{current.result?.evidenceIssues?.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+          <ul>{current.result?.evidenceIssues?.map((issue, index) => typeof issue === 'string'
+            ? <li key={`${index}:${String(issue)}`}>{issue}</li>
+            : <li key={`${issue.ticker}:${issue.kind}`}><b>{issue.ticker}:</b> {issue.message}</li>)}</ul>
           <div className="row">
             {current.canRecover && <button className="secondary" disabled={!!activeId} onClick={() => void repairResearch('recover')}>Recover saved response · no new generation</button>}
             {current.canRepair && <button disabled={!!activeId} onClick={() => void repairResearch('repair')}>Repair research · up to ${(current.repairMaxCostUsd ?? 0).toFixed(2)} within $1 cap</button>}
           </div>
           {current.researchNotes && <details><summary>Preserved research notes</summary><p style={{ whiteSpace: 'pre-wrap' }}>{current.researchNotes}</p></details>}
+        </section>
+      )}
+
+      {current?.status === 'completed_partial' && current.result && (
+        <section className="panel" aria-live="polite">
+          <h2>Recommendation from the researched subset</h2>
+          <p>Assessed {current.result.assessedCount ?? 0} of {current.result.totalCount ?? current.shortlist.length} companies. Unassessed candidates are listed below and were excluded from the ranking.</p>
         </section>
       )}
 
@@ -355,8 +381,11 @@ export default function MonthlyPicks({
             <div className="section-top">
               <div>
                 <p className="eyebrow">{current.month} RECOMMENDATION</p>
-                <h2>{current.status === 'completed' ? 'Recommendation' : 'Provisional comparison'} · {estimates.length} picks</h2>
-                <p>{money(allocated)} {current.status === 'completed' ? 'allocated' : 'proposed; not ready for execution'}</p>
+                <h2>{['completed', 'completed_partial'].includes(current.status) ? 'Recommendation' : 'Provisional comparison'} · {estimates.length} picks</h2>
+                <p>
+                  {money(allocated)} {['completed', 'completed_partial'].includes(current.status) ? 'allocated' : 'proposed; not ready for execution'}
+                  {current.workflowVersion === 2 && ` · assessed ${current.result.assessedCount ?? 0} of ${current.result.totalCount ?? current.result.coverage.length}`}
+                </p>
               </div>
               <div className="row">
                 <button className="secondary compact" onClick={() => void onRefreshPrices()}>
@@ -388,6 +417,8 @@ export default function MonthlyPicks({
                   </div>
                 </div>
                 <p>{pick.thesis}</p>
+                {pick.whySelected && <p><b>Why selected:</b> {pick.whySelected}</p>}
+                {pick.invalidation && <p><b>What would invalidate this view:</b> {pick.invalidation}</p>}
                 <div className="pick-reasons">
                   <div><b>Catalysts</b><ul>{pick.catalysts.map((item) => <li key={item}>{item}</li>)}</ul></div>
                   <div><b>Risks</b><ul>{pick.risks.map((item) => <li key={item}>{item}</li>)}</ul></div>
@@ -395,7 +426,7 @@ export default function MonthlyPicks({
                 <div className="pick-quantity">
                   {pick.shares === null ? (
                     <>
-                      <span>{current.status !== 'completed' ? 'Share estimates withheld until the full comparison is ready.' : 'Current dated price needed for share estimate.'}</span>
+                      <span>{pick.evidenceStatus === 'needs_repair' ? 'Supporting evidence is incomplete.' : 'Current dated price needed for share estimate.'}</span>
                       <button className="secondary compact" onClick={() => onManualPrice(pick.ticker)}>
                         Enter dated price
                       </button>
@@ -409,9 +440,9 @@ export default function MonthlyPicks({
                   )}
                 </div>
                 <div className="source-links">
-                  {pick.sourceUrls.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noreferrer">
-                      Source <ExternalLink size={13} />
+                  {(pick.sourceDetails ?? pick.sourceUrls.map((url) => ({ url, title: 'Source', date: '', sourceType: undefined }))).map((source) => (
+                    <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                      {secondarySource(source.url, source.sourceType) ? 'Secondary · ' : ''}{source.title}{source.date ? ` · ${source.date}` : ''} <ExternalLink size={13} />
                     </a>
                   ))}
                 </div>
@@ -427,13 +458,14 @@ export default function MonthlyPicks({
                 <summary>
                   <b>{company.ticker}</b>
                   <span className="tag">{company.outlook}</span>
-                  {company.evidenceStatus === 'needs_repair' && <span className="tag">Citation repair needed</span>}
+                  {company.assessmentStatus === 'unassessed' && <span className="tag">Unassessed</span>}
                 </summary>
                 <p>{company.summary}</p>
+                {company.evidenceGap && <p className="muted"><b>Evidence gap:</b> {company.evidenceGap}</p>}
                 <div className="source-links">
-                  {company.sourceUrls.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noreferrer">
-                      Source <ExternalLink size={13} />
+                  {(company.sourceDetails ?? company.sourceUrls.map((url) => ({ url, title: 'Source', date: '', sourceType: undefined }))).map((source) => (
+                    <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                      {secondarySource(source.url, source.sourceType) ? 'Secondary · ' : ''}{source.title}{source.date ? ` · ${source.date}` : ''} <ExternalLink size={13} />
                     </a>
                   ))}
                 </div>

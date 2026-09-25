@@ -9,6 +9,17 @@ test('weighted average includes buy fees and partial sales preserve average',()=
 test('unknown opening cost stays unknown after purchases, resets after exit',()=>{const p=fresh();p.trades=[trade('0',10,null,'opening'),trade('1',10,20)];assert.equal(holdings(p)[0].cost,null);p.trades.push(trade('2',20,30,'sell'),trade('3',5,25));assert.equal(holdings(p)[0].cost,125);assert.equal(holdings(p)[0].realized,null)});
 test('reject overselling, negative fees, future or impossible dates and duplicates',()=>{for(const entry of [trade('1',1,1,'sell'),{...trade('1',1,1),fees:-1},{...trade('1',1,1),date:'2099-01-01'},{...trade('1',1,1),date:'2026-02-30'}]){const p=fresh();p.trades=[entry];assert.throws(()=>validate(p))}const p=fresh();p.companies.push(p.companies[0]);assert.throws(()=>validate(p))});
 test('voided trades are excluded without deleting their audit entries',()=>{const p=fresh();p.trades=[{...trade('1',10,10),voided:true},trade('2',20,20)];assert.equal(holdings(p)[0].shares,20);assert.equal(p.trades.length,2)});
+test('Finqalab imports may predate an AHL opening balance, but active broker keys stay unique',()=>{
+  const p=fresh();
+  p.trades=[
+    {...trade('ahl-opening',10,null,'opening'),date:'2026-09-09',month:'',note:'AHL opening balance'},
+    {...trade('finqalab-buy',5,10),date:'2025-10-03',month:'2025-10',source:'finqalab',externalId:'finqalab:1'},
+  ];
+  validate(p);
+  assert.equal(holdings(p)[0].shares,15);
+  p.trades.push({...trade('finqalab-copy',1,10),source:'finqalab',externalId:'finqalab:1'});
+  assert.throws(()=>validate(p));
+});
 test('monthly purchase spend includes fees and excludes other months/sales/opening',()=>{const p=fresh();p.trades=[trade('0',10,10,'opening'),trade('1',10,10,'buy',5),{...trade('2',5,10),month:'2025-01'},trade('3',1,20,'sell')];const r=plan(p,month);assert.equal(r.already,105);assert.equal(r.remaining,9895)});
 test('missing and older prices block a plan unless older prices explicitly accepted',()=>{const p=fresh();delete p.quotes.TEST;assert.ok(plan(p,month).errors.length);p.quotes.TEST={price:20,date:'2025-01-01',asOf:'2025-01-01',source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()};assert.ok(plan(p,month).errors.length);assert.equal(plan(p,month,0,true).errors.length,0)});
 test('whole-share allocation is within budget, no paused purchases, no overweight MEBL additions',()=>{const p=initialPortfolio();p.quotes=JSON.parse(readFileSync(new URL('../lib/initial-quotes.json',import.meta.url)));const r=plan(p,month,.25,true);assert.equal(r.errors.length,0);assert.ok(r.invested<=r.remaining);assert.equal(r.invested+r.leftover,r.remaining);assert.equal(r.rows.find(x=>x.ticker==='MEBL').shares,0);assert.equal(r.rows.find(x=>x.ticker==='SYS').shares,0);for(const row of r.rows){assert.ok(Number.isInteger(row.shares));assert.ok(row.amount<=row.gap+.001)}});

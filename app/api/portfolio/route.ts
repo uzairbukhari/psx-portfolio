@@ -20,7 +20,11 @@ export async function GET(req: Request) {
         source: string;
         fetched_at: string;
       }>();
+    const portfolioTickers = new Set(
+      portfolio.companies.map((company) => company.ticker),
+    );
     for (const cached of cache.results) {
+      if (!portfolioTickers.has(cached.ticker)) continue;
       if (portfolio.quotes[cached.ticker]?.manual) continue;
       portfolio.quotes[cached.ticker] = {
         price: cached.price,

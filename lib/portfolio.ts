@@ -30,6 +30,9 @@ export type Trade = {
   fees: number;
   month: string;
   note: string;
+  /** Undefined is a legacy/manual entry; broker imports carry a stable key. */
+  source?: 'manual' | 'finqalab' | 'ahl';
+  externalId?: string;
   voided?: boolean;
 };
 export type Dividend = {
@@ -480,6 +483,7 @@ export function validate(p: Portfolio) {
     tickers.add(c.ticker);
   }
   const ids = new Set();
+  const brokerImportIds = new Set<string>();
   const openings = new Map(
     p.trades
       .filter((t) => !t.voided && t.kind === 'opening')
@@ -504,6 +508,13 @@ export function validate(p: Portfolio) {
         : !Number.isFinite(t.price) || t.price <= 0 || t.price > 1e8) ||
       typeof t.note !== 'string' ||
       t.note.length > 2000 ||
+      (t.source !== undefined &&
+        !['manual', 'finqalab', 'ahl'].includes(t.source)) ||
+      (t.externalId !== undefined &&
+        (typeof t.externalId !== 'string' || t.externalId.length > 120)) ||
+      (['finqalab', 'ahl'].includes(t.source ?? '') && !t.externalId) ||
+      ((t.source === undefined || t.source === 'manual') &&
+        t.externalId !== undefined) ||
       (t.month !== '' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(t.month)) ||
       (t.voided !== undefined && typeof t.voided !== 'boolean')
     )
@@ -511,6 +522,8 @@ export function validate(p: Portfolio) {
     if (
       !t.voided &&
       t.kind !== 'opening' &&
+      t.source !== 'finqalab' &&
+      t.source !== 'ahl' &&
       openings.has(t.ticker) &&
       t.date < openings.get(t.ticker)!
     )
@@ -518,6 +531,12 @@ export function validate(p: Portfolio) {
         'Transaction predates the opening balance. Correct or void that opening balance before importing earlier history.',
       );
     ids.add(t.id);
+    if (!t.voided && (t.source === 'finqalab' || t.source === 'ahl')) {
+      const brokerKey = `${t.source}:${t.externalId}`;
+      if (brokerImportIds.has(brokerKey))
+        throw Error(`Duplicate ${t.source === 'ahl' ? 'AHL' : 'Finqalab'} trade import.`);
+      brokerImportIds.add(brokerKey);
+    }
   }
   for (const [t, q] of Object.entries(p.quotes)) {
     if (
