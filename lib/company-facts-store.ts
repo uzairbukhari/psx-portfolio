@@ -1,38 +1,75 @@
-// Shared D1-backed cache for `lib/company-facts.ts`. One row per ticker per PKT
-// calendar day, so re-running Monthly Picks (or two users sharing a ticker) the same
-// day costs zero extra PSX fetches. A per-ticker fetch failure never fails the run:
-// it becomes an `unavailable` fact the scorer treats as a neutral/zero entry.
+// Shared D1-backed reader for `lib/company-facts.ts`. PSX drops Cloudflare egress, so
+// the Worker never fetches company pages itself: `scripts/psx-facts-scrape.mjs` (GitHub
+// Actions, daily + on demand) writes `company_facts` (one row per ticker, latest scrape)
+// and `facts_requests` (last attempt/error per ticker). Everything here is read-only
+// except the best-effort dispatch in `gatherFacts`.
 import { db } from './server.ts';
 import { today } from './portfolio.ts';
-import { fetchCompanyFacts, type CompanyFacts } from './company-facts.ts';
+import type { CompanyFacts } from './company-facts.ts';
+import { classifyFacts, type FactsStatus } from './monthly-picks-flow.ts';
+import { requestFacts } from './github-dispatch.ts';
 
-type FactsRow = { ticker: string; fetched_on: string; payload: string; fetched_at: string };
 export type FactsResult = CompanyFacts | { ticker: string; unavailable: string };
+export type FactsEntry = { status: FactsStatus; facts: CompanyFacts | null };
 
-export async function gatherFacts(tickers: string[]): Promise<FactsResult[]> {
-  const uniqueTickers = [...new Set(tickers)];
-  if (!uniqueTickers.length) return [];
+// D1 allows 100 bound parameters per statement.
+const CHUNK = 90;
+function chunks(list: string[]): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < list.length; i += CHUNK) out.push(list.slice(i, i + CHUNK));
+  return out;
+}
+type FactsRow = { ticker: string; fetched_on: string; payload?: string };
+type RequestRow = { ticker: string; requested_at: string; attempted_at: string | null; error: string | null };
+
+async function read(tickers: string[], withPayload: boolean): Promise<FactsEntry[]> {
+  const unique = [...new Set(tickers)];
   const day = today();
-  const placeholders = uniqueTickers.map(() => '?').join(',');
-  const cached = (await db().prepare(`SELECT * FROM company_facts WHERE fetched_on=? AND ticker IN (${placeholders})`)
-    .bind(day, ...uniqueTickers).all<FactsRow>()).results;
-  const cachedByTicker = new Map(cached.map((row) => [row.ticker, JSON.parse(row.payload) as CompanyFacts]));
-  const missing = uniqueTickers.filter((ticker) => !cachedByTicker.has(ticker));
-
-  const fetched = await Promise.allSettled(missing.map((ticker) => fetchCompanyFacts(ticker)));
-  const results: FactsResult[] = uniqueTickers.map((ticker) => cachedByTicker.get(ticker)).filter((v): v is CompanyFacts => Boolean(v));
-  const writes: D1PreparedStatement[] = [];
-  missing.forEach((ticker, index) => {
-    const outcome = fetched[index];
-    if (outcome.status === 'fulfilled') {
-      results.push(outcome.value);
-      writes.push(db().prepare('INSERT OR REPLACE INTO company_facts (ticker,fetched_on,payload,fetched_at) VALUES (?,?,?,?)')
-        .bind(ticker, day, JSON.stringify(outcome.value), outcome.value.fetchedAt));
-    } else {
-      results.push({ ticker, unavailable: outcome.reason instanceof Error ? outcome.reason.message : 'PSX fetch failed.' });
+  const facts = new Map<string, FactsRow>();
+  const requests = new Map<string, RequestRow>();
+  for (const part of chunks(unique)) {
+    const marks = part.map(() => '?').join(',');
+    const [factRows, requestRows] = await Promise.all([
+      db().prepare(`SELECT ticker,fetched_on${withPayload ? ',payload' : ''} FROM company_facts WHERE ticker IN (${marks})`).bind(...part).all<FactsRow>(),
+      db().prepare(`SELECT ticker,requested_at,attempted_at,error FROM facts_requests WHERE ticker IN (${marks})`).bind(...part).all<RequestRow>(),
+    ]);
+    for (const row of factRows.results) facts.set(row.ticker, row);
+    for (const row of requestRows.results) requests.set(row.ticker, row);
+  }
+  return unique.map((ticker) => {
+    const row = facts.get(ticker);
+    const request = requests.get(ticker);
+    let parsed: CompanyFacts | null = null;
+    if (withPayload && row?.payload) {
+      try { parsed = JSON.parse(row.payload) as CompanyFacts; } catch { parsed = null; }
     }
+    const usable = row && (!withPayload || parsed);
+    return {
+      status: classifyFacts(
+        ticker, usable ? row.fetched_on : null,
+        request ? { requestedAt: request.requested_at, attemptedAt: request.attempted_at, error: request.error } : null,
+        day,
+      ),
+      facts: parsed,
+    };
   });
-  if (writes.length) await db().batch(writes);
-  const byTicker = new Map(results.map((r) => [r.ticker, r]));
-  return uniqueTickers.map((ticker) => byTicker.get(ticker)!);
+}
+
+/** Facts plus scrape status for each ticker. */
+export const readFacts = (tickers: string[]) => read(tickers, true);
+/** Status only (no payload) — cheap enough to list for a whole portfolio. */
+export async function readFactsStatus(tickers: string[]): Promise<FactsStatus[]> {
+  return (await read(tickers, false)).map((entry) => entry.status);
+}
+
+/**
+ * Cache-only lookup used for name/sector enrichment when a portfolio is saved. Tickers
+ * with no stored facts come back `unavailable` and a scrape is requested in the
+ * background so a later save/refresh finds them.
+ */
+export async function gatherFacts(tickers: string[]): Promise<FactsResult[]> {
+  const entries = await readFacts(tickers);
+  const missing = entries.filter((entry) => !entry.facts).map((entry) => entry.status.ticker);
+  if (missing.length) await requestFacts(missing).catch(() => {});
+  return entries.map((entry) => entry.facts ?? { ticker: entry.status.ticker, unavailable: 'No PSX company data yet.' });
 }

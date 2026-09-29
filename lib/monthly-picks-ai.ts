@@ -8,7 +8,9 @@ import type { CompanyMetrics, CompanyScore } from './company-facts.ts';
 import { quantAllocation } from './company-facts.ts';
 import type { CompanyOutlook, MonthlyPick, MonthlyPicksResearch, PickMetrics, SourceDetail } from './monthly-picks.ts';
 
-export const WORKFLOW_VERSION = 8;
+export const WORKFLOW_VERSION = 9;
+// Rows from v8 onward share the same ranking/attempt mechanics and can still be advanced.
+export const MIN_ADVANCE_VERSION = 8;
 export const MODEL = 'gpt-5-mini';
 export const MAX_OUTPUT_TOKENS = 6000;
 // GPT-5 mini: $0.25/M uncached input, $0.025/M cached input, $2/M output. No tools, no

@@ -1,0 +1,38 @@
+name: PSX company facts
+
+# PSX drops requests from Cloudflare's network, so company facts (financials,
+# ratios, announcements) are scraped from a GitHub runner into the shared D1
+# `company_facts` table that Monthly Picks reads. The Worker also dispatches
+# this workflow on demand (`tickers` input) when a run needs missing tickers.
+on:
+  schedule:
+    # Daily 12:00 UTC Monday-Friday = 17:00 PKT, after the close. GitHub may delay runs.
+    - cron: '0 12 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: 'Comma-separated tickers (blank = all held tickers)'
+        required: false
+        default: ''
+
+# Scheduled runs share one group; on-demand runs get their own so a queued
+# dispatch is never cancelled or blocked by another.
+concurrency:
+  group: psx-facts-${{ github.event_name == 'schedule' && 'cron' || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh company_facts from PSX
+        run: node scripts/psx-facts-scrape.mjs ${{ inputs.tickers && format('--tickers={0}', inputs.tickers) || '' }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

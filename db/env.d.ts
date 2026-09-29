@@ -6,6 +6,8 @@ declare namespace Cloudflare {
 declare namespace Cloudflare {
   interface Env {
     OPENAI_API_KEY?: string;
+    GITHUB_DISPATCH_TOKEN?: string;
+    GITHUB_REPO?: string;
     OPENAI_MODEL?: string;
   }
 }

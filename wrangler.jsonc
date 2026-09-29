@@ -15,6 +15,9 @@
     // Empty (default) allows any verified Google account to sign up.
     "ALLOWED_EMAILS": "",
     // Public OAuth client ID from Google Cloud Console (not a secret).
-    "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com"
+    "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+    // Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
+    // data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
+    "GITHUB_REPO": "uzairbukhari/psx-portfolio"
   }
 }
