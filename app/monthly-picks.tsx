@@ -33,6 +33,7 @@ export default function MonthlyPicks({
   const [shortlist, setShortlist] = useState<string[]>(initial.slice(0, MAX_SHORTLIST));
   const [amount, setAmount] = useState(portfolio.budgets[month] ?? 100000);
   const [starting, setStarting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const recs = useRecommendations();
   const { current } = recs;
 
@@ -46,6 +47,7 @@ export default function MonthlyPicks({
 
   async function generate() {
     setStarting(true);
+    setExpanded(false);
     try {
       const shortlistChanged = JSON.stringify(portfolio.monthlyPicksShortlist ?? []) !== JSON.stringify(shortlist);
       if (shortlistChanged || portfolio.budgets[month] !== amount) {
@@ -87,6 +89,8 @@ export default function MonthlyPicks({
         busy={busy || starting} rerun={currentMatches}
         onGenerate={() => void generate()}
         onRefreshFacts={(tickers) => void refreshFacts(tickers)}
+        collapsed={!expanded && (active || !!current?.result)}
+        onExpand={() => setExpanded(true)}
       />
 
       {recs.error && (

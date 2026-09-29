@@ -6,7 +6,9 @@ import { money, type Portfolio } from '@/lib/portfolio';
 import { estimateMonthlyPicks, type CompanyOutlook, type MonthlyPickEstimate } from '@/lib/monthly-picks';
 import type { Recommendation } from './use-recommendations';
 
-const pct = (value: number | null | undefined) => (value === null || value === undefined ? '—' : `${value}%`);
+// Growth off a tiny base can be thousands of percent; show it as a capped, honest bound.
+const pct = (value: number | null | undefined) =>
+  value === null || value === undefined ? '—' : Math.abs(value) > 500 ? `${value > 0 ? '>+' : '<-'}500%` : `${value}%`;
 const num = (value: number | null | undefined) => (value === null || value === undefined ? '—' : String(value));
 const OUTLOOKS = ['Positive', 'Neutral', 'Negative', 'Insufficient evidence'] as const;
 const outlookClass = (outlook: string) => outlook.split(' ')[0].toLowerCase();
@@ -50,6 +52,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
   const [filter, setFilter] = useState<(typeof OUTLOOKS)[number] | 'All'>('All');
   const [sort, setSort] = useState<'score' | 'ticker'>('score');
   const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<'picks' | 'all'>('picks');
   const coverage = useMemo(() => {
     const rows = result.coverage.filter((company) => filter === 'All' || company.outlook === filter);
     return [...rows].sort((a, b) => sort === 'ticker' ? a.ticker.localeCompare(b.ticker) : (b.metrics?.score ?? -1) - (a.metrics?.score ?? -1));
@@ -92,6 +95,16 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
         <p className="mp-outlook">{result.marketOutlook}</p>
       </section>
 
+      <div className="mp-tabs">
+        <button type="button" className={`mp-tab${view === 'picks' ? ' active' : ''}`} aria-pressed={view === 'picks'} onClick={() => setView('picks')}>
+          Picks <span>{estimates.length}</span>
+        </button>
+        <button type="button" className={`mp-tab${view === 'all' ? ' active' : ''}`} aria-pressed={view === 'all'} onClick={() => setView('all')}>
+          All companies <span>{result.coverage.length}</span>
+        </button>
+      </div>
+
+      {view === 'picks' && (
       <div className="mp-cards">
         {estimates.map((pick, index) => (
           <article className="mp-card" key={pick.ticker}>
@@ -116,7 +129,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
             <div className="mp-quantity">
               {pick.shares === null ? (
                 <>
-                  <span>{pick.evidenceStatus === 'needs_repair' ? 'Supporting evidence is incomplete.' : 'A dated price from the last 7 days is needed for a share estimate.'}</span>
+                  <span>{pick.evidenceStatus === 'needs_repair' ? 'Evidence incomplete.' : 'No price from the last 7 days.'}</span>
                   <button type="button" className="secondary compact" onClick={() => onManualPrice(pick.ticker)}>Enter price</button>
                 </>
               ) : (
@@ -139,8 +152,11 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
             </details>
           </article>
         ))}
+        {!estimates.length && <p className="muted">No company scored high enough to recommend an allocation this month. See All companies for the scores.</p>}
       </div>
+      )}
 
+      {view === 'all' && (
       <section className="mp-coverage">
         <div className="mp-coverage__top">
           <div>
@@ -215,6 +231,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
           {!coverage.length && <p className="muted mp-empty">No companies in this group.</p>}
         </div>
       </section>
+      )}
     </>
   );
 }

@@ -26,6 +26,8 @@ type Props = {
   rerun: boolean;
   onGenerate: () => void;
   onRefreshFacts: (tickers: string[]) => void;
+  collapsed: boolean;
+  onExpand: () => void;
 };
 
 function freshness(info: FactsInfo | undefined, dispatchEnabled: boolean) {
@@ -64,6 +66,31 @@ export default function PicksSetup(props: Props) {
     : !shortlist.length ? 'Choose at least one company.'
     : !amountValid ? 'Enter an amount between 1 and 1,000,000,000.'
     : '';
+
+  const generateButton = (
+    <button type="button" className="mp-generate" disabled={props.busy || !!disabledReason} onClick={props.onGenerate}>
+      {props.running ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
+      {props.running ? 'Working…' : props.rerun ? 'Re-run picks' : 'Generate picks'}
+    </button>
+  );
+
+  if (props.collapsed) {
+    return (
+      <section className="mp-setup mp-setup--collapsed">
+        <div className="mp-setup__summary">
+          <b>{props.month}</b>
+          <span>{money(props.amount)}</span>
+          <span>{props.feePct}% fees</span>
+          <span>{shortlist.length} {shortlist.length === 1 ? 'company' : 'companies'}</span>
+          {!!notFresh.length && <span className="mp-hint mp-hint--warn">{notFresh.length} need fresh data</span>}
+        </div>
+        <div className="mp-actionbar__buttons">
+          <button type="button" className="secondary compact" onClick={props.onExpand}>Edit inputs</button>
+          {generateButton}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mp-setup">
@@ -166,10 +193,7 @@ export default function PicksSetup(props: Props) {
               {props.refreshing ? 'Fetching…' : 'Fetch data now'}
             </button>
           )}
-          <button type="button" className="mp-generate" disabled={props.busy || !!disabledReason} onClick={props.onGenerate}>
-            {props.running ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
-            {props.running ? 'Working…' : props.rerun ? 'Re-run picks' : 'Generate picks'}
-          </button>
+          {generateButton}
         </div>
       </div>
     </section>
