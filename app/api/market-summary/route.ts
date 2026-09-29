@@ -10,12 +10,17 @@ import {
   type MarketWatchQuote,
 } from '@/lib/psx-market';
 import { fetchBudget, type FetchBudget } from '@/lib/psx-fetch';
-import { mergeQuotes, readQuoteRows, refreshQuotes } from '@/lib/quote-cache';
+import { mergeQuotes, OPEN_TTL_MS, readQuoteRows, refreshQuotes } from '@/lib/quote-cache';
 import { db, failure, identity } from '@/lib/server';
 import { fetchPypsxIntradayFor, pypsxCredentialsFor } from '@/lib/pypsx-server';
 
-/** Repeat refreshes (other tabs, double clicks) inside this window reuse the saved summary. */
-const MIN_REFRESH_MS = 60_000;
+/**
+ * A saved summary younger than this is served as-is. The GitHub Actions
+ * scraper (scripts/psx-quote-scrape.mjs) rewrites it every few minutes because
+ * PSX refuses most requests from Cloudflare, so the Worker only tries PSX
+ * itself when the scraper has fallen behind.
+ */
+const MIN_REFRESH_MS = OPEN_TTL_MS;
 /** PSX fetches allowed per POST — stays under the Workers subrequest cap with room for D1/pyPSX. */
 const PSX_BUDGET = 35;
 /** Shortlist tickers refreshed per POST and pyPSX intraday calls per request. */
@@ -154,7 +159,7 @@ export async function POST(req: Request) {
       return Response.json(
         {
           ...(await personalized(user, previous.cache, previous.fetchedAt)),
-          skipped: recent ? 'Recently refreshed' : market.label,
+          skipped: recent ? 'Up to date' : market.label,
         },
         { headers: { 'Cache-Control': 'no-store' } },
       );
@@ -172,16 +177,21 @@ export async function POST(req: Request) {
         indexResult.status === 'fulfilled' ? indexResult.value : previous.cache.index,
       series:
         seriesResult.status === 'fulfilled' ? seriesResult.value : previous.cache.series,
-      // Never carry an old market-watch snapshot forward: it would outrank the
-      // fresher per-ticker quote cache in personalized().
-      quotes: quotesResult.status === 'fulfilled' ? quotesResult.value : undefined,
+      // personalized() only lets these outrank the per-ticker cache when newer.
+      quotes: quotesResult.status === 'fulfilled' ? quotesResult.value : previous.cache.quotes,
     };
     if (
       indexResult.status === 'rejected' &&
       seriesResult.status === 'rejected' &&
       quotesResult.status === 'rejected'
     )
-      throw Error('PSX market data is temporarily unavailable. Showing the last saved update.');
+      return Response.json(
+        {
+          ...(await personalized(user, previous.cache, previous.fetchedAt)),
+          skipped: 'PSX unavailable; showing the last saved update',
+        },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
 
     const now = new Date().toISOString();
     await db()

@@ -163,3 +163,32 @@ test('parseIndexConstituents reads every row of an /indices/ALLSHR table', () =>
 test('parseIndexConstituents rejects markup without a constituent table', () => {
   assert.throws(() => parseIndexConstituents('<html></html>'), /Unexpected PSX index constituents/);
 });
+
+test('parseIndexSummary reads a falling index printed with a minus sign', () => {
+  const html = readFileSync(new URL('./fixtures/psx-home-kse100-down.html', import.meta.url), 'utf8');
+  const summary = parseIndexSummary(html, 'KSE100');
+  assert.equal(summary.close, 170382.82);
+  assert.equal(summary.change, -42.8);
+  assert.equal(summary.changePercent, -0.03);
+  assert.equal(summary.previousClose, 170425.62);
+});
+
+test('buildMarketSummary grows today\'s KSE100 series and carries every ALLSHR quote', async () => {
+  const { buildMarketSummary } = await import('../scripts/psx-quote-scrape.mjs');
+  const index = { date: '2026-09-29', asOf: '2026-09-29 12:18:30', close: 170382.82 };
+  const previous = {
+    series: [
+      { time: 1790500000, value: 1 }, // 2026-09-27, dropped
+      { time: 1790659110, value: 170400 }, // 2026-09-29 10:18:30 PKT, kept
+    ],
+  };
+  const rows = [{ symbol: 'MEBL', name: 'Meezan', price: 550.2, change: 0.97, changePercent: 0.18, volume: 10 }];
+  const summary = buildMarketSummary(previous, index, rows, '2026-09-29T07:19:00Z');
+  assert.deepEqual(summary.series, [
+    { time: 1790659110, value: 170400 },
+    { time: 1790666310, value: 170382.82 },
+  ]);
+  assert.equal(summary.quotes[0].symbol, 'MEBL');
+  assert.equal(summary.quotes[0].high, null);
+  assert.equal(buildMarketSummary(null, index, rows, 'x').series.length, 1);
+});
