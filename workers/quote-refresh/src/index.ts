@@ -1,8 +1,3 @@
-import {
-  fetchPsxIndexSummary,
-  fetchPsxIndexSeries,
-  fetchPsxMarketWatch,
-} from '../../../lib/psx-market';
 import { fetchBudget } from '../../../lib/psx-fetch';
 import { refreshQuotes } from '../../../lib/quote-cache';
 import type { Portfolio } from '../../../lib/portfolio';
@@ -50,52 +45,15 @@ async function refreshAllQuotes(env: Env) {
   );
 }
 
-async function refreshMarketSummary(env: Env) {
-  // One PSX call each; /timeseries/int and /market-watch currently 404, so keep
-  // whatever pieces succeed instead of dropping the whole summary.
-  const budget = fetchBudget(5);
-  const [indexResult, seriesResult, quotesResult] = await Promise.allSettled([
-    fetchPsxIndexSummary('KSE100', budget),
-    fetchPsxIndexSeries('KSE100', 60, budget),
-    fetchPsxMarketWatch(budget),
-  ]);
-  if (indexResult.status === 'rejected') throw indexResult.reason;
-  const index = indexResult.value;
-  const previous = await env.DB.prepare(
-    "SELECT payload FROM market_summary_refreshes WHERE id='latest'",
-  ).first<{ payload: string }>();
-  let previousSeries: unknown;
-  try {
-    previousSeries = previous ? JSON.parse(previous.payload).series : undefined;
-  } catch {
-    previousSeries = undefined;
-  }
-  const payload = JSON.stringify({
-    index,
-    series: seriesResult.status === 'fulfilled' ? seriesResult.value : previousSeries,
-    quotes: quotesResult.status === 'fulfilled' ? quotesResult.value : undefined,
-  });
-  const now = new Date().toISOString();
-  await env.DB.prepare(
-    `INSERT INTO market_summary_refreshes (id,payload,fetched_at,updated_at)
-     VALUES ('latest',?,?,?)
-     ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
-  )
-    .bind(payload, index.fetchedAt, now)
-    .run();
-  console.log('PSX market summary refreshed.');
-}
-
 export default {
   async fetch() {
     return new Response('Not found', { status: 404 });
   },
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    // Fallback only: the GitHub Actions scraper is the primary writer of both
+    // quote_refreshes and market_summary_refreshes (PSX refuses most Cloudflare
+    // requests), so this skips quotes it already has fresh and leaves the
+    // market summary alone.
     ctx.waitUntil(refreshAllQuotes(env));
-    ctx.waitUntil(
-      refreshMarketSummary(env).catch((error) =>
-        console.log(`PSX market summary refresh failed: ${error instanceof Error ? error.message : error}`),
-      ),
-    );
   },
 } satisfies ExportedHandler<Env>;

@@ -94,8 +94,9 @@ export interface MarketWatchQuote {
   change: number;
   changePercent: number;
   volume: number;
-  high: number;
-  low: number;
+  /** Null when the source (e.g. an /indices constituent table) has no day range. */
+  high: number | null;
+  low: number | null;
   sourceTimestamp: string | null;
   retrievedAt: string;
 }
@@ -135,7 +136,8 @@ export function parseIndexSummary(html: string, indexName = 'KSE100'): IndexSumm
 
   const meta = block.match(/data-date="([^"]+)"[^>]*data-close="([^"]+)"/);
   const changeMatch = block.match(
-    /marketIndices__change change__text--(pos|neg)">(?:<i[^>]*><\/i>)?\s*([\d,.]+)\s*\(([-\d.]+)%\)/,
+    // A falling index is printed with its own minus sign ("-42.80 (-0.03%)").
+    /marketIndices__change change__text--(pos|neg)">(?:<i[^>]*><\/i>)?\s*-?([\d,.]+)\s*\((-?[\d.]+)%\)/,
   );
   const stat = (label: string) =>
     block.match(

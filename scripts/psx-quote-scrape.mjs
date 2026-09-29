@@ -6,7 +6,9 @@
 // .github/workflows/psx-quotes.yml): one request to /indices/ALLSHR prices every
 // All-Share stock, the homepage supplies the market timestamp, and any held
 // ticker missing from ALLSHR (e.g. ETFs) falls back to its company page. Only
-// tickers held in some portfolio are written, through the D1 REST API.
+// tickers held in some portfolio go into `quote_refreshes`; the KSE100 summary,
+// a per-day KSE100 chart and the whole ALLSHR table go into
+// `market_summary_refreshes` for the market pulse. Writes use the D1 REST API.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-quote-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
@@ -64,17 +66,76 @@ export function psxAsOf(stamp) {
   return `${weekday}, ${MONTHS[month - 1]} ${day}, ${year} ${hour12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
+const MAX_SERIES_POINTS = 120;
+
+/** "2026-09-29 11:33:30" in PKT (UTC+5) -> Unix seconds. */
+function pktSeconds(stamp) {
+  const [date, time = '00:00:00'] = stamp.split(' ');
+  return Math.round((Date.parse(`${date}T${time}Z`) - 5 * 3_600_000) / 1000);
+}
+
+/**
+ * Builds the `market_summary_refreshes` payload the market pulse reads. PSX's
+ * intraday /timeseries endpoint is gone, so the KSE100 chart is grown one point
+ * per scrape and reset each trading day; `quotes` is the full ALLSHR table so
+ * shortlisted companies get price and day change even when nobody holds them.
+ */
+export function buildMarketSummary(previous, index, constituents, retrievedAt) {
+  const dayStart = pktSeconds(`${index.date} 00:00:00`);
+  const time = pktSeconds(index.asOf);
+  const series = (Array.isArray(previous?.series) ? previous.series : []).filter(
+    (point) => point.time >= dayStart && point.time < time,
+  );
+  series.push({ time, value: index.close });
+  return {
+    index,
+    series: series.slice(-MAX_SERIES_POINTS),
+    quotes: constituents.map((row) => ({
+      symbol: row.symbol,
+      name: row.name,
+      price: row.price,
+      change: row.change,
+      changePercent: row.changePercent,
+      volume: row.volume,
+      high: null,
+      low: null,
+      sourceTimestamp: index.asOf,
+      retrievedAt,
+    })),
+  };
+}
+
+async function writeMarketSummary(index, constituents, retrievedAt) {
+  const [row] = await d1("SELECT payload FROM market_summary_refreshes WHERE id='latest'");
+  let previous = null;
+  try {
+    previous = row ? JSON.parse(row.payload) : null;
+  } catch {
+    previous = null;
+  }
+  const payload = buildMarketSummary(previous, index, constituents, retrievedAt);
+  await d1(
+    `INSERT INTO market_summary_refreshes (id,payload,fetched_at,updated_at)
+     VALUES ('latest',?,?,?)
+     ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
+    [JSON.stringify(payload), retrievedAt, retrievedAt],
+  );
+  return payload.series.length;
+}
+
 async function main() {
   const tickers = await heldTickers();
   const [home, allshr] = await Promise.all([
     fetchPsx('https://dps.psx.com.pk/').then((response) => response.text()),
     fetchPsx(SOURCE).then((response) => response.text()),
   ]);
-  const stamp = parseIndexSummary(home, 'KSE100').asOf;
+  const index = parseIndexSummary(home, 'KSE100');
+  const stamp = index.asOf;
   const asOf = psxAsOf(stamp);
   const date = stamp.slice(0, 10);
   const fetchedAt = new Date().toISOString();
-  const bySymbol = new Map(parseIndexConstituents(allshr).map((row) => [row.symbol, row]));
+  const constituents = parseIndexConstituents(allshr);
+  const bySymbol = new Map(constituents.map((row) => [row.symbol, row]));
 
   const quotes = {};
   const missing = [];
@@ -100,6 +161,7 @@ async function main() {
   );
   if (dryRun) {
     for (const [ticker, quote] of entries) console.log(`  ${ticker} ${quote.price} (${quote.asOf})`);
+    console.log(`  KSE100 ${index.close} ${index.changePercent}% · ${constituents.length} ALLSHR quotes`);
     return;
   }
   const now = new Date().toISOString();
@@ -122,6 +184,8 @@ async function main() {
       ]),
     );
   }
+  const points = await writeMarketSummary(index, constituents, fetchedAt);
+  console.log(`Market summary: KSE100 ${index.close} (${points} chart points), ${constituents.length} ALLSHR quotes.`);
   if (!entries.length) process.exitCode = 1;
 }
 
