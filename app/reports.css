@@ -1,0 +1,23 @@
+/* Portfolio Reports revamp (loads after globals.css) */
+.reports{padding-top:18px}
+.reports-intro{background:none!important;padding:0!important;margin-bottom:18px!important;gap:16px!important;border-radius:0}
+.reports-intro-header p:not(.eyebrow){color:var(--muted-foreground)!important;font-size:14px}
+.reports-intro .eyebrow{color:var(--primary)!important}
+.reports-hero-stats{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px!important}
+.reports-priced-value{min-width:0!important;padding:16px 18px!important;border:1px solid var(--card-border)!important;border-radius:12px;background:var(--card)}
+.reports-priced-value span{font-size:11px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;color:var(--muted-foreground)!important}
+.reports-priced-value small{display:block;font-size:12px;color:var(--muted-foreground)!important;line-height:1.4}
+.reports-priced-value strong{font-size:24px!important;margin:8px 0 4px!important}
+.reports-summary{display:flex!important;flex-wrap:wrap;gap:8px;margin:0 0 16px!important;border:0!important;background:none!important;backdrop-filter:none!important}
+.reports-summary article{flex:1 1 200px;display:flex;flex-direction:column;padding:10px 14px!important;border:1px solid var(--border)!important;border-radius:10px;background:rgba(255,255,255,.02)}
+.reports-summary article:last-child{border:1px solid var(--border)!important}
+.reports-summary strong{font-size:16px!important;margin:2px 0!important}
+.reports-tabs{margin:4px 0 16px;max-width:100%;overflow-x:auto}
+.reports[data-view="allocation"] .report-panel:not([data-group="allocation"]),
+.reports[data-view="performance"] .report-panel:not([data-group="performance"]),
+.reports[data-view="income"] .report-panel:not([data-group="income"]),
+.reports[data-view="activity"] .report-panel:not([data-group="activity"]){display:none}
+.report-panel{border-radius:14px!important;transition:border-color .15s ease}
+.report-panel:hover{border-color:rgba(59,130,246,.35)}
+@media(max-width:900px){.reports-hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.reports-hero-stats{grid-template-columns:1fr}.reports-intro{padding:0!important}}

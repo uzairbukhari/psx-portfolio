@@ -53,3 +53,14 @@
 .picks-coverage,.picks-history{border-radius:var(--radius)}
 @media(max-width:900px){.picks-plan{grid-template-columns:1fr}.picks-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.picks-plan{padding:18px}.picks-plan .picks-inputs{grid-template-columns:1fr}.pick-head{grid-template-columns:auto minmax(0,1fr) auto}.pick-head .tag{display:none}.pick-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.picks-tools{width:100%;justify-content:space-between}}
+.cov-group{margin-top:20px}
+.cov-title{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.8px}
+.cov-title span{border-radius:20px;padding:1px 8px;background:rgba(255,255,255,.08);font-size:12px}
+.cov-title.outlook-positive{color:var(--success)}.cov-title.outlook-negative{color:var(--danger)}.cov-title.outlook-neutral,.cov-title.outlook-insufficient{color:var(--muted-foreground)}
+.cov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.cov-card{border:1px solid var(--border)!important;border-left:3px solid var(--border)!important;border-radius:10px;padding:10px 14px!important;background:rgba(255,255,255,.02);min-width:0}
+.cov-card.outlook-positive{border-left-color:var(--success)!important}.cov-card.outlook-negative{border-left-color:var(--danger)!important}
+.cov-card[open]{grid-column:1/-1}
+.cov-card summary{display:flex;align-items:center;justify-content:flex-start!important;gap:10px;min-width:0}
+.cov-card summary small{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted-foreground)}
+.cov-card[open] summary small{display:none}

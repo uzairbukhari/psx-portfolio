@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -183,6 +184,7 @@ export default function PortfolioReports({
 }: {
   portfolio: Portfolio;
 }) {
+  const [view, setView] = useState<'all' | 'allocation' | 'performance' | 'income' | 'activity'>('all');
   const report = portfolioReport(portfolio);
   const completeQuotes =
     report.summary.quoteCoverage.percentage === 100 &&
@@ -251,7 +253,7 @@ export default function PortfolioReports({
     : 0;
 
   return (
-    <div className="reports">
+    <div className="reports" data-view={view}>
       <div className="reports-intro">
         <div className="reports-intro-header">
           <p className="eyebrow">PORTFOLIO REPORTS</p>
@@ -360,8 +362,29 @@ export default function PortfolioReports({
         </article>
       </section>
 
+      <div className="reports-tabs seg" aria-label="Report section">
+        {(
+          [
+            ['all', 'All'],
+            ['allocation', 'Allocation'],
+            ['performance', 'Performance'],
+            ['income', 'Income'],
+            ['activity', 'Activity'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            data-active={view === value || undefined}
+            onClick={() => setView(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="reports-grid" style={{ marginBottom: 20 }}>
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="performance">
           <div className="report-heading">
             <div>
               <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
@@ -434,7 +457,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="performance">
           <div className="report-heading">
             <div>
               <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
@@ -532,7 +555,7 @@ export default function PortfolioReports({
       </div>
 
       <div className="reports-grid">
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="income">
           <div className="report-heading">
             <div>
               <p className="eyebrow">DIVIDEND TRAJECTORY</p>
@@ -619,7 +642,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="income">
           <div className="report-heading">
             <div>
               <p className="eyebrow">TOP PAYERS</p>
@@ -731,7 +754,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="allocation">
           <div className="report-heading">
             <div>
               <p className="eyebrow">ALLOCATION LADDER</p>
@@ -817,7 +840,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="performance">
           <div className="report-heading">
             <div>
               <p className="eyebrow">PERFORMANCE</p>
@@ -909,7 +932,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="allocation">
           <div className="report-heading">
             <div>
               <p className="eyebrow">DIVERSIFICATION</p>
@@ -982,7 +1005,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="activity">
           <div className="report-heading">
             <div>
               <p className="eyebrow">SIP ACTIVITY</p>
@@ -1108,7 +1131,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="activity">
           <div className="report-heading">
             <div>
               <p className="eyebrow">CONTRIBUTION RHYTHM</p>
@@ -1181,7 +1204,7 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel">
+        <section className="panel report-panel" data-group="activity">
           <div className="report-heading">
             <div>
               <p className="eyebrow">SIP TRAJECTORY</p>
