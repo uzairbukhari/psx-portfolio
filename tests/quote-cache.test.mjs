@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   currentWatchQuotes,
+  rebaseWatchQuotes,
   isFresh,
   lastSessionClose,
   mergeQuotes,
@@ -171,4 +172,20 @@ test('currentWatchQuotes keeps summary quotes stamped at the same time as the ca
     LUCK: quote('2026-09-29', '2026-09-29T07:30:00Z'),
   });
   assert.deepEqual(kept.map((entry) => entry.symbol), ['MEBL', 'GAL']);
+});
+
+test('rebaseWatchQuotes keeps day change when a newer company-page price overtakes the summary quote', () => {
+  const watch = [
+    { symbol: 'MEBL', price: 550, change: 10, changePercent: 1.85, sourceTimestamp: '2026-09-29 12:51:00', retrievedAt: '2026-09-29T07:52:00Z' },
+    { symbol: 'LUCK', price: 400, change: -4, changePercent: -1, sourceTimestamp: '2026-09-28 15:30:00', retrievedAt: '2026-09-28T10:30:00Z' },
+    { symbol: 'GAL', price: 500, change: 5, changePercent: 1, sourceTimestamp: '2026-09-29 12:51:00', retrievedAt: '2026-09-29T07:52:00Z' },
+  ];
+  const cached = (price, date) => ({ price, asOf: 'Tue, Sep 29, 2026 2:00 PM', date, source: 'https://dps.psx.com.pk/company/X', fetchedAt: '2026-09-29T09:00:00Z' });
+  const out = rebaseWatchQuotes(watch, { MEBL: cached(554, '2026-09-29'), LUCK: cached(410, '2026-09-29') });
+  assert.deepEqual(out.map((e) => e.symbol), ['MEBL', 'GAL']);
+  assert.equal(out[0].price, 554);
+  assert.equal(out[0].change, 14);
+  assert.equal(out[0].changePercent, 2.59);
+  assert.equal(out[0].retrievedAt, '2026-09-29T09:00:00Z');
+  assert.equal(out[1].change, 5, 'no cached price leaves the quote untouched');
 });
