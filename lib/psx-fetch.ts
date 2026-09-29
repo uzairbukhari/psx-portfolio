@@ -93,3 +93,37 @@ export async function fetchPsxPayoutsHtml(ticker: string, budget?: FetchBudget):
   if (!html.includes('class="tbl"')) throw Error('PSX payouts response had no table');
   return html;
 }
+
+/** The per-page request token PSX embeds as `window.__ps._k` on every company page. */
+export async function fetchPsxToken(ticker: string, budget?: FetchBudget): Promise<string> {
+  const page = await (await fetchPsx(`https://dps.psx.com.pk/company/${ticker}`, budget)).text();
+  const token = /"_k":"([^"]+)"/.exec(page)?.[1];
+  if (!token) throw Error('PSX company page carried no request token');
+  return token;
+}
+
+/**
+ * `/timeseries/eod|int/<TICKER>` answers 404 unless marked as AJAX and given the
+ * page token. Returns rows newest-first: eod [sec, close, volume, open], int [sec, price, volume].
+ */
+export async function fetchPsxTimeseries(
+  ticker: string,
+  kind: 'eod' | 'int',
+  token: string,
+  budget?: FetchBudget,
+): Promise<number[][]> {
+  if (budget) {
+    if (budget.left <= 0) throw Error('PSX request budget exhausted for this refresh');
+    budget.left--;
+  }
+  const response = await fetch(`https://dps.psx.com.pk/timeseries/${kind}/${ticker}`, {
+    headers: { ...UA, 'X-Req-Id': token, 'X-Requested-With': 'XMLHttpRequest' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(TIMEOUT),
+  });
+  if (!response.ok) throw Error(`${response.status} from PSX`);
+  const body = (await response.json()) as { status: number; data: number[][] };
+  if (body.status !== 1 || !Array.isArray(body.data))
+    throw Error('Unexpected PSX timeseries response');
+  return body.data;
+}

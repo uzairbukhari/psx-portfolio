@@ -1,0 +1,293 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { Pencil, Search } from 'lucide-react';
+import {
+  money,
+  type Dividend,
+  type Portfolio,
+  type StockSplit,
+  type TaxedDividend,
+  type Trade,
+} from '@/lib/portfolio';
+
+type EntryType = 'buy' | 'sell' | 'opening' | 'dividend' | 'split';
+type Filter = 'all' | 'buy' | 'sell' | 'dividend' | 'split';
+
+export type LedgerEntry = {
+  key: string;
+  date: string;
+  ticker: string;
+  type: EntryType;
+  label: string;
+  detail: string;
+  fees: number | null;
+  amount: number | null;
+  /** true when the amount is money received rather than paid */
+  inflow: boolean;
+  voided: boolean;
+  correct: () => void;
+};
+
+const FILTERS: [Filter, string][] = [
+  ['all', 'All'],
+  ['buy', 'Buys'],
+  ['sell', 'Sells'],
+  ['dividend', 'Dividends'],
+  ['split', 'Splits'],
+];
+
+const cents = (n: number) => Math.round(n * 100) / 100;
+
+const monthLabel = (date: string) =>
+  new Date(`${date.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+
+export function buildEntries({
+  trades,
+  dividends,
+  splits,
+  taxed,
+  onCorrectTrade,
+  onCorrectDividend,
+  onCorrectSplit,
+}: {
+  trades: Trade[];
+  dividends: Dividend[];
+  splits: StockSplit[];
+  taxed: TaxedDividend[];
+  onCorrectTrade: (t: Trade) => void;
+  onCorrectDividend: (d: Dividend) => void;
+  onCorrectSplit: (s: StockSplit) => void;
+}): LedgerEntry[] {
+  const byId = new Map(taxed.map((t) => [t.id, t]));
+  const out: LedgerEntry[] = [];
+  for (const t of trades) {
+    const cash =
+      t.price === null
+        ? null
+        : t.shares * t.price + (t.kind === 'sell' ? -t.fees : t.fees);
+    out.push({
+      key: 't' + t.id,
+      date: t.date,
+      ticker: t.ticker,
+      type: t.kind,
+      label:
+        t.kind === 'opening' ? 'Opening' : t.kind === 'sell' ? 'Sale' : 'Purchase',
+      detail:
+        `${t.shares.toLocaleString()} sh` +
+        (t.price === null ? '' : ` @ ${money(t.price)}`) +
+        (t.month ? ` · ${t.month}` : ''),
+      fees: t.fees,
+      amount: cash,
+      inflow: t.kind === 'sell',
+      voided: !!t.voided,
+      correct: () => onCorrectTrade(t),
+    });
+  }
+  for (const d of dividends) {
+    const tax = byId.get(d.id);
+    const net = tax?.netAmount ?? tax?.grossAmount ?? null;
+    out.push({
+      key: 'd' + d.id,
+      date: d.date,
+      ticker: d.ticker,
+      type: 'dividend',
+      label: 'Dividend',
+      detail:
+        (d.perShare === undefined ? '' : `${money(d.perShare)}/sh · `) +
+        (d.source === 'import'
+          ? 'CDC import'
+          : d.source === 'auto'
+            ? 'PSX auto'
+            : 'Manual') +
+        (tax?.netAmount == null ? ' · gross' : ' · net of tax'),
+      fees: null,
+      amount: net,
+      inflow: true,
+      voided: !!d.voided,
+      correct: () => onCorrectDividend(d),
+    });
+  }
+  for (const s of splits) {
+    out.push({
+      key: 's' + s.id,
+      date: s.date,
+      ticker: s.ticker,
+      type: 'split',
+      label: 'Split',
+      detail:
+        `${s.newShares}-for-${s.oldShares}` + (s.note ? ` · ${s.note}` : ''),
+      fees: null,
+      amount: null,
+      inflow: false,
+      voided: !!s.voided,
+      correct: () => onCorrectSplit(s),
+    });
+  }
+  return out.sort(
+    (a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key),
+  );
+}
+
+export default function LedgerTimeline({
+  portfolio,
+  entries,
+  ticker,
+  onOpenCompany,
+}: {
+  portfolio: Portfolio;
+  entries: LedgerEntry[];
+  /** When set the list is already scoped to one company: hides the ticker and search. */
+  ticker?: string;
+  onOpenCompany?: (ticker: string) => void;
+}) {
+  const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
+  const [showVoided, setShowVoided] = useState(false);
+  const names = useMemo(
+    () => new Map(portfolio.companies.map((c) => [c.ticker, c.name])),
+    [portfolio.companies],
+  );
+  const voidedCount = entries.filter((e) => e.voided).length;
+  const q = query.trim().toLowerCase();
+  const visible = entries.filter(
+    (e) =>
+      (showVoided || !e.voided) &&
+      (filter === 'all' ||
+        e.type === filter ||
+        (filter === 'buy' && e.type === 'opening')) &&
+      (!q ||
+        e.ticker.toLowerCase().includes(q) ||
+        (names.get(e.ticker) ?? '').toLowerCase().includes(q)),
+  );
+  const live = visible.filter((e) => !e.voided);
+  const sum = (types: EntryType[]) =>
+    live
+      .filter((e) => types.includes(e.type))
+      .reduce((a, e) => a + (e.amount ?? 0), 0);
+  const fees = live.reduce((a, e) => a + (e.fees ?? 0), 0);
+
+  const groups: [string, LedgerEntry[]][] = [];
+  for (const e of visible) {
+    const m = monthLabel(e.date);
+    const last = groups.at(-1);
+    if (last && last[0] === m) last[1].push(e);
+    else groups.push([m, [e]]);
+  }
+
+  return (
+    <div className="ledger">
+      <div className="ledger-kpis">
+        <div>
+          <span>Invested</span>
+          <b>{money(cents(sum(['buy', 'opening'])))}</b>
+        </div>
+        <div>
+          <span>Sold</span>
+          <b>{money(cents(sum(['sell'])))}</b>
+        </div>
+        <div>
+          <span>Dividends</span>
+          <b className="pos-text">{money(cents(sum(['dividend'])))}</b>
+        </div>
+        <div>
+          <span>Fees paid</span>
+          <b>{money(cents(fees))}</b>
+        </div>
+      </div>
+      <div className="ledger-bar">
+        <div className="seg" aria-label="Entry type">
+          {FILTERS.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              data-active={filter === value || undefined}
+              onClick={() => setFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {!ticker && (
+          <label className="ledger-search">
+            <Search size={15} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search ticker or company"
+              aria-label="Search ledger"
+            />
+          </label>
+        )}
+        {voidedCount > 0 && (
+          <label className="check-row ledger-voided">
+            <input
+              type="checkbox"
+              checked={showVoided}
+              onChange={(e) => setShowVoided(e.target.checked)}
+            />
+            Voided ({voidedCount})
+          </label>
+        )}
+      </div>
+      {groups.length === 0 ? (
+        <p className="muted ledger-empty">Nothing matches these filters.</p>
+      ) : (
+        groups.map(([month, rows]) => (
+          <section key={month} className="ledger-month">
+            <h4>{month}</h4>
+            {rows.map((e) => (
+              <div
+                key={e.key}
+                className={'ledger-row' + (e.voided ? ' row-voided' : '')}
+              >
+                <span className="ledger-date">{e.date.slice(8)}</span>
+                <span className={`ledger-type type-${e.type}`}>{e.label}</span>
+                <div className="ledger-main">
+                  {!ticker && (
+                    <button
+                      type="button"
+                      className="quote-btn ticker"
+                      onClick={() => onOpenCompany?.(e.ticker)}
+                    >
+                      {e.ticker}
+                    </button>
+                  )}
+                  <small>
+                    {e.detail}
+                    {e.voided ? ' · voided' : ''}
+                  </small>
+                </div>
+                <span
+                  className={'ledger-amount amount' + (e.inflow ? ' pos-text' : '')}
+                >
+                  {e.amount === null
+                    ? e.type === 'split'
+                      ? '—'
+                      : 'Unknown'
+                    : (e.inflow ? '+' : '') + money(cents(e.amount))}
+                </span>
+                {!e.voided ? (
+                  <button
+                    type="button"
+                    className="secondary compact ledger-edit"
+                    aria-label={`Correct ${e.label.toLowerCase()} for ${e.ticker}`}
+                    onClick={e.correct}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                ) : (
+                  <span />
+                )}
+              </div>
+            ))}
+          </section>
+        ))
+      )}
+    </div>
+  );
+}
