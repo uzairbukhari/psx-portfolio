@@ -11,10 +11,10 @@ import {
 } from '@/lib/psx-market';
 import { fetchBudget, type FetchBudget } from '@/lib/psx-fetch';
 import {
-  currentWatchQuotes,
   mergeQuotes,
   OPEN_TTL_MS,
   readQuoteRows,
+  rebaseWatchQuotes,
   refreshQuotes,
 } from '@/lib/quote-cache';
 import { db, failure, identity } from '@/lib/server';
@@ -97,7 +97,7 @@ async function personalized(
   const companies = selectShortlistPerformance(
     shortlist,
     portfolio.companies,
-    currentWatchQuotes(cache.quotes ?? [], quotes),
+    rebaseWatchQuotes(cache.quotes ?? [], quotes),
     fallback,
   ).map((company) => {
     const session = intraday.get(company.ticker);

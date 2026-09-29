@@ -109,6 +109,48 @@ export function currentWatchQuotes<T extends { symbol: string; retrievedAt: stri
   });
 }
 
+/**
+ * Like currentWatchQuotes, but a summary quote that the per-ticker cache has
+ * overtaken (a newer company-page price, which carries no day change) is not
+ * dropped: it is rebased onto the newer price using the same trading day's
+ * previous close, so change and changePercent survive. A summary quote from a
+ * different day than the cached price is dropped.
+ */
+export function rebaseWatchQuotes<
+  T extends {
+    symbol: string;
+    retrievedAt: string;
+    price: number;
+    change: number;
+    changePercent: number;
+    sourceTimestamp: string | null;
+  },
+>(watch: T[], quotes: Record<string, Quote>): T[] {
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  return watch.flatMap((entry) => {
+    const cached = quotes[entry.symbol];
+    if (!cached || entry.retrievedAt >= cached.fetchedAt) return [entry];
+    const previousClose = entry.price - entry.change;
+    if (
+      (entry.sourceTimestamp ?? '').slice(0, 10) !== cached.date ||
+      !Number.isFinite(previousClose) ||
+      !(previousClose > 0)
+    )
+      return [];
+    const change = round2(cached.price - previousClose);
+    return [
+      {
+        ...entry,
+        price: cached.price,
+        change,
+        changePercent: round2((change / previousClose) * 100),
+        sourceTimestamp: cached.asOf,
+        retrievedAt: cached.fetchedAt,
+      },
+    ];
+  });
+}
+
 export async function readQuoteRows(db: D1Database): Promise<QuoteRow[]> {
   const rows = await db
     .prepare('SELECT ticker,price,as_of,quote_date,source,fetched_at FROM quote_refreshes')
