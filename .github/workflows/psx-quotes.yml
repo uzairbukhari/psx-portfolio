@@ -16,6 +16,10 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    # CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN are `prod` environment secrets.
+    # Keep `prod` free of required reviewers / wait timers, or every scheduled
+    # run will stall waiting for approval.
+    environment: prod
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
