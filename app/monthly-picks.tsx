@@ -468,31 +468,44 @@ export default function MonthlyPicks({
           <section className="panel picks-coverage">
             <h2>Every shortlisted company</h2>
             <p className="muted">Investment outlook and evidence status are separate. A citation gap is not a negative outlook.</p>
-            {current.result.coverage.map((company) => (
-              <details key={company.ticker}>
-                <summary>
-                  <b>{company.ticker}</b>
-                  <span className="tag">{company.outlook}</span>
-                  {company.assessmentStatus === 'unassessed' && <span className="tag">Unassessed</span>}
-                </summary>
-                <p>{company.summary}</p>
-                {company.metrics && (
-                  <p className="muted">
-                    P/E (TTM) {company.metrics.peTtm ?? '—'} · EPS YoY {company.metrics.epsYoYPct === null ? '—' : `${company.metrics.epsYoYPct}%`} ·
-                    {' '}1Y change {company.metrics.change1yPct === null ? '—' : `${company.metrics.change1yPct}%`} · quant score {company.metrics.score ?? '—'}/100
-                  </p>
-                )}
-                {company.evidenceGap && <p className="muted"><b>Evidence gap:</b> {company.evidenceGap}</p>}
-                {company.dataGaps?.map((gap) => <p key={gap} className="muted">{gap}</p>)}
-                <div className="source-links">
-                  {(company.sourceDetails ?? company.sourceUrls.map((url) => ({ url, title: 'Source', date: '', sourceType: undefined }))).map((source) => (
-                    <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
-                      {secondarySource(source.url, source.sourceType) ? 'Secondary · ' : ''}{source.title}{source.date ? ` · ${source.date}` : ''} <ExternalLink size={13} />
-                    </a>
-                  ))}
+            {(['Positive', 'Neutral', 'Negative', 'Insufficient evidence'] as const).map((outlook) => {
+              const group = current.result!.coverage.filter((company) => company.outlook === outlook);
+              if (!group.length) return null;
+              return (
+                <div className="cov-group" key={outlook}>
+                  <h3 className={`cov-title outlook-${outlook.split(' ')[0].toLowerCase()}`}>
+                    {outlook} <span>{group.length}</span>
+                  </h3>
+                  <div className="cov-grid">
+                    {group.map((company) => (
+                      <details key={company.ticker} className={`cov-card outlook-${company.outlook.split(" ")[0].toLowerCase()}`}>
+                        <summary>
+                          <b>{company.ticker}</b>
+                          {company.assessmentStatus === 'unassessed' && <span className="tag">Unassessed</span>}
+                          <small title={company.summary}>{company.summary}</small>
+                        </summary>
+                        <p>{company.summary}</p>
+                        {company.metrics && (
+                          <p className="muted">
+                            P/E (TTM) {company.metrics.peTtm ?? '—'} · EPS YoY {company.metrics.epsYoYPct === null ? '—' : `${company.metrics.epsYoYPct}%`} ·
+                            {' '}1Y change {company.metrics.change1yPct === null ? '—' : `${company.metrics.change1yPct}%`} · quant score {company.metrics.score ?? '—'}/100
+                          </p>
+                        )}
+                        {company.evidenceGap && <p className="muted"><b>Evidence gap:</b> {company.evidenceGap}</p>}
+                        {company.dataGaps?.map((gap) => <p key={gap} className="muted">{gap}</p>)}
+                        <div className="source-links">
+                          {(company.sourceDetails ?? company.sourceUrls.map((url) => ({ url, title: 'Source', date: '', sourceType: undefined }))).map((source) => (
+                            <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                              {secondarySource(source.url, source.sourceType) ? 'Secondary · ' : ''}{source.title}{source.date ? ` · ${source.date}` : ''} <ExternalLink size={13} />
+                            </a>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
                 </div>
-              </details>
-            ))}
+              );
+            })}
           </section>
         </>
       )}
