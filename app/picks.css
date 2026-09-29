@@ -189,3 +189,6 @@
 .mp-table td:first-child{white-space:nowrap}
 .mp-coverage{padding:16px 18px}
 @media(max-width:560px){.mp-picker{max-height:320px}}
+.mp-option__open{display:flex;align-items:center;gap:10px;flex:1;min-width:0;color:inherit;text-decoration:none}
+.mp-option__open:hover .mp-option__text b{color:var(--primary)}
+.mp-option__open:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:6px}

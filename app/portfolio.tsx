@@ -1392,6 +1392,7 @@ export default function Dashboard({
             busy={busy}
             onSave={save}
             onRefreshPrices={refresh}
+            onOpenCompany={openCompany}
             onManualPrice={(ticker) => {
               setQuoteTicker(ticker);
               setQuotePrice(String(p.quotes[ticker]?.price ?? ''));

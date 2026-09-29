@@ -17,6 +17,7 @@ type Props = {
   onSave: (next: Portfolio, message?: string) => Promise<void>;
   onRefreshPrices: () => Promise<void>;
   onManualPrice: (ticker: string) => void;
+  onOpenCompany: (ticker: string) => void;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,7 +26,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function MonthlyPicks({
-  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice,
+  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany,
 }: Props) {
   const initial = portfolio.monthlyPicksShortlist?.length
     ? portfolio.monthlyPicksShortlist
@@ -91,6 +92,7 @@ export default function MonthlyPicks({
         onRefreshFacts={(tickers) => void refreshFacts(tickers)}
         collapsed={!expanded && (active || !!current?.result)}
         onExpand={() => setExpanded(true)}
+        onOpenCompany={onOpenCompany}
       />
 
       {recs.error && (
@@ -119,7 +121,7 @@ export default function MonthlyPicks({
       )}
 
       {current?.result && !active && (
-        <PicksResults run={current} portfolio={portfolio} onRefreshPrices={() => void onRefreshPrices()} onManualPrice={onManualPrice} />
+        <PicksResults run={current} portfolio={portfolio} onRefreshPrices={() => void onRefreshPrices()} onManualPrice={onManualPrice} onOpenCompany={onOpenCompany} />
       )}
 
       {!recs.loaded && <p className="muted">Loading saved recommendations…</p>}
