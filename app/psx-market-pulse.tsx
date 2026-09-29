@@ -8,6 +8,7 @@ import type {
   ShortlistPerformance,
 } from '@/lib/psx-market';
 import type { PypsxLiveQuote } from '@/lib/pypsx-market';
+import { TickerLink } from './ticker-link';
 
 export interface PsxMarketPulseHandle {
   refresh: () => Promise<void>;
@@ -304,7 +305,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
                 const title = `${company.name}${company.change === null ? '' : ` · ${company.change > 0 ? '+' : ''}${number(company.change)} today`}`;
                 return (
                   <article className={`pulse-company ${direction}`} key={company.ticker} title={title} aria-label={accessibleSummary}>
-                    <b className="pulse-company__ticker">{company.ticker}</b>
+                    <b className="pulse-company__ticker"><TickerLink ticker={company.ticker} /></b>
                     <b className={`pulse-company__change ${direction}`}>{change}</b>
                     <b className="pulse-company__price">
                       {company.price === null ? '—' : <><small>Rs</small> {number(company.price)}</>}
