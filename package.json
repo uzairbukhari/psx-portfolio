@@ -15,7 +15,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "WRANGLER_LOG_PATH=.wrangler/logs wrangler d1 migrations apply DB --local --persist-to .wrangler/state",
     "quote-refresh:dev": "wrangler dev --config workers/quote-refresh/wrangler.jsonc --test-scheduled --persist-to ../../.wrangler/state",
-    "quote-refresh:deploy": "wrangler deploy --config workers/quote-refresh/wrangler.jsonc"
+    "quote-refresh:deploy": "wrangler deploy --config workers/quote-refresh/wrangler.jsonc",
+    "db:migrate:prod": "wrangler d1 migrations apply DB --remote"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

@@ -56,7 +56,6 @@ import {
   type Portfolio,
   type Trade,
   type Company,
-  type Sector,
   type Dividend,
   type StockSplit,
   type TaxedDividend,
@@ -581,7 +580,7 @@ export default function Dashboard({
       key: HoldingsSortKey;
       dir: 'asc' | 'desc';
     } | null>(null),
-    [sectorFilter, setSectorFilter] = useState<Sector | ''>(''),
+    [sectorFilter, setSectorFilter] = useState<string>(''),
     [showSoldOut, setShowSoldOut] = useState(false);
   function notify(s: string, error = false) {
     setMessage(s);
@@ -648,6 +647,17 @@ export default function Dashboard({
     void action().catch((e) =>
       notify(e instanceof Error ? e.message : String(e), true),
     );
+  }
+  function unknownCostWarning(next: Portfolio) {
+    const tickers = [
+      ...new Set(
+        taxSummary(next)
+          .sales.filter((s) => s.costBasis === null)
+          .map((s) => s.ticker),
+      ),
+    ];
+    if (!tickers.length) return '';
+    return ` Warning: ${tickers.length === 1 ? 'a sale has' : tickers.length + ' sales have'} unknown cost basis (${tickers.join(', ')}) — edit the opening trade to enter its real cost for accurate tax figures.`;
   }
   useEffect(() => {
     const context = (
@@ -777,7 +787,7 @@ export default function Dashboard({
         ),
     ),
     sectorsInUse = Array.from(
-      new Set(hs.map((h) => h.sector).filter((s): s is Sector => !!s)),
+      new Set(hs.map((h) => h.sector).filter((s): s is string => !!s)),
     ),
     rowsBase = showSoldOut ? held.concat(soldOut) : held,
     rowsFiltered = sectorFilter
@@ -1179,9 +1189,7 @@ export default function Dashboard({
               Sector
               <select
                 value={sectorFilter}
-                onChange={(e) =>
-                  setSectorFilter(e.target.value as Sector | '')
-                }
+                onChange={(e) => setSectorFilter(e.target.value)}
               >
                 <option value="">All sectors</option>
                 {sectorsInUse.map((sector) => (
@@ -1940,7 +1948,7 @@ export default function Dashboard({
                         next.trades = [...next.trades, ...result.trades];
                         await save(
                           next,
-                          `${result.imported} Finqalab trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}`,
+                          `${result.imported} Finqalab trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
                         );
                       });
                       e.target.value = '';
@@ -1974,7 +1982,7 @@ export default function Dashboard({
                         next.trades = [...next.trades, ...result.trades];
                         await save(
                           next,
-                          `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}`,
+                          `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
                         );
                       });
                       e.target.value = '';
@@ -2533,18 +2541,20 @@ export default function Dashboard({
                     onChange={(e) =>
                       setCompany({
                         ...company,
-                        sector: e.target.value as Sector | '',
+                        sector: e.target.value,
                       })
                     }
                   >
                     <option value="" disabled>
                       Select sector
                     </option>
-                    {SECTORS.map((sector) => (
-                      <option key={sector} value={sector}>
-                        {sector}
-                      </option>
-                    ))}
+                    {Array.from(new Set([...SECTORS, ...sectorsInUse]))
+                      .sort()
+                      .map((sector) => (
+                        <option key={sector} value={sector}>
+                          {sector}
+                        </option>
+                      ))}
                   </select>
                 </label>
                 <label>

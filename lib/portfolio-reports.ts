@@ -2,6 +2,7 @@ import {
   holdings,
   round,
   taxSummary,
+  today,
   type Portfolio,
   type TaxedSale,
   type TaxedDividend,
@@ -72,6 +73,19 @@ export type RealizedCompanyPoint = {
   weight: number | null;
 };
 
+export type InvestmentCompanyPoint = {
+  ticker: string;
+  name: string;
+  amount: number;
+  weight: number;
+};
+
+export type InvestmentActivityPoint = {
+  month: string;
+  total: number;
+  byCompany: { ticker: string; name: string; amount: number }[];
+};
+
 export type PortfolioReport = {
   companyAllocation: AllocationPoint[];
   sectorAllocation: SectorPoint[];
@@ -82,6 +96,8 @@ export type PortfolioReport = {
   dividendByCompany: DividendCompanyPoint[];
   realizedActivity: RealizedActivityPoint[];
   realizedByCompany: RealizedCompanyPoint[];
+  recentInvestmentByCompany: InvestmentCompanyPoint[];
+  recentInvestmentActivity: InvestmentActivityPoint[];
   realized: {
     sales: TaxedSale[];
     dividends: TaxedDividend[];
@@ -109,6 +125,15 @@ export type PortfolioReport = {
 
 const percentage = (part: number, total: number) =>
   total > 0 ? round((part / total) * 100) : 0;
+
+/** The `count` YYYY-MM calendar months ending with `dateStr`'s month, oldest first. */
+function lastMonths(dateStr: string, count: number): string[] {
+  const [year, month] = dateStr.split('-').map(Number);
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(Date.UTC(year, month - 1 - (count - 1 - i), 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  });
+}
 
 export function portfolioReport(portfolio: Portfolio): PortfolioReport {
   const allHoldings = holdings(portfolio);
@@ -234,6 +259,69 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
   const companyNames = new Map(
     portfolio.companies.map((c) => [c.ticker, c.name]),
   );
+
+  const recentInvestmentMonths = lastMonths(today(), 12);
+  const recentInvestmentMonthSet = new Set(recentInvestmentMonths);
+  const investmentByMonth = new Map<string, Map<string, number>>();
+  for (const trade of portfolio.trades) {
+    if (trade.voided || trade.kind !== 'buy' || trade.price === null) continue;
+    const month = trade.month || trade.date.slice(0, 7);
+    if (!recentInvestmentMonthSet.has(month)) continue;
+    const byTicker = investmentByMonth.get(month) ?? new Map<string, number>();
+    byTicker.set(
+      trade.ticker,
+      round(
+        (byTicker.get(trade.ticker) ?? 0) + trade.shares * trade.price + trade.fees,
+      ),
+    );
+    investmentByMonth.set(month, byTicker);
+  }
+  const recentInvestmentActivity: InvestmentActivityPoint[] =
+    recentInvestmentMonths.map((month) => {
+      const byTicker = investmentByMonth.get(month) ?? new Map<string, number>();
+      const byCompany = [...byTicker]
+        .map(([ticker, amount]) => ({
+          ticker,
+          name: companyNames.get(ticker) ?? ticker,
+          amount,
+        }))
+        .sort((a, b) => b.amount - a.amount || a.ticker.localeCompare(b.ticker));
+      return {
+        month,
+        total: round(byCompany.reduce((total, item) => total + item.amount, 0)),
+        byCompany,
+      };
+    });
+
+  const recentInvestmentTotals = new Map<string, number>();
+  for (const point of recentInvestmentActivity) {
+    for (const item of point.byCompany) {
+      recentInvestmentTotals.set(
+        item.ticker,
+        round((recentInvestmentTotals.get(item.ticker) ?? 0) + item.amount),
+      );
+    }
+  }
+  const totalRecentInvestment = round(
+    [...recentInvestmentTotals.values()].reduce(
+      (total, amount) => total + amount,
+      0,
+    ),
+  );
+  const recentInvestmentByCompany: InvestmentCompanyPoint[] = [
+    ...recentInvestmentTotals,
+  ]
+    .map(([ticker, amount]) => ({
+      ticker,
+      name: companyNames.get(ticker) ?? ticker,
+      amount,
+      weight:
+        totalRecentInvestment > 0
+          ? percentage(amount, totalRecentInvestment)
+          : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount || a.ticker.localeCompare(b.ticker));
+
   const dividendCompanies = new Map<
     string,
     { gross: number; net: number | null }
@@ -342,6 +430,8 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
     dividendByCompany,
     realizedActivity,
     realizedByCompany,
+    recentInvestmentByCompany,
+    recentInvestmentActivity,
     realized: {
       sales: tax.sales,
       dividends: tax.dividends,

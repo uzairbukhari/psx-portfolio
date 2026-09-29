@@ -2,19 +2,25 @@ import { dateOK, round, today, type Portfolio } from './portfolio.ts';
 
 export type SourceDetail = { url: string; title: string; date: string; sourceType?: 'primary' | 'secondary' | 'other' };
 export type EvidenceIssue = { ticker: string; kind: 'technical' | 'material_gap' | 'uncertainty'; message: string };
+export type PickMetrics = {
+  peTtm: number | null; earningsYieldPct: number | null; epsYoYPct: number | null;
+  change1yPct: number | null; score: number | null;
+};
 export type MonthlyPick = {
   ticker: string; name: string; allocationPct: number; confidence: 'High' | 'Medium' | 'Low';
   thesis: string; whySelected?: string; invalidation?: string; catalysts: string[]; risks: string[];
   sourceUrls: string[]; sourceDetails?: SourceDetail[]; evidenceStatus?: 'ready' | 'needs_repair';
+  metrics?: PickMetrics;
 };
 export type CompanyOutlook = {
   ticker: string; outlook: 'Positive' | 'Neutral' | 'Negative' | 'Insufficient evidence'; summary: string;
   sourceUrls: string[]; sourceDetails?: SourceDetail[]; assessmentStatus?: 'assessed' | 'unassessed';
-  evidenceStatus?: 'ready' | 'needs_repair'; evidenceGap?: string;
+  evidenceStatus?: 'ready' | 'needs_repair'; evidenceGap?: string; metrics?: PickMetrics; dataGaps?: string[];
 };
 export type MonthlyPicksResearch = {
   marketOutlook: string; picks: MonthlyPick[]; coverage: CompanyOutlook[]; unallocatedPct: number;
   evidenceIssues?: EvidenceIssue[]; assessedCount?: number; totalCount?: number;
+  method?: 'ai' | 'quant'; dataAsOf?: string;
 };
 export type MonthlyPickEstimate = MonthlyPick & {
   allocationPkr: number; price: number | null; priceDate: string | null; shares: number | null;

@@ -1,5 +1,7 @@
 import { db, identity, failure } from '@/lib/server';
 import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
+import { applyFacts, newTickers } from '@/lib/company-enrichment';
+import { gatherFacts } from '@/lib/company-facts-store';
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
@@ -51,6 +53,20 @@ export async function PUT(req: Request) {
     validate(portfolio);
     if (!Number.isInteger(revision) || revision < 0)
       throw Error('Invalid revision.');
+    const previousRow = await db()
+      .prepare('SELECT payload FROM portfolios WHERE user_id=?')
+      .bind(user)
+      .first<{ payload: string }>();
+    const previous: Portfolio | null = previousRow
+      ? JSON.parse(previousRow.payload)
+      : null;
+    const justAdded = newTickers(previous, portfolio);
+    if (justAdded.length) {
+      // Best-effort: a PSX fetch/D1 cache hiccup here should never block the save.
+      await gatherFacts(justAdded)
+        .then((facts) => applyFacts(portfolio.companies, facts))
+        .catch(() => {});
+    }
     const body = JSON.stringify(portfolio),
       now = new Date().toISOString();
     const result =

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { portfolioReport } from '../lib/portfolio-reports.ts';
+import { today } from '../lib/portfolio.ts';
 
 const portfolio = () => ({
   companies: [
@@ -138,6 +139,64 @@ test('aggregates buy cash including fees and excludes openings sales and voids',
   assert.deepEqual(report.monthlyActivity, [
     { month: '2026-02', invested: 105, cumulative: 105 },
   ]);
+});
+
+test('recentInvestmentByCompany sums buy cost per ticker within the last 12 months, excluding sells, voids and older trades', () => {
+  const recentDate = today();
+  const oldDate = (() => {
+    const [y, m, d] = today().split('-').map(Number);
+    return new Date(Date.UTC(y - 2, m - 1, d)).toISOString().slice(0, 10);
+  })();
+  const p = {
+    companies: [
+      { ticker: 'AAA', name: 'Alpha Bank', sector: 'Bank', target: 0, approved: false, screenDate: '', note: '' },
+      { ticker: 'BBB', name: 'Beta Foods', sector: 'Foods', target: 0, approved: false, screenDate: '', note: '' },
+    ],
+    trades: [
+      { id: 't1', ticker: 'AAA', kind: 'buy', date: recentDate, shares: 10, price: 20, fees: 5, month: '', note: '' },
+      { id: 't2', ticker: 'BBB', kind: 'buy', date: recentDate, shares: 4, price: 25, fees: 0, month: '', note: '' },
+      { id: 't3', ticker: 'AAA', kind: 'buy', date: oldDate, shares: 100, price: 1, fees: 0, month: '', note: '' },
+      { id: 't4', ticker: 'BBB', kind: 'sell', date: recentDate, shares: 1, price: 25, fees: 0, month: '', note: '' },
+      { id: 't5', ticker: 'AAA', kind: 'buy', date: recentDate, shares: 1, price: 1, fees: 0, month: '', note: '', voided: true },
+    ],
+    quotes: {},
+    budgets: {},
+  };
+  const report = portfolioReport(p);
+  assert.deepEqual(report.recentInvestmentByCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', amount: 205, weight: 67.21 },
+    { ticker: 'BBB', name: 'Beta Foods', amount: 100, weight: 32.79 },
+  ]);
+});
+
+test('recentInvestmentActivity breaks down buy cost per company for each of the last 12 calendar months', () => {
+  const currentMonth = today().slice(0, 7);
+  const p = {
+    companies: [
+      { ticker: 'AAA', name: 'Alpha Bank', sector: 'Bank', target: 0, approved: false, screenDate: '', note: '' },
+      { ticker: 'BBB', name: 'Beta Foods', sector: 'Foods', target: 0, approved: false, screenDate: '', note: '' },
+    ],
+    trades: [
+      { id: 't1', ticker: 'AAA', kind: 'buy', date: today(), shares: 10, price: 20, fees: 5, month: '', note: '' },
+      { id: 't2', ticker: 'BBB', kind: 'buy', date: today(), shares: 4, price: 25, fees: 0, month: '', note: '' },
+    ],
+    quotes: {},
+    budgets: {},
+  };
+  const report = portfolioReport(p);
+  assert.equal(report.recentInvestmentActivity.length, 12);
+  const months = report.recentInvestmentActivity.map((item) => item.month);
+  assert.deepEqual(months, [...months].sort(), 'months run oldest to newest');
+  const current = report.recentInvestmentActivity.at(-1);
+  assert.equal(current.month, currentMonth);
+  assert.equal(current.total, 305);
+  assert.deepEqual(current.byCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', amount: 205 },
+    { ticker: 'BBB', name: 'Beta Foods', amount: 100 },
+  ]);
+  const empty = report.recentInvestmentActivity[0];
+  assert.deepEqual(empty.byCompany, []);
+  assert.equal(empty.total, 0);
 });
 
 test('gain/loss performance excludes holdings with unknown cost basis', () => {

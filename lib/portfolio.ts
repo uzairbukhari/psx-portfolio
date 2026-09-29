@@ -14,7 +14,8 @@ export type Sector = (typeof SECTORS)[number];
 export type Company = {
   ticker: string;
   name: string;
-  sector: Sector | '';
+  /** Free text: seeded from SECTORS, but grows with whatever sector PSX reports for a company. */
+  sector: string;
   target: number;
   approved: boolean;
   screenDate: string;
@@ -169,7 +170,13 @@ const seeds: [string, string, number, number, Sector][] = [
   ['COLG', 'Colgate-Palmolive Pakistan', 0, 12.5, 'Foods'],
 ];
 export function blankPortfolio(): Portfolio {
-  return { companies: [], trades: [], quotes: {}, budgets: {} };
+  return {
+    companies: [],
+    trades: [],
+    quotes: {},
+    budgets: {},
+    taxProfile: { filerStatus: 'filer' },
+  };
 }
 export function initialPortfolio(): Portfolio {
   return {
@@ -540,8 +547,7 @@ export function validate(p: Portfolio) {
       typeof c.name !== 'string' ||
       c.name.length > 150 ||
       (c.sector !== undefined &&
-        c.sector !== '' &&
-        !SECTORS.includes(c.sector as Sector)) ||
+        (typeof c.sector !== 'string' || c.sector.length > 60)) ||
       typeof c.approved !== 'boolean' ||
       !Number.isFinite(c.target) ||
       c.target < 0 ||

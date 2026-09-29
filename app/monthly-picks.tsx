@@ -15,6 +15,10 @@ type Recommendation = {
   amount: number;
   feePct: number;
   shortlist: string[];
+  // 'completed_partial' / 'needs_evidence' / 'needs_attention' are only reachable on
+  // rows saved by the earlier per-company-evidence workflow; every run made under the
+  // current workflow settles into either 'completed' (AI-ranked or quant fallback) or
+  // 'failed' (PSX had no usable data for any shortlisted company).
   status: 'queued' | 'in_progress' | 'completed' | 'completed_partial' | 'failed' | 'needs_evidence' | 'needs_attention';
   result: MonthlyPicksResearch | null;
   sources: { url: string; title: string }[];
@@ -23,14 +27,11 @@ type Recommendation = {
   estimatedCostUsd: number | null;
   createdAt: string;
   updatedAt: string;
-  canRecover?: boolean;
-  canRepair?: boolean;
-  repairMaxCostUsd?: number;
-  researchNotes?: string;
   phase?: string;
   workflowVersion?: number;
-  batchProgress?: { completed: number; total: number };
   budgetCommittedUsd?: number;
+  method?: 'ai' | 'quant';
+  dataAsOf?: string;
 };
 
 type Props = {
@@ -206,32 +207,13 @@ export default function MonthlyPicks({
     }
   }
 
-  async function repairResearch(action: 'recover' | 'repair') {
-    if (!current) return;
-    setActiveId(current.id);
-    try {
-      const response = await fetch('/api/recommendations', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: current.id, action, confirmPaidRepair: action === 'repair' }),
-      });
-      const data = await response.json() as Recommendation;
-      if (!response.ok) throw Error(data.error ?? 'Could not repair research.');
-      setCurrent(data);
-      setMessage(action === 'recover' ? 'Saved response reprocessed; no new generation.' : 'Research repair started.');
-      if (!['queued', 'in_progress'].includes(data.status)) setActiveId(null);
-      await loadHistory();
-    } catch (error) {
-      setActiveId(null);
-      setFailed(true);
-      setMessage(error instanceof Error ? error.message : String(error));
-    }
-  }
-
   const estimates = current?.result
     ? estimateMonthlyPicks(
-        (current.workflowVersion ?? 1) >= 2 && ['completed', 'completed_partial'].includes(current.status)
-          ? current.result
-          : { ...current.result, picks: current.result.picks.map((pick) => ({ ...pick, evidenceStatus: 'needs_repair' as const })) },
+        // Rows saved by the very first workflow never recorded per-pick evidence
+        // status; treat those as unverified rather than assume they're safe to size.
+        (current.workflowVersion ?? 1) < 2
+          ? { ...current.result, picks: current.result.picks.map((pick) => ({ ...pick, evidenceStatus: 'needs_repair' as const })) }
+          : current.result,
         portfolio,
         current.amount,
         current.feePct,
@@ -339,32 +321,31 @@ export default function MonthlyPicks({
           >
             {activeId ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
             {activeId
-              ? 'Researching…'
+              ? 'Ranking…'
               : currentMatches
                 ? 'Research again'
                 : 'Give me recommendation'}
           </button>
-          <span className="muted">Maximum API cost: $1 per new run.</span>
-          {activeId && current?.batchProgress && (
-            <span className="muted">Evidence batches: {current.batchProgress.completed}/{current.batchProgress.total}</span>
-          )}
+          <span className="muted">Priced from PSX company data; a small AI call ranks the shortlist (≈$0.01–0.02).</span>
         </div>
         {message && <div className={`notice ${failed ? 'error' : 'success'}`}>{message}</div>}
       </section>
 
-      {current && ['failed', 'needs_evidence', 'needs_attention'].includes(current.status) && (
+      {current?.status === 'failed' && (
         <section className="panel" aria-live="polite">
-          <h2>Research needs attention</h2>
-          <p>Companies with missing evidence remain unassessed; they are not treated as negative opportunities.</p>
+          <h2>No recommendation for this run</h2>
+          <p>{current.error}</p>
+        </section>
+      )}
+
+      {current && ['needs_evidence', 'needs_attention'].includes(current.status) && (
+        <section className="panel" aria-live="polite">
+          <h2>Older draft needs attention</h2>
+          <p>This run was saved by an earlier version of Monthly Picks. Start a fresh run above for the current workflow.</p>
           <p>{current.error}</p>
           <ul>{current.result?.evidenceIssues?.map((issue, index) => typeof issue === 'string'
             ? <li key={`${index}:${String(issue)}`}>{issue}</li>
             : <li key={`${issue.ticker}:${issue.kind}`}><b>{issue.ticker}:</b> {issue.message}</li>)}</ul>
-          <div className="row">
-            {current.canRecover && <button className="secondary" disabled={!!activeId} onClick={() => void repairResearch('recover')}>Recover saved response · no new generation</button>}
-            {current.canRepair && <button disabled={!!activeId} onClick={() => void repairResearch('repair')}>Repair research · up to ${(current.repairMaxCostUsd ?? 0).toFixed(2)} within $1 cap</button>}
-          </div>
-          {current.researchNotes && <details><summary>Preserved research notes</summary><p style={{ whiteSpace: 'pre-wrap' }}>{current.researchNotes}</p></details>}
         </section>
       )}
 
@@ -395,6 +376,13 @@ export default function MonthlyPicks({
               </div>
             </div>
             <p>{current.result.marketOutlook}</p>
+            {current.method && (
+              <p className="muted">
+                <span className="tag">{current.method === 'ai' ? 'AI-ranked' : 'Quantitative fallback'}</span>
+                {current.dataAsOf && ` · PSX data as of ${current.dataAsOf}`}
+                {current.method === 'quant' && ' · the AI ranking step was unavailable for this run; picks are ordered by the deterministic quant score below.'}
+              </p>
+            )}
             <div className="split-stats picks-stats">
               <div><small>Fresh money</small><strong>{money(current.amount)}</strong></div>
               <div><small>Held as cash</small><strong>{money((current.amount * current.result.unallocatedPct) / 100)}</strong></div>
@@ -416,6 +404,14 @@ export default function MonthlyPicks({
                     <small>{pick.allocationPct}% allocation</small>
                   </div>
                 </div>
+                {pick.metrics && (
+                  <div className="split-stats picks-stats compact">
+                    <div><small>P/E (TTM)</small><strong>{pick.metrics.peTtm ?? '—'}</strong></div>
+                    <div><small>EPS YoY</small><strong>{pick.metrics.epsYoYPct === null ? '—' : `${pick.metrics.epsYoYPct}%`}</strong></div>
+                    <div><small>1Y change</small><strong>{pick.metrics.change1yPct === null ? '—' : `${pick.metrics.change1yPct}%`}</strong></div>
+                    <div><small>Quant score</small><strong>{pick.metrics.score ?? '—'}/100</strong></div>
+                  </div>
+                )}
                 <p>{pick.thesis}</p>
                 {pick.whySelected && <p><b>Why selected:</b> {pick.whySelected}</p>}
                 {pick.invalidation && <p><b>What would invalidate this view:</b> {pick.invalidation}</p>}
@@ -461,7 +457,14 @@ export default function MonthlyPicks({
                   {company.assessmentStatus === 'unassessed' && <span className="tag">Unassessed</span>}
                 </summary>
                 <p>{company.summary}</p>
+                {company.metrics && (
+                  <p className="muted">
+                    P/E (TTM) {company.metrics.peTtm ?? '—'} · EPS YoY {company.metrics.epsYoYPct === null ? '—' : `${company.metrics.epsYoYPct}%`} ·
+                    {' '}1Y change {company.metrics.change1yPct === null ? '—' : `${company.metrics.change1yPct}%`} · quant score {company.metrics.score ?? '—'}/100
+                  </p>
+                )}
                 {company.evidenceGap && <p className="muted"><b>Evidence gap:</b> {company.evidenceGap}</p>}
+                {company.dataGaps?.map((gap) => <p key={gap} className="muted">{gap}</p>)}
                 <div className="source-links">
                   {(company.sourceDetails ?? company.sourceUrls.map((url) => ({ url, title: 'Source', date: '', sourceType: undefined }))).map((source) => (
                     <a key={source.url} href={source.url} target="_blank" rel="noreferrer">

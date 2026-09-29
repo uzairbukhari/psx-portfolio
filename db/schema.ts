@@ -123,6 +123,17 @@ export const aiUsage = sqliteTable(
   (table) => [index('idx_ai_usage_user_created').on(table.userId, table.createdAt)],
 );
 
+// Shared, public PSX company-page facts (price, financials, ratios, announcements) used
+// by Monthly Picks scoring. Cached per calendar day so a shortlist re-run within the same
+// day costs zero extra fetches; refreshed the same way `quote_refreshes` is, independent
+// of any single user's save/revision state.
+export const companyFacts = sqliteTable('company_facts', {
+  ticker: text('ticker').primaryKey(),
+  fetchedOn: text('fetched_on').notNull(),
+  payload: text('payload').notNull(),
+  fetchedAt: text('fetched_at').notNull(),
+});
+
 export const marketSummaryRefreshes = sqliteTable('market_summary_refreshes', {
   id: text('id').primaryKey(),
   payload: text('payload').notNull(),

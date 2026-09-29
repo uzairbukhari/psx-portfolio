@@ -17,8 +17,6 @@ import {
 } from 'recharts';
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -27,6 +25,7 @@ import { money, round, type Portfolio } from '@/lib/portfolio';
 import {
   portfolioReport,
   type DividendCompanyPoint,
+  type InvestmentCompanyPoint,
   type PerformancePoint,
   type RealizedCompanyPoint,
   type SectorPoint,
@@ -34,11 +33,6 @@ import {
 
 const companyConfig = {
   weight: { label: 'Portfolio weight', color: 'var(--primary)' },
-} satisfies ChartConfig;
-
-const targetConfig = {
-  actual: { label: 'Actual weight', color: 'var(--primary)' },
-  target: { label: 'SIP target', color: '#7f93b8' },
 } satisfies ChartConfig;
 
 const activityConfig = {
@@ -121,6 +115,23 @@ function foldDividendCompanies(
   ];
 }
 
+function foldInvestmentCompanies(
+  companies: InvestmentCompanyPoint[],
+  cap = 7,
+): InvestmentCompanyPoint[] {
+  if (companies.length <= cap) return companies;
+  const rest = companies.slice(cap);
+  return [
+    ...companies.slice(0, cap),
+    {
+      ticker: 'Other',
+      name: 'Other companies',
+      amount: round(rest.reduce((total, item) => total + item.amount, 0)),
+      weight: round(rest.reduce((total, item) => total + item.weight, 0)),
+    },
+  ];
+}
+
 function performanceBarShape(props: BarShapeProps) {
   const { payload, ...rest } = props;
   const gain = (payload as PerformancePoint).gain;
@@ -181,10 +192,40 @@ export default function PortfolioReports({
     label: monthLabel(item.month),
   }));
   const sectors = foldSectors(report.sectorAllocation);
-  const dividendActivity = report.dividendActivity.map((item) => ({
-    ...item,
-    label: monthLabel(item.month),
-  }));
+  const recentInvestment = foldInvestmentCompanies(
+    report.recentInvestmentByCompany,
+  );
+  const recentInvestmentTotal = round(
+    recentInvestment.reduce((total, item) => total + item.amount, 0),
+  );
+  const recentInvestmentTickers = new Set(
+    recentInvestment.map((item) => item.ticker),
+  );
+  const recentInvestmentRows = report.recentInvestmentActivity.map(
+    (point) => {
+      const row: Record<string, number | string> = {
+        month: point.month,
+        label: monthLabel(point.month),
+      };
+      for (const item of recentInvestment) row[item.ticker] = 0;
+      for (const company of point.byCompany) {
+        const key = recentInvestmentTickers.has(company.ticker)
+          ? company.ticker
+          : 'Other';
+        row[key] = (row[key] as number) + company.amount;
+      }
+      return row;
+    },
+  );
+  const recentInvestmentConfig: ChartConfig = Object.fromEntries(
+    recentInvestment.map((item) => [item.ticker, { label: item.name }]),
+  );
+  const dividendActivity = report.dividendActivity
+    .slice(-12)
+    .map((item) => ({
+      ...item,
+      label: monthLabel(item.month),
+    }));
   const dividendCompanies = foldDividendCompanies(report.dividendByCompany);
   const realizedActivity = report.realizedActivity.map((item) => ({
     ...item,
@@ -265,9 +306,11 @@ export default function PortfolioReports({
                 : `${grandTotalReturn >= 0 ? '+' : ''}${money(grandTotalReturn)}`}
             </strong>
             <small>
-              {report.realized.totalCapitalGainsTax === null
-                ? 'Set your filer status in Settings to include tax'
-                : 'Unrealized + realized sales + dividends, after tax'}
+              {grandTotalReturn !== null
+                ? 'Unrealized + realized sales + dividends, after tax'
+                : !portfolio.taxProfile
+                  ? 'Set your filer status in Settings to include tax'
+                  : 'Add missing purchase prices or cost basis to calculate'}
             </small>
           </div>
         </div>
@@ -493,18 +536,20 @@ export default function PortfolioReports({
           <div className="report-heading">
             <div>
               <p className="eyebrow">DIVIDEND TRAJECTORY</p>
-              <h3>Cumulative net received</h3>
+              <h3>Net received, last 12 months</h3>
             </div>
             <span>
-              {dividendActivity.length &&
-              dividendActivity[dividendActivity.length - 1].cumulativeNet !==
-                null
+              {dividendActivity.length
                 ? money(
-                    dividendActivity[dividendActivity.length - 1]
-                      .cumulativeNet as number,
+                    round(
+                      dividendActivity.reduce(
+                        (sum, item) => sum + (item.net ?? 0),
+                        0,
+                      ),
+                    ),
                   )
                 : '—'}{' '}
-              to date
+              total
             </span>
           </div>
           {dividendActivity.length ? (
@@ -512,31 +557,11 @@ export default function PortfolioReports({
               config={dividendActivityConfig}
               className="report-chart report-chart--trend"
             >
-              <AreaChart
+              <BarChart
                 accessibilityLayer
                 data={dividendActivity}
                 margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
               >
-                <defs>
-                  <linearGradient
-                    id="dividendCumulativeFill"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="var(--primary)"
-                      stopOpacity={0.28}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="var(--primary)"
-                      stopOpacity={0.02}
-                    />
-                  </linearGradient>
-                </defs>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="label"
@@ -557,34 +582,32 @@ export default function PortfolioReports({
                   }
                 />
                 <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
                   content={
                     <ChartTooltipContent
-                      formatter={(value) => (
-                        <div className="report-tooltip-row">
-                          <span>Cumulative net</span>
-                          <b>
-                            {value === null ? '—' : money(Number(value))}
-                          </b>
-                        </div>
-                      )}
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as (typeof dividendActivity)[number];
+                        const amount = point.net ?? point.gross;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>
+                              {point.net === null ? 'Gross declared' : 'Net received'}
+                            </span>
+                            <b>{money(amount)}</b>
+                          </div>
+                        );
+                      }}
                     />
                   }
                 />
-                <Area
-                  type="monotone"
-                  dataKey="cumulativeNet"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  fill="url(#dividendCumulativeFill)"
-                  dot={false}
-                  connectNulls={false}
-                  activeDot={{
-                    r: 4,
-                    strokeWidth: 2,
-                    stroke: 'var(--background)',
-                  }}
+                <Bar
+                  dataKey={(item: (typeof dividendActivity)[number]) =>
+                    item.net ?? item.gross
+                  }
+                  fill="var(--color-net)"
+                  radius={[4, 4, 0, 0]}
                 />
-              </AreaChart>
+              </BarChart>
             </ChartContainer>
           ) : (
             <ReportEmpty>
@@ -592,7 +615,7 @@ export default function PortfolioReports({
             </ReportEmpty>
           )}
           <p className="report-source">
-            Source: running total of net dividend income · post-withholding
+            Source: net dividend income by month · post-withholding
           </p>
         </section>
 
@@ -962,81 +985,126 @@ export default function PortfolioReports({
         <section className="panel report-panel">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">SIP ALIGNMENT</p>
-              <h3>Actual vs target</h3>
+              <p className="eyebrow">SIP ACTIVITY</p>
+              <h3>Monthly investment by company</h3>
             </div>
-            <span>Weight (%)</span>
+            <span>
+              {recentInvestment.length ? money(recentInvestmentTotal) : '—'}{' '}
+              invested
+            </span>
           </div>
-          {report.targetComparison.length ? (
-            <ChartContainer
-              config={targetConfig}
-              className="report-chart report-chart--medium"
-            >
-              <BarChart
-                accessibilityLayer
-                data={report.targetComparison}
-                margin={{ top: 12, right: 8, bottom: 24, left: 0 }}
+          {recentInvestment.length ? (
+            <>
+              <ChartContainer
+                config={recentInvestmentConfig}
+                className="report-chart report-chart--medium"
               >
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="ticker"
-                  tickLine={false}
-                  axisLine={false}
-                  label={{
-                    value: 'SIP company',
-                    position: 'insideBottom',
-                    offset: -16,
-                  }}
-                />
-                <YAxis
-                  tickFormatter={(value) => `${value}%`}
-                  label={{
-                    value: 'Weight (%)',
-                    angle: -90,
-                    position: 'insideLeft',
-                  }}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value, name) => (
-                        <div className="report-tooltip-row">
-                          <span>
-                            {targetConfig[name as keyof typeof targetConfig]
-                              ?.label ?? name}
-                          </span>
-                          <b>{Number(value).toFixed(1)}%</b>
-                        </div>
-                      )}
+                <BarChart
+                  accessibilityLayer
+                  data={recentInvestmentRows}
+                  margin={{ top: 12, right: 16, bottom: 24, left: 16 }}
+                >
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    label={{
+                      value: 'Month',
+                      position: 'insideBottom',
+                      offset: -16,
+                    }}
+                  />
+                  <YAxis
+                    width={72}
+                    tickFormatter={(value) =>
+                      new Intl.NumberFormat('en-PK', {
+                        notation: 'compact',
+                      }).format(value)
+                    }
+                    label={{
+                      value: 'Invested (PKR)',
+                      angle: -90,
+                      position: 'insideLeft',
+                    }}
+                  />
+                  <ChartTooltip
+                    cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value, name, item) => {
+                          if (!Number(value)) return null;
+                          const company = recentInvestment.find(
+                            (entry) => entry.ticker === name,
+                          );
+                          const monthPoint =
+                            report.recentInvestmentActivity.find(
+                              (entry) => entry.month === item.payload.month,
+                            );
+                          const monthPct =
+                            monthPoint && monthPoint.total > 0
+                              ? ((Number(value) / monthPoint.total) * 100).toFixed(1)
+                              : '0.0';
+                          return (
+                            <div className="report-tooltip-row">
+                              <span>{company?.name ?? name}</span>
+                              <b>
+                                {money(Number(value))} · {monthPct}%
+                              </b>
+                            </div>
+                          );
+                        }}
+                      />
+                    }
+                  />
+                  {recentInvestment.map((item, index) => (
+                    <Bar
+                      key={item.ticker}
+                      dataKey={item.ticker}
+                      stackId="invested"
+                      fill={
+                        item.ticker === 'Other'
+                          ? OTHER_SECTOR_COLOR
+                          : sectorColors[index % sectorColors.length]
+                      }
+                      radius={
+                        index === recentInvestment.length - 1
+                          ? [4, 4, 0, 0]
+                          : 0
+                      }
                     />
-                  }
-                />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar
-                  dataKey="actual"
-                  fill="var(--color-actual)"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="target"
-                  fill="var(--color-target)"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ChartContainer>
+                  ))}
+                </BarChart>
+              </ChartContainer>
+              <div
+                className="sector-key"
+                aria-label="Recent investment legend"
+              >
+                {recentInvestment.map((item, index) => (
+                  <div key={item.ticker}>
+                    <i
+                      aria-hidden="true"
+                      style={{
+                        background:
+                          item.ticker === 'Other'
+                            ? OTHER_SECTOR_COLOR
+                            : sectorColors[index % sectorColors.length],
+                      }}
+                    />
+                    <span>{item.name}</span>
+                    <b>{item.weight.toFixed(1)}%</b>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <ReportEmpty>
-              Set SIP targets to compare your current allocation.
+              Record a purchase in the last 12 months to see this breakdown.
             </ReportEmpty>
           )}
-          {!completeQuotes && report.targetComparison.length > 0 && (
-            <p className="report-inline-note">
-              Actual weights require a saved price for every held company.
-              Targets remain visible for reference.
-            </p>
-          )}
           <p className="report-source">
-            Source: current priced holdings and saved SIP targets
+            Source: recorded buy trades, last 12 months · cost basis (shares ×
+            price + fees)
           </p>
         </section>
 

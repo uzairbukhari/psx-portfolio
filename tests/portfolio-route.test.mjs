@@ -6,7 +6,9 @@ import ts from 'typescript';
 const base = new URL('../', import.meta.url);
 const source = readFileSync(new URL('app/api/portfolio/route.ts', base), 'utf8')
   .replace("import { db, identity, failure } from '@/lib/server';", `const db=()=>globalThis.__portfolioDB; const identity=async()=> 'owner'; const failure=(e,status=400)=>Response.json({error:e.message},{status});`)
-  .replace("import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';", `import { blankPortfolio, validate } from '${new URL('lib/portfolio.ts', base).href}';`);
+  .replace("import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';", `import { blankPortfolio, validate } from '${new URL('lib/portfolio.ts', base).href}';`)
+  .replace("import { applyFacts, newTickers } from '@/lib/company-enrichment';", `import { applyFacts, newTickers } from '${new URL('lib/company-enrichment.ts', base).href}';`)
+  .replace("import { gatherFacts } from '@/lib/company-facts-store';", `const gatherFacts=async()=>[];`);
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
 const route = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
