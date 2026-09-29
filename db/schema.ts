@@ -41,6 +41,8 @@ export const monthlyRecommendations = sqliteTable(
     outputTokens: integer('output_tokens').notNull().default(0),
     workflowVersion: integer('workflow_version').notNull().default(1),
     snapshot: text('snapshot'),
+    gatherStartedAt: text('gather_started_at'),
+    pendingTickers: text('pending_tickers'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -132,6 +134,15 @@ export const companyFacts = sqliteTable('company_facts', {
   fetchedOn: text('fetched_on').notNull(),
   payload: text('payload').notNull(),
   fetchedAt: text('fetched_at').notNull(),
+});
+
+// Tracks on-demand PSX facts scrapes (GitHub Actions workflow_dispatch): dedupes
+// dispatches and surfaces the last scrape error per ticker.
+export const factsRequests = sqliteTable('facts_requests', {
+  ticker: text('ticker').primaryKey(),
+  requestedAt: text('requested_at').notNull(),
+  attemptedAt: text('attempted_at'),
+  error: text('error'),
 });
 
 export const marketSummaryRefreshes = sqliteTable('market_summary_refreshes', {

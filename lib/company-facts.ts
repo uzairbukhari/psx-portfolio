@@ -177,6 +177,25 @@ export function parseCompanyPage(html: string, ticker: string, fetchedAt = new D
   };
 }
 
+/**
+ * Scraped facts are at most a day or more old, but the shared `quote_refreshes`
+ * cache is refreshed every few minutes. When it holds a newer price, use it and
+ * rescale P/E (price / EPS) so valuation stays consistent with the price.
+ */
+export function overlayQuote(
+  facts: CompanyFacts,
+  quote: { price: number; quoteDate: string; fetchedAt: string } | undefined,
+): CompanyFacts {
+  if (!quote || !(quote.price > 0) || !(facts.price > 0)) return facts;
+  if (quote.quoteDate < facts.priceDate || quote.fetchedAt <= facts.fetchedAt) return facts;
+  return {
+    ...facts,
+    price: quote.price,
+    priceDate: quote.quoteDate,
+    peTtm: facts.peTtm === null ? null : round2(facts.peTtm * (quote.price / facts.price)),
+  };
+}
+
 export async function fetchCompanyFacts(ticker: string): Promise<CompanyFacts> {
   const response = await fetchPsx(`https://dps.psx.com.pk/company/${ticker}`);
   return parseCompanyPage(await response.text(), ticker);
