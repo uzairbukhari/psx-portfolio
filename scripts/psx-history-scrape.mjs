@@ -26,9 +26,11 @@ async function main() {
   const now = new Date();
   const failed = [];
   let ok = 0;
+  // KSE100 rides along for the market-pulse sparkline (needs a token from any company page).
+  if (!tickerArg) tickers.push('KSE100');
   for (const ticker of tickers) {
     try {
-      const token = await fetchPsxToken(ticker);
+      const token = await fetchPsxToken(ticker === 'KSE100' ? tickers[0] : ticker);
       const intraday = parseIntraday(await fetchPsxTimeseries(ticker, 'int', token));
       const eodAt = ages.get(ticker);
       const stale = !eodAt || now - new Date(eodAt) > EOD_MAX_AGE_MS;
