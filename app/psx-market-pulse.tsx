@@ -58,82 +58,6 @@ function Sparkline({ points, up }: { points: IndexPoint[]; up: boolean }) {
   );
 }
 
-function CompanyMiniChart({
-  points,
-  price,
-  high,
-  low,
-  up,
-  previousClose,
-}: {
-  points: number[];
-  price: number | null;
-  high: number | null;
-  low: number | null;
-  up: boolean;
-  previousClose: number | null;
-}) {
-  const width = 100;
-  const height = 30;
-  const midpoint = height / 2;
-  const validRange = high !== null && low !== null && high >= low;
-  const range = validRange ? high - low || 1 : 1;
-  const chartValues = previousClose === null ? points : [...points, previousClose];
-  const seriesLow = chartValues.length ? Math.min(...chartValues) : 0;
-  const seriesHigh = chartValues.length ? Math.max(...chartValues) : 1;
-  const seriesRange = seriesHigh - seriesLow || 1;
-  const coords = points.length > 1
-    ? points.map((value, index) => {
-        const x = (index / (points.length - 1)) * width;
-        const y = height - ((value - seriesLow) / seriesRange) * (height - 4) - 2;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-    : [];
-  const markerX = validRange && price !== null
-    ? Math.max(3, Math.min(97, ((price - low) / range) * width))
-    : null;
-  const baselineY = previousClose !== null && points.length > 1
-    ? height - ((previousClose - seriesLow) / seriesRange) * (height - 4) - 2
-    : null;
-  const movementClass = (value: number | null) =>
-    value === null || previousClose === null
-      ? ''
-      : value > previousClose
-        ? 'pos'
-        : value < previousClose
-          ? 'neg'
-          : '';
-
-  return (
-    <div className="pulse-mini-chart" aria-hidden="true">
-      <small className={movementClass(low)}>L {number(low)}</small>
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        {baselineY !== null && (
-          <line x1="0" x2="100" y1={baselineY} y2={baselineY} stroke="var(--muted-foreground)" strokeWidth={0.6} strokeDasharray="3 3" opacity={0.55} />
-        )}
-        {coords.length > 1 ? (
-          <polyline
-            points={coords.join(' ')}
-            fill="none"
-            stroke={up ? 'var(--success)' : 'var(--danger)'}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ) : (
-          <>
-            <line x1="3" x2="97" y1={midpoint} y2={midpoint} stroke="var(--border)" strokeWidth={2} />
-            {markerX !== null && (
-              <circle cx={markerX} cy={midpoint} r="3" fill={up ? 'var(--success)' : 'var(--danger)'} />
-            )}
-          </>
-        )}
-      </svg>
-      <small className={movementClass(high)}>H {number(high)}</small>
-    </div>
-  );
-}
-
 const number = (value: number | null, digits = 2) =>
   value === null
     ? 'Unavailable'
@@ -159,7 +83,6 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   const [error, setError] = useState('');
   const [liveConnected, setLiveConnected] = useState(false);
   const [liveReceivedAt, setLiveReceivedAt] = useState<string | null>(null);
-  const [liveSeries, setLiveSeries] = useState<Record<string, number[]>>({});
   const [stale, setStale] = useState(true);
   const liveActive = useRef(false);
 
@@ -218,10 +141,6 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
         liveActive.current = true;
         setLiveConnected(true);
         setLiveReceivedAt(update.receivedAt);
-        setLiveSeries((current) => ({
-          ...current,
-          [update.ticker]: [...(current[update.ticker] ?? []), update.price].slice(-30),
-        }));
         setSummary((current) => {
           if (!current) return current;
           const providerOpen = update.providerMarketState === 'OPN';
@@ -369,7 +288,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
           <div className="pulse-shortlist__head">
             <div>
               <h4>Your shortlisted companies</h4>
-              <span>Price · today · day range</span>
+              <span>Price · today</span>
             </div>
             <button className="quote-btn" onClick={onOpenShortlist}>Edit shortlist</button>
           </div>
@@ -377,25 +296,19 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
             <div className="pulse-company-list">
               {summary.companies.map((company) => {
                 const direction = company.change === null ? '' : company.change > 0 ? 'pos' : company.change < 0 ? 'neg' : '';
-                const up = (company.change ?? 0) >= 0;
-                const accessibleSummary = `${company.name}, ${company.ticker}. Price ${company.price === null ? 'unavailable' : `Rs ${number(company.price)}`}. Today ${company.changePercent === null ? 'unavailable' : `${number(company.changePercent)} percent`}. Low ${number(company.low)}, high ${number(company.high)}.`;
-                const sessionPoints = company.intraday.map((point) => point.value);
-                const chartPoints = [...sessionPoints, ...(liveSeries[company.ticker] ?? [])];
+                const change =
+                  company.changePercent === null
+                    ? '—'
+                    : `${company.changePercent > 0 ? '+' : ''}${number(company.changePercent)}%`;
+                const accessibleSummary = `${company.name}, ${company.ticker}. Price ${company.price === null ? 'unavailable' : `Rs ${number(company.price)}`}. Today ${company.changePercent === null ? 'unavailable' : `${number(company.changePercent)} percent`}.`;
+                const title = `${company.name}${company.change === null ? '' : ` · ${company.change > 0 ? '+' : ''}${number(company.change)} today`}`;
                 return (
-                  <article className="pulse-company" key={company.ticker} title={company.name} aria-label={accessibleSummary}>
+                  <article className={`pulse-company ${direction}`} key={company.ticker} title={title} aria-label={accessibleSummary}>
                     <b className="pulse-company__ticker">{company.ticker}</b>
-                    <b className="pulse-company__price">{company.price === null ? 'Unavailable' : `Rs ${number(company.price)}`}</b>
-                    <b className={`pulse-company__change ${direction}`}>
-                      {company.changePercent === null ? 'Unavailable' : `${company.changePercent > 0 ? '+' : ''}${number(company.changePercent)}%`}
+                    <b className={`pulse-company__change ${direction}`}>{change}</b>
+                    <b className="pulse-company__price">
+                      {company.price === null ? '—' : <><small>Rs</small> {number(company.price)}</>}
                     </b>
-                    <CompanyMiniChart
-                      points={chartPoints}
-                      price={company.price}
-                      high={company.high}
-                      low={company.low}
-                      up={up}
-                      previousClose={company.previousClose}
-                    />
                   </article>
                 );
               })}
