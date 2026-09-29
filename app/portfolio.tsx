@@ -27,6 +27,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Spinner } from '@/components/ui/spinner';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   ArrowUpRight,
   RefreshCw,
   Plus,
@@ -36,6 +41,7 @@ import {
   Settings,
   ChevronDown,
   MoreHorizontal,
+  Bell,
 } from 'lucide-react';
 import {
   holdings,
@@ -59,7 +65,15 @@ import {
   type Dividend,
   type StockSplit,
   type TaxedDividend,
+  pendingAutoDividends,
+  type AppNotification,
 } from '@/lib/portfolio';
+import {
+  addNotifications,
+  announcementNotifications,
+  dividendNotifications,
+} from '@/lib/notifications';
+import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
 import ResearchDesk from './research-desk';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
@@ -177,6 +191,7 @@ type ApiResponse = {
   error?: string;
   portfolio: Portfolio;
   revision: number;
+  announcements?: PayoutAnnouncement[];
   available?: boolean;
   cached?: boolean;
   estimatedCostUsd?: number;
@@ -254,6 +269,30 @@ function parseCdcPaymentDate(s: string): string | null {
   if (!m) return null;
   const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   return dateOK(iso) ? iso : null;
+}
+/** A CDC row is the real paid amount, so it voids the PSX-announced estimate for the same payout (mutates `existing`). */
+function voidSupersededAuto(existing: Dividend[], imported: Dividend[]) {
+  const voided: Dividend[] = [];
+  const shift = (date: string, days: number) => {
+    const d = new Date(date + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  for (const row of imported) {
+    const match = existing.find(
+      (d) =>
+        d.source === 'auto' &&
+        !d.voided &&
+        d.ticker === row.ticker &&
+        row.date >= shift(d.date, -7) &&
+        row.date <= shift(d.date, 60),
+    );
+    if (match) {
+      match.voided = true;
+      voided.push(match);
+    }
+  }
+  return voided;
 }
 type CdcImportSummary = {
   dividends: Dividend[];
@@ -503,8 +542,12 @@ function DividendHistoryTable({
                 {t?.netAmount == null ? '—' : money(t.netAmount)}
               </TableCell>
               <TableCell>
-                <span className="tag">
-                  {d.source === 'import' ? 'CDC import' : 'Manual'}
+                <span className="tag" title={d.note || undefined}>
+                  {d.source === 'import'
+                    ? 'CDC import'
+                    : d.source === 'auto'
+                      ? 'PSX auto'
+                      : 'Manual'}
                 </span>
                 {d.voided && <span className="tag status-cancelled">Voided</span>}
               </TableCell>
@@ -595,11 +638,63 @@ export default function Dashboard({
       if (!r.ok) throw Error(d.error);
       setP(d.portfolio);
       setRevision(d.revision);
+      await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? []);
     } catch (e) {
       notify(String(e), true);
     } finally {
       setBusy(false);
     }
+  }
+  /** Books cash dividends PSX announced for held companies and posts payout news, in one revisioned save. */
+  async function recordAutoDividends(
+    loaded: Portfolio,
+    loadedRevision: number,
+    announcements: PayoutAnnouncement[],
+  ) {
+    let pending: Dividend[], news: AppNotification[];
+    const now = new Date().toISOString();
+    try {
+      pending = pendingAutoDividends(loaded, announcements);
+      news = [
+        ...dividendNotifications(pending, now),
+        ...announcementNotifications(loaded, announcements, today(), now),
+      ];
+    } catch {
+      return;
+    }
+    if (!news.length) return;
+    const next = clone(loaded);
+    if (pending.length)
+      next.dividends = [...(next.dividends ?? []), ...pending];
+    addNotifications(next, news);
+    try {
+      validate(next);
+      const r = await fetch('/api/portfolio', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portfolio: next, revision: loadedRevision }),
+      });
+      const saved = (await r.json()) as ApiResponse;
+      if (!r.ok) throw Error(saved.error);
+      setP(next);
+      setRevision(saved.revision);
+      if (pending.length)
+        notify(
+          `Recorded ${pending.length} dividend${pending.length === 1 ? '' : 's'} from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}.`,
+        );
+    } catch (e) {
+      notify('Could not record PSX dividends: ' + String(e), true);
+    }
+  }
+  /** Persists read/cleared state of the notification list. */
+  function updateNotifications(
+    change: (list: AppNotification[]) => AppNotification[],
+  ) {
+    attempt(async () => {
+      const next = clone(p!);
+      next.notifications = change(next.notifications ?? []);
+      await save(next, 'Notifications updated.');
+    });
   }
   useEffect(() => {
     void load();
@@ -833,6 +928,8 @@ export default function Dashboard({
     ...(p.stockSplits ?? []).map((split) => split.ticker),
     ...(p.dividends ?? []).map((dividend) => dividend.ticker),
   ]);
+  const notifications = p.notifications ?? [];
+  const unreadCount = notifications.filter((n) => !n.read).length;
   const taxedDividends = taxSummary(p).dividends;
   const dividendsByTicker = (ticker: string) =>
     (p.dividends ?? [])
@@ -867,7 +964,11 @@ export default function Dashboard({
   }
   function correctDividend(d: Dividend) {
     setEditingDividend(d.id);
-    setDividend({ ...d });
+    setDividend(
+      d.source === 'auto'
+        ? { ...d, source: 'manual', externalId: undefined }
+        : { ...d },
+    );
   }
   function correctStockSplit(entry: StockSplit) {
     setEditingStockSplit(entry.id);
@@ -987,6 +1088,10 @@ export default function Dashboard({
       const index = next.dividends.findIndex((d) => d.id === editingDividend);
       next.dividends.splice(index + 1, 0, entry);
     } else next.dividends.push(entry);
+    addNotifications(
+      next,
+      dividendNotifications([entry], new Date().toISOString()),
+    );
     await save(
       next,
       editingDividend
@@ -1032,6 +1137,78 @@ export default function Dashboard({
           <span>PSX / PERSONAL INVESTING</span>
         </button>
         <div className="header-right">
+          <Popover>
+            <PopoverTrigger
+              className="bell-trigger"
+              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="bell-badge">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </PopoverTrigger>
+            <PopoverContent align="end" className="notice-panel">
+              <div className="notice-head">
+                <strong>Notifications</strong>
+                <span className="row">
+                  <button
+                    type="button"
+                    data-slot="link"
+                    className="link-button"
+                    disabled={busy || !unreadCount}
+                    onClick={() =>
+                      updateNotifications((list) =>
+                        list.map((n) => ({ ...n, read: true })),
+                      )
+                    }
+                  >
+                    Mark all read
+                  </button>
+                  <button
+                    type="button"
+                    data-slot="link"
+                    className="link-button"
+                    disabled={busy || !notifications.length}
+                    onClick={() => updateNotifications(() => [])}
+                  >
+                    Clear
+                  </button>
+                </span>
+              </div>
+              {notifications.length === 0 ? (
+                <p className="muted notice-empty">
+                  Nothing yet. Dividends recorded from PSX announcements and
+                  new payout announcements for your holdings appear here.
+                </p>
+              ) : (
+                <ul className="notice-list">
+                  {notifications.map((n) => (
+                    <li key={n.id} className={n.read ? '' : 'unread'}>
+                      <button
+                        type="button"
+                        data-slot="link"
+                        className="notice-item"
+                        onClick={() => {
+                          if (!n.read)
+                            updateNotifications((list) =>
+                              list.map((x) =>
+                                x.id === n.id ? { ...x, read: true } : x,
+                              ),
+                            );
+                        }}
+                      >
+                        <strong>{n.title}</strong>
+                        <span>{n.body}</span>
+                        <small>{new Date(n.at).toLocaleString()}</small>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PopoverContent>
+          </Popover>
           {email && (
             <DropdownMenu>
               <DropdownMenuTrigger className="account-trigger">
@@ -1915,13 +2092,33 @@ export default function Dashboard({
                           return;
                         }
                         const next = clone(p);
+                        const replaced = voidSupersededAuto(
+                          next.dividends ?? [],
+                          result.dividends,
+                        );
+                        const superseded = replaced.length;
+                        const at = new Date().toISOString();
+                        addNotifications(next, [
+                          ...dividendNotifications(result.dividends, at),
+                          ...replaced.map(
+                            (d): AppNotification => ({
+                              id: `replaced:${d.id}`,
+                              at,
+                              kind: 'dividend-replaced',
+                              ticker: d.ticker,
+                              title: `${d.ticker} PSX estimate replaced`,
+                              body: `The PSX-announced dividend for ${d.date} was replaced by the actual CDC payment.`,
+                              read: false,
+                            }),
+                          ),
+                        ]);
                         next.dividends = [
                           ...(next.dividends ?? []),
                           ...result.dividends,
                         ];
                         await save(
                           next,
-                          `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
+                          `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
                         );
                       });
                       e.target.value = '';
@@ -2576,6 +2773,25 @@ export default function Dashboard({
                     value={company.target}
                     onChange={(e) =>
                       setCompany({ ...company, target: Number(e.target.value) })
+                    }
+                  />
+                </label>
+                <label>
+                  Face value (Rs)
+                  <input
+                    type="number"
+                    min="0.01"
+                    max="1000"
+                    step="0.01"
+                    placeholder="10"
+                    value={company.faceValue ?? ''}
+                    onChange={(e) =>
+                      setCompany({
+                        ...company,
+                        faceValue: e.target.value
+                          ? Number(e.target.value)
+                          : undefined,
+                      })
                     }
                   />
                 </label>

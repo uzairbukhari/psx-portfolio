@@ -13,11 +13,11 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-quote-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
+import { d1, heldTickers as sharedHeldTickers } from './d1-rest.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents, parseIndexSummary } from '../lib/psx-market.ts';
 import { fetchPsxQuote } from '../lib/psx-quotes.ts';
 
-const DATABASE_ID = 'f72a6264-371b-49ff-89e3-20eef1ce2b19';
 const MAX_FALLBACK = 20;
 // D1 allows 100 bound parameters per statement; 7 per row.
 const ROWS_PER_STATEMENT = 14;
@@ -26,32 +26,7 @@ const SOURCE = 'https://dps.psx.com.pk/indices/ALLSHR';
 const dryRun = process.argv.includes('--dry-run');
 const tickerArg = process.argv.find((arg) => arg.startsWith('--tickers='));
 
-async function d1(sql, params = []) {
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const token = process.env.CLOUDFLARE_API_TOKEN;
-  if (!account || !token) throw Error('CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required.');
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${DATABASE_ID}/query`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sql, params }),
-    },
-  );
-  const body = await response.json();
-  if (!response.ok || !body.success)
-    throw Error(`D1 query failed (${response.status}): ${JSON.stringify(body.errors ?? body)}`);
-  return body.result[0].results;
-}
-
-async function heldTickers() {
-  if (tickerArg) return tickerArg.slice('--tickers='.length).split(',').filter(Boolean);
-  const rows = await d1(
-    `SELECT DISTINCT upper(json_extract(c.value, '$.ticker')) AS ticker
-     FROM portfolios, json_each(portfolios.payload, '$.companies') AS c`,
-  );
-  return rows.map((row) => row.ticker).filter((ticker) => /^[A-Z0-9]{2,12}$/.test(ticker ?? ''));
-}
+const heldTickers = () => sharedHeldTickers(tickerArg);
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

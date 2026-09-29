@@ -3,6 +3,7 @@ import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
 import { applyFacts, newTickers } from '@/lib/company-enrichment';
 import { gatherFacts } from '@/lib/company-facts-store';
 import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';
+import { readAnnouncements } from '@/lib/dividend-announcements';
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
@@ -18,8 +19,12 @@ export async function GET(req: Request) {
       await readQuoteRows(db()),
       portfolio.companies.map((company) => company.ticker),
     );
+    const announcements = await readAnnouncements(
+      db(),
+      portfolio.companies.map((company) => company.ticker),
+    ).catch(() => []);
     return Response.json(
-      { portfolio, revision: row?.revision ?? 0 },
+      { portfolio, revision: row?.revision ?? 0, announcements },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

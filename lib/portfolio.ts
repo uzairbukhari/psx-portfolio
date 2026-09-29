@@ -1,3 +1,4 @@
+import type { PayoutAnnouncement } from './psx-payouts.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -20,6 +21,8 @@ export type Company = {
   approved: boolean;
   screenDate: string;
   note: string;
+  /** Face value in PKR; PSX quotes cash dividends as a percentage of it. Defaults to 10. */
+  faceValue?: number;
 };
 export type Trade = {
   id: string;
@@ -49,7 +52,7 @@ export type Dividend = {
   id: string;
   ticker: string;
   date: string;
-  source: 'manual' | 'import';
+  source: 'manual' | 'import' | 'auto';
   perShare?: number;
   grossAmount?: number;
   netAmount?: number;
@@ -58,6 +61,22 @@ export type Dividend = {
   note: string;
   voided?: boolean;
 };
+export type AppNotification = {
+  id: string;
+  /** ISO timestamp the event was recorded. */
+  at: string;
+  kind: 'dividend-recorded' | 'dividend-replaced' | 'payout-announced' | 'info';
+  ticker?: string;
+  title: string;
+  body: string;
+  read: boolean;
+};
+export const NOTIFICATION_KINDS = [
+  'dividend-recorded',
+  'dividend-replaced',
+  'payout-announced',
+  'info',
+] as const;
 export const TAX_RATES = { filer: 0.15, 'non-filer': 0.3 } as const;
 export type TaxProfile = { filerStatus: keyof typeof TAX_RATES };
 export type Quote = {
@@ -94,6 +113,7 @@ export type Portfolio = {
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
   dividends?: Dividend[];
+  notifications?: AppNotification[];
   taxProfile?: TaxProfile;
   research?: ResearchCompany[];
   researchSettings?: ResearchSettings;
@@ -364,6 +384,81 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
   }
   return out;
 }
+export const DEFAULT_FACE_VALUE = 10;
+/** Book-closure start minus two weekdays: PSX settles T+1, so a buyer must hold by then. Holidays are ignored. */
+export function entitlementDate(bookClosureStart: string) {
+  const d = new Date(bookClosureStart + 'T00:00:00Z');
+  let back = 2;
+  while (back > 0) {
+    d.setUTCDate(d.getUTCDate() - 1);
+    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) back--;
+  }
+  return d.toISOString().slice(0, 10);
+}
+const shiftDays = (date: string, days: number) => {
+  const d = new Date(date + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+export const autoDividendId = (a: PayoutAnnouncement) =>
+  `psx:${a.ticker}:${a.bookClosureStart}:${a.announcedOn}`;
+/**
+ * Cash dividends PSX has announced for held companies whose book closure has
+ * started and that the ledger has not recorded yet. Entitlement uses the shares
+ * held on the entitlement date (split-aware). Skips ids already present (even
+ * voided, so a voided entry never returns) and dates a manual/CDC entry already
+ * covers, so CDC imports and hand-entered dividends are never double counted.
+ */
+export function pendingAutoDividends(
+  p: Portfolio,
+  announcements: PayoutAnnouncement[],
+  asOf: string = today(),
+): Dividend[] {
+  const tickers = new Map(p.companies.map((c) => [c.ticker, c]));
+  const all = p.dividends ?? [];
+  const seen = new Set(all.map((d) => d.externalId).filter(Boolean));
+  const out: Dividend[] = [];
+  for (const a of announcements) {
+    const company = tickers.get(a.ticker);
+    if (!company || a.kind !== 'cash' || a.bookClosureStart > asOf) continue;
+    const externalId = autoDividendId(a);
+    if (seen.has(externalId)) continue;
+    const perShare =
+      a.perShareRs ??
+      (a.percent === null
+        ? null
+        : round((a.percent / 100) * (company.faceValue ?? DEFAULT_FACE_VALUE)));
+    if (perShare === null || !(perShare > 0)) continue;
+    const shares = sharesHeldOn(p, a.ticker, entitlementDate(a.bookClosureStart));
+    if (shares <= 0) continue;
+    const from = shiftDays(a.bookClosureStart, -7),
+      to = shiftDays(a.bookClosureStart, 60);
+    if (
+      all.some(
+        (d) =>
+          !d.voided &&
+          d.source !== 'auto' &&
+          d.ticker === a.ticker &&
+          d.date >= from &&
+          d.date <= to,
+      )
+    )
+      continue;
+    seen.add(externalId);
+    out.push({
+      id: 'auto-' + externalId,
+      ticker: a.ticker,
+      date: a.bookClosureStart,
+      source: 'auto',
+      perShare,
+      grossAmount: round(perShare * shares),
+      externalId,
+      financialYear: a.period || undefined,
+      note: `PSX ${a.details}${a.period ? ', ' + a.period : ''}; book closure ${a.bookClosureStart} to ${a.bookClosureEnd}; ${shares} shares held on ${entitlementDate(a.bookClosureStart)}.`,
+    });
+  }
+  return out;
+}
 export type TaxedSale = RealizedSale & {
   tax: number | null;
   net: number | null;
@@ -372,7 +467,7 @@ export type TaxedDividend = {
   id: string;
   ticker: string;
   date: string;
-  source: 'manual' | 'import';
+  source: 'manual' | 'import' | 'auto';
   grossAmount: number;
   tax: number | null;
   netAmount: number | null;
@@ -555,7 +650,9 @@ export function validate(p: Portfolio) {
       typeof c.note !== 'string' ||
       c.note.length > 2000 ||
       typeof c.screenDate !== 'string' ||
-      (c.screenDate && !dateOK(c.screenDate))
+      (c.screenDate && !dateOK(c.screenDate)) ||
+      (c.faceValue !== undefined &&
+        (!Number.isFinite(c.faceValue) || c.faceValue <= 0 || c.faceValue > 1000))
     )
       throw Error('Invalid or duplicate company.');
     tickers.add(c.ticker);
@@ -724,7 +821,7 @@ export function validate(p: Portfolio) {
         !tickers.has(d.ticker) ||
         !dateOK(d.date) ||
         d.date > today() ||
-        !['manual', 'import'].includes(d.source) ||
+        !['manual', 'import', 'auto'].includes(d.source) ||
         typeof d.note !== 'string' ||
         d.note.length > 2000 ||
         (d.financialYear !== undefined && typeof d.financialYear !== 'string') ||
@@ -732,7 +829,7 @@ export function validate(p: Portfolio) {
       )
         throw Error('Invalid dividend record.');
       dividendIds.add(d.id);
-      if (d.source === 'manual') {
+      if (d.source === 'manual' || d.source === 'auto') {
         if (
           !Number.isFinite(d.perShare) ||
           d.perShare! < 0 ||
@@ -740,10 +837,24 @@ export function validate(p: Portfolio) {
           !Number.isFinite(d.grossAmount) ||
           d.grossAmount! < 0 ||
           d.netAmount !== undefined ||
-          d.externalId !== undefined
+          (d.source === 'manual' && d.externalId !== undefined) ||
+          (d.source === 'auto' &&
+            (typeof d.externalId !== 'string' || !d.externalId))
         )
           throw Error('Invalid dividend record.');
-        if (!d.voided && sharesHeldOn(p, d.ticker, d.date) <= 0)
+        if (d.source === 'auto' && !d.voided) {
+          if (importIds.has(d.externalId!))
+            throw Error('Duplicate dividend import event.');
+          importIds.add(d.externalId!);
+        }
+        if (
+          !d.voided &&
+          sharesHeldOn(
+            p,
+            d.ticker,
+            d.source === 'auto' ? entitlementDate(d.date) : d.date,
+          ) <= 0
+        )
           throw Error(
             d.ticker + ': no shares held on ' + d.date + ' for dividend.',
           );
@@ -767,6 +878,31 @@ export function validate(p: Portfolio) {
           }
         }
       }
+    }
+  }
+  if (p.notifications !== undefined) {
+    if (!Array.isArray(p.notifications) || p.notifications.length > 500)
+      throw Error('Invalid notifications.');
+    const ids = new Set<string>();
+    for (const n of p.notifications) {
+      if (
+        !n ||
+        typeof n.id !== 'string' ||
+        !n.id ||
+        n.id.length > 200 ||
+        ids.has(n.id) ||
+        typeof n.at !== 'string' ||
+        !Number.isFinite(Date.parse(n.at)) ||
+        !(NOTIFICATION_KINDS as readonly string[]).includes(n.kind) ||
+        typeof n.title !== 'string' ||
+        n.title.length > 300 ||
+        typeof n.body !== 'string' ||
+        n.body.length > 1000 ||
+        typeof n.read !== 'boolean' ||
+        (n.ticker !== undefined && typeof n.ticker !== 'string')
+      )
+        throw Error('Invalid notifications.');
+      ids.add(n.id);
     }
   }
   if (
