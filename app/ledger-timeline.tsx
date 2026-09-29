@@ -212,6 +212,16 @@ export default function LedgerTimeline({
             </button>
           ))}
         </div>
+        {voidedCount > 0 && (
+          <label className="check-row ledger-voided">
+            <input
+              type="checkbox"
+              checked={showVoided}
+              onChange={(e) => setShowVoided(e.target.checked)}
+            />
+            Voided ({voidedCount})
+          </label>
+        )}
         {!ticker && (
           <label className="ledger-search">
             <Search size={15} />
@@ -221,16 +231,6 @@ export default function LedgerTimeline({
               placeholder="Search ticker or company"
               aria-label="Search ledger"
             />
-          </label>
-        )}
-        {voidedCount > 0 && (
-          <label className="check-row ledger-voided">
-            <input
-              type="checkbox"
-              checked={showVoided}
-              onChange={(e) => setShowVoided(e.target.checked)}
-            />
-            Voided ({voidedCount})
           </label>
         )}
       </div>

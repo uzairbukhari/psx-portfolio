@@ -230,14 +230,11 @@ export default function MonthlyPicks({
 
   return (
     <div className="monthly-picks">
-      <section className="panel picks-hero">
-        <div>
+      <section className="picks-plan">
+        <div className="picks-plan__intro">
           <p className="eyebrow">MONTHLY PICKS</p>
-          <h2>Research your shortlist for the next 60–90 days.</h2>
-          <p>
-            Select companies, enter fresh money, and receive a sourced recommendation.
-            Your holdings, target weights, and Research Desk are not used.
-          </p>
+          <h2>Research your shortlist for the next 60–90 days</h2>
+          <p>Pick companies, enter fresh money, get a sourced recommendation. Holdings, target weights and Research Desk are not used.</p>
         </div>
         <div className="picks-inputs">
           <label>
@@ -283,6 +280,12 @@ export default function MonthlyPicks({
             <h2>Your shortlist</h2>
             <p>{shortlist.length}/15 selected · your selection is treated as eligible.</p>
           </div>
+          <div className="picks-tools">
+          {!!shortlist.length && (
+            <button type="button" className="link-button" onClick={() => setShortlist([])}>
+              Clear all
+            </button>
+          )}
           <label className="picks-search">
             <Search size={16} />
             <input
@@ -292,6 +295,7 @@ export default function MonthlyPicks({
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
+          </div>
         </div>
         <div className="company-picker">
           {filtered.map((company) => {
@@ -299,11 +303,11 @@ export default function MonthlyPicks({
             return (
               <label key={company.ticker} className={selected ? 'company-option selected' : 'company-option'}>
                 <Checkbox checked={selected} onCheckedChange={() => toggle(company.ticker)} />
-                <span>
+                <span className="company-option__text">
                   <b>{company.ticker}</b>
-                  <small>{company.name}</small>
+                  <small title={company.name}>{company.name}</small>
                 </span>
-                {selected && <Check size={15} />}
+                {selected && <Check size={15} className="company-option__check" />}
               </label>
             );
           })}
@@ -358,14 +362,16 @@ export default function MonthlyPicks({
 
       {current?.result && (
         <>
-          <section className="panel picks-summary">
+          <section className="picks-summary">
             <div className="section-top">
               <div>
                 <p className="eyebrow">{current.month} RECOMMENDATION</p>
                 <h2>{['completed', 'completed_partial'].includes(current.status) ? 'Recommendation' : 'Provisional comparison'} · {estimates.length} picks</h2>
-                <p>
-                  {money(allocated)} {['completed', 'completed_partial'].includes(current.status) ? 'allocated' : 'proposed; not ready for execution'}
-                  {current.workflowVersion === 2 && ` · assessed ${current.result.assessedCount ?? 0} of ${current.result.totalCount ?? current.result.coverage.length}`}
+                <p className="muted">
+                  {['completed', 'completed_partial'].includes(current.status) ? '' : 'Proposed; not ready for execution. '}
+                  {current.workflowVersion === 2 && `Assessed ${current.result.assessedCount ?? 0} of ${current.result.totalCount ?? current.result.coverage.length}. `}
+                  {current.method && (current.method === 'ai' ? 'AI-ranked' : 'Quantitative fallback')}
+                  {current.dataAsOf && ` · PSX data as of ${current.dataAsOf}`}
                 </p>
               </div>
               <div className="row">
@@ -375,50 +381,54 @@ export default function MonthlyPicks({
                 <span className="tag">{new Date(current.createdAt).toLocaleDateString()}</span>
               </div>
             </div>
-            <p>{current.result.marketOutlook}</p>
-            {current.method && (
-              <p className="muted">
-                <span className="tag">{current.method === 'ai' ? 'AI-ranked' : 'Quantitative fallback'}</span>
-                {current.dataAsOf && ` · PSX data as of ${current.dataAsOf}`}
-                {current.method === 'quant' && ' · the AI ranking step was unavailable for this run; picks are ordered by the deterministic quant score below.'}
-              </p>
-            )}
-            <div className="split-stats picks-stats">
-              <div><small>Fresh money</small><strong>{money(current.amount)}</strong></div>
-              <div><small>Held as cash</small><strong>{money((current.amount * current.result.unallocatedPct) / 100)}</strong></div>
-              <div><small>API cost</small><strong>${(current.estimatedCostUsd ?? 0).toFixed(4)}</strong></div>
+            <div className="picks-kpis">
+              <div><span>Fresh money</span><b>{money(current.amount)}</b></div>
+              <div><span>Allocated</span><b>{money(allocated)}</b></div>
+              <div><span>Held as cash</span><b>{money((current.amount * current.result.unallocatedPct) / 100)}</b></div>
+              <div><span>API cost</span><b>${(current.estimatedCostUsd ?? 0).toFixed(4)}</b></div>
             </div>
+            {!!estimates.length && (
+              <div className="picks-alloc" aria-hidden="true">
+                {estimates.map((pick, index) => (
+                  <i key={pick.ticker} className={`alloc-${index % 6}`} style={{ width: `${pick.allocationPct}%` }} title={`${pick.ticker} ${pick.allocationPct}%`} />
+                ))}
+              </div>
+            )}
+            <div className="picks-legend">
+              {estimates.map((pick, index) => (
+                <span key={pick.ticker}><i className={`alloc-${index % 6}`} />{pick.ticker} <b>{pick.allocationPct}%</b></span>
+              ))}
+            </div>
+            <p className="picks-outlook">{current.result.marketOutlook}</p>
+            {current.method === 'quant' && (
+              <p className="muted">The AI ranking step was unavailable for this run; picks are ordered by the deterministic quant score.</p>
+            )}
           </section>
 
           <div className="pick-cards">
             {estimates.map((pick, index) => (
-              <article className="panel pick-card" key={pick.ticker}>
-                <div className="pick-rank">#{index + 1}</div>
-                <div className="section-top">
-                  <div>
-                    <h2>{pick.ticker} <small>{pick.name}</small></h2>
-                    <span className="tag">{pick.confidence} confidence</span>
+              <article className="pick-card" key={pick.ticker}>
+                <header className="pick-head">
+                  <span className="pick-rank">{index + 1}</span>
+                  <div className="pick-title">
+                    <h3>{pick.ticker}</h3>
+                    <small title={pick.name}>{pick.name}</small>
                   </div>
+                  <span className="tag">{pick.confidence} confidence</span>
                   <div className="pick-allocation">
                     <strong>{money(pick.allocationPkr)}</strong>
-                    <small>{pick.allocationPct}% allocation</small>
+                    <small>{pick.allocationPct}%</small>
                   </div>
-                </div>
+                </header>
                 {pick.metrics && (
-                  <div className="split-stats picks-stats compact">
-                    <div><small>P/E (TTM)</small><strong>{pick.metrics.peTtm ?? '—'}</strong></div>
-                    <div><small>EPS YoY</small><strong>{pick.metrics.epsYoYPct === null ? '—' : `${pick.metrics.epsYoYPct}%`}</strong></div>
-                    <div><small>1Y change</small><strong>{pick.metrics.change1yPct === null ? '—' : `${pick.metrics.change1yPct}%`}</strong></div>
-                    <div><small>Quant score</small><strong>{pick.metrics.score ?? '—'}/100</strong></div>
+                  <div className="pick-metrics">
+                    <div><span>P/E (TTM)</span><b>{pick.metrics.peTtm ?? '—'}</b></div>
+                    <div><span>EPS YoY</span><b>{pick.metrics.epsYoYPct === null ? '—' : `${pick.metrics.epsYoYPct}%`}</b></div>
+                    <div><span>1Y change</span><b>{pick.metrics.change1yPct === null ? '—' : `${pick.metrics.change1yPct}%`}</b></div>
+                    <div><span>Quant score</span><b>{pick.metrics.score ?? '—'}/100</b></div>
                   </div>
                 )}
-                <p>{pick.thesis}</p>
-                {pick.whySelected && <p><b>Why selected:</b> {pick.whySelected}</p>}
-                {pick.invalidation && <p><b>What would invalidate this view:</b> {pick.invalidation}</p>}
-                <div className="pick-reasons">
-                  <div><b>Catalysts</b><ul>{pick.catalysts.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                  <div><b>Risks</b><ul>{pick.risks.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                </div>
+                <p className="pick-thesis">{pick.thesis}</p>
                 <div className="pick-quantity">
                   {pick.shares === null ? (
                     <>
@@ -429,19 +439,28 @@ export default function MonthlyPicks({
                     </>
                   ) : (
                     <>
-                      <span><b>{pick.shares.toLocaleString()}</b> estimated whole shares</span>
+                      <span><b>{pick.shares.toLocaleString()}</b> whole shares</span>
                       <span>{money(pick.price)} · {pick.priceDate}</span>
-                      <span>Estimated spend {money(pick.estimatedSpend)} including {current.feePct}% fees</span>
+                      <span>~{money(pick.estimatedSpend)} incl. {current.feePct}% fees</span>
                     </>
                   )}
                 </div>
-                <div className="source-links">
-                  {(pick.sourceDetails ?? pick.sourceUrls.map((url) => ({ url, title: 'Source', date: '', sourceType: undefined }))).map((source) => (
-                    <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
-                      {secondarySource(source.url, source.sourceType) ? 'Secondary · ' : ''}{source.title}{source.date ? ` · ${source.date}` : ''} <ExternalLink size={13} />
-                    </a>
-                  ))}
-                </div>
+                <details className="pick-more">
+                  <summary>Reasoning, risks and sources</summary>
+                  {pick.whySelected && <p><b>Why selected:</b> {pick.whySelected}</p>}
+                  {pick.invalidation && <p><b>What would invalidate this view:</b> {pick.invalidation}</p>}
+                  <div className="pick-reasons">
+                    <div><b>Catalysts</b><ul>{pick.catalysts.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                    <div><b>Risks</b><ul>{pick.risks.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  </div>
+                  <div className="source-links">
+                    {(pick.sourceDetails ?? pick.sourceUrls.map((url) => ({ url, title: 'Source', date: '', sourceType: undefined }))).map((source) => (
+                      <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                        {secondarySource(source.url, source.sourceType) ? 'Secondary · ' : ''}{source.title}{source.date ? ` · ${source.date}` : ''} <ExternalLink size={13} />
+                      </a>
+                    ))}
+                  </div>
+                </details>
               </article>
             ))}
           </div>

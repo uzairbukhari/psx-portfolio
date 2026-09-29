@@ -116,10 +116,19 @@ async function personalized(
         }
       : company;
   });
+  // The Worker cannot reach PSX's index ticks; the history scraper stores them.
+  const indexRow = await db()
+    .prepare("SELECT intraday FROM price_history WHERE ticker='KSE100'")
+    .first<{ intraday: string }>()
+    .catch(() => null);
+  const scraped: [number, number][] = indexRow ? JSON.parse(indexRow.intraday) : [];
+  const series = scraped.length > 1
+    ? scraped.map(([time, value]) => ({ time, value }))
+    : (cache.series ?? []);
   return {
     summary: {
       index: cache.index ?? null,
-      series: cache.series ?? [],
+      series,
       companies,
       market: pakistanMarketState(),
       source: {

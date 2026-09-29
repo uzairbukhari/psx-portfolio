@@ -1098,8 +1098,8 @@ export default function Dashboard({
           <TabsList>
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="sip">Monthly Picks</TabsTrigger>
             <TabsTrigger value="history">Purchase log</TabsTrigger>
+            <TabsTrigger value="sip">Monthly Picks</TabsTrigger>
             <TabsTrigger value="research-desk">Research desk</TabsTrigger>
           </TabsList>
         )}
