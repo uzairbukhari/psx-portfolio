@@ -33,9 +33,16 @@ type Props = {
   portfolio: Portfolio;
   onRefreshPrices: () => void;
   onManualPrice: (ticker: string) => void;
+  onOpenCompany: (ticker: string) => void;
 };
 
-export default function PicksResults({ run, portfolio, onRefreshPrices, onManualPrice }: Props) {
+export default function PicksResults({ run, portfolio, onRefreshPrices, onManualPrice, onOpenCompany }: Props) {
+  // Keep the SPA (no reload) for plain clicks; modified clicks fall through to the real link.
+  const open_ = (ticker: string) => (event: React.MouseEvent) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    onOpenCompany(ticker);
+  };
   const result = run.result!;
   const legacy = (run.workflowVersion ?? 1) < 2;
   const estimates: MonthlyPickEstimate[] = useMemo(
@@ -111,7 +118,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
             <header className="mp-card__head">
               <span className="mp-rank">{index + 1}</span>
               <div className="mp-card__title">
-                <h3><a href={`/company/${pick.ticker}`}>{pick.ticker}</a></h3>
+                <h3><a href={`/company/${pick.ticker}`} onClick={open_(pick.ticker)}>{pick.ticker}</a></h3>
                 <small title={pick.name}>{pick.name}</small>
               </div>
               <span className={`mp-badge mp-badge--${pick.confidence.toLowerCase()}`}>{pick.confidence}</span>
@@ -195,7 +202,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
                   <Fragment key={company.ticker}>
                     <tr className={isOpen ? 'open' : undefined}>
                       <td>
-                        <a href={`/company/${company.ticker}`}><b>{company.ticker}</b></a>
+                        <a href={`/company/${company.ticker}`} onClick={open_(company.ticker)}><b>{company.ticker}</b></a>
                         <small title={names.get(company.ticker)}>{names.get(company.ticker) ?? ''}</small>
                       </td>
                       <td><span className={`mp-badge mp-badge--${outlookClass(company.outlook)}`}>{company.outlook === 'Insufficient evidence' ? 'No data' : company.outlook}</span></td>

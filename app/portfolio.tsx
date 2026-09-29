@@ -75,6 +75,7 @@ import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
 import CompanyDetail from './company-detail';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
+import { CompanyNavProvider } from './ticker-link';
 import ResearchDesk from './research-desk';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import MonthlyPicks from './monthly-picks';
@@ -940,6 +941,7 @@ export default function Dashboard({
     setCreatingCompany(false);
   }
   return (
+    <CompanyNavProvider value={openCompany}>
     <main className="desk">
       <header>
         <button
@@ -1392,6 +1394,7 @@ export default function Dashboard({
             busy={busy}
             onSave={save}
             onRefreshPrices={refresh}
+            onOpenCompany={openCompany}
             onManualPrice={(ticker) => {
               setQuoteTicker(ticker);
               setQuotePrice(String(p.quotes[ticker]?.price ?? ''));
@@ -2546,5 +2549,6 @@ export default function Dashboard({
         </DialogContent>
       </Dialog>
     </main>
+    </CompanyNavProvider>
   );
 }

@@ -37,6 +37,7 @@ import {
   type ResearchCompany,
 } from '@/lib/portfolio';
 import DossierExperience from './dossier-experience';
+import { TickerLink } from './ticker-link';
 import { onRunnerEvent, startResearchRunner, getRunArchive } from './research-runner';
 import { downloadRunSources } from './research-zip';
 
@@ -619,7 +620,7 @@ export default function ResearchDesk({
                   className={needsAttention ? 'row-attention' : ''}
                 >
                   <TableCell>
-                    <span className="ticker">{value}</span>
+                    <TickerLink ticker={value} className="ticker" />
                     <small>{job?.companyName || company?.name}</small>
                   </TableCell>
                   <TableCell>

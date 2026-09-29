@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, DatabaseZap, Loader2, Search, Sparkles } from 'lucide-react';
+import { DatabaseZap, Loader2, Search, Sparkles } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { money, today, type Company, type Portfolio } from '@/lib/portfolio';
 import type { FactsInfo } from './use-recommendations';
@@ -28,6 +28,7 @@ type Props = {
   onRefreshFacts: (tickers: string[]) => void;
   collapsed: boolean;
   onExpand: () => void;
+  onOpenCompany: (ticker: string) => void;
 };
 
 function freshness(info: FactsInfo | undefined, dispatchEnabled: boolean) {
@@ -138,7 +139,7 @@ export default function PicksSetup(props: Props) {
         <div className="mp-shortlist__top">
           <div>
             <h3>Shortlist <span className="mp-count">{shortlist.length}/{MAX_SHORTLIST}</span></h3>
-            <p className="muted">Everything you select is treated as eligible.</p>
+            <p className="muted">Tick to include a company; click a card to open its page.</p>
           </div>
           <div className="mp-shortlist__tools">
             {!!targeted.length && <button type="button" className="link-button" onClick={() => setShortlist(targeted)}>Target holdings</button>}
@@ -157,15 +158,28 @@ export default function PicksSetup(props: Props) {
             const fresh = freshness(facts[company.ticker], dispatchEnabled);
             const blocked = !selected && shortlist.length >= MAX_SHORTLIST;
             return (
-              <label key={company.ticker} className={`mp-option${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}`}>
-                <Checkbox checked={selected} disabled={blocked} onCheckedChange={() => toggle(company.ticker)} />
-                <span className="mp-option__text">
-                  <b>{company.ticker}</b>
-                  <small title={company.name}>{company.name}</small>
-                </span>
-                <span className={`mp-fresh mp-fresh--${fresh.state}`} title={fresh.hint}>{fresh.label}</span>
-                {selected && <Check size={14} className="mp-option__check" aria-hidden="true" />}
-              </label>
+              <div key={company.ticker} className={`mp-option${selected ? ' selected' : ''}${blocked ? ' blocked' : ''}`}>
+                <Checkbox
+                  aria-label={`${selected ? 'Remove' : 'Add'} ${company.ticker} ${selected ? 'from' : 'to'} shortlist`}
+                  checked={selected} disabled={blocked} onCheckedChange={() => toggle(company.ticker)}
+                />
+                <a
+                  className="mp-option__open"
+                  href={`/company/${company.ticker}`}
+                  title={`Open ${company.name}`}
+                  onClick={(event) => {
+                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+                    event.preventDefault();
+                    props.onOpenCompany(company.ticker);
+                  }}
+                >
+                  <span className="mp-option__text">
+                    <b>{company.ticker}</b>
+                    <small title={company.name}>{company.name}</small>
+                  </span>
+                  <span className={`mp-fresh mp-fresh--${fresh.state}`} title={fresh.hint}>{fresh.label}</span>
+                </a>
+              </div>
             );
           })}
         </div>

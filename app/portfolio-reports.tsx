@@ -23,6 +23,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { money, round, type Portfolio } from '@/lib/portfolio';
+import { TickerLink } from './ticker-link';
 import {
   portfolioReport,
   type DividendCompanyPoint,
@@ -330,7 +331,13 @@ export default function PortfolioReports({
       <section className="reports-summary" aria-label="Concentration summary">
         <article>
           <span>Largest holding</span>
-          <strong>{report.summary.largestHolding?.ticker ?? '—'}</strong>
+          <strong>
+            {report.summary.largestHolding ? (
+              <TickerLink ticker={report.summary.largestHolding.ticker} />
+            ) : (
+              '—'
+            )}
+          </strong>
           <small>
             {report.summary.largestHolding
               ? `${report.summary.largestHolding.weight.toFixed(1)}% of priced value`
@@ -913,7 +920,7 @@ export default function PortfolioReports({
               <div className="perf-key" aria-label="Gain and loss by company">
                 {report.performance.map((item) => (
                   <div key={item.ticker}>
-                    <span>{item.ticker}</span>
+                    <TickerLink ticker={item.ticker} />
                     <b className={item.gain >= 0 ? 'pos-text' : 'neg-text'}>
                       {item.gain >= 0 ? '+' : ''}
                       {item.gainPercent.toFixed(1)}%
