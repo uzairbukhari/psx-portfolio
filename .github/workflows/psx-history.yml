@@ -1,0 +1,31 @@
+name: PSX history
+
+# PSX drops requests from Cloudflare's network, so chart history is scraped from
+# a GitHub runner into the shared D1 `price_history` table.
+on:
+  schedule:
+    # Every 15 minutes 04:00-11:45 UTC Mon-Fri (09:00-16:45 PKT) for intraday
+    # ticks, plus 12:10 UTC (17:10 PKT) after the close for the final daily close.
+    - cron: '*/15 4-11 * * 1-5'
+    - cron: '10 12 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: psx-history
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh price_history from PSX
+        run: node scripts/psx-history-scrape.mjs
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

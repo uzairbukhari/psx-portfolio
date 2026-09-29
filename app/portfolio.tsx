@@ -32,7 +32,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-  ArrowUpRight,
   RefreshCw,
   Plus,
   Download,
@@ -64,7 +63,6 @@ import {
   type Company,
   type Dividend,
   type StockSplit,
-  type TaxedDividend,
   pendingAutoDividends,
   type AppNotification,
 } from '@/lib/portfolio';
@@ -75,6 +73,8 @@ import {
 } from '@/lib/notifications';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
+import CompanyDetail from './company-detail';
+import LedgerTimeline, { buildEntries } from './ledger-timeline';
 import ResearchDesk from './research-desk';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import MonthlyPicks from './monthly-picks';
@@ -94,8 +94,13 @@ const TAB_PATHS: Record<string, string> = {
 const PATH_TABS: Record<string, string> = Object.fromEntries(
   Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
 );
+const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
+function companyFromPathname(pathname: string): string {
+  const match = COMPANY_PATH.exec(pathname);
+  return match ? match[1].toUpperCase() : '';
+}
 function tabFromPathname(pathname: string): string {
-  return PATH_TABS[pathname] ?? 'holdings';
+  return companyFromPathname(pathname) ? 'company' : (PATH_TABS[pathname] ?? 'holdings');
 }
 const SIGNIN_TICKERS: { ticker: string; up: boolean }[] = [
   { ticker: 'MEBL', up: true },
@@ -240,10 +245,6 @@ const blankTrade = (
   month: kind === 'buy' ? today().slice(0, 7) : '',
   note: '',
 });
-const cashAmount = (t: Trade) =>
-  t.price === null
-    ? null
-    : t.shares * t.price + (t.kind === 'sell' ? -t.fees : t.fees);
 const blankDividend = (ticker: string): Dividend => ({
   id: crypto.randomUUID(),
   ticker,
@@ -380,194 +381,6 @@ function importCdcDividends(
   }
   return summary;
 }
-const kindLabel = (t: Trade) =>
-  t.kind === 'opening' ? 'Opening' : t.kind === 'sell' ? 'Sale' : 'Purchase';
-function ledgerGroups(trades: Trade[], ticker = '', extraTickers: string[] = []) {
-  const groups = new Map<string, Trade[]>();
-  for (const extraTicker of extraTickers)
-    if (!ticker || extraTicker === ticker) groups.set(extraTicker, []);
-  for (const t of [...trades]
-    .filter((entry) => !ticker || entry.ticker === ticker)
-    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))) {
-    const rows = groups.get(t.ticker) ?? [];
-    rows.push(t);
-    groups.set(t.ticker, rows);
-  }
-  return [...groups.entries()];
-}
-function StockSplitHistoryTable({
-  splits,
-  onCorrect,
-}: {
-  splits: StockSplit[];
-  onCorrect: (split: StockSplit) => void;
-}) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {['Effective date', 'Ratio', 'Note', ''].map((label) => (
-            <TableHead key={label}>{label}</TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {splits.map((split) => (
-          <TableRow
-            key={split.id}
-            className={split.voided ? 'row-voided' : ''}
-          >
-            <TableCell>{split.date}</TableCell>
-            <TableCell className="amount">
-              {split.newShares}-for-{split.oldShares}
-              {split.voided && (
-                <span className="tag status-cancelled">Voided</span>
-              )}
-            </TableCell>
-            <TableCell>{split.note || '—'}</TableCell>
-            <TableCell>
-              {!split.voided && (
-                <button
-                  className="secondary compact"
-                  onClick={() => onCorrect(split)}
-                >
-                  Correct
-                </button>
-              )}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-function TradeHistoryTable({
-  trades,
-  onCorrect,
-}: {
-  trades: Trade[];
-  onCorrect: (t: Trade) => void;
-}) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {['Date', 'Type', 'Shares', 'Price', 'Fees', 'Cash amount', ''].map(
-            (x) => (
-              <TableHead key={x}>{x}</TableHead>
-            ),
-          )}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {trades.map((t) => (
-          <TableRow key={t.id} className={t.voided ? 'row-voided' : ''}>
-            <TableCell>{t.date}</TableCell>
-            <TableCell>
-              <span
-                className={
-                  t.kind === 'opening'
-                    ? 'tag status-cancelled'
-                    : t.kind === 'sell'
-                      ? 'tag kind-sell'
-                      : 'tag'
-                }
-              >
-                {kindLabel(t)}
-              </span>
-              {t.voided && <span className="tag status-cancelled">Voided</span>}
-              {t.month && <small>{t.month}</small>}
-            </TableCell>
-            <TableCell className="amount">
-              {t.shares.toLocaleString()}
-            </TableCell>
-            <TableCell className="amount">{money(t.price)}</TableCell>
-            <TableCell className="amount">{money(t.fees)}</TableCell>
-            <TableCell className="amount">
-              {cashAmount(t) === null ? 'Unknown' : money(cashAmount(t))}
-            </TableCell>
-            <TableCell>
-              {!t.voided && (
-                <button
-                  className="secondary compact"
-                  onClick={() => onCorrect(t)}
-                >
-                  Correct
-                </button>
-              )}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-function DividendHistoryTable({
-  dividends,
-  taxed,
-  onCorrect,
-}: {
-  dividends: Dividend[];
-  taxed: TaxedDividend[];
-  onCorrect: (d: Dividend) => void;
-}) {
-  const byId = new Map(taxed.map((t) => [t.id, t]));
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {['Date', 'Per share', 'Gross', 'Tax', 'Net', 'Source', ''].map(
-            (x) => (
-              <TableHead key={x}>{x}</TableHead>
-            ),
-          )}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {dividends.map((d) => {
-          const t = byId.get(d.id);
-          return (
-            <TableRow key={d.id} className={d.voided ? 'row-voided' : ''}>
-              <TableCell>{d.date}</TableCell>
-              <TableCell className="amount">
-                {d.perShare === undefined ? '—' : money(d.perShare)}
-              </TableCell>
-              <TableCell className="amount">
-                {t ? money(t.grossAmount) : '—'}
-              </TableCell>
-              <TableCell className="amount">
-                {t?.tax == null ? '—' : money(t.tax)}
-              </TableCell>
-              <TableCell className="amount">
-                {t?.netAmount == null ? '—' : money(t.netAmount)}
-              </TableCell>
-              <TableCell>
-                <span className="tag" title={d.note || undefined}>
-                  {d.source === 'import'
-                    ? 'CDC import'
-                    : d.source === 'auto'
-                      ? 'PSX auto'
-                      : 'Manual'}
-                </span>
-                {d.voided && <span className="tag status-cancelled">Voided</span>}
-              </TableCell>
-              <TableCell>
-                {!d.voided && (
-                  <button
-                    className="secondary compact"
-                    onClick={() => onCorrect(d)}
-                  >
-                    Correct
-                  </button>
-                )}
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  );
-}
 export default function Dashboard({
   email,
   name,
@@ -578,6 +391,9 @@ export default function Dashboard({
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
   const initialPathname = usePathname();
   const [tab, setTabState] = useState(() => tabFromPathname(initialPathname));
+  const [companyTicker, setCompanyTicker] = useState(() =>
+    companyFromPathname(initialPathname),
+  );
   function setTab(next: string) {
     setTabState(next);
     const path = TAB_PATHS[next] ?? '/';
@@ -588,6 +404,7 @@ export default function Dashboard({
   useEffect(() => {
     function onPopState() {
       setTabState(tabFromPathname(window.location.pathname));
+      setCompanyTicker(companyFromPathname(window.location.pathname));
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -611,10 +428,6 @@ export default function Dashboard({
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
     [quoteDate, setQuoteDate] = useState(today()),
-    [historyTicker, setHistoryTicker] = useState(''),
-    [historyView, setHistoryView] = useState<'all' | 'trades' | 'dividends'>(
-      'all',
-    ),
     [usage, setUsage] = useState<{
       inputTokens: number;
       outputTokens: number;
@@ -924,17 +737,19 @@ export default function Dashboard({
     if (!holdingsSort || holdingsSort.key !== key) return null;
     return holdingsSort.dir === 'asc' ? ' ▲' : ' ▼';
   }
-  const historyGroups = ledgerGroups(p.trades, historyTicker, [
-    ...(p.stockSplits ?? []).map((split) => split.ticker),
-    ...(p.dividends ?? []).map((dividend) => dividend.ticker),
-  ]);
   const notifications = p.notifications ?? [];
   const unreadCount = notifications.filter((n) => !n.read).length;
   const taxedDividends = taxSummary(p).dividends;
-  const dividendsByTicker = (ticker: string) =>
-    (p.dividends ?? [])
-      .filter((d) => d.ticker === ticker)
-      .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  const ledgerEntries = (ticker: string | undefined) =>
+    buildEntries({
+      trades: p.trades.filter((t) => !ticker || t.ticker === ticker),
+      dividends: (p.dividends ?? []).filter((d) => !ticker || d.ticker === ticker),
+      splits: (p.stockSplits ?? []).filter((x) => !ticker || x.ticker === ticker),
+      taxed: taxedDividends,
+      onCorrectTrade: correctTrade,
+      onCorrectDividend: correctDividend,
+      onCorrectSplit: correctStockSplit,
+    });
   const companySummary = (ticker: string) => {
     const h = hs.find((x) => x.ticker === ticker);
     const div = taxedDividends.filter((d) => d.ticker === ticker);
@@ -954,9 +769,12 @@ export default function Dashboard({
       dividendNet,
     };
   };
-  function openHistory(ticker: string) {
-    setHistoryTicker(ticker);
-    setTab('history');
+  function openCompany(ticker: string) {
+    setCompanyTicker(ticker);
+    const path = '/company/' + encodeURIComponent(ticker);
+    setTabState('company');
+    if (window.location.pathname !== path) window.history.pushState(null, '', path);
+    window.scrollTo({ top: 0 });
   }
   function correctTrade(t: Trade) {
     setEditing(t.id);
@@ -1035,8 +853,7 @@ export default function Dashboard({
     );
     setTrade(null);
     setEditing(null);
-    setHistoryTicker(entry.ticker);
-    setTab('history');
+    if (tab !== 'company') setTab('history');
   }
   async function recordStockSplit(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -1064,8 +881,7 @@ export default function Dashboard({
     );
     setStockSplit(null);
     setEditingStockSplit(null);
-    setHistoryTicker(entry.ticker);
-    setTab('history');
+    if (tab !== 'company') setTab('history');
   }
   async function recordDividend(e: React.FormEvent) {
     e.preventDefault();
@@ -1100,8 +916,7 @@ export default function Dashboard({
     );
     setDividend(null);
     setEditingDividend(null);
-    setHistoryTicker(entry.ticker);
-    setTab('history');
+    if (tab !== 'company') setTab('history');
   }
   async function saveCompany(e: React.FormEvent) {
     e.preventDefault();
@@ -1240,7 +1055,7 @@ export default function Dashboard({
           )}
         </div>
       </header>
-      {tab !== 'settings' && (
+      {tab !== 'settings' && tab !== 'company' && (
         <section className="heading">
           <div>
             <p className="eyebrow">YOUR LONG-TERM PICTURE</p>
@@ -1262,7 +1077,7 @@ export default function Dashboard({
               disabled={busy}
               onClick={() => {
                 setEditing(null);
-                setTrade(blankTrade(historyTicker || 'MEBL'));
+                setTrade(blankTrade(companyTicker || 'MEBL'));
               }}
             >
               <Plus size={17} /> Record a purchase
@@ -1279,7 +1094,7 @@ export default function Dashboard({
         </div>
       )}
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-        {tab !== 'settings' && (
+        {tab !== 'settings' && tab !== 'company' && (
           <TabsList>
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -1429,7 +1244,7 @@ export default function Dashboard({
                     <TableCell>
                       <button
                         className="quote-btn ticker"
-                        onClick={() => openHistory(h.ticker)}
+                        onClick={() => openCompany(h.ticker)}
                       >
                         {h.ticker}
                       </button>
@@ -1509,9 +1324,9 @@ export default function Dashboard({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => openHistory(h.ticker)}
+                            onClick={() => openCompany(h.ticker)}
                           >
-                            History
+                            View company
                           </DropdownMenuItem>
                           {h.shares > 0 && (
                             <DropdownMenuItem
@@ -1587,247 +1402,71 @@ export default function Dashboard({
         <TabsContent value="history">
           <div className="section-top">
             <div>
-              <h2>Transaction line items</h2>
+              <h2>Purchase log</h2>
               <p>
-                Each purchase is saved as its own dated entry. Viewing a company
-                shows every trade: date, shares, and price.
+                Every purchase, sale, dividend and split in one dated timeline.
+                Open a company for its own page.
               </p>
             </div>
-            <div className="row">
-              <label className="history-filter">
-                Company
-                <select
-                  value={historyTicker}
-                  onChange={(e) => setHistoryTicker(e.target.value)}
-                >
-                  <option value="">All companies</option>
-                  {p.companies.map((c) => (
-                    <option key={c.ticker} value={c.ticker}>
-                      {c.ticker} · {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {historyTicker && (
-                <button
-                  className="secondary compact"
-                  onClick={() => {
-                    setEditingStockSplit(null);
-                    setStockSplit(blankStockSplit(historyTicker));
-                  }}
-                >
-                  Record stock split
-                </button>
-              )}
-              {!historyTicker && (
-                <label className="history-filter">
-                  Show
-                  <select
-                    value={historyView}
-                    onChange={(e) =>
-                      setHistoryView(
-                        e.target.value as 'all' | 'trades' | 'dividends',
-                      )
-                    }
-                  >
-                    <option value="all">All activity</option>
-                    <option value="trades">Transactions & splits</option>
-                    <option value="dividends">Dividends only</option>
-                  </select>
-                </label>
-              )}
-            </div>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setTrade(blankTrade(p.companies[0]?.ticker ?? 'MEBL'));
+              }}
+            >
+              <Plus size={16} /> Add purchase
+            </button>
           </div>
-          {historyTicker &&
-            historyGroups.length > 0 &&
-            (() => {
-              const s = companySummary(historyTicker);
-              return (
-                <div className="metrics company-summary">
-                  <article className="invested-vs-current">
-                    <span>Invested vs. current value</span>
-                    <div className="invested-vs-current-row">
-                      <div>
-                        <small>Invested</small>
-                        <strong>{s.cost === null ? '—' : money(s.cost)}</strong>
-                      </div>
-                      <ArrowUpRight size={16} className="invested-vs-current-arrow" />
-                      <div>
-                        <small>Current</small>
-                        <strong>
-                          {s.value === null ? '—' : money(s.value)}
-                        </strong>
-                      </div>
-                    </div>
-                  </article>
-                  <article>
-                    <span>Profit / loss</span>
-                    <strong
-                      style={{
-                        color:
-                          s.gain === null
-                            ? 'inherit'
-                            : s.gain >= 0
-                              ? '#22e0a0'
-                              : '#ff5d6c',
-                      }}
-                    >
-                      {s.gain === null ? '—' : money(s.gain)}
-                      {s.gainPercent !== null && (
-                        <small>
-                          {' '}
-                          ({s.gainPercent >= 0 ? '+' : ''}
-                          {s.gainPercent.toFixed(1)}%)
-                        </small>
-                      )}
-                    </strong>
-                  </article>
-                  <article>
-                    <span>Dividends earned</span>
-                    <strong>
-                      {s.dividendNet === null
-                        ? money(s.dividendGross)
-                        : money(s.dividendNet)}
-                    </strong>
-                    <small>
-                      {s.dividendNet === null
-                        ? 'Gross · set filer status in Settings for net'
-                        : `Net of tax · ${money(s.dividendGross)} gross`}
-                    </small>
-                  </article>
-                </div>
-              );
-            })()}
-          {(() => {
-            const visibleGroups = historyGroups.filter(
-              ([ticker]) =>
-                historyTicker ||
-                historyView !== 'dividends' ||
-                dividendsByTicker(ticker).length > 0,
-            );
-            if (visibleGroups.length === 0)
-              return (
-                <section className="panel">
-                  <p className="muted">
-                    {historyTicker
-                      ? `No transactions recorded for ${historyTicker} yet.`
-                      : historyView === 'dividends'
-                        ? 'No dividends recorded yet.'
-                        : 'No transactions recorded yet.'}
-                  </p>
-                </section>
-              );
-            return visibleGroups.map(([ticker, rows]) => {
-              const name =
-                p.companies.find((c) => c.ticker === ticker)?.name ?? ticker;
-              const live = rows.filter((t) => !t.voided);
-              const purchases = live.filter((t) => t.kind === 'buy').length;
-              const effectiveView = historyTicker ? 'all' : historyView;
-              const groupDividends = dividendsByTicker(ticker);
-              const groupSplits = (p.stockSplits ?? [])
-                .filter((split) => split.ticker === ticker)
-                .sort(
-                  (a, b) =>
-                    b.date.localeCompare(a.date) || a.id.localeCompare(b.id),
+          <LedgerTimeline
+            portfolio={p}
+            entries={ledgerEntries(undefined)}
+            onOpenCompany={openCompany}
+          />
+        </TabsContent>
+        <TabsContent value="company">
+          {companyTicker && (
+            <CompanyDetail
+              portfolio={p}
+              ticker={companyTicker}
+              holding={hs.find((h) => h.ticker === companyTicker)}
+              summary={companySummary(companyTicker)}
+              taxed={taxedDividends}
+              busy={busy}
+              onBack={() => setTab('holdings')}
+              onAddPurchase={() => {
+                setEditing(null);
+                setTrade(blankTrade(companyTicker));
+              }}
+              onSell={() => {
+                setEditing(null);
+                setTrade(
+                  blankTrade(
+                    companyTicker,
+                    'sell',
+                    hs.find((h) => h.ticker === companyTicker)?.quote?.price ?? null,
+                  ),
                 );
-              const cs = !historyTicker ? companySummary(ticker) : null;
-              return (
-                <section
-                  className="panel table-panel ledger-group"
-                  key={ticker}
-                >
-                  <div className="ledger-heading">
-                    <div>
-                      <h3>
-                        {ticker}
-                        <small>{name}</small>
-                      </h3>
-                      <p>
-                        {live.length} line item{live.length === 1 ? '' : 's'}
-                        {purchases
-                          ? ` · ${purchases} purchase${purchases === 1 ? '' : 's'}`
-                          : ''}
-                      </p>
-                      {cs && (
-                        <div className="ledger-summary-chips">
-                          <span
-                            className={
-                              'ledger-summary-chip' +
-                              (cs.gain === null
-                                ? ''
-                                : cs.gain >= 0
-                                  ? ' pos'
-                                  : ' neg')
-                            }
-                          >
-                            P/L{' '}
-                            <b>
-                              {cs.gain === null ? '—' : money(cs.gain)}
-                              {cs.gainPercent !== null &&
-                                ` (${cs.gainPercent >= 0 ? '+' : ''}${cs.gainPercent.toFixed(1)}%)`}
-                            </b>
-                          </span>
-                          <span className="ledger-summary-chip">
-                            Dividends{' '}
-                            <b>
-                              {cs.dividendNet === null
-                                ? money(cs.dividendGross)
-                                : money(cs.dividendNet)}
-                            </b>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="row">
-                      <button
-                        className="secondary compact"
-                        onClick={() => {
-                          setEditingStockSplit(null);
-                          setStockSplit(blankStockSplit(ticker));
-                        }}
-                      >
-                        Record stock split
-                      </button>
-                      <button
-                        className="secondary compact"
-                        onClick={() => {
-                          setEditing(null);
-                          setTrade(blankTrade(ticker));
-                        }}
-                      >
-                        <Plus size={14} /> Add purchase
-                      </button>
-                    </div>
-                  </div>
-                  {effectiveView !== 'dividends' && (
-                    <TradeHistoryTable
-                      trades={rows}
-                      onCorrect={correctTrade}
-                    />
-                  )}
-                  {effectiveView !== 'trades' && groupDividends.length > 0 && (
-                    <div className="dividends-block">
-                      <p className="dividends-block-heading">Dividends</p>
-                      <DividendHistoryTable
-                        dividends={groupDividends}
-                        taxed={taxedDividends}
-                        onCorrect={correctDividend}
-                      />
-                    </div>
-                  )}
-                  {effectiveView !== 'dividends' && groupSplits.length > 0 && (
-                    <div className="dividends-block stock-splits-block">
-                      <p className="dividends-block-heading">Stock splits</p>
-                      <StockSplitHistoryTable
-                        splits={groupSplits}
-                        onCorrect={correctStockSplit}
-                      />
-                    </div>
-                  )}
-                </section>
-              );
-            });
-          })()}
+              }}
+              onDividend={() => {
+                setEditingDividend(null);
+                setDividend(blankDividend(companyTicker));
+              }}
+              onSplit={() => {
+                setEditingStockSplit(null);
+                setStockSplit(blankStockSplit(companyTicker));
+              }}
+              onEdit={() => {
+                const c = p.companies.find((x) => x.ticker === companyTicker);
+                if (!c) return;
+                setCreatingCompany(false);
+                setCompany({ ...c });
+              }}
+              onCorrectTrade={correctTrade}
+              onCorrectDividend={correctDividend}
+              onCorrectSplit={correctStockSplit}
+            />
+          )}
         </TabsContent>
         <TabsContent value="research-desk">
           <ResearchDesk

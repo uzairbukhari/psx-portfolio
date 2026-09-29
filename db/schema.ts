@@ -176,3 +176,14 @@ export const dividendAnnouncements = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.ticker, t.bookClosureStart, t.announcedOn, t.kind] })],
 );
+
+// Per-ticker PSX price history for the company page chart. Written by the GitHub
+// Actions scrapers (PSX blocks Cloudflare egress): `eod` is daily closes as
+// [unixSec, close] pairs, `intraday` is today's downsampled [unixSec, price] ticks.
+export const priceHistory = sqliteTable('price_history', {
+  ticker: text('ticker').primaryKey(),
+  eod: text('eod').notNull().default('[]'),
+  intraday: text('intraday').notNull().default('[]'),
+  eodFetchedAt: text('eod_fetched_at'),
+  intradayFetchedAt: text('intraday_fetched_at'),
+});
