@@ -1,6 +1,8 @@
-import initialQuotes from '@/lib/initial-quotes.json';
 import { db, identity, failure } from '@/lib/server';
-import { initialPortfolio, validate } from '@/lib/portfolio';
+import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
+import { applyFacts, newTickers } from '@/lib/company-enrichment';
+import { gatherFacts } from '@/lib/company-facts-store';
+import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
@@ -8,13 +10,16 @@ export async function GET(req: Request) {
       .prepare('SELECT payload,revision FROM portfolios WHERE user_id=?')
       .bind(user)
       .first<{ payload: string; revision: number }>();
+    const portfolio: Portfolio = row
+      ? JSON.parse(row.payload)
+      : blankPortfolio();
+    portfolio.quotes = mergeQuotes(
+      portfolio.quotes,
+      await readQuoteRows(db()),
+      portfolio.companies.map((company) => company.ticker),
+    );
     return Response.json(
-      {
-        portfolio: row
-          ? JSON.parse(row.payload)
-          : { ...initialPortfolio(), quotes: initialQuotes },
-        revision: row?.revision ?? 0,
-      },
+      { portfolio, revision: row?.revision ?? 0 },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
@@ -30,6 +35,20 @@ export async function PUT(req: Request) {
     validate(portfolio);
     if (!Number.isInteger(revision) || revision < 0)
       throw Error('Invalid revision.');
+    const previousRow = await db()
+      .prepare('SELECT payload FROM portfolios WHERE user_id=?')
+      .bind(user)
+      .first<{ payload: string }>();
+    const previous: Portfolio | null = previousRow
+      ? JSON.parse(previousRow.payload)
+      : null;
+    const justAdded = newTickers(previous, portfolio);
+    if (justAdded.length) {
+      // Best-effort: a PSX fetch/D1 cache hiccup here should never block the save.
+      await gatherFacts(justAdded)
+        .then((facts) => applyFacts(portfolio.companies, facts))
+        .catch(() => {});
+    }
     const body = JSON.stringify(portfolio),
       now = new Date().toISOString();
     const result =

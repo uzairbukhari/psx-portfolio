@@ -3,21 +3,10 @@ import { initialPortfolio } from '@/lib/portfolio';
 import {
   addEvent,
   publicJob,
-  RESEARCH_BUDGET_MICROS,
+  resolveResearchSettings,
   type ResearchJobRow,
   tickerOK,
 } from '@/lib/research-jobs';
-
-async function helperLastSeen(userId: string) {
-  return (
-    await db()
-      .prepare(
-        'SELECT last_seen_at FROM research_helpers WHERE user_id=? AND revoked_at IS NULL ORDER BY last_seen_at DESC LIMIT 1',
-      )
-      .bind(userId)
-      .first<{ last_seen_at: string | null }>()
-  )?.last_seen_at;
-}
 
 async function resolveCompany(ticker: string, userId: string) {
   const saved = await db()
@@ -37,8 +26,8 @@ async function resolveCompany(ticker: string, userId: string) {
   const seeded = initialPortfolio().companies.find(
     (company) => company.ticker === ticker,
   );
-  // The Worker cannot reliably reach DPS. The Mac helper verifies unknown
-  // symbols and sends the authoritative company name when it completes.
+  // The browser-side research runner verifies unknown symbols against PSX
+  // itself and sends the authoritative company name when it completes.
   return { name: seeded?.name || ticker, sector: seeded?.sector || 'Unknown' };
 }
 
@@ -51,7 +40,6 @@ export async function GET(req: Request) {
       )
       .bind(userId)
       .all<ResearchJobRow>();
-    const lastSeen = await helperLastSeen(userId);
     const selected = new URL(req.url).searchParams.get('job');
     let events: unknown[] = [];
     if (selected) {
@@ -67,7 +55,7 @@ export async function GET(req: Request) {
         ).results.reverse();
     }
     return Response.json(
-      { jobs: rows.results.map((row) => publicJob(row, lastSeen)), events },
+      { jobs: rows.results.map((row) => publicJob(row)), events },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
@@ -93,11 +81,13 @@ export async function POST(req: Request) {
     if (existing)
       return Response.json({ job: publicJob(existing), existing: true });
     const company = await resolveCompany(ticker, userId);
+    const settings = await resolveResearchSettings(userId);
+    const budgetMicros = Math.round(settings.budgetUsd * 1_000_000);
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     await db()
       .prepare(
-        "INSERT INTO research_jobs (id,user_id,ticker,company_name,sector,status,stage,message,budget_micros,created_at,updated_at) VALUES (?,?,?,?,?,'queued','waiting','Waiting for your Mac helper',?,?,?)",
+        "INSERT INTO research_jobs (id,user_id,ticker,company_name,sector,status,stage,message,budget_micros,created_at,updated_at) VALUES (?,?,?,?,?,'queued','waiting','Queued',?,?,?)",
       )
       .bind(
         id,
@@ -105,7 +95,7 @@ export async function POST(req: Request) {
         ticker,
         company.name,
         company.sector,
-        RESEARCH_BUDGET_MICROS,
+        budgetMicros,
         now,
         now,
       )
@@ -113,7 +103,7 @@ export async function POST(req: Request) {
     await addEvent(
       id,
       'waiting',
-      'Dossier queued. Waiting for your Mac helper.',
+      'Dossier queued. Open Research desk to process it.',
     );
     const row = await db()
       .prepare('SELECT * FROM research_jobs WHERE id=?')
@@ -171,7 +161,7 @@ export async function PATCH(req: Request) {
         );
       await db()
         .prepare(
-          "UPDATE research_jobs SET status='queued',stage='waiting',message='Waiting for your Mac helper',error=NULL,cancel_requested=0,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
+          "UPDATE research_jobs SET status='queued',stage='waiting',message='Queued',error=NULL,cancel_requested=0,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",
         )
         .bind(now, row.id)
         .run();
@@ -186,6 +176,38 @@ export async function PATCH(req: Request) {
       .bind(row.id)
       .first<ResearchJobRow>();
     return Response.json({ job: publicJob(updated!) });
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const userId = await identity(req, true);
+    const ticker = String(new URL(req.url).searchParams.get('ticker') ?? '')
+      .trim()
+      .toUpperCase();
+    if (!tickerOK(ticker))
+      throw Error('Enter a valid PSX ticker using letters and numbers.');
+    const active = await db()
+      .prepare(
+        "SELECT id FROM research_jobs WHERE user_id=? AND ticker=? AND status IN ('queued','researching') LIMIT 1",
+      )
+      .bind(userId, ticker)
+      .first();
+    if (active)
+      throw Error('Cancel the active research run before deleting it.');
+    await db().batch([
+      db()
+        .prepare(
+          'DELETE FROM research_events WHERE job_id IN (SELECT id FROM research_jobs WHERE user_id=? AND ticker=?)',
+        )
+        .bind(userId, ticker),
+      db()
+        .prepare('DELETE FROM research_jobs WHERE user_id=? AND ticker=?')
+        .bind(userId, ticker),
+    ]);
+    return Response.json({ ok: true });
   } catch (error) {
     return failure(error);
   }

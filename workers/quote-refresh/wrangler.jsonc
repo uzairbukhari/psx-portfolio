@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "psx-portfolio-sip-quote-refresh",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-22",
+  // Every 15 minutes, 04:00-11:45 UTC Monday-Friday = 09:00-16:45 Pakistan Standard Time
+  // (UTC+5): covers the session plus the post-close print (Friday closes 16:30). Runs
+  // outside trading hours cost no PSX calls once the closing quotes are cached.
+  "triggers": { "crons": ["*/15 4-11 * * 1-5"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "psx-portfolio-sip",
+      "database_id": "f72a6264-371b-49ff-89e3-20eef1ce2b19",
+      "migrations_dir": "../../drizzle"
+    }
+  ]
+}

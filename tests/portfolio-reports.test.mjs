@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { portfolioReport } from '../lib/portfolio-reports.ts';
+import { today } from '../lib/portfolio.ts';
 
 const portfolio = () => ({
   companies: [
@@ -136,7 +137,248 @@ test('compares actual and target weights when every held company is priced', () 
 test('aggregates buy cash including fees and excludes openings sales and voids', () => {
   const report = portfolioReport(portfolio());
   assert.deepEqual(report.monthlyActivity, [
-    { month: '2026-02', invested: 105 },
+    { month: '2026-02', invested: 105, cumulative: 105 },
+  ]);
+});
+
+test('recentInvestmentByCompany sums buy cost per ticker within the last 12 months, excluding sells, voids and older trades', () => {
+  const recentDate = today();
+  const oldDate = (() => {
+    const [y, m, d] = today().split('-').map(Number);
+    return new Date(Date.UTC(y - 2, m - 1, d)).toISOString().slice(0, 10);
+  })();
+  const p = {
+    companies: [
+      { ticker: 'AAA', name: 'Alpha Bank', sector: 'Bank', target: 0, approved: false, screenDate: '', note: '' },
+      { ticker: 'BBB', name: 'Beta Foods', sector: 'Foods', target: 0, approved: false, screenDate: '', note: '' },
+    ],
+    trades: [
+      { id: 't1', ticker: 'AAA', kind: 'buy', date: recentDate, shares: 10, price: 20, fees: 5, month: '', note: '' },
+      { id: 't2', ticker: 'BBB', kind: 'buy', date: recentDate, shares: 4, price: 25, fees: 0, month: '', note: '' },
+      { id: 't3', ticker: 'AAA', kind: 'buy', date: oldDate, shares: 100, price: 1, fees: 0, month: '', note: '' },
+      { id: 't4', ticker: 'BBB', kind: 'sell', date: recentDate, shares: 1, price: 25, fees: 0, month: '', note: '' },
+      { id: 't5', ticker: 'AAA', kind: 'buy', date: recentDate, shares: 1, price: 1, fees: 0, month: '', note: '', voided: true },
+    ],
+    quotes: {},
+    budgets: {},
+  };
+  const report = portfolioReport(p);
+  assert.deepEqual(report.recentInvestmentByCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', amount: 205, weight: 67.21 },
+    { ticker: 'BBB', name: 'Beta Foods', amount: 100, weight: 32.79 },
+  ]);
+});
+
+test('recentInvestmentActivity breaks down buy cost per company for each of the last 12 calendar months', () => {
+  const currentMonth = today().slice(0, 7);
+  const p = {
+    companies: [
+      { ticker: 'AAA', name: 'Alpha Bank', sector: 'Bank', target: 0, approved: false, screenDate: '', note: '' },
+      { ticker: 'BBB', name: 'Beta Foods', sector: 'Foods', target: 0, approved: false, screenDate: '', note: '' },
+    ],
+    trades: [
+      { id: 't1', ticker: 'AAA', kind: 'buy', date: today(), shares: 10, price: 20, fees: 5, month: '', note: '' },
+      { id: 't2', ticker: 'BBB', kind: 'buy', date: today(), shares: 4, price: 25, fees: 0, month: '', note: '' },
+    ],
+    quotes: {},
+    budgets: {},
+  };
+  const report = portfolioReport(p);
+  assert.equal(report.recentInvestmentActivity.length, 12);
+  const months = report.recentInvestmentActivity.map((item) => item.month);
+  assert.deepEqual(months, [...months].sort(), 'months run oldest to newest');
+  const current = report.recentInvestmentActivity.at(-1);
+  assert.equal(current.month, currentMonth);
+  assert.equal(current.total, 305);
+  assert.deepEqual(current.byCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', amount: 205 },
+    { ticker: 'BBB', name: 'Beta Foods', amount: 100 },
+  ]);
+  const empty = report.recentInvestmentActivity[0];
+  assert.deepEqual(empty.byCompany, []);
+  assert.equal(empty.total, 0);
+});
+
+test('gain/loss performance excludes holdings with unknown cost basis', () => {
+  const report = portfolioReport(portfolio());
+  assert.deepEqual(report.performance, [
+    {
+      ticker: 'BBB',
+      name: 'Beta Foods',
+      cost: 84,
+      value: 100,
+      gain: 16,
+      gainPercent: 19.05,
+    },
+  ]);
+});
+
+test('monthly activity carries a running cumulative total across months', () => {
+  const p = {
+    companies: [
+      {
+        ticker: 'X',
+        name: 'Xylo Corp',
+        sector: 'Tech',
+        target: 50,
+        approved: true,
+        screenDate: '',
+        note: '',
+      },
+      {
+        ticker: 'Y',
+        name: 'Yara Mills',
+        sector: 'Textile',
+        target: 50,
+        approved: true,
+        screenDate: '',
+        note: '',
+      },
+    ],
+    trades: [
+      {
+        id: 'x1',
+        ticker: 'X',
+        kind: 'buy',
+        date: '2026-01-15',
+        shares: 10,
+        price: 10,
+        fees: 0,
+        month: '2026-01',
+        note: '',
+      },
+      {
+        id: 'y1',
+        ticker: 'Y',
+        kind: 'buy',
+        date: '2026-01-20',
+        shares: 5,
+        price: 20,
+        fees: 0,
+        month: '2026-01',
+        note: '',
+      },
+      {
+        id: 'x2',
+        ticker: 'X',
+        kind: 'buy',
+        date: '2026-02-05',
+        shares: 5,
+        price: 12,
+        fees: 0,
+        month: '2026-02',
+        note: '',
+      },
+    ],
+    quotes: {
+      X: {
+        price: 15,
+        date: '2026-09-15',
+        asOf: '2026-09-15',
+        source: 'https://dps.psx.com.pk/company/X',
+        fetchedAt: '2026-09-15T12:00:00Z',
+      },
+      Y: {
+        price: 18,
+        date: '2026-09-15',
+        asOf: '2026-09-15',
+        source: 'https://dps.psx.com.pk/company/Y',
+        fetchedAt: '2026-09-15T12:00:00Z',
+      },
+    },
+    budgets: {},
+  };
+  const report = portfolioReport(p);
+  assert.deepEqual(report.monthlyActivity, [
+    { month: '2026-01', invested: 200, cumulative: 200 },
+    { month: '2026-02', invested: 60, cumulative: 260 },
+  ]);
+  assert.deepEqual(report.performance, [
+    { ticker: 'X', name: 'Xylo Corp', cost: 160, value: 225, gain: 65, gainPercent: 40.63 },
+    { ticker: 'Y', name: 'Yara Mills', cost: 100, value: 90, gain: -10, gainPercent: -10 },
+  ]);
+  assert.equal(report.summary.totalGain, 55);
+  assert.equal(report.summary.totalGainPercent, 21.15);
+});
+
+test('realized sales report the sell trade gain, with null tax when no filer status is set', () => {
+  const report = portfolioReport(portfolio());
+  assert.equal(report.realized.sales.length, 1);
+  assert.equal(report.realized.sales[0].realizedGain, 2);
+  assert.equal(report.realized.totalRealizedGain, 2);
+  assert.equal(report.realized.totalCapitalGainsTax, null);
+  assert.equal(report.realized.netRealizedReturn, null);
+  assert.equal(report.summary.grandTotalReturn, null);
+});
+
+test('grand total return combines unrealized gain with net-of-tax realized gain once filer status is set', () => {
+  const p = portfolio();
+  p.taxProfile = { filerStatus: 'filer' };
+  const report = portfolioReport(p);
+  assert.equal(report.realized.totalCapitalGainsTax, 0.3);
+  assert.equal(report.realized.netRealizedReturn, 1.7);
+  assert.equal(report.summary.totalGain, 16);
+  assert.equal(report.summary.grandTotalReturn, 17.7);
+});
+
+test('aggregates dividends by month with a running net cumulative total', () => {
+  const p = portfolio();
+  p.taxProfile = { filerStatus: 'filer' };
+  p.dividends = [
+    {
+      id: 'd1',
+      ticker: 'AAA',
+      date: '2026-03-05',
+      source: 'manual',
+      grossAmount: 100,
+      note: '',
+    },
+    {
+      id: 'd2',
+      ticker: 'BBB',
+      date: '2026-03-20',
+      source: 'manual',
+      grossAmount: 50,
+      note: '',
+    },
+    {
+      id: 'd3',
+      ticker: 'AAA',
+      date: '2026-04-01',
+      source: 'manual',
+      grossAmount: 200,
+      note: '',
+    },
+  ];
+  const report = portfolioReport(p);
+  assert.deepEqual(report.dividendActivity, [
+    { month: '2026-03', gross: 150, net: 127.5, cumulativeNet: 127.5 },
+    { month: '2026-04', gross: 200, net: 170, cumulativeNet: 297.5 },
+  ]);
+  assert.deepEqual(report.dividendByCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', gross: 300, net: 255, weight: 85.71 },
+    { ticker: 'BBB', name: 'Beta Foods', gross: 50, net: 42.5, weight: 14.29 },
+  ]);
+});
+
+test('dividend net and weight stay null without a filer status', () => {
+  const p = portfolio();
+  p.dividends = [
+    {
+      id: 'd1',
+      ticker: 'AAA',
+      date: '2026-03-05',
+      source: 'manual',
+      grossAmount: 100,
+      note: '',
+    },
+  ];
+  const report = portfolioReport(p);
+  assert.deepEqual(report.dividendActivity, [
+    { month: '2026-03', gross: 100, net: null, cumulativeNet: null },
+  ]);
+  assert.deepEqual(report.dividendByCompany, [
+    { ticker: 'AAA', name: 'Alpha Bank', gross: 100, net: null, weight: null },
   ]);
 });
 

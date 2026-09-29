@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 export const portfolios = sqliteTable('portfolios', {
   userId: text('user_id').primaryKey(),
   payload: text('payload').notNull(),
@@ -18,6 +18,37 @@ export const reviews = sqliteTable(
   },
   (table) => [
     index('idx_ai_reviews_user_created').on(table.userId, table.createdAt),
+  ],
+);
+
+export const monthlyRecommendations = sqliteTable(
+  'monthly_recommendations',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    month: text('month').notNull(),
+    amount: real('amount').notNull(),
+    feePct: real('fee_pct').notNull().default(0),
+    shortlist: text('shortlist').notNull(),
+    status: text('status').notNull(),
+    providerResponseId: text('provider_response_id'),
+    result: text('result'),
+    sources: text('sources'),
+    error: text('error'),
+    model: text('model').notNull(),
+    estimatedCostUsd: real('estimated_cost_usd'),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    workflowVersion: integer('workflow_version').notNull().default(1),
+    snapshot: text('snapshot'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('idx_monthly_recommendations_user_created').on(
+      table.userId,
+      table.createdAt,
+    ),
   ],
 );
 
@@ -66,37 +97,63 @@ export const researchEvents = sqliteTable(
   (table) => [index('idx_research_events_job_id').on(table.jobId, table.id)],
 );
 
-export const researchHelpers = sqliteTable(
-  'research_helpers',
+export const quoteRefreshes = sqliteTable('quote_refreshes', {
+  ticker: text('ticker').primaryKey(),
+  price: real('price').notNull(),
+  asOf: text('as_of').notNull(),
+  quoteDate: text('quote_date').notNull(),
+  source: text('source').notNull(),
+  fetchedAt: text('fetched_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const aiUsage = sqliteTable(
+  'ai_usage',
   {
     id: text('id').primaryKey(),
     userId: text('user_id').notNull(),
-    tokenHash: text('token_hash').notNull().unique(),
-    label: text('label').notNull(),
+    source: text('source').notNull(),
+    model: text('model').notNull(),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    cachedTokens: integer('cached_tokens').notNull().default(0),
+    costUsd: real('cost_usd').notNull().default(0),
     createdAt: text('created_at').notNull(),
-    lastSeenAt: text('last_seen_at'),
-    revokedAt: text('revoked_at'),
   },
-  (table) => [index('idx_research_helpers_user_id').on(table.userId)],
+  (table) => [index('idx_ai_usage_user_created').on(table.userId, table.createdAt)],
 );
 
-export const quoteRefreshes = sqliteTable(
-  'quote_refreshes',
-  {
-    id: text('id').primaryKey(),
-    userId: text('user_id').notNull(),
-    tickers: text('tickers').notNull(),
-    status: text('status').notNull(),
-    result: text('result'),
-    error: text('error'),
-    leaseOwner: text('lease_owner'),
-    leaseUntil: text('lease_until'),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    completedAt: text('completed_at'),
-  },
-  (table) => [
-    index('idx_quote_refreshes_user_updated').on(table.userId, table.updatedAt),
-    index('idx_quote_refreshes_status_lease').on(table.status, table.leaseUntil),
-  ],
-);
+// Shared, public PSX company-page facts (price, financials, ratios, announcements) used
+// by Monthly Picks scoring. Cached per calendar day so a shortlist re-run within the same
+// day costs zero extra fetches; refreshed the same way `quote_refreshes` is, independent
+// of any single user's save/revision state.
+export const companyFacts = sqliteTable('company_facts', {
+  ticker: text('ticker').primaryKey(),
+  fetchedOn: text('fetched_on').notNull(),
+  payload: text('payload').notNull(),
+  fetchedAt: text('fetched_at').notNull(),
+});
+
+export const marketSummaryRefreshes = sqliteTable('market_summary_refreshes', {
+  id: text('id').primaryKey(),
+  payload: text('payload').notNull(),
+  fetchedAt: text('fetched_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// Durable provider attempts: retain evidence and charge each request once.
+export const recommendationAttempts = sqliteTable('recommendation_attempts', {
+  id: text('id').primaryKey(),
+  recommendationId: text('recommendation_id').notNull(),
+  phase: text('phase').notNull(),
+  cycle: integer('cycle').notNull(),
+  batchKey: text('batch_key').notNull().default('legacy'),
+  state: text('state').notNull(),
+  providerResponseId: text('provider_response_id'),
+  request: text('request').notNull(),
+  response: text('response'),
+  reservedUsd: real('reserved_usd').notNull(),
+  costUsd: real('cost_usd'),
+  error: text('error'),
+  createdAt: text('created_at').notNull(),
+}, (t) => [index('idx_recommendation_attempts_run').on(t.recommendationId)]);

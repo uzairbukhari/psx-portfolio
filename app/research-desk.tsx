@@ -1,18 +1,49 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Upload, Laptop, RotateCcw, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  Download,
+  Plus,
+  Trash2,
+  Upload,
+  RotateCcw,
+  Settings,
+  X,
+  MoreHorizontal,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { today, type Portfolio, type ResearchCompany } from '@/lib/portfolio';
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import {
+  DEFAULT_RESEARCH_SETTINGS,
+  today,
+  type Portfolio,
+  type ResearchCompany,
+} from '@/lib/portfolio';
 import DossierExperience from './dossier-experience';
+import { onRunnerEvent, startResearchRunner, getRunArchive } from './research-runner';
+import { downloadRunSources } from './research-zip';
 
 type Props = {
   portfolio: Portfolio;
   onSave: (next: Portfolio, message?: string) => Promise<void>;
+  onOpenSettings: () => void;
 };
 type Job = {
   id: string;
@@ -35,9 +66,21 @@ type Job = {
   updatedAt: string;
   startedAt: string | null;
   completedAt: string | null;
-  helperOnline: boolean;
+  claimed: boolean;
 };
 type Event = { id: number; stage: string; message: string; created_at: string };
+type DeskSortKey = 'company' | 'status' | 'score' | 'reports' | 'updated';
+const STAGE_SEQUENCE = [
+  'waiting',
+  'verifying',
+  'finding_reports',
+  'downloading',
+  'extracting',
+  'analyzing',
+  'validating',
+  'saving',
+  'complete',
+] as const;
 const textValue = (value: unknown, fallback = '') =>
   typeof value === 'string' || typeof value === 'number'
     ? String(value)
@@ -47,6 +90,8 @@ const blank = (ticker: string): ResearchCompany => ({
   status: 'Queue',
   score: null,
   fairValue: null,
+  fairValueLow: null,
+  fairValueHigh: null,
   thesis: '',
   risks: '',
   catalysts: '',
@@ -56,7 +101,7 @@ const blank = (ticker: string): ResearchCompany => ({
   updatedAt: today(),
 });
 const stageLabel: Record<string, string> = {
-  waiting: 'Waiting for your Mac',
+  waiting: 'Queued',
   verifying: 'Verifying company',
   finding_reports: 'Finding reports',
   downloading: 'Downloading reports',
@@ -82,18 +127,29 @@ function elapsed(start: string | null, end?: string | null) {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
-export default function ResearchDesk({ portfolio, onSave }: Props) {
+export default function ResearchDesk({
+  portfolio,
+  onSave,
+  onOpenSettings,
+}: Props) {
   const [selected, setSelected] = useState<string | null>(null),
     [draft, setDraft] = useState<ResearchCompany | null>(null),
     [jobs, setJobs] = useState<Job[]>([]),
     [events, setEvents] = useState<Event[]>([]),
     [jobOpen, setJobOpen] = useState<Job | null>(null),
     [addOpen, setAddOpen] = useState(false),
-    [pairOpen, setPairOpen] = useState(false),
     [ticker, setTicker] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [pairToken, setPairToken] = useState('');
+    [deskSort, setDeskSort] = useState<{
+      key: DeskSortKey;
+      dir: 'asc' | 'desc';
+    } | null>(null);
+  const eventListRef = useRef<HTMLDivElement | null>(null);
+  const settings = useMemo(
+    () => portfolio.researchSettings ?? DEFAULT_RESEARCH_SETTINGS,
+    [portfolio.researchSettings],
+  );
   const research = useMemo(
     () => portfolio.research ?? [],
     [portfolio.research],
@@ -149,6 +205,24 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
     };
   }, [jobOpen?.id, loadJobs]);
   useEffect(() => {
+    const stop = startResearchRunner();
+    const unsubscribe = onRunnerEvent(({ jobId, stage, message, reportsFound }) => {
+      const patch = { stage, message, reportsFound, claimed: true };
+      setJobs((prev) =>
+        prev.map((job) => (job.id === jobId ? { ...job, ...patch } : job)),
+      );
+      setJobOpen((prev) => (prev && prev.id === jobId ? { ...prev, ...patch } : prev));
+    });
+    return () => {
+      stop();
+      unsubscribe();
+    };
+  }, []);
+  useEffect(() => {
+    const node = eventListRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [events, jobOpen?.message]);
+  useEffect(() => {
     const value = sessionStorage.getItem('open-completed-dossier');
     if (
       value &&
@@ -180,6 +254,40 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       company: portfolio.companies.find((item) => item.ticker === value),
     }));
   }, [research, jobs, latestJob, portfolio.companies]);
+  const deskSortAccessor: Record<
+    DeskSortKey,
+    (row: (typeof rows)[number]) => number | string
+  > = {
+    company: (row) => row.job?.companyName || row.company?.name || row.ticker,
+    status: (row) => row.job?.status || row.dossier?.status || 'Queue',
+    score: (row) => row.dossier?.score ?? -Infinity,
+    reports: (row) => row.job?.reportsFound ?? row.dossier?.sources.length ?? 0,
+    updated: (row) =>
+      row.job?.updatedAt || row.dossier?.updatedAt || '',
+  };
+  const sortedRows = deskSort
+    ? rows.slice().sort((a, b) => {
+        const acc = deskSortAccessor[deskSort.key],
+          av = acc(a),
+          bv = acc(b),
+          cmp =
+            typeof av === 'string'
+              ? av.localeCompare(bv as string)
+              : (av as number) - (bv as number);
+        return deskSort.dir === 'asc' ? cmp : -cmp;
+      })
+    : rows;
+  function toggleDeskSort(key: DeskSortKey) {
+    setDeskSort((prev) =>
+      prev && prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'desc' },
+    );
+  }
+  function deskSortIndicator(key: DeskSortKey) {
+    if (!deskSort || deskSort.key !== key) return null;
+    return deskSort.dir === 'asc' ? ' ▲' : ' ▼';
+  }
   const save = async (value = draft) => {
     if (!value) return;
     const next = structuredClone(portfolio);
@@ -255,20 +363,30 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       setBusy(false);
     }
   };
-  const pair = async () => {
+  const deleteResearch = async (value: string) => {
+    if (!window.confirm(`Delete all research for ${value}? This cannot be undone.`))
+      return;
     setBusy(true);
     setError('');
     try {
-      const response = await fetch('/api/research/pair', { method: 'POST' }),
-        data = (await response.json()) as { error?: string; token: string };
+      const response = await fetch(
+          `/api/research/jobs?ticker=${encodeURIComponent(value)}`,
+          { method: 'DELETE' },
+        ),
+        data = (await response.json()) as { error?: string };
       if (!response.ok)
-        throw Error(data.error || 'A pairing token could not be created.');
-      setPairToken(data.token);
+        throw Error(data.error || 'Research could not be deleted.');
+      setJobs((prev) => prev.filter((job) => job.ticker !== value));
+      const next = structuredClone(portfolio);
+      next.research = (next.research ?? []).filter(
+        (item) => item.ticker !== value,
+      );
+      await onSave(next, `${value} research deleted.`);
     } catch (reason) {
       setError(
         reason instanceof Error
           ? reason.message
-          : 'A pairing token could not be created.',
+          : 'Research could not be deleted.',
       );
     } finally {
       setBusy(false);
@@ -325,6 +443,8 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
               )
             : null,
         fairValue: null,
+        fairValueLow: null,
+        fairValueHigh: null,
         thesis: textValue(company.thesis),
         risks: textValue(company.risk),
         catalysts: textValue(company.catalyst),
@@ -395,24 +515,26 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
         onExport={exportDossier}
       />
     );
+  const researchingCount = jobs.filter((job) =>
+    ['queued', 'researching'].includes(job.status),
+  ).length;
+  const completeCount = research.filter(
+    (item) => item.status === 'Complete',
+  ).length;
+  const attentionCount =
+    jobs.filter((job) => job.status === 'needs_attention').length +
+    research.filter((item) => item.status === 'Update needed').length;
   return (
     <section className="research-queue">
-      <div className="section-top">
+      <div className="research-hero">
         <div>
           <p className="eyebrow">PSX RESEARCH DESK</p>
-          <h2>Research queue & dossiers</h2>
+          <h2>Research queue &amp; dossiers</h2>
           <p>Start cited company research and follow each saved stage.</p>
         </div>
         <div className="row">
-          <button
-            className="secondary"
-            onClick={() => {
-              setPairOpen(true);
-              setPairToken('');
-              setError('');
-            }}
-          >
-            <Laptop size={16} /> Connect Mac helper
+          <button className="secondary" onClick={onOpenSettings}>
+            <Settings size={16} /> Settings
           </button>
           <label className="import-label">
             <Upload size={15} /> Import research backup
@@ -444,77 +566,91 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
       <section className="metrics research-metrics">
         <article>
           <span>Researching</span>
-          <strong>
-            {
-              jobs.filter((job) =>
-                ['queued', 'researching'].includes(job.status),
-              ).length
-            }
-          </strong>
+          <strong>{researchingCount}</strong>
         </article>
-        <article>
+        <article className={completeCount ? 'stat-pos' : ''}>
           <span>Complete</span>
-          <strong>
-            {research.filter((item) => item.status === 'Complete').length}
-          </strong>
+          <strong>{completeCount}</strong>
         </article>
-        <article>
+        <article className={attentionCount ? 'stat-neg' : ''}>
           <span>Needs attention</span>
-          <strong>
-            {jobs.filter((job) => job.status === 'needs_attention').length +
-              research.filter((item) => item.status === 'Update needed').length}
-          </strong>
+          <strong>{attentionCount}</strong>
         </article>
       </section>
       <section className="panel table-panel">
-        <div className="scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Status</th>
-                <th>Score</th>
-                <th>Reports</th>
-                <th>Last activity</th>
-                <th>
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ ticker: value, dossier, job, company }) => {
-                const active =
-                  job && !['complete', 'cancelled'].includes(job.status);
-                return (
-                  <tr key={value}>
-                    <td>
-                      <span className="ticker">{value}</span>
-                      <small>{job?.companyName || company?.name}</small>
-                    </td>
-                    <td>
-                      <span
-                        className={`tag status-${job?.status || dossier?.status.toLowerCase().replace(' ', '-')}`}
-                      >
-                        {active
-                          ? stageLabel[job.stage] || job.message
-                          : dossier?.status ||
-                            stageLabel[job?.stage || ''] ||
-                            'Queue'}
-                      </span>
-                      {active && !job.helperOnline && (
-                        <small className="helper-offline">
-                          Waiting for your Mac
-                        </small>
-                      )}
-                    </td>
-                    <td>{dossier?.score ?? '—'}</td>
-                    <td>{job?.reportsFound ?? dossier?.sources.length ?? 0}</td>
-                    <td>
-                      {job?.updatedAt.slice(0, 16).replace('T', ' ') ||
-                        dossier?.updatedAt ||
-                        '—'}
-                    </td>
-                    <td>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {(
+                [
+                  ['company', 'Company'],
+                  ['status', 'Status'],
+                  ['score', 'Score'],
+                  ['reports', 'Reports'],
+                  ['updated', 'Last activity'],
+                ] as [DeskSortKey, string][]
+              ).map(([key, label]) => (
+                <TableHead key={key}>
+                  <button
+                    type="button"
+                    className="sort-head"
+                    onClick={() => toggleDeskSort(key)}
+                  >
+                    {label}
+                    {deskSortIndicator(key)}
+                  </button>
+                </TableHead>
+              ))}
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedRows.map(({ ticker: value, dossier, job, company }) => {
+              const active =
+                job && !['complete', 'cancelled'].includes(job.status);
+              const needsAttention =
+                job?.status === 'needs_attention' ||
+                dossier?.status === 'Update needed';
+              return (
+                <TableRow
+                  key={value}
+                  className={needsAttention ? 'row-attention' : ''}
+                >
+                  <TableCell>
+                    <span className="ticker">{value}</span>
+                    <small>{job?.companyName || company?.name}</small>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`tag status-${job?.status || dossier?.status.toLowerCase().replace(' ', '-')}`}
+                    >
+                      {active
+                        ? stageLabel[job.stage] || job.message
+                        : dossier?.status ||
+                          stageLabel[job?.stage || ''] ||
+                          'Queue'}
+                    </span>
+                    {active && !job.claimed && (
+                      <small className="helper-offline">
+                        Open Research desk to process
+                      </small>
+                    )}
+                  </TableCell>
+                  <TableCell className="amount">
+                    {dossier?.score ?? '—'}
+                  </TableCell>
+                  <TableCell className="amount">
+                    {job?.reportsFound ?? dossier?.sources.length ?? 0}
+                  </TableCell>
+                  <TableCell>
+                    {job?.updatedAt.slice(0, 16).replace('T', ' ') ||
+                      dossier?.updatedAt ||
+                      '—'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="row">
                       <button
                         className="secondary compact"
                         onClick={() => {
@@ -528,29 +664,50 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                           ? 'View progress'
                           : 'Open'}
                       </button>
-                      {dossier?.status === 'Complete' && !active && (
-                        <button
-                          className="secondary compact"
-                          disabled={busy}
-                          onClick={() => void startResearch(value)}
-                        >
-                          <RotateCcw size={14} /> Refresh research
-                        </button>
+                      {(!active ||
+                        (dossier?.status === 'Complete' && !active)) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className="secondary compact icon-btn"
+                            aria-label={`More actions for ${value}`}
+                          >
+                            <MoreHorizontal size={16} />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {dossier?.status === 'Complete' && !active && (
+                              <DropdownMenuItem
+                                disabled={busy}
+                                onClick={() => void startResearch(value)}
+                              >
+                                <RotateCcw size={14} /> Refresh research
+                              </DropdownMenuItem>
+                            )}
+                            {!active && (
+                              <DropdownMenuItem
+                                disabled={busy}
+                                onClick={() => void deleteResearch(value)}
+                              >
+                                <Trash2 size={14} /> Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </section>
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="form-dialog">
           <DialogTitle>Research a PSX company</DialogTitle>
           <DialogDescription>
-            Enter the ticker. The dossier appears immediately and your Mac
-            helper continues the research in the background.
+            Enter the ticker. The dossier appears immediately and research
+            continues automatically while this tab (or any other Research
+            desk tab you have open) stays open.
           </DialogDescription>
           <label>
             Company ticker
@@ -569,7 +726,8 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
             />
           </label>
           <p className="help">
-            Each run is capped at US$0.50. Existing reports are reused.
+            Each run is capped at US${settings.budgetUsd.toFixed(2)} using{' '}
+            {settings.model}. Existing reports are reused.
           </p>
           {error && (
             <p className="notice error" role="alert">
@@ -603,11 +761,41 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
           <DialogDescription>{jobOpen?.companyName}</DialogDescription>
           {jobOpen && (
             <>
+              {!['needs_attention', 'cancelled'].includes(jobOpen.status) && (
+                <div className="stage-track">
+                  {STAGE_SEQUENCE.map((stage) => {
+                    const currentIndex = STAGE_SEQUENCE.indexOf(
+                      jobOpen.stage as (typeof STAGE_SEQUENCE)[number],
+                    );
+                    const stageIndex = STAGE_SEQUENCE.indexOf(stage);
+                    const state =
+                      stageIndex < currentIndex
+                        ? 'done'
+                        : stageIndex === currentIndex
+                          ? 'active'
+                          : 'pending';
+                    return <span key={stage} className={`stage-step ${state}`} />;
+                  })}
+                </div>
+              )}
               <div className="current-stage">
                 <span className={`job-dot ${jobOpen.status}`} />
                 <div>
                   <b>{stageLabel[jobOpen.stage] || jobOpen.message}</b>
                   <p>{jobOpen.message}</p>
+                </div>
+                <div
+                  className="spend-gauge"
+                  style={
+                    {
+                      '--pct': Math.min(100, (jobOpen.spentUsd / 0.5) * 100),
+                    } as CSSProperties
+                  }
+                >
+                  <div className="spend-gauge-hole">
+                    <b>${jobOpen.spentUsd.toFixed(2)}</b>
+                    <small>/ $0.50</small>
+                  </div>
                 </div>
               </div>
               <div className="job-facts">
@@ -620,19 +808,19 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                   <b>{elapsed(jobOpen.startedAt, jobOpen.completedAt)}</b>
                 </div>
                 <div>
-                  <span>AI spending</span>
-                  <b>${jobOpen.spentUsd.toFixed(4)} / $0.50</b>
+                  <span>Processing</span>
+                  <b>{jobOpen.claimed ? 'This tab' : 'Not yet claimed'}</b>
                 </div>
               </div>
-              {!jobOpen.helperOnline &&
+              {!jobOpen.claimed &&
                 ['queued', 'researching'].includes(jobOpen.status) && (
                   <p className="notice">
-                    Waiting for your Mac helper. Research resumes automatically
-                    when the Mac is awake and connected.
+                    Queued. Research starts automatically as soon as a
+                    Research desk tab is open — this one, or any other.
                   </p>
                 )}
               {jobOpen.error && <p className="notice error">{jobOpen.error}</p>}
-              <div className="event-list">
+              <div className="event-list" ref={eventListRef}>
                 {events.map((item) => (
                   <div key={item.id}>
                     <span className="event-mark" />
@@ -664,43 +852,17 @@ export default function ResearchDesk({ portfolio, onSave }: Props) {
                     <X size={15} /> Cancel research
                   </button>
                 )}
+                {jobOpen.status === 'complete' && getRunArchive(jobOpen.id) && (
+                  <button
+                    className="secondary"
+                    onClick={() => downloadRunSources(jobOpen.id)}
+                  >
+                    <Download size={15} /> Download sources
+                  </button>
+                )}
               </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={pairOpen} onOpenChange={setPairOpen}>
-        <DialogContent className="form-dialog">
-          <DialogTitle>Connect this Mac</DialogTitle>
-          <DialogDescription>
-            Create a private one-time token, then run the included helper
-            installer on this Mac.
-          </DialogDescription>
-          {!pairToken ? (
-            <button disabled={busy} onClick={() => void pair()}>
-              <Laptop size={16} /> Create pairing token
-            </button>
-          ) : (
-            <>
-              <p className="notice success">
-                Pairing token created. It is shown once.
-              </p>
-              <label>
-                Pairing token
-                <input
-                  readOnly
-                  value={pairToken}
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-              </label>
-              <p className="help">
-                Run <code>portfolio-dashboard/research-helper/install.sh</code>.
-                Enter this app’s URL, paste the token when prompted, and accept
-                the default companies folder.
-              </p>
-            </>
-          )}
-          {error && <p className="notice error">{error}</p>}
         </DialogContent>
       </Dialog>
     </section>
