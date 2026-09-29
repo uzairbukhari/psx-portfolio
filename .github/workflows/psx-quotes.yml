@@ -1,0 +1,29 @@
+name: PSX quotes
+
+# PSX drops requests from Cloudflare's network, so prices are scraped from a
+# GitHub runner and written straight into the shared D1 `quote_refreshes` cache.
+on:
+  schedule:
+    # Every 5 minutes, 04:00-11:55 UTC Monday-Friday = 09:00-16:55 PKT (UTC+5),
+    # covering the session and the Friday 16:30 close. GitHub may delay runs.
+    - cron: '*/5 4-11 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: psx-quotes
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh quote_refreshes from PSX
+        run: node scripts/psx-quote-scrape.mjs
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

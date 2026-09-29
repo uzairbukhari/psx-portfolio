@@ -1,9 +1,6 @@
-import { failure, identity } from '@/lib/server';
+import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
-import { fetchPsxQuote } from '@/lib/psx-quotes';
-import type { Quote } from '@/lib/portfolio';
-
-const CONCURRENCY = 5;
+import { refreshQuotes } from '@/lib/quote-cache';
 
 export async function POST(req: Request) {
   try {
@@ -22,29 +19,13 @@ export async function POST(req: Request) {
       tickers.some((ticker) => !tickerOK(ticker))
     )
       throw Error('Invalid symbols.');
-    const quotes: Record<string, Quote> = {};
-    const errors: string[] = [];
-    const reasons: Record<string, string> = {};
-    for (let index = 0; index < tickers.length; index += CONCURRENCY) {
-      await Promise.all(
-        tickers.slice(index, index + CONCURRENCY).map(async (ticker) => {
-          try {
-            quotes[ticker] = await fetchPsxQuote(ticker);
-          } catch (error) {
-            errors.push(ticker);
-            reasons[ticker] =
-              (error instanceof Error ? error.message : 'Unknown failure').slice(
-                0,
-                1000,
-              );
-          }
-        }),
-      );
-    }
+    const force = new URL(req.url).searchParams.get('force') === '1';
+    const { quotes, stale, failed } = await refreshQuotes(db(), tickers, { force });
+    const errors = Object.keys(failed);
     if (!Object.keys(quotes).length && errors.length)
       throw Error('Every PSX quote request failed.');
     return Response.json(
-      { quotes, errors, reasons },
+      { quotes, errors, reasons: failed, stale },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

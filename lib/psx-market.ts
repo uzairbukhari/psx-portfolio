@@ -1,4 +1,4 @@
-import { fetchPsx } from './psx-fetch.ts';
+import { fetchPsx, type FetchBudget } from './psx-fetch.ts';
 
 function num(s: string | undefined): number {
   return Number((s ?? '').replace(/,/g, '').trim());
@@ -172,8 +172,11 @@ export function parseIndexSummary(html: string, indexName = 'KSE100'): IndexSumm
   };
 }
 
-export async function fetchPsxIndexSummary(indexName = 'KSE100'): Promise<IndexSummary> {
-  const response = await fetchPsx('https://dps.psx.com.pk/');
+export async function fetchPsxIndexSummary(
+  indexName = 'KSE100',
+  budget?: FetchBudget,
+): Promise<IndexSummary> {
+  const response = await fetchPsx('https://dps.psx.com.pk/', budget);
   return parseIndexSummary(await response.text(), indexName);
 }
 
@@ -272,8 +275,62 @@ export function parseMarketWatch(
   return rows;
 }
 
-export async function fetchPsxMarketWatch(): Promise<MarketWatchQuote[]> {
-  const response = await fetchPsx('https://dps.psx.com.pk/market-watch');
+export interface IndexConstituent {
+  symbol: string;
+  name: string;
+  previousClose: number;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+}
+
+/**
+ * Parses an `/indices/{INDEX}` constituent table (SYMBOL, NAME, LDCP, CURRENT,
+ * CHANGE, CHANGE %, IDX WTG, IDX POINT, VOLUME, …). `/indices/ALLSHR` lists
+ * every All-Share stock, so one fetch prices nearly every ticker.
+ */
+export function parseIndexConstituents(html: string): IndexConstituent[] {
+  const rows: IndexConstituent[] = [];
+  for (const match of html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+    const row = match[1];
+    const symbol = row.match(
+      /<a class="tbl__symbol" href="\/company\/([A-Z0-9]+)" data-title="([^"]*)"/,
+    );
+    if (!symbol) continue;
+    const values = [...row.matchAll(/<td class="right[^"]*" data-order="(-?[\d.]+)"/g)].map(
+      (item) => num(item[1]),
+    );
+    if (values.length < 4) continue;
+    const [previousClose, current, change, changePercent] = values;
+    // An untraded stock can show CURRENT 0; its price is still the last close.
+    const price = current > 0 ? current : previousClose;
+    if (!Number.isFinite(price) || price <= 0) continue;
+    rows.push({
+      symbol: symbol[1],
+      name: symbol[2],
+      previousClose,
+      price,
+      change: current > 0 ? change : 0,
+      changePercent: current > 0 ? Math.round(changePercent * 100) / 100 : 0,
+      volume: values.length >= 7 ? values[values.length - 3] : 0,
+    });
+  }
+  if (!rows.length)
+    throw Error(`Unexpected PSX index constituents markup (${html.length} bytes)`);
+  return rows;
+}
+
+export async function fetchPsxIndexConstituents(
+  indexName = 'ALLSHR',
+  budget?: FetchBudget,
+): Promise<IndexConstituent[]> {
+  const response = await fetchPsx(`https://dps.psx.com.pk/indices/${indexName}`, budget);
+  return parseIndexConstituents(await response.text());
+}
+
+export async function fetchPsxMarketWatch(budget?: FetchBudget): Promise<MarketWatchQuote[]> {
+  const response = await fetchPsx('https://dps.psx.com.pk/market-watch', budget);
   const retrievedAt = new Date().toISOString();
   return parseMarketWatch(await response.text(), retrievedAt);
 }
@@ -354,8 +411,12 @@ export function downsample(points: IndexPoint[], limit: number): IndexPoint[] {
   return Array.from({ length: limit }, (_, i) => points[Math.round(i * step)]);
 }
 
-export async function fetchPsxIndexSeries(indexName = 'KSE100', limit = 60): Promise<IndexPoint[]> {
-  const response = await fetchPsx(`https://dps.psx.com.pk/timeseries/int/${indexName}`);
+export async function fetchPsxIndexSeries(
+  indexName = 'KSE100',
+  limit = 60,
+  budget?: FetchBudget,
+): Promise<IndexPoint[]> {
+  const response = await fetchPsx(`https://dps.psx.com.pk/timeseries/int/${indexName}`, budget);
   const body = (await response.json()) as { status: number; data: [number, number, number][] };
   if (body.status !== 1 || !Array.isArray(body.data))
     throw Error('Unexpected PSX timeseries response');

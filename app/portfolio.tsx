@@ -190,6 +190,7 @@ type QuoteRefreshResponse = {
   quotes: Portfolio['quotes'];
   errors: string[];
   reasons?: Record<string, string>;
+  stale?: Record<string, string>;
   error?: string;
 };
 type HoldingsSortKey =
@@ -884,7 +885,13 @@ export default function Dashboard({
       });
       const d = (await r.json()) as QuoteRefreshResponse;
       if (!r.ok) throw Error(d.error);
-      const next = { ...p!, quotes: { ...p!.quotes, ...d.quotes } };
+      // A stale cached quote must not replace one the ledger already holds.
+      const fresh = Object.fromEntries(
+        Object.entries(d.quotes).filter(
+          ([ticker]) => !(d.stale?.[ticker] && p!.quotes[ticker]),
+        ),
+      );
+      const next = { ...p!, quotes: { ...p!.quotes, ...fresh } };
       validate(next);
       const s = await fetch('/api/portfolio', {
         method: 'PUT',
@@ -895,9 +902,10 @@ export default function Dashboard({
       if (!s.ok) throw Error(saved.error);
       setP(next);
       setRevision(saved.revision);
+      const stale = Object.keys(d.stale ?? {});
       notify(
-        `${Object.keys(d.quotes).length} PSX prices refreshed.${d.errors.length ? ' Unavailable: ' + d.errors.join(', ') + '. Previous quotes retained.' + (d.reasons ? ' Reason: ' + [...new Set(Object.values(d.reasons))].join(' | ') : '') : ''}`,
-        !!d.errors.length,
+        `${Object.keys(d.quotes).length - stale.length} PSX prices up to date.${stale.length ? ` Last saved price kept for ${stale.join(', ')} (${[...new Set(Object.values(d.stale ?? {}))].join(' | ')}).` : ''}${d.errors.length ? ' Unavailable: ' + d.errors.join(', ') + '. Previous quotes retained.' + (d.reasons ? ' Reason: ' + [...new Set(Object.values(d.reasons))].join(' | ') : '') : ''}`,
+        !!d.errors.length || !!stale.length,
       );
     } catch (e) {
       notify(String(e), true);

@@ -9,6 +9,7 @@ import {
   pakistanMarketState,
   selectShortlistPerformance,
   downsample,
+  parseIndexConstituents,
 } from '../lib/psx-market.ts';
 
 const fixture = (name) =>
@@ -137,4 +138,28 @@ test('downsample keeps first/last points and caps length', () => {
   assert.equal(sampled[0].time, 0);
   assert.equal(sampled[9].time, 99);
   assert.equal(downsample(points, 200).length, 100);
+});
+
+test('parseIndexConstituents reads every row of an /indices/ALLSHR table', () => {
+  const html = readFileSync(new URL('./fixtures/psx-allshr.html', import.meta.url), 'utf8');
+  const rows = parseIndexConstituents(html);
+  assert.deepEqual(
+    rows.map((row) => row.symbol),
+    ['786', 'LUCK', 'MEBL'],
+  );
+  const mebl = rows.find((row) => row.symbol === 'MEBL');
+  assert.deepEqual(mebl, {
+    symbol: 'MEBL',
+    name: 'Meezan Bank Limited',
+    previousClose: 549.23,
+    price: 550.2,
+    change: 0.97,
+    changePercent: 0.18,
+    volume: 65654,
+  });
+  assert.equal(rows.find((row) => row.symbol === 'LUCK').price, 413.49);
+});
+
+test('parseIndexConstituents rejects markup without a constituent table', () => {
+  assert.throws(() => parseIndexConstituents('<html></html>'), /Unexpected PSX index constituents/);
 });

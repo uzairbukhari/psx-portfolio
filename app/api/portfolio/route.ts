@@ -2,6 +2,7 @@ import { db, identity, failure } from '@/lib/server';
 import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
 import { applyFacts, newTickers } from '@/lib/company-enrichment';
 import { gatherFacts } from '@/lib/company-facts-store';
+import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
@@ -12,30 +13,11 @@ export async function GET(req: Request) {
     const portfolio: Portfolio = row
       ? JSON.parse(row.payload)
       : blankPortfolio();
-    const cache = await db()
-      .prepare('SELECT * FROM quote_refreshes')
-      .all<{
-        ticker: string;
-        price: number;
-        as_of: string;
-        quote_date: string;
-        source: string;
-        fetched_at: string;
-      }>();
-    const portfolioTickers = new Set(
+    portfolio.quotes = mergeQuotes(
+      portfolio.quotes,
+      await readQuoteRows(db()),
       portfolio.companies.map((company) => company.ticker),
     );
-    for (const cached of cache.results) {
-      if (!portfolioTickers.has(cached.ticker)) continue;
-      if (portfolio.quotes[cached.ticker]?.manual) continue;
-      portfolio.quotes[cached.ticker] = {
-        price: cached.price,
-        asOf: cached.as_of,
-        date: cached.quote_date,
-        source: cached.source,
-        fetchedAt: cached.fetched_at,
-      };
-    }
     return Response.json(
       { portfolio, revision: row?.revision ?? 0 },
       { headers: { 'Cache-Control': 'no-store' } },
