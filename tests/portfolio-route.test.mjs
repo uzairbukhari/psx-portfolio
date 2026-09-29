@@ -9,7 +9,8 @@ const source = readFileSync(new URL('app/api/portfolio/route.ts', base), 'utf8')
   .replace("import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';", `import { blankPortfolio, validate } from '${new URL('lib/portfolio.ts', base).href}';`)
   .replace("import { applyFacts, newTickers } from '@/lib/company-enrichment';", `import { applyFacts, newTickers } from '${new URL('lib/company-enrichment.ts', base).href}';`)
   .replace("import { gatherFacts } from '@/lib/company-facts-store';", `const gatherFacts=async()=>[];`)
-  .replace("import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';", `import { mergeQuotes, readQuoteRows } from '${new URL('lib/quote-cache.ts', base).href}';`);
+  .replace("import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';", `import { mergeQuotes, readQuoteRows } from '${new URL('lib/quote-cache.ts', base).href}';`)
+  .replace("import { readAnnouncements } from '@/lib/dividend-announcements';", `import { readAnnouncements } from '${new URL('lib/dividend-announcements.ts', base).href}';`);
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
 const route = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
@@ -20,7 +21,8 @@ test('portfolio GET does not inject cached quotes for another portfolio ticker',
   globalThis.__portfolioDB = { prepare() { return { bind() { return this; }, async first() { return { payload: JSON.stringify(portfolio), revision: 2 }; }, async all() { call++; return { results: [cached('MEBL'), cached('OTHER')] }; } }; } };
   const response = await route.GET(new Request('https://test/api/portfolio'));
   const body = await response.json();
-  assert.equal(call, 1);
+  assert.equal(call, 2, 'one read for the quote cache, one for dividend announcements');
+  assert.ok(Array.isArray(body.announcements));
   assert.deepEqual(Object.keys(body.portfolio.quotes), ['MEBL']);
 });
 

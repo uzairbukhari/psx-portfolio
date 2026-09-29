@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, primaryKey } from 'drizzle-orm/sqlite-core';
 export const portfolios = sqliteTable('portfolios', {
   userId: text('user_id').primaryKey(),
   payload: text('payload').notNull(),
@@ -157,3 +157,22 @@ export const recommendationAttempts = sqliteTable('recommendation_attempts', {
   error: text('error'),
   createdAt: text('created_at').notNull(),
 }, (t) => [index('idx_recommendation_attempts_run').on(t.recommendationId)]);
+
+// Shared (not per-user) PSX payout announcements, scraped outside Cloudflare
+// by scripts/psx-payout-scrape.mjs. Portfolios turn these into dividends.
+export const dividendAnnouncements = sqliteTable(
+  'dividend_announcements',
+  {
+    ticker: text('ticker').notNull(),
+    bookClosureStart: text('book_closure_start').notNull(),
+    kind: text('kind').notNull(),
+    bookClosureEnd: text('book_closure_end').notNull(),
+    announcedOn: text('announced_on').notNull(),
+    period: text('period').notNull(),
+    details: text('details').notNull(),
+    percent: real('percent'),
+    perShareRs: real('per_share_rs'),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ticker, t.bookClosureStart, t.announcedOn, t.kind] })],
+);

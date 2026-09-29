@@ -61,3 +61,35 @@ export async function fetchPsx(url: string, budget?: FetchBudget): Promise<Respo
   }
   throw lastError;
 }
+
+/**
+ * PSX serves the company Payouts table as an HTML fragment from
+ * POST /company/payouts. It answers a "Not Found" page unless the request is
+ * marked as AJAX (`X-Requested-With`) and carries the page's `X-Req-Id` token,
+ * which the company page embeds as `window.__ps._k`. No cookie is needed.
+ */
+export async function fetchPsxPayoutsHtml(ticker: string, budget?: FetchBudget): Promise<string> {
+  const page = await (await fetchPsx(`https://dps.psx.com.pk/company/${ticker}`, budget)).text();
+  const token = /"_k":"([^"]+)"/.exec(page)?.[1];
+  if (!token) throw Error('PSX company page carried no request token');
+  if (budget) {
+    if (budget.left <= 0) throw Error('PSX request budget exhausted for this refresh');
+    budget.left--;
+  }
+  const response = await fetch('https://dps.psx.com.pk/company/payouts', {
+    method: 'POST',
+    headers: {
+      ...UA,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Req-Id': token,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    body: new URLSearchParams({ symbol: ticker }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(TIMEOUT),
+  });
+  if (!response.ok) throw Error(`${response.status} from PSX`);
+  const html = await response.text();
+  if (!html.includes('class="tbl"')) throw Error('PSX payouts response had no table');
+  return html;
+}

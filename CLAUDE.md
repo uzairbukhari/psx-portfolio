@@ -20,6 +20,7 @@ Full product/domain rules (cost-basis accounting, SIP allocation limits, AI revi
 - `npm run lint` / `npm run format` — oxlint / oxfmt.
 - `npm run quote-refresh:dev` — run the separate PSX-refresh Worker locally (`workers/quote-refresh/`), with `--test-scheduled` so its cron handler can be triggered manually via `/__scheduled`.
 - `npm run quote-refresh:deploy` — deploy the PSX-refresh Worker (its own Cron Trigger schedule, same D1 database).
+- `node scripts/psx-payout-scrape.mjs --dry-run --tickers=MEBL,LUCK` — run the GitHub Actions PSX dividend-announcement scraper locally without writing (`.github/workflows/psx-payouts.yml`; feeds `dividend_announcements`, which `lib/portfolio.ts#pendingAutoDividends` turns into `source: 'auto'` dividends on dashboard load).
 - `node scripts/psx-quote-scrape.mjs --dry-run --tickers=MEBL,LUCK` — run the GitHub Actions PSX scraper locally without writing (PSX blocks Cloudflare egress, so `.github/workflows/psx-quotes.yml` is the primary live-price source; it needs `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_API_TOKEN` to write).
 
 ## Architecture

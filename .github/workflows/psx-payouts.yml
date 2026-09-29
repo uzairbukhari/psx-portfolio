@@ -1,0 +1,31 @@
+name: PSX payouts
+
+# PSX drops requests from Cloudflare's network, so dividend announcements are
+# scraped from a GitHub runner into the shared D1 `dividend_announcements` table.
+on:
+  schedule:
+    # Daily 13:30 UTC Monday-Friday = 18:30 PKT, after the close, when PSX
+    # companies publish most payout announcements. GitHub may delay runs.
+    - cron: '30 13 * * 1-5'
+  workflow_dispatch:
+
+concurrency:
+  group: psx-payouts
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN are `prod` environment secrets.
+    environment: prod
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh dividend_announcements from PSX
+        run: node scripts/psx-payout-scrape.mjs
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

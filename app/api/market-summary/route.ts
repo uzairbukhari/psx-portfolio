@@ -10,7 +10,13 @@ import {
   type MarketWatchQuote,
 } from '@/lib/psx-market';
 import { fetchBudget, type FetchBudget } from '@/lib/psx-fetch';
-import { mergeQuotes, OPEN_TTL_MS, readQuoteRows, refreshQuotes } from '@/lib/quote-cache';
+import {
+  currentWatchQuotes,
+  mergeQuotes,
+  OPEN_TTL_MS,
+  readQuoteRows,
+  refreshQuotes,
+} from '@/lib/quote-cache';
 import { db, failure, identity } from '@/lib/server';
 import { fetchPypsxIntradayFor, pypsxCredentialsFor } from '@/lib/pypsx-server';
 
@@ -91,9 +97,7 @@ async function personalized(
   const companies = selectShortlistPerformance(
     shortlist,
     portfolio.companies,
-    (cache.quotes ?? []).filter(
-      (watch) => !quotes[watch.symbol] || watch.retrievedAt > quotes[watch.symbol].fetchedAt,
-    ),
+    currentWatchQuotes(cache.quotes ?? [], quotes),
     fallback,
   ).map((company) => {
     const session = intraday.get(company.ticker);
