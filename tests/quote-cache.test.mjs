@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  currentWatchQuotes,
   isFresh,
   lastSessionClose,
   mergeQuotes,
@@ -156,4 +157,18 @@ test('refreshQuotes stops fetching once PSX blocks the network', async () => {
   });
   assert.equal(calls, 3);
   assert.equal(Object.keys(result.failed).length, 6);
+});
+
+test('currentWatchQuotes keeps summary quotes stamped at the same time as the cache', () => {
+  const at = '2026-09-29T07:52:30Z';
+  const watch = [
+    { symbol: 'MEBL', retrievedAt: at },
+    { symbol: 'GAL', retrievedAt: at },
+    { symbol: 'LUCK', retrievedAt: '2026-09-29T07:00:00Z' },
+  ];
+  const kept = currentWatchQuotes(watch, {
+    MEBL: quote('2026-09-29', at),
+    LUCK: quote('2026-09-29', '2026-09-29T07:30:00Z'),
+  });
+  assert.deepEqual(kept.map((entry) => entry.symbol), ['MEBL', 'GAL']);
 });

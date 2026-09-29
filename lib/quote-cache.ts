@@ -94,6 +94,21 @@ export function mergeQuotes(
   return merged;
 }
 
+/**
+ * Keeps the market-summary quotes (with day change) unless the per-ticker
+ * cache holds a strictly newer price. The scraper writes both tables in one
+ * run with the same timestamp, so a tie must keep the summary quote.
+ */
+export function currentWatchQuotes<T extends { symbol: string; retrievedAt: string }>(
+  watch: T[],
+  quotes: Record<string, Quote>,
+): T[] {
+  return watch.filter((entry) => {
+    const cached = quotes[entry.symbol];
+    return !cached || entry.retrievedAt >= cached.fetchedAt;
+  });
+}
+
 export async function readQuoteRows(db: D1Database): Promise<QuoteRow[]> {
   const rows = await db
     .prepare('SELECT ticker,price,as_of,quote_date,source,fetched_at FROM quote_refreshes')
