@@ -6,6 +6,7 @@
 // which builds the same shape directly from the quant score with no AI call at all.
 import type { CompanyMetrics, CompanyScore } from './company-facts.ts';
 import { quantAllocation } from './company-facts.ts';
+import { constrainAllocations, MAX_PICK_PCT } from './allocation.ts';
 import type { CompanyOutlook, MonthlyPick, MonthlyPicksResearch, PickMetrics, SourceDetail } from './monthly-picks.ts';
 
 export const WORKFLOW_VERSION = 9;
@@ -149,7 +150,7 @@ export function sanitizePicks(raw: unknown, snapshot: SnapshotV8): MonthlyPicksR
     if (!urls.length) continue;
     picks.push({
       ticker, name: companyByTicker.get(ticker)?.name ?? ticker,
-      allocationPct: Math.min(35, Math.max(0.01, Number(item.allocationPct))),
+      allocationPct: Number(item.allocationPct),
       confidence: item.confidence as MonthlyPick['confidence'], thesis: String(item.thesis),
       whySelected: typeof item.whySelected === 'string' ? item.whySelected : undefined,
       invalidation: typeof item.invalidation === 'string' ? item.invalidation : undefined,
@@ -161,14 +162,20 @@ export function sanitizePicks(raw: unknown, snapshot: SnapshotV8): MonthlyPicksR
   }
   if (!picks.length) return null;
 
-  // Renormalize if the model's allocations plus cash don't sum to 100.
-  const pickTotal = picks.reduce((sum, p) => sum + p.allocationPct, 0);
-  const rawUnallocated = Number.isFinite(parsed.unallocatedPct) ? Math.max(0, Number(parsed.unallocatedPct)) : 100 - pickTotal;
-  const total = pickTotal + rawUnallocated;
-  const scale = total > 0 ? 100 / total : 1;
-  for (const pick of picks) pick.allocationPct = Math.round(pick.allocationPct * scale * 100) / 100;
-  let unallocatedPct = Math.round((100 - picks.reduce((sum, p) => sum + p.allocationPct, 0)) * 100) / 100;
-  if (unallocatedPct < 0) { picks[0].allocationPct += unallocatedPct; unallocatedPct = 0; }
+  // Scale the model's allocations plus cash to 100 while preserving their proportions, then hold
+  // every pick at the cap (re-splitting the excess; what cannot be placed stays cash). Doing the
+  // cap after scaling is what keeps a lone surviving pick from being scaled back up to 100%.
+  const constrained = constrainAllocations(
+    picks.map((p) => ({ ticker: p.ticker, weight: p.allocationPct })),
+    Number.isFinite(parsed.unallocatedPct) ? Number(parsed.unallocatedPct) : undefined,
+    MAX_PICK_PCT,
+  );
+  const allocated = new Map(constrained.allocations.map((a) => [a.ticker, a.allocationPct]));
+  for (const pick of picks) pick.allocationPct = allocated.get(pick.ticker) ?? 0;
+  const kept = picks.filter((p) => p.allocationPct >= 0.01);
+  if (!kept.length) return null;
+  picks.splice(0, picks.length, ...kept);
+  const unallocatedPct = Math.round((100 - picks.reduce((sum, p) => sum + p.allocationPct, 0)) * 100) / 100;
 
   const coverageByTicker = new Map<string, RecordValue>();
   for (const rawItem of Array.isArray(parsed.coverage) ? parsed.coverage : []) {

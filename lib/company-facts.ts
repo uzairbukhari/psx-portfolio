@@ -6,6 +6,7 @@
 // already publishes instead of asking an AI model to search the web for it.
 import { quoteDate } from './psx-quotes.ts';
 import { fetchPsx } from './psx-fetch.ts';
+import { constrainAllocations } from './allocation.ts';
 
 export type FinancialPeriod = { period: string; revenue: number | null; pat: number | null; eps: number | null };
 export type Announcement = { date: string; title: string; category: 'Financial Results' | 'Board Meetings' | 'Others'; url: string | null };
@@ -335,22 +336,10 @@ export function quantAllocation(scores: CompanyScore[], threshold = 55, maxPicks
   const candidates = scores.filter((s) => !s.metrics.unavailable && s.score >= threshold)
     .sort((a, b) => b.score - a.score).slice(0, maxPicks);
   if (!candidates.length) return { picks: [], unallocatedPct: 100 };
-  // Water-filling: allocate proportional to score, cap any share above `capPct`,
-  // and re-split the capped-off amount across the still-uncapped picks. A pick
-  // capped with nothing left to redistribute to simply leaves cash unallocated.
-  const capped = candidates.map(() => false);
-  for (let iteration = 0; iteration <= candidates.length; iteration++) {
-    const cappedPct = capped.filter(Boolean).length * capPct;
-    const activeTotal = candidates.reduce((sum, c, i) => (capped[i] ? sum : sum + c.score), 0);
-    const pct = candidates.map((c, i) => (capped[i] ? capPct : activeTotal > 0 ? (c.score / activeTotal) * (100 - cappedPct) : 0));
-    const overIndex = pct.findIndex((p, i) => !capped[i] && p > capPct + 1e-9);
-    if (overIndex === -1) {
-      const picks = candidates.map((c, i) => ({ ticker: c.ticker, score: c.score, allocationPct: round2(pct[i]) }));
-      const unallocatedPct = round2(100 - picks.reduce((sum, p) => sum + p.allocationPct, 0));
-      return { picks, unallocatedPct: Math.max(0, unallocatedPct) };
-    }
-    capped[overIndex] = true;
-  }
-  const picks = candidates.map((c) => ({ ticker: c.ticker, score: c.score, allocationPct: capPct }));
-  return { picks, unallocatedPct: Math.max(0, round2(100 - picks.length * capPct)) };
+  // Same constraint set as the AI path (`constrainAllocations`): proportional to score, capped
+  // at `capPct` with the excess re-split, and whatever cannot be placed left as cash.
+  const constrained = constrainAllocations(candidates.map((c) => ({ ticker: c.ticker, weight: c.score })), 0, capPct);
+  const scoreOf = new Map(candidates.map((c) => [c.ticker, c.score]));
+  const picks = constrained.allocations.map((a) => ({ ticker: a.ticker, score: scoreOf.get(a.ticker)!, allocationPct: a.allocationPct }));
+  return { picks, unallocatedPct: constrained.cashPct };
 }
