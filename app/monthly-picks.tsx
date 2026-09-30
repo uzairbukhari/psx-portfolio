@@ -5,6 +5,7 @@ import { money, type Portfolio } from '@/lib/portfolio';
 import PicksProgress from './picks-progress';
 import PicksResults from './picks-results';
 import PicksSetup, { MAX_SHORTLIST } from './picks-setup';
+import { TabLoader } from './tab-loader';
 import { isActive, useRecommendations } from './use-recommendations';
 
 type Props = {
@@ -77,6 +78,13 @@ export default function MonthlyPicks({
   const active = current !== null && isActive(current.status);
   const legacy = current !== null && ['needs_evidence', 'needs_attention', 'completed_partial'].includes(current.status);
 
+  if (!recs.loaded)
+    return (
+      <div className="monthly-picks">
+        <TabLoader label="Loading Monthly Picks…" />
+      </div>
+    );
+
   return (
     <div className="monthly-picks">
       <PicksSetup
@@ -124,8 +132,7 @@ export default function MonthlyPicks({
         <PicksResults run={current} portfolio={portfolio} onRefreshPrices={() => void onRefreshPrices()} onManualPrice={onManualPrice} onOpenCompany={onOpenCompany} />
       )}
 
-      {!recs.loaded && <p className="muted">Loading saved recommendations…</p>}
-      {recs.loaded && !current && !recs.error && (
+      {!current && !recs.error && (
         <section className="mp-empty-state">
           <h3>No recommendations yet</h3>
           <p>Pick a shortlist above and generate your first monthly recommendation.</p>

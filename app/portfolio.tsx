@@ -33,6 +33,7 @@ import {
 import {
   RefreshCw,
   Plus,
+  X,
   Wallet,
   LogOut,
   Settings,
@@ -971,12 +972,38 @@ export default function Dashboard({
           <span>PSX / PERSONAL INVESTING</span>
         </button>
         <div className="header-right">
+          <button
+            type="button"
+            data-slot="hdr"
+            className="hdr-btn"
+            disabled={busy}
+            aria-label="Refresh PSX prices"
+            onClick={refresh}
+          >
+            <RefreshCw size={18} />
+            <span className="hdr-label">Refresh PSX prices</span>
+          </button>
+          <button
+            type="button"
+            data-slot="hdr"
+            className="hdr-btn"
+            disabled={busy}
+            aria-label="Record a purchase"
+            onClick={() => {
+              setEditing(null);
+              setTrade(blankTrade(companyTicker || 'MEBL'));
+            }}
+          >
+            <Plus size={18} />
+            <span className="hdr-label">Record a purchase</span>
+          </button>
           <Popover>
             <PopoverTrigger
-              className="bell-trigger"
+              className="bell-trigger hdr-btn"
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
             >
               <Bell size={18} />
+              <span className="hdr-label">Notifications</span>
               {unreadCount > 0 && (
                 <span className="bell-badge">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -1107,24 +1134,6 @@ export default function Dashboard({
               next.
             </p>
           </div>
-          <div className="row">
-            <button
-              className="secondary"
-              disabled={busy}
-              onClick={refresh}
-            >
-              <RefreshCw size={16} /> Refresh PSX prices
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => {
-                setEditing(null);
-                setTrade(blankTrade(companyTicker || 'MEBL'));
-              }}
-            >
-              <Plus size={17} /> Record a purchase
-            </button>
-          </div>
         </section>
       )}
       {message && (
@@ -1132,7 +1141,16 @@ export default function Dashboard({
           role={failed ? 'alert' : 'status'}
           className={'notice ' + (failed ? 'error' : 'success')}
         >
-          {message}
+          <span>{message}</span>
+          <button
+            type="button"
+            data-slot="notice-close"
+            className="notice-close"
+            aria-label="Dismiss message"
+            onClick={() => setMessage('')}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>

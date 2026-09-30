@@ -8,6 +8,7 @@ import type {
   ShortlistPerformance,
 } from '@/lib/psx-market';
 import type { PypsxLiveQuote } from '@/lib/pypsx-market';
+import { TabLoader } from './tab-loader';
 import { TickerLink } from './ticker-link';
 
 export interface PsxMarketPulseHandle {
@@ -320,7 +321,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
               <button className="secondary compact" onClick={onOpenShortlist}>Open Monthly Picks</button>
             </div>
           ) : (
-            <p className="pulse-empty">Loading your shortlist and latest saved market data…</p>
+            <TabLoader label="Loading your shortlist and latest saved market data…" />
           )}
         </div>
       </div>

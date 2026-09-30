@@ -8,6 +8,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { money, type Portfolio } from '@/lib/portfolio';
+import { TabLoader } from './tab-loader';
 import {
   portfolioValueSeries,
   sliceValueRange,
@@ -189,7 +190,7 @@ export default function PortfolioValueCard({
       {error ? (
         <p className="muted">{error}</p>
       ) : !series ? (
-        <p className="muted">Loading history…</p>
+        <TabLoader label="Loading history…" />
       ) : data.length < 2 ? (
         <p className="muted">
           {points.length > 1

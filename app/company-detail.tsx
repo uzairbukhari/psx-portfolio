@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Plus } from 'lucide-react';
+import { TabLoader } from './tab-loader';
 import {
   Area,
   AreaChart,
@@ -175,7 +176,7 @@ function PriceChart({
       {error ? (
         <p className="muted">{error}</p>
       ) : !history ? (
-        <p className="muted">Loading price history…</p>
+        <TabLoader label="Loading price history…" />
       ) : points.length < 2 ? (
         <p className="muted">
           {range === 'today'
