@@ -44,10 +44,28 @@ test('mergeQuotes keeps newer or manual saved quotes and fills the rest', () => 
     ['MEBL', 'HUBC', 'OGDC', 'LUCK'],
   );
   assert.equal(merged.MEBL.price, 120);
-  assert.equal(merged.HUBC.price, 90);
+  // A manual quote gives way to a PSX quote from a strictly later trading day.
+  assert.equal(merged.HUBC.price, 100);
+  assert.equal(merged.HUBC.manual, undefined);
   assert.equal(merged.OGDC.price, 55);
   assert.equal(merged.LUCK.price, 100);
   assert.equal(merged.OTHER, undefined);
+});
+
+test('mergeQuotes keeps a manual quote against a same-day or older PSX quote', () => {
+  const merged = mergeQuotes(
+    {
+      HUBC: quote('2026-09-29', '2026-09-29T04:00:00Z', 90, true),
+      LUCK: quote('2026-09-29', '2026-09-29T04:00:00Z', 70, true),
+    },
+    [
+      row('HUBC', '2026-09-29', '2026-09-29T11:00:00Z'),
+      row('LUCK', '2026-09-28', '2026-09-28T11:00:00Z'),
+    ],
+    ['HUBC', 'LUCK'],
+  );
+  assert.equal(merged.HUBC.price, 90);
+  assert.equal(merged.LUCK.price, 70);
 });
 
 test('lastSessionClose skips weekends and uses the Friday close', () => {

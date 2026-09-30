@@ -90,6 +90,16 @@ export type Quote = {
   fetchedAt: string;
   manual?: boolean;
 };
+/**
+ * Whether a fetched quote should replace the saved one: a later trading date
+ * wins, then a later fetch time. A manually verified quote holds until PSX
+ * publishes a price for a strictly later trading day.
+ */
+export function quoteSupersedes(candidate: Quote, current: Quote | undefined) {
+  if (!current) return true;
+  if (candidate.date !== current.date) return candidate.date > current.date;
+  return !current.manual && candidate.fetchedAt > current.fetchedAt;
+}
 export const RESEARCH_MODELS = ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'] as const;
 export type ResearchModel = (typeof RESEARCH_MODELS)[number];
 export const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;

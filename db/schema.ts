@@ -205,3 +205,16 @@ export const userRoles = sqliteTable('user_roles', {
   role: text('role').notNull(),
   createdAt: text('created_at').notNull(),
 });
+
+// Per-user fixed-window rate limits for expensive actions (forced PSX refreshes,
+// on-demand facts scrapes). One row per user and action.
+export const rateLimits = sqliteTable(
+  'rate_limits',
+  {
+    userId: text('user_id').notNull(),
+    action: text('action').notNull(),
+    windowStart: text('window_start').notNull(),
+    count: integer('count').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.action] })],
+);

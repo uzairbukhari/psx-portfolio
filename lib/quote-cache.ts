@@ -1,4 +1,4 @@
-import type { Quote } from './portfolio.ts';
+import { quoteSupersedes, type Quote } from './portfolio.ts';
 import { fetchBudget, type FetchBudget } from './psx-fetch.ts';
 import { pakistanMarketState } from './psx-market.ts';
 import { fetchPsxQuote } from './psx-quotes.ts';
@@ -66,16 +66,9 @@ export function isFresh(fetchedAt: string | undefined, now = new Date()): boolea
   return fetched >= lastSessionClose(now).getTime();
 }
 
-/** Newer quote wins: later trading date first, then later fetch time. */
-export function isNewer(candidate: Quote, current: Quote | undefined): boolean {
-  if (!current) return true;
-  if (candidate.date !== current.date) return candidate.date > current.date;
-  return candidate.fetchedAt > current.fetchedAt;
-}
-
 /**
  * Overlays cached rows onto a portfolio's own quotes for the given tickers,
- * never replacing a manually verified quote or a newer one already saved.
+ * never replacing a newer saved quote (see `quoteSupersedes`).
  */
 export function mergeQuotes(
   quotes: Record<string, Quote>,
@@ -86,10 +79,8 @@ export function mergeQuotes(
   const merged = { ...quotes };
   for (const row of rows) {
     if (!wanted.has(row.ticker)) continue;
-    const current = merged[row.ticker];
-    if (current?.manual) continue;
     const cached = rowToQuote(row);
-    if (isNewer(cached, current)) merged[row.ticker] = cached;
+    if (quoteSupersedes(cached, merged[row.ticker])) merged[row.ticker] = cached;
   }
   return merged;
 }

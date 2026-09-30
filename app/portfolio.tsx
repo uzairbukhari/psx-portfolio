@@ -61,6 +61,7 @@ import {
   type Dividend,
   type StockSplit,
   pendingAutoDividends,
+  quoteSupersedes,
   type AppNotification,
 } from '@/lib/portfolio';
 import {
@@ -823,10 +824,13 @@ export default function Dashboard({
       });
       const d = (await r.json()) as QuoteRefreshResponse;
       if (!r.ok) throw Error(d.error);
-      // A stale cached quote must not replace one the ledger already holds.
+      // A stale cached quote must not replace one the ledger already holds, and
+      // an older or same-day PSX price never replaces a newer or manual quote.
       const fresh = Object.fromEntries(
         Object.entries(d.quotes).filter(
-          ([ticker]) => !(d.stale?.[ticker] && p!.quotes[ticker]),
+          ([ticker, quote]) =>
+            !(d.stale?.[ticker] && p!.quotes[ticker]) &&
+            quoteSupersedes(quote, p!.quotes[ticker]),
         ),
       );
       const next = { ...p!, quotes: { ...p!.quotes, ...fresh } };
