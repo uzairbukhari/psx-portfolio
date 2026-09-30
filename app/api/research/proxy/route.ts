@@ -1,4 +1,4 @@
-import { failure, identity } from '@/lib/server';
+import { failure, requireSuperAdmin } from '@/lib/server';
 import { credibleResearchHost, isPrivateOrLocalHost } from '@/lib/research-policy.mjs';
 
 // The browser-side research runner cannot fetch PSX / issuer / search sites
@@ -49,7 +49,7 @@ async function fetchValidated(start: URL, mode: 'report' | 'search') {
 
 export async function POST(req: Request) {
   try {
-    await identity(req, true);
+    await requireSuperAdmin(req, true);
     const body = (await req.json()) as { url?: string; mode?: 'report' | 'search' };
     const mode = body.mode === 'search' ? 'search' : 'report';
     let target: URL;

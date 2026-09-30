@@ -198,3 +198,10 @@ export const priceHistory = sqliteTable('price_history', {
   eodFetchedAt: text('eod_fetched_at'),
   intradayFetchedAt: text('intraday_fetched_at'),
 });
+
+// Role assignments by email. No row means the default 'user' role.
+export const userRoles = sqliteTable('user_roles', {
+  email: text('email').primaryKey(),
+  role: text('role').notNull(),
+  createdAt: text('created_at').notNull(),
+});

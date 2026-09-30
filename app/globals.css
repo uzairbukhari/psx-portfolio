@@ -184,29 +184,6 @@ body{margin:0;font-size:16px}.desk{max-width:1460px;margin:auto;padding:0 48px}h
 
 .app-loading{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
 .app-loading .brand{color:var(--primary)}
-.signin{min-height:100vh;display:grid;grid-template-columns:1.15fr 1fr}
-.signin-hero{position:relative;display:flex;flex-direction:column;overflow:hidden;padding:48px 56px 0;background:linear-gradient(165deg,#0b1f3a 0%,#123059 60%,#0e2748 100%);color:#fff}
-.signin-hero .brand{color:#fff}
-.signin-hero .brand span{color:#9db8dc}
-.signin-hero-copy{margin-top:60px;max-width:460px}
-.signin-hero-copy h1{color:#fff;font-size:40px;line-height:1.16;letter-spacing:-1px;margin:0 0 18px;font-weight:650}
-.signin-hero-copy p{color:#b7c8e2;font-size:16px;line-height:1.7;margin:0}
-.signin-chart{width:100%;flex:1;min-height:150px;margin-top:20px;display:block}
-.signin-ticker{border-top:1px solid rgba(255,255,255,.14);overflow:hidden;padding:16px 0;margin-top:auto}
-.signin-ticker-track{display:flex;gap:36px;width:max-content;animation:signin-ticker-scroll 30s linear infinite;font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:13px;letter-spacing:.2px;color:#dce6f5;white-space:nowrap}
-.signin-ticker-track .up{color:#22e0a0}
-.signin-ticker-track .down{color:#ff5d6c}
-@keyframes signin-ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.signin-panel{display:flex;align-items:center;justify-content:center;padding:48px}
-.signin-card{width:100%;max-width:380px}
-.signin-kicker{color:var(--muted-foreground);font-size:13px;margin:0 0 6px}
-.signin-card h2{font-size:26px;margin:0 0 10px;letter-spacing:-.4px}
-.signin-card p.muted{margin:0 0 28px}
-.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;color:#152840!important;border:1px solid #c9d7e9;border-radius:9px;padding:13px 18px;font-size:15px;font-weight:600;text-decoration:none;box-sizing:border-box}
-.google-btn:hover{border-color:#a9c0dc;background:#fafcff}
-.signin-card .secondary{margin-top:14px;width:100%}
-@media(max-width:860px){.signin{grid-template-columns:1fr}.signin-hero{padding:32px 24px 0;min-height:380px}.signin-hero-copy{margin-top:28px}.signin-hero-copy h1{font-size:29px}.signin-panel{padding:32px 24px}}
-@media(prefers-reduced-motion:reduce){.signin-ticker-track{animation:none}}
 
 .header-right{display:flex;align-items:center;gap:12px}
 .account-trigger{display:flex;align-items:center;gap:8px;border:1px solid var(--card-border);border-radius:999px;padding:5px 12px 5px 5px;background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--foreground);cursor:pointer;transition:border-color .2s ease,box-shadow .2s ease}
