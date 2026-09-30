@@ -279,6 +279,11 @@ export default function LedgerTimeline({
                     {e.detail}
                     {e.voided ? ' · voided' : ''}
                   </small>
+                  {!e.voided && e.confirm && (
+                    <button type="button" className="link-button ledger-confirm" onClick={e.confirm}>
+                      Mark received
+                    </button>
+                  )}
                 </div>
                 <span
                   className={'ledger-amount amount' + (e.inflow ? ' pos-text' : '')}
@@ -289,11 +294,6 @@ export default function LedgerTimeline({
                       : 'Unknown'
                     : (e.inflow ? '+' : '') + money(cents(e.amount))}
                 </span>
-                {!e.voided && e.confirm && (
-                  <button type="button" className="secondary compact" onClick={e.confirm}>
-                    Mark received
-                  </button>
-                )}
                 {!e.voided ? (
                   <button
                     type="button"

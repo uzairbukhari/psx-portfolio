@@ -245,3 +245,55 @@ test('unknown cost basis keeps tax unknown and gross proceeds available', () => 
   assert.equal(t.totalCapitalGainsTax, null);
   assert.equal(t.sales[0].proceeds, 11000);
 });
+
+import { startDividendTracking } from '../lib/portfolio.ts';
+
+test('expected dividends start from the tracking date: earlier book closures are never created', () => {
+  const p = portfolio([tr('1', 'buy', '2026-01-02', 100)]);
+  p.dividendTrackingFrom = '2026-08-27';
+  const before = ann({ announcedOn: '2026-05-01', bookClosureStart: '2026-05-20', bookClosureEnd: '2026-05-21' });
+  const onDay = ann();
+  assert.deepEqual(pendingAutoDividends(p, [before], ASOF), []);
+  assert.equal(pendingAutoDividends(p, [before, onDay], ASOF).length, 1);
+  assert.equal(pendingAutoDividends(p, [onDay], ASOF)[0].date, '2026-08-27');
+});
+
+test('without a tracking date nothing is filtered (legacy behaviour)', () => {
+  const p = portfolio([tr('1', 'buy', '2026-01-02', 100)]);
+  assert.equal(pendingAutoDividends(p, [ann({ announcedOn: '2026-05-01', bookClosureStart: '2026-05-20', bookClosureEnd: '2026-05-21' })], ASOF).length, 1);
+});
+
+test('startDividendTracking sets the date once and voids only unconfirmed auto dividends before it', () => {
+  const p = portfolio([tr('1', 'buy', '2026-01-02', 100)]);
+  const oldExpected = pendingAutoDividends(p, [ann({ announcedOn: '2026-05-01', bookClosureStart: '2026-05-20', bookClosureEnd: '2026-05-21' })], ASOF)[0];
+  const oldReceived = confirmDividendReceipt(pendingAutoDividends(p, [ann({ announcedOn: '2026-03-01', bookClosureStart: '2026-03-10', bookClosureEnd: '2026-03-11' })], ASOF)[0], { paymentDate: '2026-03-25' });
+  const current = pendingAutoDividends(p, [ann()], ASOF)[0];
+  p.dividends = [oldExpected, oldReceived, current, manual('m', '2026-02-01', 5)];
+  const first = startDividendTracking(p, '2026-08-01');
+  assert.equal(p.dividendTrackingFrom, '2026-08-01');
+  assert.equal(first.set, true);
+  assert.deepEqual(first.voided.map((d) => d.id), [oldExpected.id]);
+  assert.equal(p.dividends[0].voided, true);
+  assert.equal(p.dividends[1].voided, undefined, 'a confirmed dividend stays');
+  assert.equal(p.dividends[2].voided, undefined, 'a book closure after the start stays');
+  assert.equal(p.dividends[3].voided, undefined, 'manual entries are never touched');
+  validate(p);
+  const again = startDividendTracking(p, '2026-09-30');
+  assert.equal(again.set, false);
+  assert.equal(again.voided.length, 0);
+  assert.equal(p.dividendTrackingFrom, '2026-08-01', 'the date never moves once set');
+});
+
+test('a voided past expected dividend is not re-created', () => {
+  const p = portfolio([tr('1', 'buy', '2026-01-02', 100)]);
+  const old = ann({ announcedOn: '2026-05-01', bookClosureStart: '2026-05-20', bookClosureEnd: '2026-05-21' });
+  p.dividends = pendingAutoDividends(p, [old], ASOF);
+  startDividendTracking(p, '2026-08-01');
+  assert.deepEqual(pendingAutoDividends(p, [old], ASOF), []);
+});
+
+test('validate rejects a malformed tracking date', () => {
+  const p = portfolio([tr('1', 'buy', '2026-01-02', 100)]);
+  p.dividendTrackingFrom = 'soon';
+  assert.throws(() => validate(p));
+});

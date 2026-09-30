@@ -61,6 +61,7 @@ import {
   type Dividend,
   type StockSplit,
   pendingAutoDividends,
+  startDividendTracking,
   quoteSupersedes,
   supersedeAutoWithImports,
   confirmDividendReceipt,
@@ -387,17 +388,20 @@ export default function Dashboard({
     for (let tries = 0; tries < 3; tries++) {
       let pending: Dividend[], news: AppNotification[];
       const now = new Date().toISOString();
+      // Expected dividends only start from the day tracking began: set that date once and
+      // void unconfirmed auto dividends for earlier book closures.
+      const next = clone(current);
+      const tracking = startDividendTracking(next);
       try {
-        pending = pendingAutoDividends(current, announcements);
+        pending = pendingAutoDividends(next, announcements);
         news = [
           ...dividendNotifications(pending, now),
-          ...announcementNotifications(current, announcements, today(), now),
+          ...announcementNotifications(next, announcements, today(), now),
         ];
       } catch {
         return;
       }
-      if (!news.length) return;
-      const next = clone(current);
+      if (!news.length && !tracking.set && !tracking.voided.length) return;
       if (pending.length)
         next.dividends = [...(next.dividends ?? []), ...pending];
       addNotifications(next, news);
@@ -423,7 +427,11 @@ export default function Dashboard({
         if (!r.ok) throw Error(saved.error);
         setP(next);
         setRevision(saved.revision);
-        if (pending.length)
+        if (tracking.voided.length)
+          notify(
+            `${tracking.voided.length} past expected dividend${tracking.voided.length === 1 ? '' : 's'} voided: expected dividends now start from ${next.dividendTrackingFrom}.`,
+          );
+        else if (pending.length)
           notify(
             `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
           );

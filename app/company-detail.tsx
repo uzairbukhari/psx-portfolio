@@ -451,7 +451,7 @@ export default function CompanyDetail({
                     {d.entitlementDate ?? 'unknown date'}
                     {d.entitlementCertain === false ? ' (unconfirmed)' : ''}
                   </small>
-                  <button type="button" className="secondary compact" onClick={() => onConfirmDividend(d)}>
+                  <button type="button" className="secondary compact card-action" onClick={() => onConfirmDividend(d)}>
                     Mark received
                   </button>
                 </div>

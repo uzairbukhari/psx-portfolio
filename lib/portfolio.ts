@@ -142,6 +142,11 @@ export type Portfolio = {
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
   dividends?: Dividend[];
+  /**
+   * First book-closure date for which PSX announcements become expected dividends. Set once
+   * (to the day tracking began) so past announcements are never created; never moves.
+   */
+  dividendTrackingFrom?: string;
   notifications?: AppNotification[];
   taxProfile?: TaxProfile;
   research?: ResearchCompany[];
@@ -488,6 +493,7 @@ export function pendingAutoDividends(
   for (const a of announcements) {
     const company = tickers.get(a.ticker);
     if (!company || a.kind !== 'cash' || a.bookClosureStart > asOf) continue;
+    if (p.dividendTrackingFrom && a.bookClosureStart < p.dividendTrackingFrom) continue;
     const externalId = autoDividendId(a);
     if (seen.has(externalId)) continue;
     const perShare =
@@ -546,6 +552,29 @@ export function pendingAutoDividends(
     usedRecord.add(pair.r);
   }
   return candidates.filter((_, i) => !coveredCandidate.has(i)).map((c) => c.dividend);
+}
+
+/**
+ * Starts expected-dividend tracking: sets `dividendTrackingFrom` to `asOf` the first time (it
+ * never moves afterwards) and voids unconfirmed automatic dividends whose book closure is
+ * before it. Confirmed and manual/CDC dividends are never touched; voided records stay in the
+ * audit trail and are not re-created. Mutates `p`.
+ */
+export function startDividendTracking(p: Portfolio, asOf: string = today()) {
+  const set = p.dividendTrackingFrom === undefined;
+  if (set) p.dividendTrackingFrom = asOf;
+  const voided: Dividend[] = [];
+  for (const d of p.dividends ?? [])
+    if (
+      d.source === 'auto' &&
+      !d.voided &&
+      dividendStatus(d) === 'expected' &&
+      d.date < p.dividendTrackingFrom!
+    ) {
+      d.voided = true;
+      voided.push(d);
+    }
+  return { set, voided };
 }
 
 /**
@@ -1192,6 +1221,8 @@ export function validate(p: Portfolio) {
           `${row.ticker}: a CDC import and a PSX auto record cover the same payout. Void one of them.`,
         );
   }
+  if (p.dividendTrackingFrom !== undefined && !dateOK(p.dividendTrackingFrom))
+    throw new UserError('Invalid dividend tracking date.');
   if (p.notifications !== undefined) {
     if (!Array.isArray(p.notifications) || p.notifications.length > 500)
       throw new UserError('Invalid notifications.');
