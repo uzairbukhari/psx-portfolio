@@ -288,6 +288,7 @@ export default function CompanyDetail({
   onCorrectTrade,
   onCorrectDividend,
   onCorrectSplit,
+  onConfirmDividend,
 }: {
   portfolio: Portfolio;
   ticker: string;
@@ -304,6 +305,7 @@ export default function CompanyDetail({
   onCorrectTrade: (t: Trade) => void;
   onCorrectDividend: (d: Dividend) => void;
   onCorrectSplit: (s: StockSplit) => void;
+  onConfirmDividend: (d: Dividend) => void;
 }) {
   const trades = portfolio.trades.filter((t) => t.ticker === ticker);
   const dividends = (portfolio.dividends ?? []).filter((d) => d.ticker === ticker);
@@ -316,10 +318,14 @@ export default function CompanyDetail({
     onCorrectTrade,
     onCorrectDividend,
     onCorrectSplit,
+    onConfirmDividend,
   });
   const byId = new Map(taxed.map((t) => [t.id, t]));
+  const expectedDividends = dividends
+    .filter((d) => !d.voided && byId.get(d.id)?.status === 'expected')
+    .sort((a, b) => a.date.localeCompare(b.date));
   const received = dividends
-    .filter((d) => !d.voided)
+    .filter((d) => !d.voided && byId.get(d.id)?.status !== 'expected')
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((d) => {
       const t = byId.get(d.id);
@@ -423,6 +429,37 @@ export default function CompanyDetail({
         )}
       </section>
 
+      {expectedDividends.length > 0 && (
+        <section className="company-section">
+          <h2>Expected dividends</h2>
+          <p className="muted">
+            Announced by PSX but not confirmed as paid. They are not counted as income until you mark them received.
+          </p>
+          <div className="dividend-grid">
+            {expectedDividends.map((d) => {
+              const t = byId.get(d.id);
+              return (
+                <div className="dividend-card" key={d.id}>
+                  <span>
+                    Book closure {d.date}
+                    {d.financialYear ? ` · FY ${d.financialYear}` : ''}
+                  </span>
+                  <strong>{money(Math.round((t?.netAmount ?? t?.grossAmount ?? 0) * 100) / 100)}</strong>
+                  <small>
+                    {d.perShare === undefined ? '' : `${money(d.perShare)}/sh · `}
+                    {money(Math.round((t?.grossAmount ?? 0) * 100) / 100)} gross · estimated tax · entitled on{' '}
+                    {d.entitlementDate ?? 'unknown date'}
+                    {d.entitlementCertain === false ? ' (unconfirmed)' : ''}
+                  </small>
+                  <button type="button" className="secondary compact" onClick={() => onConfirmDividend(d)}>
+                    Mark received
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
       <section className="company-section">
         <h2>Dividends received</h2>
         {received.length === 0 ? (

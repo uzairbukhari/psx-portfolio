@@ -103,6 +103,8 @@ test('validate rejects malformed auto dividends and bad face values', () => {
   assert.throws(() => validate(p));
   const none = portfolio([buy('1', '2025-08-26', 10)]);
   none.dividends = [d];
-  assert.throws(() => validate(none), /no shares held/);
+  // Derived from the ledger: no shares on the entitlement date means a zero expected amount, not a blocked save.
+  validate(none);
+  assert.equal(taxSummary(none).dividends[0].grossAmount, 0);
   assert.equal(holdings(portfolio([buy('1', '2025-01-02', 1)])).length, 1);
 });

@@ -26,7 +26,11 @@ export type LedgerEntry = {
   /** true when the amount is money received rather than paid */
   inflow: boolean;
   voided: boolean;
+  /** An announced dividend that is not yet confirmed as received. */
+  expected?: boolean;
   correct: () => void;
+  /** Present on expected dividends: opens the confirm-receipt form. */
+  confirm?: () => void;
 };
 
 const FILTERS: [Filter, string][] = [
@@ -54,6 +58,7 @@ export function buildEntries({
   onCorrectTrade,
   onCorrectDividend,
   onCorrectSplit,
+  onConfirmDividend,
 }: {
   trades: Trade[];
   dividends: Dividend[];
@@ -62,6 +67,7 @@ export function buildEntries({
   onCorrectTrade: (t: Trade) => void;
   onCorrectDividend: (d: Dividend) => void;
   onCorrectSplit: (s: StockSplit) => void;
+  onConfirmDividend?: (d: Dividend) => void;
 }): LedgerEntry[] {
   const byId = new Map(taxed.map((t) => [t.id, t]));
   const out: LedgerEntry[] = [];
@@ -91,12 +97,13 @@ export function buildEntries({
   for (const d of dividends) {
     const tax = byId.get(d.id);
     const net = tax?.netAmount ?? tax?.grossAmount ?? null;
+    const expected = tax?.status === 'expected';
     out.push({
       key: 'd' + d.id,
       date: d.date,
       ticker: d.ticker,
       type: 'dividend',
-      label: 'Dividend',
+      label: expected ? 'Expected dividend' : 'Dividend',
       detail:
         (d.perShare === undefined ? '' : `${money(d.perShare)}/sh · `) +
         (d.source === 'import'
@@ -104,12 +111,23 @@ export function buildEntries({
           : d.source === 'auto'
             ? 'PSX auto'
             : 'Manual') +
-        (tax?.netAmount == null ? ' · gross' : ' · net of tax'),
+        (tax?.netAmount == null
+          ? ' · gross'
+          : tax.taxBasis === 'actual'
+            ? ' · net of recorded tax'
+            : ' · net of estimated tax') +
+        (expected
+          ? ` · not yet received${tax?.entitlementCertain === false ? ' · entitlement date unconfirmed' : ''}`
+          : d.paymentDate
+            ? ` · paid ${d.paymentDate}`
+            : ''),
       fees: null,
       amount: net,
-      inflow: true,
+      inflow: !expected,
       voided: !!d.voided,
+      expected,
       correct: () => onCorrectDividend(d),
+      confirm: expected && onConfirmDividend ? () => onConfirmDividend(d) : undefined,
     });
   }
   for (const s of splits) {
@@ -167,7 +185,7 @@ export default function LedgerTimeline({
   const live = visible.filter((e) => !e.voided);
   const sum = (types: EntryType[]) =>
     live
-      .filter((e) => types.includes(e.type))
+      .filter((e) => types.includes(e.type) && !e.expected)
       .reduce((a, e) => a + (e.amount ?? 0), 0);
   const fees = live.reduce((a, e) => a + (e.fees ?? 0), 0);
 
@@ -191,7 +209,7 @@ export default function LedgerTimeline({
           <b>{money(cents(sum(['sell'])))}</b>
         </div>
         <div>
-          <span>Dividends</span>
+          <span>Dividends received</span>
           <b className="pos-text">{money(cents(sum(['dividend'])))}</b>
         </div>
         <div>
@@ -271,6 +289,11 @@ export default function LedgerTimeline({
                       : 'Unknown'
                     : (e.inflow ? '+' : '') + money(cents(e.amount))}
                 </span>
+                {!e.voided && e.confirm && (
+                  <button type="button" className="secondary compact" onClick={e.confirm}>
+                    Mark received
+                  </button>
+                )}
                 {!e.voided ? (
                   <button
                     type="button"
