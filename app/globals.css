@@ -354,3 +354,5 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 .notice-item span{font-size:13px;color:var(--muted-foreground);line-height:1.5}.notice-item small{font-size:12px}
 
 .ticker-link{color:inherit;text-decoration:none;cursor:pointer}.ticker-link:hover,.ticker-link:focus-visible{color:var(--primary);text-decoration:underline}
+
+.value-card{margin-bottom:32px}.value-card-top{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:24px;padding-bottom:22px;margin-bottom:18px;border-bottom:1px solid var(--border)}.value-card-label{display:block;color:var(--muted-foreground);font-size:14px}.value-card strong{display:block;letter-spacing:-1px;margin:14px 0 8px}.value-card-main{font-size:38px}.value-card-stat{font-size:26px}@media(max-width:760px){.value-card{padding:18px}.value-card-top{grid-template-columns:1fr;gap:16px}.value-card-main{font-size:30px}.value-card-stat{font-size:22px}}

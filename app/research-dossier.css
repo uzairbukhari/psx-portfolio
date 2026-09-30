@@ -792,7 +792,7 @@ textarea:focus {
 .original-research-dossier .note-grid textarea{font-size:14px}
 .original-research-dossier .page-heading h1{margin:0}
 .original-research-dossier .financial-table{overflow:auto}
-.desk:has(.original-research-dossier) > .heading,.desk:has(.original-research-dossier) > .metrics{display:none}
+.desk:has(.original-research-dossier) > .heading,.desk:has(.original-research-dossier) > .metrics,.desk:has(.original-research-dossier) > .value-card{display:none}
 .original-research-dossier .back{margin:12px 0 28px;padding:0!important}
 .original-research-dossier .page-heading{margin-bottom:28px}
 .original-research-dossier .dossier-controls label,.original-research-dossier .control-label{font-size:14px;line-height:1.5}
