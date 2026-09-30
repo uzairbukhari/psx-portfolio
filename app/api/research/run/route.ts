@@ -1,4 +1,4 @@
-import { db, failure, identity } from '@/lib/server';
+import { db, failure, requireSuperAdmin } from '@/lib/server';
 import { validateInvestmentDossier } from '@/lib/research-policy.mjs';
 import {
   blankPortfolio,
@@ -138,7 +138,7 @@ async function completeJob(
 // runner's counterpart to the old Mac helper's poll loop.
 export async function POST(req: Request) {
   try {
-    const userId = await identity(req, true);
+    const userId = await requireSuperAdmin(req, true);
     const body = (await req.json()) as {
       action?:
         | 'claim'

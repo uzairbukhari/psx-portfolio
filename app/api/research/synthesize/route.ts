@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { db, failure, identity } from '@/lib/server';
+import { db, failure, requireSuperAdmin } from '@/lib/server';
 import researchContext from '@/lib/research-context.json';
 import {
   addEvent,
@@ -161,7 +161,7 @@ export async function POST(req: Request) {
   let jobId = '';
   let authorizedJob = false;
   try {
-    const userId = await identity(req, true);
+    const userId = await requireSuperAdmin(req, true);
     if (!env.OPENAI_API_KEY)
       throw Error('The secure AI connection is not configured.');
     const body = (await req.json()) as {

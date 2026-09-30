@@ -44,6 +44,7 @@ export async function GET(req: Request) {
     email?: string;
     email_verified?: boolean;
     name?: string;
+    picture?: string;
   };
 
   const allowed = (env.ALLOWED_EMAILS ?? '')
@@ -58,7 +59,14 @@ export async function GET(req: Request) {
 
   if (!env.SESSION_SECRET) return redirectWithError(url.origin, 'oauth_config');
   const name = typeof userInfo.name === 'string' ? userInfo.name : null;
-  const sessionToken = await signSession(email, name, env.SESSION_SECRET);
+  const picture = safePicture(userInfo.picture);
+  const sessionToken = await signSession(
+    email,
+    name,
+    env.SESSION_SECRET,
+    undefined,
+    picture,
+  );
 
   const headers = new Headers({
     Location: new URL(returnTo, url.origin).toString(),
@@ -74,4 +82,16 @@ export async function GET(req: Request) {
 
 function redirectWithError(origin: string, code: string): Response {
   return Response.redirect(new URL(`/?error=${code}`, origin).toString(), 302);
+}
+
+function safePicture(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 500) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname.endsWith('.googleusercontent.com')
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
 }

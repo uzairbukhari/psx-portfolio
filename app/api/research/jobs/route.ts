@@ -1,4 +1,4 @@
-import { db, failure, identity } from '@/lib/server';
+import { db, failure, requireSuperAdmin } from '@/lib/server';
 import { initialPortfolio } from '@/lib/portfolio';
 import {
   addEvent,
@@ -33,7 +33,7 @@ async function resolveCompany(ticker: string, userId: string) {
 
 export async function GET(req: Request) {
   try {
-    const userId = await identity(req);
+    const userId = await requireSuperAdmin(req);
     const rows = await db()
       .prepare(
         'SELECT * FROM research_jobs WHERE user_id=? ORDER BY created_at DESC LIMIT 100',
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const userId = await identity(req, true);
+    const userId = await requireSuperAdmin(req, true);
     const input = (await req.json()) as { ticker?: string };
     const ticker = String(input.ticker ?? '')
       .trim()
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const userId = await identity(req, true);
+    const userId = await requireSuperAdmin(req, true);
     const body = (await req.json()) as { id?: string; action?: string };
     const row = await db()
       .prepare('SELECT * FROM research_jobs WHERE id=? AND user_id=?')
@@ -183,7 +183,7 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const userId = await identity(req, true);
+    const userId = await requireSuperAdmin(req, true);
     const ticker = String(new URL(req.url).searchParams.get('ticker') ?? '')
       .trim()
       .toUpperCase();

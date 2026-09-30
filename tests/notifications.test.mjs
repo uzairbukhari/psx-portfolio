@@ -64,3 +64,15 @@ test('validate rejects malformed notifications', () => {
   }
   assert.throws(() => validate(pf({ notifications: [good, good] })), /notifications/);
 });
+
+test('cleared notifications stay for dedupe and validate', () => {
+  const p = pf();
+  const n = { id: 'a', at: NOW, kind: 'info', title: 't', body: 'b', read: true, clearedAt: NOW };
+  addNotifications(p, [n]);
+  addNotifications(p, [{ ...n, clearedAt: undefined, read: false }]);
+  assert.equal(p.notifications.length, 1);
+  assert.equal(p.notifications[0].clearedAt, NOW);
+  validate(p);
+  p.notifications[0].clearedAt = 'nope';
+  assert.throws(() => validate(p), /Invalid notifications/);
+});

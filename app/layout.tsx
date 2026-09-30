@@ -4,6 +4,7 @@ import './globals.css';
 import './ledger.css';
 import './picks.css';
 import './reports.css';
+import './settings.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -17,6 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'PSX Portfolio & SIP',
+  icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({

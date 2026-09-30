@@ -1,13 +1,11 @@
-import { redirect } from 'next/navigation';
 import { getViewer } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
-  title: 'Research desk | PSX Portfolio',
-  description: 'Company research jobs, dossiers and screening.',
+  title: 'Notifications | PSX Portfolio',
+  description: 'Every notification, including the ones you cleared.',
 };
-export default async function ResearchDeskPage() {
+export default async function NotificationsPage() {
   const user = await getViewer();
-  if (user && user.role !== 'super_admin') redirect('/');
   return (
     <Dashboard
       email={user?.email ?? null}

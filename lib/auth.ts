@@ -1,8 +1,14 @@
 import { headers } from 'next/headers';
 import { env } from 'cloudflare:workers';
 import { readCookieValue, verifySession } from '@/lib/session';
+import { getUserRole, type Role } from '@/lib/roles';
 
-export type AuthUser = { email: string; name: string | null };
+export type AuthUser = {
+  email: string;
+  name: string | null;
+  picture: string | null;
+};
+export type Viewer = AuthUser & { role: Role };
 
 const LOGIN_PATH = '/api/auth/google/login';
 const LOGOUT_PATH = '/api/auth/logout';
@@ -23,6 +29,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return verifySession(token, env.SESSION_SECRET);
 }
 
+export async function getViewer(): Promise<Viewer | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return { ...user, role: await getUserRole(user.email) };
+}
+
 // Local development bypass: skip Google OAuth and act as a fixed user. Both
 // conditions must hold — `DEV_AUTH_EMAIL` is only ever set in a git-ignored
 // `.dev.vars` (never in `wrangler.jsonc` vars or as a deployed secret), and the
@@ -31,7 +43,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 function devAuthUser(host: string | null): AuthUser | null {
   const email = env.DEV_AUTH_EMAIL?.trim().toLowerCase();
   if (!email || !isLoopbackHost(host)) return null;
-  return { email, name: env.DEV_AUTH_NAME?.trim() || 'Local dev' };
+  return { email, name: env.DEV_AUTH_NAME?.trim() || 'Local dev', picture: null };
 }
 
 function isLoopbackHost(host: string | null): boolean {

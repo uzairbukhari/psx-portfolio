@@ -17,7 +17,6 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -34,7 +33,6 @@ import {
 import {
   RefreshCw,
   Plus,
-  Download,
   Wallet,
   LogOut,
   Settings,
@@ -54,8 +52,6 @@ import {
   sharesHeldBefore,
   taxSummary,
   dateOK,
-  RESEARCH_MODELS,
-  REASONING_EFFORTS,
   DEFAULT_RESEARCH_SETTINGS,
   type ResearchSettings,
   type Portfolio,
@@ -78,6 +74,10 @@ import CompanyDetail from './company-detail';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
 import { CompanyNavProvider } from './ticker-link';
 import ResearchDesk from './research-desk';
+import { SignIn, LoadError } from './sign-in';
+import { UserAvatar } from './user-avatar';
+import NotificationsView from './notifications-view';
+import SettingsView from './settings-view';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import MonthlyPicks from './monthly-picks';
 import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
@@ -92,6 +92,7 @@ const TAB_PATHS: Record<string, string> = {
   history: '/history',
   'research-desk': '/research-desk',
   settings: '/settings',
+  notifications: '/notifications',
 };
 const PATH_TABS: Record<string, string> = Object.fromEntries(
   Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
@@ -101,99 +102,13 @@ function companyFromPathname(pathname: string): string {
   const match = COMPANY_PATH.exec(pathname);
   return match ? match[1].toUpperCase() : '';
 }
+/** Non-admins never land on the Research desk, even via a direct URL or history entry. */
+function allowTab(tab: string, isAdmin: boolean): string {
+  return tab === 'research-desk' && !isAdmin ? 'holdings' : tab;
+}
 function tabFromPathname(pathname: string): string {
   return companyFromPathname(pathname) ? 'company' : (PATH_TABS[pathname] ?? 'holdings');
 }
-const SIGNIN_TICKERS: { ticker: string; up: boolean }[] = [
-  { ticker: 'MEBL', up: true },
-  { ticker: 'OGDC', up: true },
-  { ticker: 'LUCK', up: false },
-  { ticker: 'FFC', up: true },
-  { ticker: 'MARI', up: true },
-  { ticker: 'PSO', up: false },
-  { ticker: 'SYS', up: true },
-  { ticker: 'FATIMA', up: true },
-];
-const SIGNIN_CANDLES: [number, number][] = [
-  [18, 24],
-  [24, 21],
-  [21, 30],
-  [30, 27],
-  [27, 36],
-  [36, 43],
-  [43, 39],
-  [39, 49],
-  [49, 56],
-  [56, 51],
-  [51, 61],
-  [61, 68],
-  [68, 63],
-  [63, 72],
-  [72, 80],
-  [80, 88],
-];
-function SignInChart() {
-  const width = 640,
-    height = 220,
-    gap = width / SIGNIN_CANDLES.length;
-  const scale = (v: number) => height - 20 - v * 1.9;
-  return (
-    <svg
-      className="signin-chart"
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      {SIGNIN_CANDLES.map(([open, close], i) => {
-        const x = i * gap + gap / 2;
-        const up = close >= open;
-        const color = up ? '#22e0a0' : '#ff5d6c';
-        const bodyTop = scale(Math.max(open, close));
-        const bodyBottom = scale(Math.min(open, close));
-        return (
-          <g key={i} stroke={color} fill={color}>
-            <line
-              x1={x}
-              x2={x}
-              y1={scale(Math.max(open, close) + 4)}
-              y2={scale(Math.min(open, close) - 4)}
-              strokeWidth={1.5}
-            />
-            <rect
-              x={x - gap * 0.28}
-              y={bodyTop}
-              width={gap * 0.56}
-              height={Math.max(bodyBottom - bodyTop, 2)}
-            />
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-function GoogleMark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62Z"
-      />
-      <path
-        fill="#34A853"
-        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18Z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03l3-2.33Z"
-      />
-      <path
-        fill="#EA4335"
-        d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97l3 2.33C4.66 5.17 6.65 3.58 9 3.58Z"
-      />
-    </svg>
-  );
-}
-
 type ApiResponse = {
   error?: string;
   portfolio: Portfolio;
@@ -386,17 +301,25 @@ function importCdcDividends(
 export default function Dashboard({
   email,
   name,
+  picture,
+  role,
 }: {
   email: string | null;
   name: string | null;
+  picture: string | null;
+  role: 'super_admin' | 'user';
 }) {
+  const isAdmin = role === 'super_admin';
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
   const initialPathname = usePathname();
-  const [tab, setTabState] = useState(() => tabFromPathname(initialPathname));
+  const [tab, setTabState] = useState(() =>
+    allowTab(tabFromPathname(initialPathname), isAdmin),
+  );
   const [companyTicker, setCompanyTicker] = useState(() =>
     companyFromPathname(initialPathname),
   );
-  function setTab(next: string) {
+  function setTab(requested: string) {
+    const next = allowTab(requested, isAdmin);
     setTabState(next);
     const path = TAB_PATHS[next] ?? '/';
     if (typeof window !== 'undefined' && window.location.pathname !== path) {
@@ -405,12 +328,14 @@ export default function Dashboard({
   }
   useEffect(() => {
     function onPopState() {
-      setTabState(tabFromPathname(window.location.pathname));
+      setTabState(
+        allowTab(tabFromPathname(window.location.pathname), isAdmin),
+      );
       setCompanyTicker(companyFromPathname(window.location.pathname));
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [isAdmin]);
   const [p, setP] = useState<Portfolio | null>(null),
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
@@ -512,8 +437,8 @@ export default function Dashboard({
     });
   }
   useEffect(() => {
-    void load();
-  }, []);
+    if (email) void load();
+  }, [email]);
   useEffect(() => {
     if (tab !== 'settings' || usage) return;
     void fetch('/api/usage')
@@ -616,63 +541,151 @@ export default function Dashboard({
         <p className="muted">Loading your holdings…</p>
       </main>
     );
+  if (!p && !email) return <SignIn returnTo={initialPathname || '/'} />;
   if (!p)
-    return (
-      <main className="signin">
-        <section className="signin-hero">
-          <div className="brand">
-            <Wallet size={26} />
-            <span>PSX / PERSONAL INVESTING</span>
-          </div>
-          <div className="signin-hero-copy">
-            <h1>Every rupee you&rsquo;ve put into PSX, in one ledger.</h1>
-            <p>
-              Purchases, prices and your monthly SIP plan, tracked the way you
-              actually invest, not how a spreadsheet assumes you should.
-            </p>
-          </div>
-          <SignInChart />
-          <div className="signin-ticker" aria-hidden="true">
-            <div className="signin-ticker-track">
-              {[...SIGNIN_TICKERS, ...SIGNIN_TICKERS].map((t, i) => (
-                <span key={i}>
-                  {t.ticker}{' '}
-                  <span className={t.up ? 'up' : 'down'}>
-                    {t.up ? '▲' : '▼'}
-                  </span>
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
-        <section className="signin-panel">
-          <div className="signin-card">
-            <p className="signin-kicker">Portfolio & SIP desk</p>
-            <h2>Sign in to continue</h2>
-            <p className="muted">
-              {busy
-                ? 'Loading your holdings and purchase history…'
-                : 'Your holdings stay private to your Google account.'}
-            </p>
-            <a
-              className="google-btn"
-              href="/api/auth/google/login?return_to=%2F"
-              target="_top"
-            >
-              <GoogleMark /> Continue with Google
-            </a>
-            {message &&
-              !message.includes('Sign in to access your portfolio') && (
-                <p role="alert" className="notice error">
-                  {message}
-                </p>
-              )}
-            <button className="secondary" onClick={load}>
-              Retry loading
-            </button>
-          </div>
-        </section>
-      </main>
+    return <LoadError message={message} busy={busy} onRetry={load} />;
+  const restoreBackup = (f: File) => {
+    attempt(async () => {
+    const data = JSON.parse(await f.text());
+    if (
+      data.kind !== 'psx-portfolio-ledger' ||
+      data.schemaVersion !== 1
+    )
+      throw Error(
+        'Choose a portfolio-ledger backup, not a company research file.',
+      );
+    validate(data.portfolio);
+    await save(
+      data.portfolio,
+      'Portfolio backup restored.',
+    );
+    });
+  };
+  const importCdc = (f: File) => {
+    attempt(async () => {
+    const raw = JSON.parse(await f.text());
+    const result = importCdcDividends(
+      raw,
+      p.companies,
+      p.dividends ?? [],
+    );
+    if (!result.imported) {
+      notify(
+        `No dividends imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
+        true,
+      );
+      return;
+    }
+    const next = clone(p);
+    const replaced = voidSupersededAuto(
+      next.dividends ?? [],
+      result.dividends,
+    );
+    const superseded = replaced.length;
+    const at = new Date().toISOString();
+    addNotifications(next, [
+      ...dividendNotifications(result.dividends, at),
+      ...replaced.map(
+        (d): AppNotification => ({
+          id: `replaced:${d.id}`,
+          at,
+          kind: 'dividend-replaced',
+          ticker: d.ticker,
+          title: `${d.ticker} PSX estimate replaced`,
+          body: `The PSX-announced dividend for ${d.date} was replaced by the actual CDC payment.`,
+          read: false,
+        }),
+      ),
+    ]);
+    next.dividends = [
+      ...(next.dividends ?? []),
+      ...result.dividends,
+    ];
+    await save(
+      next,
+      `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
+    );
+    });
+  };
+  const importFinqalab = (f: File) => {
+    attempt(async () => {
+    if (f.type && f.type !== 'application/pdf')
+      throw Error('Choose a PDF report from Finqalab.');
+    const { text } = await extractPdfText(
+      new Uint8Array(await f.arrayBuffer()),
+    );
+    const rows = parseFinqalabReport(text);
+    const result = importFinqalabTrades(p, rows);
+    if (!result.imported) {
+      notify(
+        `No Finqalab trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
+        true,
+      );
+      return;
+    }
+    const next = clone(p);
+    next.companies = result.companies;
+    next.trades = [...next.trades, ...result.trades];
+    await save(
+      next,
+      `${result.imported} Finqalab trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
+    );
+    });
+  };
+  const importAhl = (f: File) => {
+    attempt(async () => {
+    const rows = parseAhlHistory(JSON.parse(await f.text()));
+    const result = importAhlTrades(p, rows);
+    if (!result.imported) {
+      notify(
+        `No AHL trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
+        true,
+      );
+      return;
+    }
+    const next = clone(p);
+    next.companies = result.companies;
+    for (const trade of next.trades) {
+      if (result.voidedTradeIds.includes(trade.id))
+        trade.voided = true;
+    }
+    next.trades = [...next.trades, ...result.trades];
+    await save(
+      next,
+      `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
+    );
+    });
+  };
+  const exportBackup = () =>
+    download(
+      `psx-portfolio-${today()}.json`,
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          kind: 'psx-portfolio-ledger',
+          exportedAt: new Date().toISOString(),
+          portfolio: p,
+        },
+        null,
+        2,
+      ),
+    );
+  const saveResearchSettings = (patch: Partial<ResearchSettings>) =>
+    attempt(() =>
+      save(
+        {
+          ...p,
+          researchSettings: {
+            ...(p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS),
+            ...patch,
+          },
+        },
+        'AI model settings saved.',
+      ),
+    );
+  const saveFilerStatus = (filerStatus: 'filer' | 'non-filer') =>
+    attempt(() =>
+      save({ ...p, taxProfile: { filerStatus } }, 'Tax status saved.'),
     );
   const hs = holdings(p)
       .slice()
@@ -739,8 +752,11 @@ export default function Dashboard({
     if (!holdingsSort || holdingsSort.key !== key) return null;
     return holdingsSort.dir === 'asc' ? ' ▲' : ' ▼';
   }
-  const notifications = p.notifications ?? [];
+  const allNotifications = p.notifications ?? [];
+  const notifications = allNotifications.filter((n) => !n.clearedAt);
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const chromeless =
+    tab === 'settings' || tab === 'company' || tab === 'notifications';
   const taxedDividends = taxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     buildEntries({
@@ -989,7 +1005,14 @@ export default function Dashboard({
                     data-slot="link"
                     className="link-button"
                     disabled={busy || !notifications.length}
-                    onClick={() => updateNotifications(() => [])}
+                    onClick={() => {
+                      const at = new Date().toISOString();
+                      updateNotifications((list) =>
+                        list.map((n) =>
+                          n.clearedAt ? n : { ...n, read: true, clearedAt: at },
+                        ),
+                      );
+                    }}
                   >
                     Clear
                   </button>
@@ -1025,20 +1048,36 @@ export default function Dashboard({
                   ))}
                 </ul>
               )}
+              <div className="notice-foot">
+                <button
+                  type="button"
+                  data-slot="link"
+                  className="link-button"
+                  onClick={() => setTab('notifications')}
+                >
+                  View all notifications
+                </button>
+              </div>
             </PopoverContent>
           </Popover>
           {email && (
             <DropdownMenu>
               <DropdownMenuTrigger className="account-trigger">
-                <span className="account-avatar">
-                  {(name || email).charAt(0).toUpperCase()}
-                </span>
+                <UserAvatar name={name} email={email} picture={picture} />
                 <ChevronDown size={14} className="account-chevron" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="account-menu">
                 <div className="account-menu-header">
-                  {name && <span className="account-menu-name">{name}</span>}
-                  <span className="account-menu-email">{email}</span>
+                  <UserAvatar
+                    name={name}
+                    email={email}
+                    picture={picture}
+                    large
+                  />
+                  <div>
+                    {name && <span className="account-menu-name">{name}</span>}
+                    <span className="account-menu-email">{email}</span>
+                  </div>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setTab('settings')}>
@@ -1058,7 +1097,7 @@ export default function Dashboard({
           )}
         </div>
       </header>
-      {tab !== 'settings' && tab !== 'company' && (
+      {!chromeless && (
         <section className="heading">
           <div>
             <p className="eyebrow">YOUR LONG-TERM PICTURE</p>
@@ -1097,13 +1136,15 @@ export default function Dashboard({
         </div>
       )}
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-        {tab !== 'settings' && tab !== 'company' && (
+        {!chromeless && (
           <TabsList>
             <TabsTrigger value="holdings">Holdings</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="history">Purchase log</TabsTrigger>
             <TabsTrigger value="sip">Monthly Picks</TabsTrigger>
-            <TabsTrigger value="research-desk">Research desk</TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="research-desk">Research desk</TabsTrigger>
+            )}
           </TabsList>
         )}
         <TabsContent value="holdings">
@@ -1433,389 +1474,42 @@ export default function Dashboard({
             />
           )}
         </TabsContent>
-        <TabsContent value="research-desk">
-          <ResearchDesk
-            portfolio={p}
-            onSave={save}
-            onOpenSettings={() => setTab('settings')}
+        {isAdmin && (
+          <TabsContent value="research-desk">
+            <ResearchDesk
+              portfolio={p}
+              onSave={save}
+              onOpenSettings={() => setTab('settings')}
+            />
+          </TabsContent>
+        )}
+        <TabsContent value="settings">
+          <SettingsView
+            name={name}
+            email={email!}
+            picture={picture}
+            role={role}
+            busy={busy}
+            usage={usage}
+            filerStatus={p.taxProfile?.filerStatus ?? ''}
+            researchSettings={p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS}
+            onBack={() => setTab('holdings')}
+            onFilerStatus={saveFilerStatus}
+            onResearchSettings={saveResearchSettings}
+            onExport={exportBackup}
+            onRestore={restoreBackup}
+            onImportCdc={importCdc}
+            onImportFinqalab={importFinqalab}
+            onImportAhl={importAhl}
           />
         </TabsContent>
-        <TabsContent value="settings">
-          <div className="settings-page">
-            <section className="panel">
-              <p className="eyebrow">ACCOUNT</p>
-              <h2>{name ?? 'Signed in'}</h2>
-              <p className="muted">{email}</p>
-            </section>
-            <section className="panel">
-              <p className="eyebrow">TAX STATUS</p>
-              <h2>Filer or non-filer</h2>
-              <p className="muted">
-                Sets the capital-gains and dividend tax rate used in Reports:
-                15% for filers, 30% for non-filers. Applies to sells and
-                manually entered dividends; imported dividend records already
-                carry their own real, post-withholding amounts.
-              </p>
-              <RadioGroup
-                value={p.taxProfile?.filerStatus ?? ''}
-                onValueChange={(v) =>
-                  attempt(() =>
-                    save(
-                      {
-                        ...p,
-                        taxProfile: { filerStatus: v as 'filer' | 'non-filer' },
-                      },
-                      'Tax status saved.',
-                    ),
-                  )
-                }
-              >
-                <label className="check-row" htmlFor="tax-filer">
-                  <RadioGroupItem id="tax-filer" value="filer" /> Filer — 15%
-                </label>
-                <label className="check-row" htmlFor="tax-non-filer">
-                  <RadioGroupItem id="tax-non-filer" value="non-filer" />{' '}
-                  Non-filer — 30%
-                </label>
-              </RadioGroup>
-            </section>
-            <section className="panel">
-              <p className="eyebrow">AI MODEL</p>
-              <h2>Research desk model settings</h2>
-              <p className="muted">
-                Applies to research runs started after you save. Jobs already
-                queued or in progress keep the settings they started with.
-              </p>
-              {(() => {
-                const rs: ResearchSettings =
-                  p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS;
-                const update = (patch: Partial<ResearchSettings>) =>
-                  attempt(() =>
-                    save(
-                      { ...p, researchSettings: { ...rs, ...patch } },
-                      'AI model settings saved.',
-                    ),
-                  );
-                return (
-                  <div className="form-grid">
-                    <label>
-                      AI model
-                      <select
-                        value={rs.model}
-                        onChange={(e) =>
-                          update({
-                            model: e.target.value as ResearchSettings['model'],
-                          })
-                        }
-                      >
-                        {RESEARCH_MODELS.map((model) => (
-                          <option key={model} value={model}>
-                            {model}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Reasoning effort
-                      <select
-                        value={rs.reasoningEffort}
-                        onChange={(e) =>
-                          update({
-                            reasoningEffort: e.target
-                              .value as ResearchSettings['reasoningEffort'],
-                          })
-                        }
-                      >
-                        {REASONING_EFFORTS.map((effort) => (
-                          <option key={effort} value={effort}>
-                            {effort}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Budget limit per run (US$)
-                      <input
-                        type="number"
-                        min={0.05}
-                        max={5}
-                        step={0.05}
-                        key={'budget-' + rs.budgetUsd}
-                        defaultValue={rs.budgetUsd}
-                        onBlur={(e) => {
-                          const v = Number(e.target.value);
-                          if (v !== rs.budgetUsd) update({ budgetUsd: v });
-                        }}
-                      />
-                    </label>
-                    <label>
-                      Max output tokens
-                      <input
-                        type="number"
-                        min={4000}
-                        max={64000}
-                        step={1000}
-                        key={'tokens-' + rs.maxOutputTokens}
-                        defaultValue={rs.maxOutputTokens}
-                        onBlur={(e) => {
-                          const v = Number(e.target.value);
-                          if (v !== rs.maxOutputTokens)
-                            update({ maxOutputTokens: v });
-                        }}
-                      />
-                    </label>
-                    <label>
-                      Self-correction attempts
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        step={1}
-                        key={'attempts-' + rs.maxAttempts}
-                        defaultValue={rs.maxAttempts}
-                        onBlur={(e) => {
-                          const v = Number(e.target.value);
-                          if (v !== rs.maxAttempts) update({ maxAttempts: v });
-                        }}
-                      />
-                    </label>
-                  </div>
-                );
-              })()}
-            </section>
-            <section className="panel">
-              <p className="eyebrow">USAGE &amp; COST</p>
-              <h2>AI usage</h2>
-              <p className="muted">
-                Tracked from account setup date forward — usage before this
-                feature existed isn&rsquo;t included.
-              </p>
-              {usage ? (
-                <div className="split-stats">
-                  <div>
-                    <small>Input tokens</small>
-                    <strong>{usage.inputTokens.toLocaleString()}</strong>
-                  </div>
-                  <div>
-                    <small>Output tokens</small>
-                    <strong>{usage.outputTokens.toLocaleString()}</strong>
-                  </div>
-                  <div>
-                    <small>Estimated cost</small>
-                    <strong>
-                      {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD',
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 4,
-                      }).format(usage.costUsd)}
-                    </strong>
-                  </div>
-                </div>
-              ) : (
-                <p className="muted">Loading…</p>
-              )}
-            </section>
-            <section className="panel">
-              <p className="eyebrow">DATA MANAGEMENT</p>
-              <h2>Backup and import</h2>
-              <div className="row">
-                <button
-                  className="secondary compact"
-                  onClick={() =>
-                    download(
-                      `psx-portfolio-${today()}.json`,
-                      JSON.stringify(
-                        {
-                          schemaVersion: 1,
-                          kind: 'psx-portfolio-ledger',
-                          exportedAt: new Date().toISOString(),
-                          portfolio: p,
-                        },
-                        null,
-                        2,
-                      ),
-                    )
-                  }
-                >
-                  <Download size={14} /> Export backup
-                </button>
-                <label className="import-label">
-                  Restore backup
-                  <input
-                    type="file"
-                    accept="application/json,.json"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      attempt(async () => {
-                        const data = JSON.parse(await f.text());
-                        if (
-                          data.kind !== 'psx-portfolio-ledger' ||
-                          data.schemaVersion !== 1
-                        )
-                          throw Error(
-                            'Choose a portfolio-ledger backup, not a company research file.',
-                          );
-                        validate(data.portfolio);
-                        if (
-                          !window.confirm(
-                            'Replace this portfolio with the selected backup? Export your current backup first.',
-                          )
-                        )
-                          return;
-                        await save(
-                          data.portfolio,
-                          'Portfolio backup restored.',
-                        );
-                      });
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-                <label className="import-label">
-                  Import dividends (CDC JSON)
-                  <input
-                    type="file"
-                    accept="application/json,.json"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      attempt(async () => {
-                        const raw = JSON.parse(await f.text());
-                        const result = importCdcDividends(
-                          raw,
-                          p.companies,
-                          p.dividends ?? [],
-                        );
-                        if (!result.imported) {
-                          notify(
-                            `No dividends imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
-                            true,
-                          );
-                          return;
-                        }
-                        const next = clone(p);
-                        const replaced = voidSupersededAuto(
-                          next.dividends ?? [],
-                          result.dividends,
-                        );
-                        const superseded = replaced.length;
-                        const at = new Date().toISOString();
-                        addNotifications(next, [
-                          ...dividendNotifications(result.dividends, at),
-                          ...replaced.map(
-                            (d): AppNotification => ({
-                              id: `replaced:${d.id}`,
-                              at,
-                              kind: 'dividend-replaced',
-                              ticker: d.ticker,
-                              title: `${d.ticker} PSX estimate replaced`,
-                              body: `The PSX-announced dividend for ${d.date} was replaced by the actual CDC payment.`,
-                              read: false,
-                            }),
-                          ),
-                        ]);
-                        next.dividends = [
-                          ...(next.dividends ?? []),
-                          ...result.dividends,
-                        ];
-                        await save(
-                          next,
-                          `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
-                        );
-                      });
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-                <label className="import-label">
-                  Import trades (Finqalab PDF)
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      attempt(async () => {
-                        if (f.type && f.type !== 'application/pdf')
-                          throw Error('Choose a PDF report from Finqalab.');
-                        const { text } = await extractPdfText(
-                          new Uint8Array(await f.arrayBuffer()),
-                        );
-                        const rows = parseFinqalabReport(text);
-                        const result = importFinqalabTrades(p, rows);
-                        if (!result.imported) {
-                          notify(
-                            `No Finqalab trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
-                            true,
-                          );
-                          return;
-                        }
-                        const next = clone(p);
-                        next.companies = result.companies;
-                        next.trades = [...next.trades, ...result.trades];
-                        await save(
-                          next,
-                          `${result.imported} Finqalab trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
-                        );
-                      });
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-                <label className="import-label">
-                  Import trades (AHL JSON)
-                  <input
-                    type="file"
-                    accept="application/json,.json"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      attempt(async () => {
-                        const rows = parseAhlHistory(JSON.parse(await f.text()));
-                        const result = importAhlTrades(p, rows);
-                        if (!result.imported) {
-                          notify(
-                            `No AHL trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
-                            true,
-                          );
-                          return;
-                        }
-                        const next = clone(p);
-                        next.companies = result.companies;
-                        for (const trade of next.trades) {
-                          if (result.voidedTradeIds.includes(trade.id))
-                            trade.voided = true;
-                        }
-                        next.trades = [...next.trades, ...result.trades];
-                        await save(
-                          next,
-                          `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
-                        );
-                      });
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-              </div>
-              <p className="muted">
-                Import expects the CDC Access dividend export JSON (an array, or
-                an object with a <code>data</code> array). Only Paid rows are
-                imported; personal and bank fields are never read or stored.
-              </p>
-              <p className="muted">
-                Finqalab import accepts its Periodic Trade Details Report PDF.
-                It reads only trade details and ignores subtotal rows. Re-uploading
-                a report or an overlapping partial report will not duplicate trades.
-              </p>
-              <p className="muted">
-                AHL import accepts its trade history JSON. Execution date, quantity,
-                gross rate and net amount are used to reconstruct each trade and fee;
-                repeated uploads and overlapping files are deduplicated.
-              </p>
-            </section>
-          </div>
+        <TabsContent value="notifications">
+          <NotificationsView
+            notifications={allNotifications}
+            busy={busy}
+            onChange={updateNotifications}
+            onBack={() => setTab('holdings')}
+          />
         </TabsContent>
       </Tabs>
       <footer>

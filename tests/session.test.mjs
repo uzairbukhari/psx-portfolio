@@ -13,7 +13,13 @@ test('a signed session round-trips to the original email and name', async () => 
   assert.deepEqual(await verifySession(token, 'test-secret'), {
     email: 'owner@example.com',
     name: 'Owner Name',
+    picture: null,
   });
+});
+
+test('a session carries the Google profile picture through', async () => {
+  const token = await signSession('o@example.com', 'O', 'test-secret', undefined, 'https://lh3.googleusercontent.com/a/x');
+  assert.equal((await verifySession(token, 'test-secret')).picture, 'https://lh3.googleusercontent.com/a/x');
 });
 
 test('a session signed without a name verifies with name null', async () => {
@@ -21,6 +27,7 @@ test('a session signed without a name verifies with name null', async () => {
   assert.deepEqual(await verifySession(token, 'test-secret'), {
     email: 'owner@example.com',
     name: null,
+    picture: null,
   });
 });
 

@@ -70,6 +70,8 @@ export type AppNotification = {
   title: string;
   body: string;
   read: boolean;
+  /** ISO timestamp the user cleared it from the bell; kept so it stays in history. */
+  clearedAt?: string;
 };
 export const NOTIFICATION_KINDS = [
   'dividend-recorded',
@@ -924,6 +926,9 @@ export function validate(p: Portfolio) {
         typeof n.body !== 'string' ||
         n.body.length > 1000 ||
         typeof n.read !== 'boolean' ||
+        (n.clearedAt !== undefined &&
+          (typeof n.clearedAt !== 'string' ||
+            !Number.isFinite(Date.parse(n.clearedAt)))) ||
         (n.ticker !== undefined && typeof n.ticker !== 'string')
       )
         throw Error('Invalid notifications.');
