@@ -209,7 +209,7 @@ function quantSummary(company: SnapshotCompany, score: CompanyScore | undefined)
 }
 
 /** Builds the same result shape directly from the quant score — used whenever the AI step is unavailable. */
-export function quantResult(snapshot: SnapshotV8): MonthlyPicksResearch {
+export function quantResult(snapshot: SnapshotV8, fallbackReason?: string): MonthlyPicksResearch {
   const companyByTicker = new Map(snapshot.companies.map((c) => [c.ticker, c]));
   const scoreByTicker = new Map(snapshot.scores.map((s) => [s.ticker, s]));
   const allocation = quantAllocation(snapshot.scores);
@@ -241,11 +241,12 @@ export function quantResult(snapshot: SnapshotV8): MonthlyPicksResearch {
     return { ticker, outlook, summary: quantSummary(company, score), sourceUrls: urls, sourceDetails: details, assessmentStatus: 'assessed', evidenceStatus: 'ready', metrics, dataGaps: company.metrics.dataGaps.length ? company.metrics.dataGaps : undefined };
   });
   return {
-    marketOutlook: picks.length
+    marketOutlook: (fallbackReason ? `${fallbackReason} ` : '') + (picks.length
       ? `Quantitative fallback: ranked ${availableCompanies(snapshot).length} of ${snapshot.shortlist.length} shortlisted companies by a deterministic score (valuation, growth, profitability trend, momentum, catalyst recency) from PSX data as of ${snapshot.dataAsOf}. No AI narrative review was completed for this run.`
-      : `No shortlisted company scored highly enough on the deterministic quant model (valuation, growth, profitability, momentum, catalyst recency) to recommend an allocation from PSX data as of ${snapshot.dataAsOf}.`,
+      : `No shortlisted company scored highly enough on the deterministic quant model (valuation, growth, profitability, momentum, catalyst recency) to recommend an allocation from PSX data as of ${snapshot.dataAsOf}.`),
     picks, coverage, unallocatedPct: allocation.unallocatedPct,
     assessedCount: coverage.filter((c) => c.assessmentStatus === 'assessed').length, totalCount: snapshot.shortlist.length,
     method: 'quant', dataAsOf: snapshot.dataAsOf,
+    ...(fallbackReason ? { fallbackReason } : {}),
   };
 }

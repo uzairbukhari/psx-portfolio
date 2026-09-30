@@ -7,7 +7,9 @@ import { readQuoteRows } from '@/lib/quote-cache';
 import { dispatchEnabled, requestFacts } from '@/lib/github-dispatch';
 import {
   canReuseRun, needsScrape, nextGatherStep, unavailableReason, FACTS_MAX_AGE_DAYS,
+  aiCapCheck, parseAiCap, pktMonthStartIso,
 } from '@/lib/monthly-picks-flow';
+import { takeRateLimit, waitText } from '@/lib/rate-limit';
 import {
   WORKFLOW_VERSION, MIN_ADVANCE_VERSION, MODEL, BUDGET_USD, PICK_RESERVE,
   pickRequest, sanitizePicks, quantResult, outputText, usage,
@@ -35,6 +37,8 @@ const SUBMIT_STUCK_MS = 120_000;
 const RUN_TIMEOUT_MS = 5 * 60_000;
 // An active run nobody has polled for this long is advanced (or timed out) by the next POST.
 const STALE_RUN_MS = 10 * 60_000;
+// On-demand GitHub facts scrapes (explicit refreshes and run-triggered) per user per day.
+const FACTS_DISPATCH_LIMIT = { windowMs: 86_400_000, max: 10 };
 const privateJson = (body: unknown) => Response.json(body, { headers: { 'Cache-Control': 'no-store' } });
 const readRow = (id: string, owner: string) => db().prepare('SELECT * FROM monthly_recommendations WHERE id=? AND user_id=?').bind(id, owner).first<Row>();
 async function attempts(id: string) {
@@ -119,7 +123,32 @@ async function submit(row: Row, attempt: Attempt) {
   } catch (error) {
     const message = `Submission could not be confirmed. ${error instanceof Error ? error.message : ''}`.slice(0, 1000);
     await db().prepare("UPDATE recommendation_attempts SET state='uncertain',error=? WHERE id=?").bind(message, attempt.id).run();
+    await recordEstimatedCost(row, attempt);
   }
+}
+/**
+ * A call that may have reached OpenAI but whose usage was never read back (submission
+ * unconfirmed, stuck, or timed out) is charged at its full reserve, so it still counts
+ * against the user's monthly cap. Idempotent: never overwrites a measured cost.
+ */
+async function recordEstimatedCost(row: Row, attempt: Attempt) {
+  await db().batch([
+    db().prepare('UPDATE recommendation_attempts SET cost_usd=reserved_usd WHERE id=? AND cost_usd IS NULL').bind(attempt.id),
+    db().prepare('INSERT OR IGNORE INTO ai_usage (id,user_id,source,model,input_tokens,output_tokens,cached_tokens,cost_usd,created_at) VALUES (?,?,?,?,0,0,0,?,?)')
+      .bind(`monthly:${attempt.id}`, row.user_id, 'monthly_picks_estimate', MODEL, attempt.reserved_usd, now()),
+    db().prepare('UPDATE monthly_recommendations SET estimated_cost_usd=(SELECT SUM(cost_usd) FROM recommendation_attempts WHERE recommendation_id=?),updated_at=? WHERE id=? AND user_id=?')
+      .bind(row.id, now(), row.id, row.user_id),
+  ]);
+}
+/** AI spend this PKT month: measured or estimated usage plus reserves of calls still in flight. */
+async function monthlyAiSpend(owner: string) {
+  const used = await db().prepare('SELECT COALESCE(SUM(cost_usd),0) AS usd FROM ai_usage WHERE user_id=? AND created_at>=?')
+    .bind(owner, pktMonthStartIso(new Date())).first<{ usd: number }>();
+  const reserved = await db().prepare(`SELECT COALESCE(SUM(a.reserved_usd),0) AS usd FROM recommendation_attempts a
+    JOIN monthly_recommendations r ON r.id=a.recommendation_id
+    WHERE r.user_id=? AND a.cost_usd IS NULL AND a.state IN ('pending','submitting','in_progress')`)
+    .bind(owner).first<{ usd: number }>();
+  return (used?.usd ?? 0) + (reserved?.usd ?? 0);
 }
 async function archive(row: Row, attempt: Attempt, response: ProviderResponse) {
   const measured = usage(response);
@@ -158,6 +187,8 @@ async function beginRanking(row: Row, snapshot: SnapshotV8) {
     return;
   }
   if (!env.OPENAI_API_KEY) { await finish(row, quantResult(snapshot)); return; }
+  const cap = aiCapCheck(await monthlyAiSpend(row.user_id), PICK_RESERVE, parseAiCap(env.AI_MONTHLY_CAP_USD));
+  if (!cap.allowed) { await finish(row, quantResult(snapshot, cap.message)); return; }
   const attempt = await createAttempt(row, pickRequest(snapshot), PICK_RESERVE);
   // Budget can't cover the AI call: the deterministic result is still a complete answer.
   if (!attempt) { await finish(row, quantResult(snapshot)); return; }
@@ -199,14 +230,20 @@ async function advanceRanking(row: Row) {
     return;
   }
   if (attempt.state === 'submitting') {
-    if (Date.now() - Date.parse(attempt.created_at) > SUBMIT_STUCK_MS) await finish(row, quantResult(snapshot));
+    if (Date.now() - Date.parse(attempt.created_at) > SUBMIT_STUCK_MS) {
+      await recordEstimatedCost(row, attempt);
+      await finish(row, quantResult(snapshot));
+    }
     return;
   }
   if (attempt.state === 'pending') { await submit(row, attempt); return; }
   if (attempt.state === 'in_progress') {
     const outcome = await retrieve(row, attempt);
     if (outcome === 'pending') {
-      if (Date.now() - Date.parse(attempt.created_at) > RUN_TIMEOUT_MS) await finish(row, quantResult(snapshot));
+      if (Date.now() - Date.parse(attempt.created_at) > RUN_TIMEOUT_MS) {
+        await recordEstimatedCost(row, attempt);
+        await finish(row, quantResult(snapshot));
+      }
       return;
     }
     if (outcome === 'failed') { await finish(row, quantResult(snapshot)); return; }
@@ -295,6 +332,9 @@ export async function POST(req: Request) {
       const tickers = Array.isArray(body.tickers) ? body.tickers.filter((t): t is string => typeof t === 'string').map((t) => t.trim().toUpperCase()) : [];
       const owned = tickers.filter((ticker) => portfolio.companies.some((company) => company.ticker === ticker)).slice(0, 40);
       if (!owned.length) throw new UserError('Choose companies to refresh.');
+      const limit = await takeRateLimit(db(), owner, 'facts-dispatch', FACTS_DISPATCH_LIMIT);
+      if (!limit.allowed)
+        throw new UserError(`Company data refreshes are limited to ${FACTS_DISPATCH_LIMIT.max} a day. Try again in ${waitText(limit.retryAfterMs)}.`, 429);
       const result = await requestFacts(owned);
       return privateJson({ dispatched: result.dispatched, waiting: result.waiting, reason: result.reason ?? null });
     }
@@ -340,7 +380,8 @@ export async function POST(req: Request) {
 
     // Ask GitHub Actions to scrape whatever isn't fresh; the run waits in 'gathering' until it lands.
     const stale = (await readFactsStatus(shortlist)).filter(needsScrape).map((status) => status.ticker);
-    if (stale.length && dispatchEnabled()) {
+    // Over the daily dispatch limit the run simply uses the cached company data.
+    if (stale.length && dispatchEnabled() && (await takeRateLimit(db(), owner, 'facts-dispatch', FACTS_DISPATCH_LIMIT)).allowed) {
       const result = await requestFacts(stale);
       if (result.waiting) {
         await db().prepare('UPDATE monthly_recommendations SET pending_tickers=?,updated_at=? WHERE id=? AND user_id=?')

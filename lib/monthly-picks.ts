@@ -22,6 +22,8 @@ export type MonthlyPicksResearch = {
   marketOutlook: string; picks: MonthlyPick[]; coverage: CompanyOutlook[]; unallocatedPct: number;
   evidenceIssues?: EvidenceIssue[]; assessedCount?: number; totalCount?: number;
   method?: 'ai' | 'quant'; dataAsOf?: string;
+  /** Why a quant result was used instead of the AI ranking, when that is worth telling the user. */
+  fallbackReason?: string;
 };
 export type MonthlyPickEstimate = MonthlyPick & {
   allocationPkr: number; price: number | null; priceDate: string | null; shares: number | null;
