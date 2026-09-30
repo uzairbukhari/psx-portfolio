@@ -544,6 +544,31 @@ export function taxSummary(p: Portfolio) {
     netRealizedReturn,
   };
 }
+/** Shares and remaining cost (average-cost method, as in `holdings`) after each ledger date. */
+export function positionTimeline(p: Portfolio, ticker: string) {
+  const out: { date: string; shares: number; cost: number | null }[] = [];
+  let shares = 0,
+    cost: number | null = 0;
+  for (const event of ledgerEventsFor(p, ticker)) {
+    if (event.type === 'split') shares = applySplit(shares, event.value);
+    else {
+      const t = event.value;
+      if (t.kind === 'sell') {
+        const avg: number | null = cost === null ? null : shares ? cost / shares : 0;
+        cost = avg === null ? null : Math.max(0, cost! - avg * Math.min(t.shares, shares));
+        shares = Math.max(0, shares - t.shares);
+        if (shares === 0) cost = 0;
+      } else {
+        shares += t.shares;
+        cost = t.price === null || cost === null ? null : cost + t.shares * t.price + t.fees;
+      }
+    }
+    const snap = { date: event.value.date, shares, cost: cost === null ? null : round(cost) };
+    if (out.at(-1)?.date === snap.date) out[out.length - 1] = snap;
+    else out.push(snap);
+  }
+  return out;
+}
 export function holdings(p: Portfolio) {
   return p.companies.map((c) => {
     let shares = 0,

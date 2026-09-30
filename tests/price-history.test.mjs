@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { holdings, positionTimeline } from '../lib/portfolio.ts';
 import { parseEod, parseIntraday, sliceRange, rangeChange, portfolioValueSeries, sliceValueRange } from '../lib/price-history.ts';
 
 const DAY = 86_400;
@@ -34,24 +35,24 @@ test('portfolioValueSeries steps with buys, sells and carries closes forward', (
   const eod = { AAA: [[sec('2026-01-02'), 10], [sec('2026-01-05'), 12], [sec('2026-01-06'), 11]] };
   const { points, unpriced } = portfolioValueSeries(p, eod);
   assert.deepEqual(points, [
-    { date: '2026-01-02', value: 100 },
-    { date: '2026-01-05', value: 120 },
-    { date: '2026-01-06', value: 66 },
+    { date: '2026-01-02', value: 100, cost: 10, gain: 90 },
+    { date: '2026-01-05', value: 120, cost: 10, gain: 110 },
+    { date: '2026-01-06', value: 66, cost: 6, gain: 60 },
   ]);
   assert.deepEqual(unpriced, []);
   const other = portfolioValueSeries(pf([trade('1', 'AAA', 'buy', '2026-01-02', 10), trade('2', 'BBB', 'buy', '2026-01-02', 1)]), {
     AAA: [[sec('2026-01-02'), 10], [sec('2026-01-05'), 12]],
     BBB: [[sec('2026-01-05'), 100]],
   });
-  assert.deepEqual(other.points, [{ date: '2026-01-05', value: 220 }]);
+  assert.deepEqual(other.points, [{ date: '2026-01-05', value: 220, cost: 11, gain: 209 }]);
 });
 test('portfolioValueSeries handles splits, unpriced tickers and the live point', () => {
   const p = pf([trade('1', 'AAA', 'buy', '2026-01-02', 10), trade('2', 'ZZZ', 'buy', '2026-01-02', 5)], [
     { id: 's', ticker: 'AAA', date: '2026-01-05', oldShares: 1, newShares: 2, note: '' },
   ]);
   const eod = { AAA: [[sec('2026-01-02'), 10], [sec('2026-01-05'), 6]] };
-  const { points, unpriced } = portfolioValueSeries(p, eod, { date: '2026-01-05', value: 999 });
-  assert.deepEqual(points, [{ date: '2026-01-02', value: 100 }, { date: '2026-01-05', value: 999 }]);
+  const { points, unpriced } = portfolioValueSeries(p, eod, { date: '2026-01-05', value: 999, cost: 10, gain: 989 });
+  assert.deepEqual(points, [{ date: '2026-01-02', value: 100, cost: 10, gain: 90 }, { date: '2026-01-05', value: 999, cost: 10, gain: 989 }]);
   assert.deepEqual(unpriced, ['ZZZ']);
   assert.equal(portfolioValueSeries(p, eod).points[1].value, 120);
 });
@@ -60,4 +61,20 @@ test('sliceValueRange', () => {
   assert.equal(sliceValueRange(pts, 'all').length, 3);
   assert.equal(sliceValueRange(pts, '1m').length, 2);
   assert.equal(sliceValueRange(pts, '1y').length, 2);
+});
+
+test('positionTimeline ends where holdings() does and yields null cost for unknown openings', () => {
+  const p = pf([trade('1', 'AAA', 'buy', '2026-01-02', 10), { ...trade('2', 'AAA', 'buy', '2026-01-03', 10), price: 3, fees: 2 }, trade('3', 'AAA', 'sell', '2026-01-04', 5)]);
+  p.companies = [{ ticker: 'AAA' }];
+  const h = holdings(p)[0];
+  const last = positionTimeline(p, 'AAA').at(-1);
+  assert.equal(last.shares, h.shares);
+  assert.equal(last.cost, h.cost);
+  const unknown = pf([{ ...trade('1', 'BBB', 'opening', '2026-01-02', 10), price: null }]);
+  assert.equal(positionTimeline(unknown, 'BBB')[0].cost, null);
+});
+test('portfolioValueSeries gives null gain while an opening cost is unknown', () => {
+  const p = pf([{ ...trade('1', 'BBB', 'opening', '2026-01-02', 10), price: null }]);
+  const { points } = portfolioValueSeries(p, { BBB: [[sec('2026-01-02'), 5]] });
+  assert.deepEqual(points, [{ date: '2026-01-02', value: 50, cost: null, gain: null }]);
 });

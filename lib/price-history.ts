@@ -1,4 +1,4 @@
-import { sharesHeldOn, type Portfolio } from './portfolio.ts';
+import { positionTimeline, type Portfolio } from './portfolio.ts';
 
 export type PricePoint = [number, number];
 export type HistoryRange = 'today' | '7d' | '1m' | '1y';
@@ -45,30 +45,37 @@ export function rangeChange(points: PricePoint[]) {
   return { change: last - first, percent: first ? ((last - first) / first) * 100 : 0 };
 }
 
-export type ValuePoint = { date: string; value: number };
+/** `cost`/`gain` are null on days a held position has an unknown opening cost. */
+export type ValuePoint = { date: string; value: number; cost: number | null; gain: number | null };
 export type ValueRange = '1m' | '1y' | 'all';
 
 const pktDate = (sec: number) => new Date((sec + 5 * 3600) * 1000).toISOString().slice(0, 10);
+const cents = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Rebuild the portfolio's market value per PSX trading day from ledger share counts and
- * per-ticker daily closes (each carried forward over gaps). Days before every held
- * position can be priced are dropped; tickers with no history at all are listed in
- * `unpriced` and left out. `today` pins the final point to the live card value.
+ * Rebuild the portfolio's market value, remaining cost and gain/loss per PSX trading day
+ * from ledger positions and per-ticker daily closes (each carried forward over gaps).
+ * Days before every held position can be priced are dropped; tickers with no history at
+ * all are listed in `unpriced` and left out. `today` pins the final point to the live
+ * card figures.
  */
 export function portfolioValueSeries(
   p: Portfolio,
   eodByTicker: Record<string, PricePoint[]>,
   today?: ValuePoint,
 ): { points: ValuePoint[]; unpriced: string[] } {
-  const tickers = Array.from(new Set(p.trades.filter((t) => !t.voided).map((t) => t.ticker)));
-  const start = p.trades.filter((t) => !t.voided).map((t) => t.date).sort()[0];
+  const live = p.trades.filter((t) => !t.voided);
+  const start = live.map((t) => t.date).sort()[0];
   const unpriced: string[] = [];
-  const priced = tickers.filter((t) => {
-    if (eodByTicker[t]?.length) return true;
-    if (sharesHeldOn(p, t, '9999-12-31') > 0) unpriced.push(t);
-    return false;
-  });
+  const priced: string[] = [];
+  const timelines = new Map<string, ReturnType<typeof positionTimeline>>();
+  for (const t of new Set(live.map((x) => x.ticker))) {
+    const timeline = positionTimeline(p, t);
+    if (eodByTicker[t]?.length) {
+      priced.push(t);
+      timelines.set(t, timeline);
+    } else if ((timeline.at(-1)?.shares ?? 0) > 0) unpriced.push(t);
+  }
   if (!start || !priced.length) return { points: today ? [today] : [], unpriced };
 
   const closes = new Map(
@@ -77,38 +84,31 @@ export function portfolioValueSeries(
   const days = Array.from(new Set([...closes.values()].flatMap((rows) => rows.map((r) => r[0]))))
     .filter((d) => d >= start)
     .sort();
-  const eventDates = new Map(
-    priced.map((t) => [
-      t,
-      Array.from(
-        new Set([
-          ...p.trades.filter((x) => x.ticker === t && !x.voided).map((x) => x.date),
-          ...(p.stockSplits ?? []).filter((x) => x.ticker === t && !x.voided).map((x) => x.date),
-        ]),
-      ).sort(),
-    ]),
-  );
-  const state = new Map(priced.map((t) => [t, { ci: -1, ei: 0, shares: 0 }]));
+  const cursor = new Map(priced.map((t) => [t, { ci: -1, ei: -1 }]));
   const points: ValuePoint[] = [];
   for (const day of days) {
-    let total = 0;
+    let value = 0;
+    let cost: number | null = 0;
     let ready = true;
     for (const t of priced) {
-      const s = state.get(t)!;
+      const c = cursor.get(t)!;
       const rows = closes.get(t)!;
-      while (s.ci + 1 < rows.length && rows[s.ci + 1][0] <= day) s.ci++;
-      const dates = eventDates.get(t)!;
-      let moved = false;
-      while (s.ei < dates.length && dates[s.ei] <= day) {
-        s.ei++;
-        moved = true;
-      }
-      if (moved) s.shares = sharesHeldOn(p, t, day);
-      if (s.shares <= 0) continue;
-      if (s.ci < 0) ready = false;
-      else total += s.shares * rows[s.ci][1];
+      const timeline = timelines.get(t)!;
+      while (c.ci + 1 < rows.length && rows[c.ci + 1][0] <= day) c.ci++;
+      while (c.ei + 1 < timeline.length && timeline[c.ei + 1].date <= day) c.ei++;
+      const pos = c.ei >= 0 ? timeline[c.ei] : undefined;
+      if (!pos || pos.shares <= 0) continue;
+      if (c.ci < 0) ready = false;
+      else value += pos.shares * rows[c.ci][1];
+      cost = cost === null || pos.cost === null ? null : cost + pos.cost;
     }
-    if (ready) points.push({ date: day, value: Math.round(total * 100) / 100 });
+    if (!ready) continue;
+    points.push({
+      date: day,
+      value: cents(value),
+      cost: cost === null ? null : cents(cost),
+      gain: cost === null ? null : cents(value - cost),
+    });
   }
   if (today) {
     if (points.at(-1)?.date === today.date) points[points.length - 1] = today;
