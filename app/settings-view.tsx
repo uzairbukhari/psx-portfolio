@@ -288,7 +288,7 @@ export default function SettingsView({
             id="tax"
             icon={<Receipt size={18} />}
             title="Tax status"
-            description="Sets the rate used to ESTIMATE capital gains tax (netted per July–June tax year) and tax on dividends without a recorded deduction. Broker/NCCPL/CDC deductions you record are kept as actual figures and never recalculated when you change this. Actual CGT depends on acquisition date and current rules, so treat estimates as indicative, not as your tax liability."
+            description="Sets the rate used to estimate tax on gains and dividends in Reports."
           >
             <RadioGroup
               className="option-cards"
@@ -317,6 +317,11 @@ export default function SettingsView({
             {!filerStatus && (
               <p className="set-hint">Choose one to see after-tax figures in Reports.</p>
             )}
+            <ul className="set-note">
+              <li>Capital gains are netted per July–June tax year before the rate is applied.</li>
+              <li>Deductions you record (broker, NCCPL or CDC) are kept as actual figures and never recalculated when you change this.</li>
+              <li>Real capital gains tax depends on the acquisition date and current rules, so estimates are indicative, not your tax liability.</li>
+            </ul>
           </Section>
 
           <Section

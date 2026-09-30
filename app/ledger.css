@@ -27,6 +27,7 @@
 .ledger-main small{font-size:12px;max-width:none}
 .ledger-amount{font-weight:600;text-align:right;white-space:nowrap}
 .ledger-edit{opacity:0;padding:6px 8px!important}
+.ledger-confirm{display:block;margin-top:4px;font-size:12px!important;text-align:left}
 .ledger-row:hover .ledger-edit,.ledger-edit:focus-visible{opacity:1}
 .ledger-empty{padding:24px 0;text-align:center}
 @media(hover:none){.ledger-edit{opacity:1}}
@@ -53,6 +54,7 @@
 .dividend-card span{display:block;font-size:12px;color:var(--muted-foreground)}
 .dividend-card strong{display:block;margin:6px 0 4px;font-size:20px;font-variant-numeric:tabular-nums}
 .dividend-card small{font-size:12px}
+.dividend-card .card-action{display:inline-flex;margin-top:10px;width:auto}
 .dividend-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .dividend-charts .company-chart{height:220px;min-height:220px}
 @media(max-width:900px){.company-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.dividend-charts{grid-template-columns:1fr}}

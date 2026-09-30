@@ -28,6 +28,8 @@
 .set-card-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(59,130,246,.14);color:#7ea6e6}
 .set-card-head h2{margin:0;font-size:18px;letter-spacing:-.2px;display:flex;align-items:center;gap:10px}
 .set-card-head p{margin:4px 0 0;font-size:14px;line-height:1.55}
+.set-card-head>div:not(.set-card-icon){min-width:0;flex:1}
+.set-card-head p{overflow-wrap:anywhere}
 .set-badge{font-style:normal;font-size:11px;font-weight:600;color:#7ea6e6;background:rgba(59,130,246,.16);border-radius:20px;padding:2px 9px}
 .set-card-body{padding:6px 24px 8px}
 .set-row{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:16px 0;border-bottom:1px solid var(--border)}
@@ -38,6 +40,7 @@
 .set-row-control{flex-shrink:0}
 .set-input{width:200px;padding:9px 12px;font-size:14px}
 .set-hint{margin:0 0 14px;font-size:13px}
+.set-note{margin:14px 0 0;padding-left:18px;font-size:13px;line-height:1.55;overflow-wrap:anywhere}.set-note li+li{margin-top:4px}
 .profile-row{display:flex;align-items:center;gap:14px;padding:16px 0;flex-wrap:wrap}
 .profile-text{display:flex;flex-direction:column;min-width:0;flex:1}
 .profile-text strong{font-size:16px}
