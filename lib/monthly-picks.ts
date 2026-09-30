@@ -112,3 +112,27 @@ function sourceKey(value: string) {
     url.searchParams.sort(); return url.toString();
   } catch { return null; }
 }
+
+/**
+ * Reconciles an estimate to the fresh money. `plannedCashPkr` is the reserve the ranking
+ * left unallocated; `roundingLeftoverPkr` is what whole-share rounding and fees leave
+ * inside the allocated picks. Unspent money = fresh money − fee-inclusive estimated
+ * spend = planned cash + rounding leftover. A pick without a usable price makes the
+ * estimate incomplete: the figures that depend on it are null rather than guessed.
+ */
+export function summarizeEstimates(estimates: MonthlyPickEstimate[], amount: number) {
+  const allocatedPkr = round(estimates.reduce((sum, pick) => sum + pick.allocationPkr, 0));
+  const plannedCashPkr = round(amount - allocatedPkr);
+  const missingPrices = estimates.filter((pick) => pick.estimatedSpend === null).map((pick) => pick.ticker);
+  const incomplete = missingPrices.length > 0;
+  const estimatedSpendPkr = round(estimates.reduce((sum, pick) => sum + (pick.estimatedSpend ?? 0), 0));
+  return {
+    allocatedPkr,
+    plannedCashPkr,
+    estimatedSpendPkr,
+    roundingLeftoverPkr: incomplete ? null : round(allocatedPkr - estimatedSpendPkr),
+    unspentPkr: incomplete ? null : round(amount - estimatedSpendPkr),
+    incomplete,
+    missingPrices,
+  };
+}

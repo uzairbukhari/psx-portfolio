@@ -95,3 +95,15 @@ export function aiCapCheck(spentUsd: number, reserveUsd: number, capUsd: number)
       : `AI ranking skipped: this account has used $${spentUsd.toFixed(2)} of its $${capUsd.toFixed(2)} monthly AI limit, so this run used the quantitative ranking instead. The limit resets at the start of next month.`,
   };
 }
+
+export type RunInputs = { month: string; amount: number; feePct: number; shortlist: string[] };
+
+/** Which draft inputs differ from the saved run being displayed (shortlist order is irrelevant). */
+export function inputDifferences(run: RunInputs, draft: RunInputs): ('month' | 'amount' | 'fees' | 'shortlist')[] {
+  const out: ('month' | 'amount' | 'fees' | 'shortlist')[] = [];
+  if (run.month !== draft.month) out.push('month');
+  if (run.amount !== draft.amount) out.push('amount');
+  if (run.feePct !== draft.feePct) out.push('fees');
+  if (JSON.stringify([...run.shortlist].sort()) !== JSON.stringify([...draft.shortlist].sort())) out.push('shortlist');
+  return out;
+}

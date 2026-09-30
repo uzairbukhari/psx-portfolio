@@ -6,7 +6,8 @@ import PicksProgress from './picks-progress';
 import PicksResults from './picks-results';
 import PicksSetup, { MAX_SHORTLIST } from './picks-setup';
 import { TabLoader } from './tab-loader';
-import { isActive, useRecommendations } from './use-recommendations';
+import { isActive, useRecommendations, type Recommendation } from './use-recommendations';
+import { inputDifferences } from '@/lib/monthly-picks-flow';
 
 type Props = {
   portfolio: Portfolio;
@@ -75,6 +76,17 @@ export default function MonthlyPicks({
     }
   }
 
+  const showingSaved = current !== null && !!current.result && current.status === 'completed';
+  const differences = showingSaved ? inputDifferences(current, { month, amount, feePct, shortlist }) : [];
+  // Selecting a saved run loads its inputs into the form so the form and the result agree.
+  function selectRun(item: Recommendation) {
+    recs.select(item);
+    setMonth(item.month);
+    setAmount(item.amount);
+    setFeePct(item.feePct);
+    setShortlist(item.shortlist.slice(0, MAX_SHORTLIST));
+  }
+
   const active = current !== null && isActive(current.status);
   const legacy = current !== null && ['needs_evidence', 'needs_attention', 'completed_partial'].includes(current.status);
 
@@ -128,6 +140,14 @@ export default function MonthlyPicks({
         </section>
       )}
 
+      {showingSaved && !active && differences.length > 0 && (
+        <p className="notice" role="status">
+          The recommendation below is a saved run for {current.month}, {money(current.amount)}, {current.feePct}% fees and{' '}
+          {current.shortlist.length} companies. Your form now has different {differences.join(', ')}; generate a new run to use them.
+          <button type="button" className="link-button" onClick={() => selectRun(current)}>Reset form to this run</button>
+        </p>
+      )}
+
       {current?.result && !active && (
         <PicksResults run={current} portfolio={portfolio} onRefreshPrices={() => void onRefreshPrices()} onManualPrice={onManualPrice} onOpenCompany={onOpenCompany} />
       )}
@@ -145,7 +165,7 @@ export default function MonthlyPicks({
           <ul>
             {recs.history.map((item) => (
               <li key={item.id}>
-                <button type="button" className={`mp-history__item${current?.id === item.id ? ' active' : ''}`} onClick={() => recs.select(item)}>
+                <button type="button" className={`mp-history__item${current?.id === item.id ? ' active' : ''}`} onClick={() => selectRun(item)}>
                   <b>{item.month}</b>
                   <span>{money(item.amount)}</span>
                   <span>{item.shortlist.length} companies</span>
