@@ -1,0 +1,642 @@
+[
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 30,
+  "grossRate": 157.3,
+  "netAmount": 4727.292,
+  "executionDate": "Nov 28, 2024"
+ },
+ {
+  "scrip": "JSRR",
+  "type": "Sell",
+  "quantity": 10,
+  "grossRate": 40.5,
+  "netAmount": 397.5877,
+  "executionDate": "Dec 02, 2024"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 68,
+  "grossRate": 118.33,
+  "netAmount": 8058.5097,
+  "executionDate": "Dec 08, 2024"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 68,
+  "grossRate": 232.85,
+  "netAmount": 15857.5507,
+  "executionDate": "Dec 15, 2024"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 21,
+  "grossRate": 198.82,
+  "netAmount": 4181.4828,
+  "executionDate": "Dec 18, 2024"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 26,
+  "grossRate": 390.41,
+  "netAmount": 10165.886,
+  "executionDate": "Dec 27, 2024"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 90,
+  "grossRate": 127.32,
+  "netAmount": 11475.9882,
+  "executionDate": "Jan 02, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 73,
+  "grossRate": 62.94,
+  "netAmount": 4601.5119,
+  "executionDate": "Jan 08, 2025"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Sell",
+  "quantity": 13,
+  "grossRate": 154.07,
+  "netAmount": 1999.3048,
+  "executionDate": "Jan 09, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 89,
+  "grossRate": 155.86,
+  "netAmount": 13892.3473,
+  "executionDate": "Jan 14, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 31,
+  "grossRate": 225.35,
+  "netAmount": 6996.3288,
+  "executionDate": "Jan 19, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 78,
+  "grossRate": 285.08,
+  "netAmount": 22269.5944,
+  "executionDate": "Jan 22, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 15,
+  "grossRate": 185.85,
+  "netAmount": 2791.9316,
+  "executionDate": "Feb 02, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 8,
+  "grossRate": 147.76,
+  "netAmount": 1183.8531,
+  "executionDate": "Feb 07, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 76,
+  "grossRate": 328.65,
+  "netAmount": 25014.8661,
+  "executionDate": "Feb 17, 2025"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 24,
+  "grossRate": 372.71,
+  "netAmount": 8958.4576,
+  "executionDate": "Feb 25, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 31,
+  "grossRate": 360.53,
+  "netAmount": 11193.1946,
+  "executionDate": "Feb 28, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 71,
+  "grossRate": 91.38,
+  "netAmount": 6497.712,
+  "executionDate": "Mar 06, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 7,
+  "grossRate": 425.33,
+  "netAmount": 2981.776,
+  "executionDate": "Mar 08, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 30,
+  "grossRate": 284.27,
+  "netAmount": 8540.8921,
+  "executionDate": "Mar 10, 2025"
+ },
+ {
+  "scrip": "ISL",
+  "type": "Buy",
+  "quantity": 100,
+  "grossRate": 81.5,
+  "netAmount": 8162.225,
+  "executionDate": "Mar 11, 2025"
+ },
+ {
+  "scrip": "ISL",
+  "type": "Buy",
+  "quantity": 100,
+  "grossRate": 81.5,
+  "netAmount": 8162.225,
+  "executionDate": "Mar 11, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 52,
+  "grossRate": 120.64,
+  "netAmount": 6282.6899,
+  "executionDate": "Mar 14, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 37,
+  "grossRate": 313.53,
+  "netAmount": 11618.0109,
+  "executionDate": "Mar 18, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 22,
+  "grossRate": 249.55,
+  "netAmount": 5498.3352,
+  "executionDate": "Mar 26, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 62,
+  "grossRate": 194.76,
+  "netAmount": 12093.2327,
+  "executionDate": "Mar 27, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 74,
+  "grossRate": 163.8,
+  "netAmount": 12139.3818,
+  "executionDate": "Apr 07, 2025"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 45,
+  "grossRate": 92.6,
+  "netAmount": 4173.2505,
+  "executionDate": "Apr 17, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 60,
+  "grossRate": 120.82,
+  "netAmount": 7260.0738,
+  "executionDate": "Apr 18, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 90,
+  "grossRate": 290.28,
+  "netAmount": 26164.3878,
+  "executionDate": "Apr 29, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 89,
+  "grossRate": 265.75,
+  "netAmount": 23687.2276,
+  "executionDate": "May 06, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 14,
+  "grossRate": 184.13,
+  "netAmount": 2581.6867,
+  "executionDate": "May 16, 2025"
+ },
+ {
+  "scrip": "MEBL",
+  "type": "Buy",
+  "quantity": 200,
+  "grossRate": 250,
+  "netAmount": 50075,
+  "executionDate": "May 20, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 70,
+  "grossRate": 238.5,
+  "netAmount": 16720.0425,
+  "executionDate": "May 25, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 80,
+  "grossRate": 303.13,
+  "netAmount": 24286.7756,
+  "executionDate": "Jun 04, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 53,
+  "grossRate": 205.75,
+  "netAmount": 10921.1071,
+  "executionDate": "Jun 14, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 35,
+  "grossRate": 153.41,
+  "netAmount": 5377.404,
+  "executionDate": "Jun 21, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 24,
+  "grossRate": 118,
+  "netAmount": 2836.248,
+  "executionDate": "Jun 25, 2025"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 90,
+  "grossRate": 287.84,
+  "netAmount": 25944.4584,
+  "executionDate": "Jun 27, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 12,
+  "grossRate": 391.57,
+  "netAmount": 4705.8883,
+  "executionDate": "Jul 04, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 21,
+  "grossRate": 200.49,
+  "netAmount": 4216.6054,
+  "executionDate": "Jul 12, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 44,
+  "grossRate": 415.69,
+  "netAmount": 18317.7955,
+  "executionDate": "Jul 19, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 15,
+  "grossRate": 46.23,
+  "netAmount": 694.4902,
+  "executionDate": "Jul 20, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 30,
+  "grossRate": 84.49,
+  "netAmount": 2538.5021,
+  "executionDate": "Jul 28, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 23,
+  "grossRate": 185.19,
+  "netAmount": 4265.7591,
+  "executionDate": "Aug 04, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 54,
+  "grossRate": 354.02,
+  "netAmount": 19145.7556,
+  "executionDate": "Aug 11, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 92,
+  "grossRate": 152.37,
+  "netAmount": 14039.0671,
+  "executionDate": "Aug 12, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 38,
+  "grossRate": 424.31,
+  "netAmount": 16147.9657,
+  "executionDate": "Aug 17, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 67,
+  "grossRate": 252.1,
+  "netAmount": 16916.0361,
+  "executionDate": "Aug 21, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 92,
+  "grossRate": 346.4,
+  "netAmount": 31916.6032,
+  "executionDate": "Aug 27, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 75,
+  "grossRate": 177.61,
+  "netAmount": 13340.7311,
+  "executionDate": "Sep 05, 2025"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 46,
+  "grossRate": 254.36,
+  "netAmount": 11718.1108,
+  "executionDate": "Sep 11, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 93,
+  "grossRate": 255.57,
+  "netAmount": 23803.662,
+  "executionDate": "Sep 20, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 54,
+  "grossRate": 222.3,
+  "netAmount": 12022.2063,
+  "executionDate": "Sep 22, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 22,
+  "grossRate": 115.57,
+  "netAmount": 2546.3538,
+  "executionDate": "Sep 25, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 84,
+  "grossRate": 346.45,
+  "netAmount": 29145.4527,
+  "executionDate": "Sep 26, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 74,
+  "grossRate": 384.71,
+  "netAmount": 28511.2428,
+  "executionDate": "Oct 01, 2025"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 13,
+  "grossRate": 252.17,
+  "netAmount": 3283.1273,
+  "executionDate": "Oct 07, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 34,
+  "grossRate": 210.01,
+  "netAmount": 7151.0505,
+  "executionDate": "Oct 18, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 69,
+  "grossRate": 166.34,
+  "netAmount": 11494.6762,
+  "executionDate": "Oct 20, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 45,
+  "grossRate": 234.28,
+  "netAmount": 10558.4139,
+  "executionDate": "Oct 21, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 48,
+  "grossRate": 241.02,
+  "netAmount": 11586.3134,
+  "executionDate": "Nov 01, 2025"
+ },
+ {
+  "scrip": "MEBL",
+  "type": "Buy",
+  "quantity": 215,
+  "grossRate": 400.5,
+  "netAmount": 86236.661,
+  "executionDate": "Nov 04, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 54,
+  "grossRate": 229.67,
+  "netAmount": 12420.7833,
+  "executionDate": "Nov 05, 2025"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 7,
+  "grossRate": 228.74,
+  "netAmount": 1603.5818,
+  "executionDate": "Nov 07, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 99,
+  "grossRate": 292.26,
+  "netAmount": 28977.1406,
+  "executionDate": "Nov 17, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 11,
+  "grossRate": 91.93,
+  "netAmount": 1012.7468,
+  "executionDate": "Nov 28, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 29,
+  "grossRate": 242.44,
+  "netAmount": 7041.3061,
+  "executionDate": "Dec 06, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 77,
+  "grossRate": 41.21,
+  "netAmount": 3177.9298,
+  "executionDate": "Dec 12, 2025"
+ },
+ {
+  "scrip": "FFC",
+  "type": "Buy",
+  "quantity": 9,
+  "grossRate": 403.89,
+  "netAmount": 3640.4625,
+  "executionDate": "Dec 17, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 97,
+  "grossRate": 76.77,
+  "netAmount": 7457.86,
+  "executionDate": "Dec 26, 2025"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 81,
+  "grossRate": 107.42,
+  "netAmount": 8714.0715,
+  "executionDate": "Dec 28, 2025"
+ },
+ {
+  "scrip": "OGDC",
+  "type": "Buy",
+  "quantity": 33,
+  "grossRate": 54.78,
+  "netAmount": 1810.4516,
+  "executionDate": "Jan 01, 2026"
+ },
+ {
+  "scrip": "LUCK",
+  "type": "Buy",
+  "quantity": 15,
+  "grossRate": 319.91,
+  "netAmount": 4805.848,
+  "executionDate": "Jan 04, 2026"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 40,
+  "grossRate": 278.78,
+  "netAmount": 11167.9268,
+  "executionDate": "Jan 07, 2026"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 21,
+  "grossRate": 398.19,
+  "netAmount": 8374.533,
+  "executionDate": "Jan 13, 2026"
+ },
+ {
+  "scrip": "PPL",
+  "type": "Buy",
+  "quantity": 17,
+  "grossRate": 216.14,
+  "netAmount": 3679.8916,
+  "executionDate": "Jan 18, 2026"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 27,
+  "grossRate": 216.61,
+  "netAmount": 5857.2427,
+  "executionDate": "Jan 21, 2026"
+ },
+ {
+  "scrip": "HUBC",
+  "type": "Buy",
+  "quantity": 73,
+  "grossRate": 87.01,
+  "netAmount": 6361.2576,
+  "executionDate": "Jan 26, 2026"
+ },
+ {
+  "scrip": "MEBL",
+  "type": "Buy",
+  "quantity": 200,
+  "grossRate": 560,
+  "netAmount": 112168,
+  "executionDate": "Sep 08, 2026"
+ }
+]

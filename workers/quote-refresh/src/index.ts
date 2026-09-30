@@ -1,6 +1,5 @@
 import { fetchBudget } from '../../../lib/psx-fetch';
 import { refreshQuotes } from '../../../lib/quote-cache';
-import type { Portfolio } from '../../../lib/portfolio';
 
 interface Env {
   DB: D1Database;
@@ -14,24 +13,19 @@ const PSX_BUDGET = 40;
 const tickerOK = (value: string) => /^[A-Z0-9]{2,12}$/.test(value);
 
 async function refreshAllQuotes(env: Env) {
-  const rows = await env.DB.prepare('SELECT payload FROM portfolios').all<{
-    payload: string;
-  }>();
+  // Only the ticker list is needed, so let D1 extract it instead of loading every
+  // portfolio payload (they can be megabytes each) into the Worker.
+  const rows = await env.DB.prepare(
+    `SELECT DISTINCT upper(json_extract(c.value, '$.ticker')) AS ticker
+     FROM portfolios, json_each(portfolios.payload, '$.companies') AS c`,
+  ).all<{ ticker: string | null }>();
 
-  const tickers = [
-    ...new Set(
-      rows.results.flatMap((row) => {
-        try {
-          const portfolio = JSON.parse(row.payload) as Portfolio;
-          return portfolio.companies.map((c) => c.ticker.toUpperCase());
-        } catch {
-          return [];
-        }
-      }),
-    ),
-  ]
-    .filter(tickerOK)
-    .slice(0, MAX_TICKERS);
+  const valid = rows.results.map((row) => row.ticker ?? '').filter(tickerOK).sort();
+  const tickers = valid.slice(0, MAX_TICKERS);
+  if (valid.length > tickers.length)
+    console.warn(
+      `PSX quote refresh: ${valid.length - tickers.length} of ${valid.length} held tickers are over the ${MAX_TICKERS}-ticker cap and were not refreshed: ${valid.slice(MAX_TICKERS).join(', ')}`,
+    );
 
   const { fetched, stale, failed } = await refreshQuotes(env.DB, tickers, {
     budget: fetchBudget(PSX_BUDGET),

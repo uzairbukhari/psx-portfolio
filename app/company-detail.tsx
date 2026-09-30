@@ -413,7 +413,7 @@ export default function CompanyDetail({
           <small>
             {summary.dividendNet === null
               ? 'Gross · set filer status in Settings for net'
-              : `Net of tax · ${money(summary.dividendGross)} gross`}
+              : `Net of tax (estimated unless recorded) · ${money(summary.dividendGross)} gross`}
           </small>
         </article>
       </div>

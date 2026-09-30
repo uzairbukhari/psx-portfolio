@@ -399,7 +399,7 @@ export default function PortfolioReports({
               <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
               <h3>Realized gains by month</h3>
             </div>
-            <span>Capital gains 15% filer / 30% non-filer</span>
+            <span>Estimated tax (15% filer / 30% non-filer), unless a deduction is recorded</span>
           </div>
           {realizedActivity.length ? (
             <ChartContainer
@@ -472,7 +472,7 @@ export default function PortfolioReports({
               <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
               <h3>Realized gain / loss by company</h3>
             </div>
-            <span>Net of capital gains tax</span>
+            <span>Net of estimated capital gains tax</span>
           </div>
           {realizedCompanies.length ? (
             <ChartContainer
