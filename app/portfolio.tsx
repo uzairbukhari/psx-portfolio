@@ -73,6 +73,7 @@ import {
 } from '@/lib/notifications';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
+import PortfolioValueCard from './portfolio-value-card';
 import CompanyDetail from './company-detail';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
 import { CompanyNavProvider } from './ticker-link';
@@ -1107,55 +1108,16 @@ export default function Dashboard({
         )}
         <TabsContent value="holdings">
           <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
-          <div className="metrics">
-            <article>
-              <span>
-                {missing.length
-                  ? 'Priced holdings · incomplete'
-                  : 'Portfolio market value'}
-              </span>
-              <strong className="amount">
-                {missing.length === held.length
-                  ? 'Prices needed'
-                  : money(value)}
-              </strong>
-              <small>
-                {missing.length
-                  ? `${missing.length} holdings need a price`
-                  : `${held.length} holdings · each quote dated below`}
-              </small>
-            </article>
-            <article>
-              <span>Total remaining cost</span>
-              <strong className="amount">{money(cost)}</strong>
-              <small>
-                {unknown.length
-                  ? `${unknown.length} holdings have unknown opening costs`
-                  : `New purchases recorded: ${money(newBuys)}`}
-              </small>
-            </article>
-            <article>
-              <span>Unrealised gain / loss</span>
-              <strong
-                className="amount"
-                style={{
-                  color:
-                    gain === null
-                      ? 'inherit'
-                      : gain >= 0
-                        ? '#22e0a0'
-                        : '#ff5d6c',
-                }}
-              >
-                {gain === null ? 'Not yet known' : money(gain)}
-              </strong>
-              <small>
-                {gain === null
-                  ? 'Requires all opening costs and prices'
-                  : 'Market value less remaining cost, including buy fees'}
-              </small>
-            </article>
-          </div>
+          <PortfolioValueCard
+            p={p}
+            value={value}
+            cost={cost}
+            gain={gain}
+            heldCount={held.length}
+            missingCount={missing.length}
+            unknownCount={unknown.length}
+            newBuys={newBuys}
+          />
           <div className="section-top">
             <div>
               <h2>Your companies</h2>
