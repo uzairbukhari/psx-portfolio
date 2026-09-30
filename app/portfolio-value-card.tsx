@@ -7,7 +7,10 @@ import {
   ChartTooltip,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { money, type Portfolio } from '@/lib/portfolio';
+import { pct, pkr, pkrCompact, signedPkr } from '@/lib/format';
+import type { Portfolio } from '@/lib/portfolio';
+import { GainText } from './gain-text';
+import { usePortfolioContext } from './portfolio-context';
 import { TabLoader } from './tab-loader';
 import {
   portfolioValueSeries,
@@ -23,10 +26,10 @@ const RANGES: [ValueRange, string][] = [
   ['all', 'All'],
 ];
 const config = { gain: { label: 'Gain / loss', color: 'var(--primary)' } } satisfies ChartConfig;
-const signed = (n: number) => `${n >= 0 ? '+' : '−'}${money(Math.abs(n))}`;
+const signed = signedPkr;
 const compact = (v: number) => {
   const a = Math.abs(v);
-  const t = a >= 1e6 ? `${(a / 1e6).toFixed(1)}M` : `${Math.round(a / 1000)}k`;
+  const t = a >= 1e5 ? pkrCompact(a).replace('PKR ', '') : `${Math.round(a / 1000)}k`;
   return v < 0 ? `−${t}` : t;
 };
 
@@ -39,8 +42,8 @@ const dateLabel = (date: string, withYear: boolean) =>
   });
 const pktToday = () => new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
 
-export default function PortfolioValueCard({
-  p,
+/** Top-of-Overview summary: value, remaining cost and clearly labelled unrealised gain/loss. */
+export function PortfolioMetrics({
   value,
   cost,
   gain,
@@ -49,7 +52,6 @@ export default function PortfolioValueCard({
   unknownCount,
   newBuys,
 }: {
-  p: Portfolio;
   value: number;
   cost: number | null;
   gain: number | null;
@@ -58,6 +60,65 @@ export default function PortfolioValueCard({
   unknownCount: number;
   newBuys: number;
 }) {
+  const gainPercent = gain !== null && cost ? (gain / cost) * 100 : null;
+  return (
+    <section className="panel value-card" aria-label="Portfolio summary">
+      <div className="value-card-top">
+        <div>
+          <span className="value-card-label">
+            {missingCount ? 'Priced holdings · incomplete' : 'Portfolio market value'}
+          </span>
+          <strong className="amount value-card-main">
+            {heldCount > 0 && missingCount === heldCount ? 'Prices needed' : pkr(value)}
+          </strong>
+          <small>
+            {heldCount === 0
+              ? 'No holdings yet'
+              : missingCount
+                ? `${missingCount} ${missingCount === 1 ? 'holding needs' : 'holdings need'} a price, so this total is incomplete`
+                : `${heldCount} ${heldCount === 1 ? 'holding' : 'holdings'} · each quote dated below`}
+          </small>
+        </div>
+        <div>
+          <span className="value-card-label">Total remaining cost</span>
+          <strong className="amount value-card-stat">{cost === null ? 'Unknown' : pkr(cost)}</strong>
+          <small>
+            {unknownCount
+              ? `${unknownCount} ${unknownCount === 1 ? 'holding has' : 'holdings have'} an unknown opening cost`
+              : `New purchases recorded: ${pkr(newBuys)}`}
+          </small>
+        </div>
+        <div>
+          <span className="value-card-label">Unrealised gain / loss</span>
+          <strong className="amount value-card-stat">
+            <GainText value={gain} percent={gainPercent} unknownLabel="Not yet known" />
+          </strong>
+          <small>
+            {gain === null
+              ? 'Requires every opening cost and price'
+              : 'Market value less remaining cost, including buy fees. Excludes realised gains and dividends.'}
+          </small>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Day-by-day remaining unrealised gain/loss chart. */
+export default function PortfolioHistory({
+  p,
+  value,
+  cost,
+  gain,
+  missingCount,
+}: {
+  p: Portfolio;
+  value: number;
+  cost: number | null;
+  gain: number | null;
+  missingCount: number;
+}) {
+  const { openDialog, busy } = usePortfolioContext();
   const [range, setRange] = useState<ValueRange>('all');
   const [attempt, setAttempt] = useState(0);
   const tickerKey = useMemo(
@@ -139,49 +200,7 @@ export default function PortfolioValueCard({
   const rangeLabel = range === 'all' ? 'all time' : RANGES.find(([v]) => v === range)![1];
 
   return (
-    <section className="panel value-card">
-      <div className="value-card-top">
-        <div>
-          <span className="value-card-label">
-            {missingCount ? 'Priced holdings · incomplete' : 'Portfolio market value'}
-          </span>
-          <strong className="amount value-card-main">
-            {heldCount > 0 && missingCount === heldCount ? 'Prices needed' : money(value)}
-          </strong>
-          <small>
-            {heldCount === 0
-              ? 'No holdings yet'
-              : missingCount
-                ? `${missingCount} holdings need a price`
-                : `${heldCount} holdings · each quote dated below`}
-          </small>
-        </div>
-        <div>
-          <span className="value-card-label">Total remaining cost</span>
-          <strong className="amount value-card-stat">{money(cost)}</strong>
-          <small>
-            {unknownCount
-              ? `${unknownCount} holdings have unknown opening costs`
-              : `New purchases recorded: ${money(newBuys)}`}
-          </small>
-        </div>
-        <div>
-          <span className="value-card-label">Unrealised gain / loss</span>
-          <strong
-            className="amount value-card-stat"
-            style={{
-              color: gain === null ? 'inherit' : gain >= 0 ? '#22e0a0' : '#ff5d6c',
-            }}
-          >
-            {gain === null ? 'Not yet known' : money(gain)}
-          </strong>
-          <small>
-            {gain === null
-              ? 'Requires all opening costs and prices'
-              : 'Market value less remaining cost, including buy fees'}
-          </small>
-        </div>
-      </div>
+    <section className="panel value-card" aria-label="Gain and loss history">
       <div className="company-chart-head">
         <div>
           <strong className="value-card-chart-title">Remaining unrealised gain / loss</strong>
@@ -191,21 +210,28 @@ export default function PortfolioValueCard({
               : `${signed(Math.round(change * 100) / 100)} over ${rangeLabel}`}
           </small>
         </div>
-        <div className="seg" aria-label="Chart range">
+        <fieldset className="seg">
+          <legend className="sr-only">Chart range</legend>
           {RANGES.map(([v, label]) => (
             <button
               key={v}
               type="button"
+              aria-pressed={range === v}
               data-active={range === v || undefined}
               onClick={() => setRange(v)}
             >
               {label}
             </button>
           ))}
-        </div>
+        </fieldset>
       </div>
       {!tickerKey ? (
-        <p className="muted">No transactions yet. Record a purchase to start this chart.</p>
+        <div className="empty-inline">
+          <p className="muted">No transactions yet, so there is nothing to chart.</p>
+          <button type="button" disabled={busy} onClick={() => openDialog({ type: 'trade', kind: 'buy' })}>
+            Add first purchase
+          </button>
+        </div>
       ) : error ? (
         <p className="muted">
           History unavailable: {error}{' '}
@@ -222,6 +248,10 @@ export default function PortfolioValueCard({
             : 'Not enough price history yet — the scheduled PSX history job fills it in.'}
         </p>
       ) : (
+        <>
+        <p className="chart-summary">
+          {`Remaining gain / loss moved from ${signed(data[0].gain)} on ${dateLabel(data[0].date, true)} to ${signed(data[data.length - 1].gain)} on ${dateLabel(data[data.length - 1].date, true)}; lowest ${signed(lo)}, highest ${signed(hi)}.`}
+        </p>
         <ChartContainer config={config} className="company-chart">
           <AreaChart data={data} margin={{ top: 10, right: 12, bottom: 4, left: 8 }}>
             <defs>
@@ -261,10 +291,10 @@ export default function PortfolioValueCard({
                     <span className="font-medium">{dateLabel(d.date, true)}</span>
                     <span className={d.gain >= 0 ? 'pos-text' : 'neg-text'}>
                       {signed(d.gain)}
-                      {d.cost > 0 ? ` (${d.gain >= 0 ? '+' : '−'}${Math.abs((d.gain / d.cost) * 100).toFixed(1)}%)` : ''}
+                      {d.cost > 0 ? ` (${pct((d.gain / d.cost) * 100, { sign: true })})` : ''}
                     </span>
-                    <span className="muted">Invested {money(d.cost)}</span>
-                    <span className="muted">Value {money(d.value)}</span>
+                    <span className="muted">Invested {pkr(d.cost)}</span>
+                    <span className="muted">Value {pkr(d.value)}</span>
                   </div>
                 );
               }}
@@ -280,6 +310,7 @@ export default function PortfolioValueCard({
             />
           </AreaChart>
         </ChartContainer>
+        </>
       )}
       {series && series.inconsistent.length > 0 && (
         <p className="report-source neg-text">

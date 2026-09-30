@@ -1,9 +1,9 @@
-.helper-offline{margin-top:5px;color:#e8c27a}
+.helper-offline{margin-top:5px;color:var(--warning)}
 .research-progress{max-width:720px!important}
 .stage-track{display:flex;gap:4px;margin-bottom:14px}
 .stage-step{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.08);transition:background .3s ease}
 .stage-step.done{background:var(--success);box-shadow:0 0 8px var(--success-glow)}
-.stage-step.active{background-image:linear-gradient(90deg,var(--primary) 0%,#8fc0ff 50%,var(--primary) 100%);background-size:220% 100%;box-shadow:0 0 10px var(--primary-glow);animation:stage-sweep 1.6s linear infinite}
+.stage-step.active{background-image:linear-gradient(90deg,var(--primary) 0%,var(--link) 50%,var(--primary) 100%);background-size:220% 100%;box-shadow:0 0 10px var(--primary-glow);animation:stage-sweep 1.6s linear infinite}
 @keyframes stage-sweep{0%{background-position:220% 0}100%{background-position:-220% 0}}
 .current-stage{display:flex;align-items:center;gap:14px;padding:18px;border:1px solid var(--card-border);border-radius:12px;background:rgba(255,255,255,.03)}
 .current-stage>div:nth-child(2){flex:1}

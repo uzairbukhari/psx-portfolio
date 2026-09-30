@@ -1296,7 +1296,7 @@ export function plan(
     .filter((h) => h.quote && h.quote.date < lastTradingDay(today()))
     .map((h) => h.ticker);
   const totalTarget = candidates.reduce((a, h) => a + h.target, 0);
-  let errors: string[] = [];
+  const errors: string[] = [];
   if (Math.abs(totalTarget - 100) > 0.01)
     errors.push('Target weights must total 100%.');
   if (missing.length) errors.push('Missing prices: ' + missing.join(', '));

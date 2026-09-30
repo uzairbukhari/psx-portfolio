@@ -31,7 +31,6 @@ import {
   type ResearchSettings,
 } from '@/lib/portfolio';
 import { UserAvatar } from './user-avatar';
-import './settings.css';
 
 type Usage = { inputTokens: number; outputTokens: number; costUsd: number };
 

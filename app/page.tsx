@@ -1,9 +1,9 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from './portfolio';
 export const metadata = {
-  title: 'PSX Portfolio | SIP desk',
+  title: 'FolioRaah — PSX Portfolio & SIP Tracker',
   description:
-    'Your private portfolio, purchase ledger and monthly SIP planner.',
+    'A clear path for every investment.',
 };
 export default async function Home() {
   const user = await getViewer();

@@ -2,7 +2,7 @@
 .reports{padding-top:18px}
 .reports-intro{background:none!important;padding:0!important;margin-bottom:18px!important;gap:16px!important;border-radius:0}
 .reports-intro-header p:not(.eyebrow){color:var(--muted-foreground)!important;font-size:14px}
-.reports-intro .eyebrow{color:var(--primary)!important}
+.reports-intro .eyebrow{color:var(--link)!important}
 .reports-hero-stats{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px!important}
 .reports-priced-value{min-width:0!important;padding:16px 18px!important;border:1px solid var(--card-border)!important;border-radius:12px;background:var(--card)}
 .reports-priced-value span{font-size:11px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;color:var(--muted-foreground)!important}

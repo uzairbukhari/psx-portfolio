@@ -1,7 +1,7 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
-  title: 'Monthly Picks | PSX Portfolio',
+  title: 'Monthly Picks — FolioRaah',
   description: 'Sourced 60–90 day research for your PSX shortlist.',
 };
 export default async function SipPage() {

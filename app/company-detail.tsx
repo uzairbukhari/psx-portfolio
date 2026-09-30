@@ -25,8 +25,6 @@ import {
 import {
   money,
   type Dividend,
-  type Portfolio,
-  type StockSplit,
   type TaxedDividend,
   type Trade,
 } from '@/lib/portfolio';
@@ -37,6 +35,7 @@ import {
   type PricePoint,
 } from '@/lib/price-history';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
+import { usePortfolioContext } from './portfolio-context';
 
 type Holding = {
   ticker: string;
@@ -273,53 +272,29 @@ function PriceChart({
 }
 
 export default function CompanyDetail({
-  portfolio,
   ticker,
   holding,
   summary,
+  entries,
   taxed,
-  busy,
   onBack,
-  onAddPurchase,
-  onSell,
-  onDividend,
-  onSplit,
-  onEdit,
-  onCorrectTrade,
-  onCorrectDividend,
-  onCorrectSplit,
-  onConfirmDividend,
 }: {
-  portfolio: Portfolio;
   ticker: string;
   holding: Holding | undefined;
   summary: Summary;
+  entries: ReturnType<typeof buildEntries>;
   taxed: TaxedDividend[];
-  busy: boolean;
   onBack: () => void;
-  onAddPurchase: () => void;
-  onSell: () => void;
-  onDividend: () => void;
-  onSplit: () => void;
-  onEdit: () => void;
-  onCorrectTrade: (t: Trade) => void;
-  onCorrectDividend: (d: Dividend) => void;
-  onCorrectSplit: (s: StockSplit) => void;
-  onConfirmDividend: (d: Dividend) => void;
 }) {
+  const { p: portfolio, busy, openDialog } = usePortfolioContext();
   const trades = portfolio.trades.filter((t) => t.ticker === ticker);
   const dividends = (portfolio.dividends ?? []).filter((d) => d.ticker === ticker);
-  const splits = (portfolio.stockSplits ?? []).filter((s) => s.ticker === ticker);
-  const entries = buildEntries({
-    trades,
-    dividends,
-    splits,
-    taxed,
-    onCorrectTrade,
-    onCorrectDividend,
-    onCorrectSplit,
-    onConfirmDividend,
-  });
+  const onConfirmDividend = (d: Dividend) => openDialog({ type: 'receipt', dividend: d });
+  const onAddPurchase = () => openDialog({ type: 'trade', ticker, kind: 'buy' });
+  const onSell = () => openDialog({ type: 'trade', ticker, kind: 'sell' });
+  const onDividend = () => openDialog({ type: 'dividend', ticker });
+  const onSplit = () => openDialog({ type: 'split', ticker });
+  const onEdit = () => openDialog({ type: 'company', ticker });
   const byId = new Map(taxed.map((t) => [t.id, t]));
   const expectedDividends = dividends
     .filter((d) => !d.voided && byId.get(d.id)?.status === 'expected')

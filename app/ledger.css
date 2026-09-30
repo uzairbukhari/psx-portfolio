@@ -6,8 +6,8 @@
 .ledger-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px;padding:8px 0}
 .seg{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03)}
 .seg button{background:transparent!important;color:var(--muted-foreground)!important;box-shadow:none!important;border-radius:7px!important;padding:6px 12px!important;font-size:13px!important;transform:none!important}
-.seg button[data-active]{background:linear-gradient(135deg,#1c3660,#152a4d)!important;color:#fff!important;box-shadow:0 0 0 1px rgba(59,130,246,.35) inset!important}
-.ledger-search{flex-direction:row;align-items:center;gap:8px;min-width:240px;border:1px solid var(--border);border-radius:9px;padding:0 12px;background:#0b1526;color:var(--muted-foreground)}
+.seg button[data-active]{background:var(--accent)!important;color:#fff!important;box-shadow:0 0 0 1px rgba(59,130,246,.35) inset!important}
+.ledger-search{flex-direction:row;align-items:center;gap:8px;min-width:240px;border:1px solid var(--border);border-radius:9px;padding:0 12px;background:var(--field);color:var(--muted-foreground)}
 .ledger-search input{border:0;padding:9px 0;background:transparent;font-size:14px}
 .ledger-search input:focus{outline:none}
 .ledger-voided{margin:0 0 0 auto;font-size:13px}
@@ -18,7 +18,7 @@
 .ledger-row:last-child{border-bottom:0}
 .ledger-row:hover{background:rgba(59,130,246,.06)}
 .ledger-date{font-variant-numeric:tabular-nums;color:var(--muted-foreground);font-size:13px}
-.ledger-type{font-size:11px;font-weight:700;letter-spacing:.3px;text-align:center;border-radius:20px;padding:4px 8px;background:rgba(59,130,246,.16);color:#bcd4f7}
+.ledger-type{font-size:11px;font-weight:700;letter-spacing:.3px;text-align:center;border-radius:20px;padding:4px 8px;background:rgba(59,130,246,.16);color:var(--accent-foreground)}
 .ledger-type.type-sell{background:rgba(255,93,108,.14);color:var(--danger)}
 .ledger-type.type-dividend{background:rgba(34,224,160,.14);color:var(--success)}
 .ledger-type.type-opening,.ledger-type.type-split{background:rgba(255,255,255,.07);color:var(--muted-foreground)}

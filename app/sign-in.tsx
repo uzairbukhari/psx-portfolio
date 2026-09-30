@@ -1,7 +1,8 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { BookOpenCheck, CalendarClock, Coins, Wallet } from 'lucide-react';
+import { BookOpenCheck, CalendarClock, Coins } from 'lucide-react';
+import { Brand, BrandMark, Tagline } from './brand';
 import './sign-in.css';
 
 const SIGNIN_CANDLES: [number, number][] = [
@@ -37,7 +38,7 @@ function SignInChart() {
       {SIGNIN_CANDLES.map(([open, close], i) => {
         const x = i * gap + gap / 2;
         const up = close >= open;
-        const color = up ? '#22e0a0' : '#ff5d6c';
+        const color = up ? '#42d6a4' : '#ff7a8a';
         const bodyTop = scale(Math.max(open, close));
         const bodyBottom = scale(Math.min(open, close));
         return (
@@ -112,15 +113,6 @@ const POINTS = [
   },
 ];
 
-function Brand() {
-  return (
-    <div className="brand">
-      <Wallet size={24} />
-      <span>PSX / PERSONAL INVESTING</span>
-    </div>
-  );
-}
-
 export function SignIn({ returnTo }: { returnTo: string }) {
   const errorCode = useSyncExternalStore(
     () => () => {},
@@ -133,7 +125,8 @@ export function SignIn({ returnTo }: { returnTo: string }) {
   return (
     <main className="signin">
       <section className="signin-hero">
-        <Brand />
+        <Brand size="signin" />
+        <Tagline className="signin-tagline" />
         <div className="signin-hero-copy">
           <h1>Every rupee you&rsquo;ve put into PSX, in one ledger.</h1>
           <p>
@@ -156,10 +149,8 @@ export function SignIn({ returnTo }: { returnTo: string }) {
       </section>
       <section className="signin-panel">
         <div className="signin-card">
-          <span className="signin-mark">
-            <Wallet size={22} />
-          </span>
-          <h2>Sign in to PSX Portfolio</h2>
+          <BrandMark size={56} className="signin-mark-logo" />
+          <h2>Sign in to FolioRaah</h2>
           <p className="muted">
             Use your Google account. Your holdings stay private to it.
           </p>
@@ -196,9 +187,7 @@ export function LoadError({
   return (
     <main className="load-error">
       <div className="signin-card">
-        <span className="signin-mark">
-          <Wallet size={22} />
-        </span>
+        <BrandMark size={48} className="signin-mark-logo" />
         <h2>We couldn&rsquo;t load your portfolio</h2>
         <p role="alert" className="notice error">
           {message}

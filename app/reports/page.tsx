@@ -1,7 +1,7 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
-  title: 'Reports | PSX Portfolio',
+  title: 'Reports — FolioRaah',
   description: 'Portfolio performance and allocation reports.',
 };
 export default async function ReportsPage() {

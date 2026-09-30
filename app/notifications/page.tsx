@@ -1,7 +1,7 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
-  title: 'Notifications | PSX Portfolio',
+  title: 'Notifications — FolioRaah',
   description: 'Every notification, including the ones you cleared.',
 };
 export default async function NotificationsPage() {
