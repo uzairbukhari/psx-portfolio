@@ -58,7 +58,7 @@
 .danger-zone{display:flex;justify-content:space-between;align-items:center;gap:24px;margin:8px 0 16px;padding:16px;border:1px solid rgba(255,93,108,.28);border-radius:10px;background:rgba(255,93,108,.05)}
 
 /* Notifications page */
-.notif-page{max-width:820px}
+.notif-page{max-width:none;width:100%}
 .filter-chips{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
 .chip{display:inline-flex!important;align-items:center;gap:8px;padding:7px 14px!important;font-size:13px!important;font-weight:600;border-radius:20px!important;background:transparent!important;border:1px solid var(--border)!important;color:var(--muted-foreground)!important;box-shadow:none!important;transform:none!important}
 .chip span{font-size:12px;padding:1px 7px;border-radius:10px;background:rgba(255,255,255,.08)}
@@ -93,3 +93,24 @@
   .notif-actions{margin-left:46px}
   .page-head h1{font-size:26px}
 }
+
+/* Header action buttons: icon-only, expand with label on hover/focus */
+.hdr-btn{position:relative;display:inline-flex!important;align-items:center;justify-content:center;height:38px;min-width:38px;padding:0 10px!important;border:1px solid var(--card-border)!important;border-radius:999px!important;background:var(--card)!important;color:var(--foreground)!important;cursor:pointer;font:inherit;font-size:13px;font-weight:600;white-space:nowrap;box-shadow:none;transition:border-color .2s ease,box-shadow .2s ease}
+.hdr-btn:hover:not(:disabled),.hdr-btn:focus-visible,.hdr-btn[data-popup-open]{border-color:rgba(59,130,246,.45)!important;box-shadow:0 0 0 1px rgba(59,130,246,.25),0 8px 20px -12px var(--primary-glow)}
+.hdr-btn:disabled{opacity:.5;cursor:default}
+.hdr-label{display:inline-block;max-width:0;opacity:0;overflow:hidden;margin-left:0;transition:max-width .28s ease,opacity .2s ease,margin-left .28s ease}
+.hdr-btn:hover .hdr-label,.hdr-btn:focus-visible .hdr-label,.hdr-btn[data-popup-open] .hdr-label{max-width:170px;opacity:1;margin-left:8px}
+@media(prefers-reduced-motion:reduce){.hdr-label{transition:none}}
+
+/* Dismissible status message */
+.notice{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.notice-close{flex:none;display:grid;place-items:center;width:26px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;color:inherit;opacity:.7;cursor:pointer}
+.notice-close:hover{opacity:1;background:rgba(255,255,255,.1)}
+
+/* Tab loader */
+.tab-loader{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:48px 16px;color:var(--muted-foreground);font-size:14px}
+
+/* Header buttons: bell's fixed width must not block expansion; colored hover */
+.bell-trigger.hdr-btn{width:auto;display:inline-flex!important}
+.hdr-btn:hover:not(:disabled),.hdr-btn:focus-visible,.hdr-btn[data-popup-open]{background:var(--primary)!important;border-color:var(--primary)!important;color:#fff!important}
+.hdr-btn .bell-badge{background:#fff;color:var(--primary)}
