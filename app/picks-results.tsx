@@ -91,9 +91,9 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
           <div><span>Companies scored</span><b>{result.assessedCount ?? result.coverage.length}/{result.totalCount ?? result.coverage.length}</b></div>
         </div>
         {summary.incomplete && (
-          <p className="notice" role="status">
+          <output className="notice">
             Estimate incomplete: no recent price for {summary.missingPrices.join(', ')}, so whole-share leftover and unspent money cannot be calculated yet. Refresh prices or enter one.
-          </p>
+          </output>
         )}
         {!!estimates.length && (
           <>

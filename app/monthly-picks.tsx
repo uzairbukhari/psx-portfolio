@@ -141,11 +141,11 @@ export default function MonthlyPicks({
       )}
 
       {showingSaved && !active && differences.length > 0 && (
-        <p className="notice" role="status">
+        <output className="notice">
           The recommendation below is a saved run for {current.month}, {money(current.amount)}, {current.feePct}% fees and{' '}
           {current.shortlist.length} companies. Your form now has different {differences.join(', ')}; generate a new run to use them.
           <button type="button" className="link-button" onClick={() => selectRun(current)}>Reset form to this run</button>
-        </p>
+        </output>
       )}
 
       {current?.result && !active && (
