@@ -52,7 +52,7 @@ test('portfolio PUT rejects an oversized body by bytes, before reading it all', 
 
 test('portfolio PUT validates after enrichment', async () => {
   let saved = null;
-  const db = { prepare(sql) { return { bind(...args) { this.args = args; return this; }, async first() { return null; }, async run() { saved = this.args[1]; return { meta: { changes: 1 } }; } }; } };
+  const db = { prepare() { return { bind(...args) { this.args = args; return this; }, async first() { return null; }, async run() { saved = this.args[1]; return { meta: { changes: 1 } }; } }; } };
   globalThis.__portfolioDB = db;
   const portfolio = { companies: [{ ticker: 'MEBL', name: 'Meezan', sector: 'Bank', target: 0, approved: false, screenDate: '', note: '' }], trades: [], quotes: {}, budgets: {} };
   const res = await route.PUT(new Request('https://test/api/portfolio', { method: 'PUT', body: JSON.stringify({ portfolio, revision: 0 }) }));

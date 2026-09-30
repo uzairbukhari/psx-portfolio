@@ -108,27 +108,30 @@ function PriceChart({
   trades: Trade[];
 }) {
   const [range, setRange] = useState<HistoryRange>('1m');
-  const [history, setHistory] = useState<History | null>(null);
-  const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  // Keyed by request, so switching company (or retrying) never shows the previous
+  // company's history or error while the next load runs.
+  const requestKey = `${ticker}#${attempt}`;
+  const [loaded, setLoaded] = useState<{ key: string; history?: History; error?: string } | null>(null);
+  const current = loaded?.key === requestKey ? loaded : null;
+  const history = current?.history ?? null;
+  const error = current?.error ?? '';
   useEffect(() => {
-    // Switching company (or retrying) must not keep showing the previous history or error.
-    setHistory(null);
-    setError('');
     let live = true;
     fetch(`/api/price-history?ticker=${encodeURIComponent(ticker)}`)
       .then(async (r) => {
         const d = (await r.json()) as History & { error?: string };
         if (!r.ok) throw Error(d.error ?? 'Could not load price history.');
-        if (live) setHistory({ eod: d.eod, intraday: d.intraday });
+        if (live) setLoaded({ key: requestKey, history: { eod: d.eod, intraday: d.intraday } });
       })
       .catch((e: unknown) => {
-        if (live) setError(e instanceof Error ? e.message : 'Could not load price history.');
+        if (live)
+          setLoaded({ key: requestKey, error: e instanceof Error ? e.message : 'Could not load price history.' });
       });
     return () => {
       live = false;
     };
-  }, [ticker, attempt]);
+  }, [ticker, requestKey]);
 
   const points = useMemo(
     () => (history ? sliceRange(history.eod, history.intraday, range) : []),

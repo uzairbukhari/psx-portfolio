@@ -59,18 +59,23 @@ export default function PortfolioValueCard({
   newBuys: number;
 }) {
   const [range, setRange] = useState<ValueRange>('all');
-  const [eod, setEod] = useState<Record<string, PricePoint[]> | null>(null);
-  const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const tickerKey = useMemo(
     () => Array.from(new Set(p.trades.filter((t) => !t.voided).map((t) => t.ticker))).sort().join(','),
     [p.trades],
   );
+  // Results are keyed by the request that produced them, so new inputs (or a retry)
+  // never show the previous ledger's history or error while the next load runs.
+  const requestKey = `${tickerKey}#${attempt}`;
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    eod?: Record<string, PricePoint[]>;
+    error?: string;
+  } | null>(null);
+  const current = loaded?.key === requestKey ? loaded : null;
+  const eod = current?.eod ?? null;
+  const error = current?.error ?? '';
   useEffect(() => {
-    // New inputs (or a retry) start from a clean slate: never show the previous
-    // ledger's history or error while the new request is in flight.
-    setEod(null);
-    setError('');
     if (!tickerKey) return;
     let live = true;
     fetch(`/api/price-history?tickers=${encodeURIComponent(tickerKey)}`)
@@ -81,8 +86,9 @@ export default function PortfolioValueCard({
         };
         if (!r.ok || !d.histories) throw Error(d.error ?? 'Could not load price history.');
         if (live)
-          setEod(
-            Object.fromEntries(
+          setLoaded({
+            key: requestKey,
+            eod: Object.fromEntries(
               Object.entries(d.histories).map(([t, h]) => [
                 t,
                 h.eod
@@ -91,15 +97,19 @@ export default function PortfolioValueCard({
                   .sort((a, b) => a[0] - b[0]),
               ]),
             ),
-          );
+          });
       })
       .catch((e: unknown) => {
-        if (live) setError(e instanceof Error ? e.message : 'Could not load price history.');
+        if (live)
+          setLoaded({
+            key: requestKey,
+            error: e instanceof Error ? e.message : 'Could not load price history.',
+          });
       });
     return () => {
       live = false;
     };
-  }, [tickerKey, attempt]);
+  }, [tickerKey, requestKey]);
 
   const series = useMemo(
     () =>
