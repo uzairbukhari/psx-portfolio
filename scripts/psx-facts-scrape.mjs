@@ -8,6 +8,7 @@
 // Usage: node scripts/psx-facts-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
 import { d1, heldTickers } from './d1-rest.mjs';
+import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchCompanyFacts } from '../lib/company-facts.ts';
 
 const CONCURRENCY = 3;
@@ -20,7 +21,7 @@ async function targetTickers() {
   const held = await heldTickers(undefined);
   const requested = await d1(
     'SELECT ticker FROM facts_requests WHERE attempted_at IS NULL OR attempted_at < requested_at',
-  ).catch(() => []);
+  );
   const valid = (t) => /^[A-Z0-9]{2,12}$/.test(t ?? '');
   return [...new Set([...held, ...requested.map((row) => String(row.ticker).toUpperCase())])].filter(valid);
 }
@@ -73,7 +74,7 @@ async function main() {
   console.log(
     `PSX facts: ${ok.length}/${tickers.length} tickers` + (failed.length ? `. Failed: ${failed.join('; ')}` : '.'),
   );
-  if (tickers.length && !ok.length) process.exitCode = 1;
+  process.exitCode = scrapeExitCode(tickers.length, failed.length);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

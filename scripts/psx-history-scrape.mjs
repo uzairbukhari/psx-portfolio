@@ -6,6 +6,7 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-history-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { d1, heldTickers } from './d1-rest.mjs';
+import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsxToken, fetchPsxTimeseries } from '../lib/psx-fetch.ts';
 import { parseEod, parseIntraday } from '../lib/price-history.ts';
 
@@ -27,7 +28,7 @@ async function main() {
   const failed = [];
   let ok = 0;
   // KSE100 rides along for the market-pulse sparkline (needs a token from any company page).
-  if (!tickerArg) tickers.push('KSE100');
+  if (!tickerArg && tickers.length) tickers.push('KSE100');
   for (const ticker of tickers) {
     try {
       const token = await fetchPsxToken(ticker === 'KSE100' ? tickers[0] : ticker);
@@ -59,7 +60,7 @@ async function main() {
   console.log(
     `PSX history: ${ok}/${tickers.length} tickers` + (failed.length ? `. Failed: ${failed.join('; ')}` : '.'),
   );
-  if (tickers.length && failed.length === tickers.length) process.exitCode = 1;
+  process.exitCode = scrapeExitCode(tickers.length, failed.length);
 }
 
 main().catch((error) => {

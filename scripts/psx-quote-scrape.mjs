@@ -14,6 +14,7 @@
 // Usage: node scripts/psx-quote-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
 import { d1, heldTickers as sharedHeldTickers } from './d1-rest.mjs';
+import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents, parseIndexSummary } from '../lib/psx-market.ts';
 import { fetchPsxQuote } from '../lib/psx-quotes.ts';
@@ -161,7 +162,7 @@ async function main() {
   }
   const points = await writeMarketSummary(index, constituents, fetchedAt);
   console.log(`Market summary: KSE100 ${index.close} (${points} chart points), ${constituents.length} ALLSHR quotes.`);
-  if (!entries.length) process.exitCode = 1;
+  process.exitCode = scrapeExitCode(tickers.length, tickers.length - entries.length);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();
