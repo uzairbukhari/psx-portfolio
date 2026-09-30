@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const base = new URL('../', import.meta.url);
 const source = readFileSync(new URL('app/api/portfolio/route.ts', base), 'utf8')
-  .replace("import { db, identity, failure } from '@/lib/server';", `const db=()=>globalThis.__portfolioDB; const identity=async()=> 'owner'; const failure=(e,status=400)=>Response.json({error:e.message},{status});`)
+  .replace("import { db, identity, failure } from '@/lib/server';", `const db=()=>globalThis.__portfolioDB; const identity=async()=> 'owner'; const failure=(e,status)=>Response.json({error:e.message},{status:status??e.status??400});`)
   .replace("import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';", `import { blankPortfolio, validate } from '${new URL('lib/portfolio.ts', base).href}';`)
   .replace("import { applyFacts, newTickers } from '@/lib/company-enrichment';", `import { applyFacts, newTickers } from '${new URL('lib/company-enrichment.ts', base).href}';`)
   .replace("import { gatherFacts } from '@/lib/company-facts-store';", `const gatherFacts=async()=>[];`)
@@ -35,4 +35,27 @@ test('portfolio GET keeps a newer saved quote over an older cached refresh', asy
   const body = await (await route.GET(new Request('https://test/api/portfolio'))).json();
   assert.equal(body.portfolio.quotes.MEBL.price, 120);
   assert.equal(body.portfolio.quotes.LUCK.price, 100);
+});
+
+test('portfolio PUT rejects an oversized body by bytes, before reading it all', async () => {
+  globalThis.__portfolioDB = { prepare() { throw Error('DB must not be touched'); } };
+  const big = new Request('https://test/api/portfolio', { method: 'PUT', headers: { 'content-length': '5000000' }, body: 'x' });
+  const early = await route.PUT(big);
+  assert.equal(early.status, 413);
+  // Multi-byte characters: under 4M chars but over 4MB.
+  const payload = JSON.stringify({ portfolio: { companies: [], note: 'é'.repeat(2_100_000) }, revision: 0 });
+  assert.ok(payload.length < 4_000_000);
+  const res = await route.PUT(new Request('https://test/api/portfolio', { method: 'PUT', body: payload }));
+  assert.equal(res.status, 413);
+  assert.match((await res.json()).error, /too large/);
+});
+
+test('portfolio PUT validates after enrichment', async () => {
+  let saved = null;
+  const db = { prepare(sql) { return { bind(...args) { this.args = args; return this; }, async first() { return null; }, async run() { saved = this.args[1]; return { meta: { changes: 1 } }; } }; } };
+  globalThis.__portfolioDB = db;
+  const portfolio = { companies: [{ ticker: 'MEBL', name: 'Meezan', sector: 'Bank', target: 0, approved: false, screenDate: '', note: '' }], trades: [], quotes: {}, budgets: {} };
+  const res = await route.PUT(new Request('https://test/api/portfolio', { method: 'PUT', body: JSON.stringify({ portfolio, revision: 0 }) }));
+  assert.equal(res.status, 200);
+  assert.ok(saved);
 });

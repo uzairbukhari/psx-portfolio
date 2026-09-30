@@ -175,8 +175,11 @@ export const money = (n: number | null) =>
         currency: 'PKR',
         maximumFractionDigits: 2,
       }).format(n);
-export const round = (n: number) =>
-  Math.round((n + Number.EPSILON) * 100) / 100;
+/** Rounds to paisa, half away from zero for negative values as well as positive. */
+export const round = (n: number) => {
+  const r = (Math.sign(n) * Math.round((Math.abs(n) + Number.EPSILON) * 100)) / 100;
+  return r === 0 ? 0 : r;
+};
 const seeds: [string, string, number, number, Sector][] = [
   ['BFAGRO', 'Barkat Frisian Agro', 3102, 0, 'Foods'],
   ['BIPL', 'BankIslami Pakistan', 57, 0, 'Bank'],
@@ -557,16 +560,22 @@ export function taxSummary(p: Portfolio) {
     netRealizedReturn,
   };
 }
-/** Shares and remaining cost (average-cost method, as in `holdings`) after each ledger date. */
+/**
+ * Shares and remaining cost (average-cost method, as in `holdings`) after each ledger date.
+ * Where `holdings` throws on a sale larger than the position, this clamps at zero and sets
+ * `oversold` from that point on, so a chart can still render and flag the ledger.
+ */
 export function positionTimeline(p: Portfolio, ticker: string) {
-  const out: { date: string; shares: number; cost: number | null }[] = [];
+  const out: { date: string; shares: number; cost: number | null; oversold: boolean }[] = [];
   let shares = 0,
-    cost: number | null = 0;
+    cost: number | null = 0,
+    oversold = false;
   for (const event of ledgerEventsFor(p, ticker)) {
     if (event.type === 'split') shares = applySplit(shares, event.value);
     else {
       const t = event.value;
       if (t.kind === 'sell') {
+        if (t.shares > shares) oversold = true;
         const avg: number | null = cost === null ? null : shares ? cost / shares : 0;
         cost = avg === null ? null : Math.max(0, cost! - avg * Math.min(t.shares, shares));
         shares = Math.max(0, shares - t.shares);
@@ -576,7 +585,7 @@ export function positionTimeline(p: Portfolio, ticker: string) {
         cost = t.price === null || cost === null ? null : cost + t.shares * t.price + t.fees;
       }
     }
-    const snap = { date: event.value.date, shares, cost: cost === null ? null : round(cost) };
+    const snap = { date: event.value.date, shares, cost: cost === null ? null : round(cost), oversold };
     if (out.at(-1)?.date === snap.date) out[out.length - 1] = snap;
     else out.push(snap);
   }
@@ -664,7 +673,21 @@ export function validate(p: Portfolio) {
           (v) => v.length > 5000,
         ) ||
         !Array.isArray(r.sources) ||
-        !Array.isArray(r.financials)
+        r.sources.length > 200 ||
+        r.sources.some((s) => typeof s !== 'string' || s.length > 2000) ||
+        !Array.isArray(r.financials) ||
+        r.financials.length > 40 ||
+        r.financials.some(
+          (f) =>
+            !f ||
+            typeof f.year !== 'string' ||
+            f.year.length > 20 ||
+            [f.revenue, f.profit, f.eps, f.roe, f.debt].some(
+              (v) => v != null && !Number.isFinite(v),
+            ),
+        ) ||
+        (r.details !== undefined &&
+          (!r.details || typeof r.details !== 'object' || Array.isArray(r.details)))
       )
         throw new UserError('Invalid research dossier.');
       researchTickers.add(r.ticker);
@@ -826,7 +849,14 @@ export function validate(p: Portfolio) {
       p.aiReview.summary.length > 20000 ||
       typeof p.aiReview.generatedAt !== 'string' ||
       typeof p.aiReview.snapshot !== 'string' ||
-      !p.aiReview.weights)
+      p.aiReview.snapshot.length > 200000 ||
+      !p.aiReview.weights ||
+      typeof p.aiReview.weights !== 'object' ||
+      Array.isArray(p.aiReview.weights) ||
+      Object.keys(p.aiReview.weights).length > 200 ||
+      Object.entries(p.aiReview.weights).some(
+        ([t, w]) => !tickersPlaceholder(t) || !Number.isFinite(w) || w < 0 || w > 100,
+      ))
   )
     throw new UserError('Invalid saved AI review.');
   if (p.researchSettings !== undefined) {
@@ -940,7 +970,7 @@ export function validate(p: Portfolio) {
         (n.clearedAt !== undefined &&
           (typeof n.clearedAt !== 'string' ||
             !Number.isFinite(Date.parse(n.clearedAt)))) ||
-        (n.ticker !== undefined && typeof n.ticker !== 'string')
+        (n.ticker !== undefined && !tickersPlaceholder(n.ticker))
       )
         throw new UserError('Invalid notifications.');
       ids.add(n.id);
@@ -972,9 +1002,15 @@ export function plan(
 ) {
   const hs = holdings(p),
     budget = p.budgets[month] ?? 100000;
+  // A buy tagged to this SIP month counts, and so does an untagged buy dated in it.
   const already = round(
     p.trades
-      .filter((t) => !t.voided && t.kind === 'buy' && t.month === month)
+      .filter(
+        (t) =>
+          !t.voided &&
+          t.kind === 'buy' &&
+          (t.month === month || (!t.month && t.date.slice(0, 7) === month)),
+      )
       .reduce((a, t) => a + t.shares * t.price! + t.fees, 0),
   );
   const remaining = Math.max(0, round(budget - already));

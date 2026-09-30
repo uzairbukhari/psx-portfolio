@@ -78,3 +78,10 @@ test('portfolioValueSeries gives null gain while an opening cost is unknown', ()
   const { points } = portfolioValueSeries(p, { BBB: [[sec('2026-01-02'), 5]] });
   assert.deepEqual(points, [{ date: '2026-01-02', value: 50, cost: null, gain: null }]);
 });
+test('portfolioValueSeries reports tickers whose ledger sells more than was held', () => {
+  const p = pf([trade('1', 'AAA', 'buy', '2026-01-02', 10), trade('2', 'AAA', 'sell', '2026-01-06', 14), trade('3', 'BBB', 'buy', '2026-01-02', 1)]);
+  const eod = { AAA: [[sec('2026-01-02'), 10]], BBB: [[sec('2026-01-02'), 5]] };
+  assert.deepEqual(portfolioValueSeries(p, eod).inconsistent, ['AAA']);
+  const clean = pf([trade('1', 'AAA', 'buy', '2026-01-02', 10)]);
+  assert.deepEqual(portfolioValueSeries(clean, eod).inconsistent, []);
+});

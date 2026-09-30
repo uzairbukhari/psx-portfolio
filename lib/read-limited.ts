@@ -1,7 +1,13 @@
-// Streams the body and stops at `limit` bytes, so an oversized (or endless)
-// upstream response is cut off instead of being buffered whole in memory.
-export async function readLimited(upstream: Response, limit: number) {
-  const tooLarge = () => Error('The response was too large.');
+import { UserError } from './user-error.ts';
+
+// Streams a request or response body and stops at `limit` bytes, so an oversized
+// (or endless) body is cut off instead of being buffered whole in memory.
+export async function readLimited(
+  upstream: Pick<Response, 'headers' | 'body'>,
+  limit: number,
+  message = 'The response was too large.',
+) {
+  const tooLarge = () => new UserError(message, 413);
   const declared = Number(upstream.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > limit) {
     await upstream.body?.cancel();

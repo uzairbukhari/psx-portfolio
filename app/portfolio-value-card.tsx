@@ -61,11 +61,16 @@ export default function PortfolioValueCard({
   const [range, setRange] = useState<ValueRange>('all');
   const [eod, setEod] = useState<Record<string, PricePoint[]> | null>(null);
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const tickerKey = useMemo(
     () => Array.from(new Set(p.trades.filter((t) => !t.voided).map((t) => t.ticker))).sort().join(','),
     [p.trades],
   );
   useEffect(() => {
+    // New inputs (or a retry) start from a clean slate: never show the previous
+    // ledger's history or error while the new request is in flight.
+    setEod(null);
+    setError('');
     if (!tickerKey) return;
     let live = true;
     fetch(`/api/price-history?tickers=${encodeURIComponent(tickerKey)}`)
@@ -94,7 +99,7 @@ export default function PortfolioValueCard({
     return () => {
       live = false;
     };
-  }, [tickerKey]);
+  }, [tickerKey, attempt]);
 
   const series = useMemo(
     () =>
@@ -131,12 +136,14 @@ export default function PortfolioValueCard({
             {missingCount ? 'Priced holdings · incomplete' : 'Portfolio market value'}
           </span>
           <strong className="amount value-card-main">
-            {missingCount === heldCount ? 'Prices needed' : money(value)}
+            {heldCount > 0 && missingCount === heldCount ? 'Prices needed' : money(value)}
           </strong>
           <small>
-            {missingCount
-              ? `${missingCount} holdings need a price`
-              : `${heldCount} holdings · each quote dated below`}
+            {heldCount === 0
+              ? 'No holdings yet'
+              : missingCount
+                ? `${missingCount} holdings need a price`
+                : `${heldCount} holdings · each quote dated below`}
           </small>
         </div>
         <div>
@@ -167,10 +174,10 @@ export default function PortfolioValueCard({
       </div>
       <div className="company-chart-head">
         <div>
-          <strong className="value-card-chart-title">Gain / loss vs. amount invested</strong>
+          <strong className="value-card-chart-title">Remaining unrealised gain / loss</strong>
           <small className={change === null ? undefined : change >= 0 ? 'pos-text' : 'neg-text'}>
             {change === null
-              ? 'Market value minus remaining cost, day by day'
+              ? 'Value of shares still held minus their remaining cost, day by day. Not total return: excludes realised gains and dividends.'
               : `${signed(Math.round(change * 100) / 100)} over ${rangeLabel}`}
           </small>
         </div>
@@ -187,14 +194,21 @@ export default function PortfolioValueCard({
           ))}
         </div>
       </div>
-      {error ? (
-        <p className="muted">{error}</p>
+      {!tickerKey ? (
+        <p className="muted">No transactions yet. Record a purchase to start this chart.</p>
+      ) : error ? (
+        <p className="muted">
+          History unavailable: {error}{' '}
+          <button type="button" className="link-button" onClick={() => setAttempt((n) => n + 1)}>
+            Retry
+          </button>
+        </p>
       ) : !series ? (
         <TabLoader label="Loading history…" />
       ) : data.length < 2 ? (
         <p className="muted">
           {points.length > 1
-            ? 'Gain / loss history needs every opening cost to be known.'
+            ? 'Incomplete: gain / loss history needs every opening cost to be known.'
             : 'Not enough price history yet — the scheduled PSX history job fills it in.'}
         </p>
       ) : (
@@ -256,6 +270,12 @@ export default function PortfolioValueCard({
             />
           </AreaChart>
         </ChartContainer>
+      )}
+      {series && series.inconsistent.length > 0 && (
+        <p className="report-source neg-text">
+          Ledger inconsistent: a recorded sale exceeds the shares held for{' '}
+          {series.inconsistent.join(', ')}. Those positions are shown as zero; correct the ledger.
+        </p>
       )}
       {series && series.unpriced.length > 0 && (
         <p className="report-source">

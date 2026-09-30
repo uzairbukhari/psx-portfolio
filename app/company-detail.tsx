@@ -110,7 +110,11 @@ function PriceChart({
   const [range, setRange] = useState<HistoryRange>('1m');
   const [history, setHistory] = useState<History | null>(null);
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    // Switching company (or retrying) must not keep showing the previous history or error.
+    setHistory(null);
+    setError('');
     let live = true;
     fetch(`/api/price-history?ticker=${encodeURIComponent(ticker)}`)
       .then(async (r) => {
@@ -124,7 +128,7 @@ function PriceChart({
     return () => {
       live = false;
     };
-  }, [ticker]);
+  }, [ticker, attempt]);
 
   const points = useMemo(
     () => (history ? sliceRange(history.eod, history.intraday, range) : []),
@@ -174,7 +178,12 @@ function PriceChart({
         </div>
       </div>
       {error ? (
-        <p className="muted">{error}</p>
+        <p className="muted">
+          Price history unavailable: {error}{' '}
+          <button type="button" className="link-button" onClick={() => setAttempt((n) => n + 1)}>
+            Retry
+          </button>
+        </p>
       ) : !history ? (
         <TabLoader label="Loading price history…" />
       ) : points.length < 2 ? (
