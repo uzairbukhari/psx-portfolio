@@ -1,4 +1,5 @@
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import { dividendEntitlement, lastTradingDay } from './psx-calendar.ts';
 import { UserError } from './user-error.ts';
 export const SECTORS = [
   'Bank',
@@ -401,16 +402,9 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
   return out;
 }
 export const DEFAULT_FACE_VALUE = 10;
-/** Book-closure start minus two weekdays: PSX settles T+1, so a buyer must hold by then. Holidays are ignored. */
-export function entitlementDate(bookClosureStart: string) {
-  const d = new Date(bookClosureStart + 'T00:00:00Z');
-  let back = 2;
-  while (back > 0) {
-    d.setUTCDate(d.getUTCDate() - 1);
-    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) back--;
-  }
-  return d.toISOString().slice(0, 10);
-}
+/** Last qualifying trade date for a book closure start (PSX calendar and settlement rules; see `dividendEntitlement`). */
+export const entitlementDate = (bookClosureStart: string) =>
+  dividendEntitlement(bookClosureStart).date;
 const shiftDays = (date: string, days: number) => {
   const d = new Date(date + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() + days);
@@ -1018,7 +1012,7 @@ export function plan(
   const required = hs.filter((h) => h.shares > 0 || h.target > 0);
   const missing = required.filter((h) => !h.quote).map((h) => h.ticker);
   const stale = required
-    .filter((h) => h.quote && h.quote.date !== today())
+    .filter((h) => h.quote && h.quote.date < lastTradingDay(today()))
     .map((h) => h.ticker);
   const totalTarget = candidates.reduce((a, h) => a + h.target, 0);
   let errors: string[] = [];

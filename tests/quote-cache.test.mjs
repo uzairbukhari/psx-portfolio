@@ -81,6 +81,14 @@ test('lastSessionClose skips weekends and uses the Friday close', () => {
   );
 });
 
+test('lastSessionClose skips PSX holidays as well as weekends', () => {
+  // Tue 2026-03-24 11:00 PKT: Mon 23rd (holiday), weekend, Fri 20th (holiday) -> Thu 19th 15:40 PKT.
+  assert.equal(
+    lastSessionClose(new Date('2026-03-24T06:00:00Z')).toISOString(),
+    '2026-03-19T10:40:00.000Z',
+  );
+});
+
 test('isFresh uses a short TTL while open and the last close while shut', () => {
   const open = new Date('2026-09-29T06:00:00Z'); // Tue 11:00 PKT
   assert.equal(isFresh('2026-09-29T05:52:00Z', open), true);
