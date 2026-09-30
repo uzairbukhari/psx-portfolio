@@ -22,7 +22,12 @@ export async function d1(sql, params = []) {
 
 /** Every ticker in any user's portfolio, or the `--tickers=A,B` override. */
 export async function heldTickers(tickerArg) {
-  if (tickerArg) return tickerArg.slice('--tickers='.length).split(',').filter(Boolean);
+  if (tickerArg)
+    return tickerArg
+      .slice('--tickers='.length)
+      .split(',')
+      .map((ticker) => ticker.trim().toUpperCase())
+      .filter((ticker) => /^[A-Z0-9]{2,12}$/.test(ticker));
   const rows = await d1(
     `SELECT DISTINCT upper(json_extract(c.value, '$.ticker')) AS ticker
      FROM portfolios, json_each(portfolios.payload, '$.companies') AS c`,

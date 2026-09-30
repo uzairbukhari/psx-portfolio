@@ -6,6 +6,7 @@ import {
   type Portfolio,
   type TaxedSale,
   type TaxedDividend,
+  type TaxYearSummary,
 } from './portfolio.ts';
 
 export type AllocationPoint = {
@@ -106,6 +107,11 @@ export type PortfolioReport = {
     totalDividendIncomeGross: number;
     totalDividendTax: number | null;
     netRealizedReturn: number | null;
+    /** Capital-gains tax per Pakistani tax year, with whether it is an estimate or recorded. */
+    taxYears: TaxYearSummary[];
+    /** Announced dividends awaiting receipt confirmation; not part of any income total. */
+    expectedDividends: ReturnType<typeof taxSummary>['expectedDividends'];
+    taxProfileSet: boolean;
   };
   summary: {
     pricedValue: number;
@@ -233,7 +239,7 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
     string,
     { gross: number; net: number | null }
   >();
-  for (const d of tax.dividends) {
+  for (const d of tax.dividends.filter((x) => x.status === 'received')) {
     const month = d.date.slice(0, 7);
     const entry = dividendMonths.get(month) ?? { gross: 0, net: 0 };
     dividendMonths.set(month, {
@@ -326,7 +332,7 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
     string,
     { gross: number; net: number | null }
   >();
-  for (const d of tax.dividends) {
+  for (const d of tax.dividends.filter((x) => x.status === 'received')) {
     const entry = dividendCompanies.get(d.ticker) ?? { gross: 0, net: 0 };
     dividendCompanies.set(d.ticker, {
       gross: round(entry.gross + d.grossAmount),
@@ -440,6 +446,9 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
       totalDividendIncomeGross: tax.totalDividendIncomeGross,
       totalDividendTax: tax.totalDividendTax,
       netRealizedReturn: tax.netRealizedReturn,
+      taxYears: tax.taxYears,
+      expectedDividends: tax.expectedDividends,
+      taxProfileSet: portfolio.taxProfile !== undefined,
     },
     summary: {
       pricedValue,

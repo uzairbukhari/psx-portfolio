@@ -230,3 +230,58 @@ test('researchWeightProfile rewards higher scores and undervaluation, penalizes 
   assert.ok(w.C>w.LOW);
   assert.ok(w.LOW>w.UNRESEARCHED);
 });
+
+test('round is sign-aware: negative values round away from zero like positive ones', async () => {
+  const { round } = await import('../lib/portfolio.ts');
+  for (const n of [1.005, 2.675, 0.125, 10.555, 1234.565])
+    assert.equal(round(-n), -round(n), String(n));
+  assert.equal(Object.is(round(-0.001), -0), false);
+});
+
+test('SIP spend this month counts untagged buys dated in that month', () => {
+  const p = fresh();
+  p.trades = [
+    trade('1', 10, 10, 'buy', 5),
+    { ...trade('2', 5, 10), month: '' },
+    { ...trade('3', 5, 10), month: '', date: '2025-01-15' },
+    { ...trade('4', 2, 10), month: '2025-01', date: date },
+  ];
+  const r = plan(p, month);
+  assert.equal(r.already, 155);
+});
+
+test('positionTimeline flags an oversold ledger instead of clamping silently', async () => {
+  const { positionTimeline } = await import('../lib/portfolio.ts');
+  const p = fresh();
+  p.trades = [
+    { ...trade('1', 10, 10), date: '2025-01-01', month: '2025-01' },
+    { ...trade('2', 15, 12, 'sell'), date: '2025-02-01' },
+  ];
+  const timeline = positionTimeline(p, 'TEST');
+  assert.equal(timeline.at(-1).shares, 0);
+  assert.equal(timeline.at(-1).oversold, true);
+  assert.equal(timeline[0].oversold, false);
+  assert.throws(() => holdings(p), /sale exceeds/);
+});
+
+test('validate rejects malformed saved AI review, research and notification tickers', () => {
+  const withReview = (weights) => ({ ...fresh(), aiReview: { summary: 'ok', weights, generatedAt: date, snapshot: '' } });
+  validate(withReview({ TEST: 100 }));
+  assert.throws(() => validate(withReview([])), /AI review/);
+  assert.throws(() => validate(withReview({ TEST: 'lots' })), /AI review/);
+  assert.throws(() => validate(withReview({ TEST: 101 })), /AI review/);
+  assert.throws(() => validate(withReview({ 'bad ticker': 5 })), /AI review/);
+
+  const dossier = (extra) => ({ ...fresh(), research: [{ ticker: 'TEST', status: 'Queue', score: null, fairValue: null, fairValueLow: null, fairValueHigh: null, thesis: '', risks: '', catalysts: '', conversationUrl: '', sources: [], financials: [], updatedAt: '', ...extra }] });
+  validate(dossier({ sources: ['https://dps.psx.com.pk/company/TEST'], financials: [{ year: '2025', revenue: 1, profit: null, eps: 2, roe: null, debt: null }] }));
+  assert.throws(() => validate(dossier({ sources: [42] })), /research/);
+  assert.throws(() => validate(dossier({ sources: ['x'.repeat(2001)] })), /research/);
+  assert.throws(() => validate(dossier({ sources: Array(201).fill('https://a.b') })), /research/);
+  assert.throws(() => validate(dossier({ financials: [{ year: 2025, revenue: 1 }] })), /research/);
+  assert.throws(() => validate(dossier({ financials: [{ year: '2025', revenue: 'big', profit: null, eps: null, roe: null, debt: null }] })), /research/);
+  assert.throws(() => validate(dossier({ details: 'not an object' })), /research/);
+
+  const note = (ticker) => ({ ...fresh(), notifications: [{ id: 'n1', at: new Date().toISOString(), kind: 'info', ticker, title: 't', body: 'b', read: false }] });
+  validate(note('TEST'));
+  assert.throws(() => validate(note('<script>')), /notifications/);
+});

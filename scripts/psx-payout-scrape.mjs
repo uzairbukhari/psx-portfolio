@@ -7,6 +7,7 @@
 // Usage: node scripts/psx-payout-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
 import { d1, heldTickers } from './d1-rest.mjs';
+import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsxPayoutsHtml } from '../lib/psx-fetch.ts';
 import { parsePayouts } from '../lib/psx-payouts.ts';
 
@@ -52,10 +53,8 @@ async function main() {
   if (dryRun) {
     for (const r of rows.slice(0, 40))
       console.log(`  ${r.ticker} ${r.bookClosureStart} ${r.kind} ${r.percent ?? 'Rs' + r.perShareRs} (${r.details})`);
-    return;
-  }
-  await upsert(rows, new Date().toISOString());
-  if (failed.length === tickers.length) process.exitCode = 1;
+  } else await upsert(rows, new Date().toISOString());
+  process.exitCode = scrapeExitCode(tickers.length, failed.length);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

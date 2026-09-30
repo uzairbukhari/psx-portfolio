@@ -31,12 +31,12 @@ export function dividendNotifications(
     at: now,
     kind: 'dividend-recorded',
     ticker: d.ticker,
-    title: `${d.ticker} dividend recorded`,
+    title: d.source === 'auto' ? `${d.ticker} dividend expected` : `${d.ticker} dividend recorded`,
     body:
       `${money(d.netAmount ?? d.grossAmount ?? 0)}${d.netAmount === undefined ? ' gross' : ' net'}` +
       ` for ${d.date}` +
       (d.source === 'auto'
-        ? ' — booked automatically from the PSX announcement.'
+        ? ' — booked automatically from the PSX announcement as an expected dividend; confirm it once the payment arrives.'
         : d.source === 'import'
           ? ' — imported from CDC.'
           : ' — entered manually.'),

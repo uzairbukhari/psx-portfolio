@@ -7,6 +7,7 @@ import {
   type ResearchJobRow,
   tickerOK,
 } from '@/lib/research-jobs';
+import { UserError } from '@/lib/user-error';
 
 async function resolveCompany(ticker: string, userId: string) {
   const saved = await db()
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
       .trim()
       .toUpperCase();
     if (!tickerOK(ticker))
-      throw Error('Enter a valid PSX ticker using letters and numbers.');
+      throw new UserError('Enter a valid PSX ticker using letters and numbers.');
     const existing = await db()
       .prepare(
         "SELECT * FROM research_jobs WHERE user_id=? AND ticker=? AND status IN ('queued','researching','needs_attention') ORDER BY created_at DESC LIMIT 1",
@@ -126,11 +127,11 @@ export async function PATCH(req: Request) {
       .prepare('SELECT * FROM research_jobs WHERE id=? AND user_id=?')
       .bind(body.id, userId)
       .first<ResearchJobRow>();
-    if (!row) return failure(Error('Research job was not found.'), 404);
+    if (!row) return failure(new UserError('Research job was not found.'), 404);
     const now = new Date().toISOString();
     if (body.action === 'cancel') {
       if (row.status === 'complete' || row.status === 'cancelled')
-        throw Error('This research job has already finished.');
+        throw new UserError('This research job has already finished.');
       if (row.status === 'queued' || row.status === 'needs_attention') {
         await db()
           .prepare(
@@ -154,9 +155,9 @@ export async function PATCH(req: Request) {
       }
     } else if (body.action === 'resume') {
       if (row.status !== 'needs_attention')
-        throw Error('Only paused research can be resumed.');
+        throw new UserError('Only paused research can be resumed.');
       if (row.spent_micros >= row.budget_micros)
-        throw Error(
+        throw new UserError(
           'This run has reached its US$0.50 limit. Start a new refresh to spend more.',
         );
       await db()
@@ -170,7 +171,7 @@ export async function PATCH(req: Request) {
         'waiting',
         'Research resumed within the remaining budget.',
       );
-    } else throw Error('Unknown research action.');
+    } else throw new UserError('Unknown research action.');
     const updated = await db()
       .prepare('SELECT * FROM research_jobs WHERE id=?')
       .bind(row.id)
@@ -188,7 +189,7 @@ export async function DELETE(req: Request) {
       .trim()
       .toUpperCase();
     if (!tickerOK(ticker))
-      throw Error('Enter a valid PSX ticker using letters and numbers.');
+      throw new UserError('Enter a valid PSX ticker using letters and numbers.');
     const active = await db()
       .prepare(
         "SELECT id FROM research_jobs WHERE user_id=? AND ticker=? AND status IN ('queued','researching') LIMIT 1",
@@ -196,7 +197,7 @@ export async function DELETE(req: Request) {
       .bind(userId, ticker)
       .first();
     if (active)
-      throw Error('Cancel the active research run before deleting it.');
+      throw new UserError('Cancel the active research run before deleting it.');
     await db().batch([
       db()
         .prepare(

@@ -18,6 +18,9 @@
     "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
     // Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
     // data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
-    "GITHUB_REPO": "uzairbukhari/psx-portfolio"
+    "GITHUB_REPO": "uzairbukhari/psx-portfolio",
+    // Per-user AI spend cap per PKT calendar month, in USD. Over the cap, Monthly
+    // Picks runs use the quantitative ranking instead of the AI call. "0" disables AI.
+    "AI_MONTHLY_CAP_USD": "1"
   }
 }

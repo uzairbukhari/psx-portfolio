@@ -9,6 +9,8 @@ declare namespace Cloudflare {
     GITHUB_DISPATCH_TOKEN?: string;
     GITHUB_REPO?: string;
     OPENAI_MODEL?: string;
+    /** Per-user AI spend cap per PKT month in USD (Monthly Picks); defaults to 1. */
+    AI_MONTHLY_CAP_USD?: string;
   }
 }
 declare namespace Cloudflare {

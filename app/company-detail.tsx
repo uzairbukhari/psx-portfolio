@@ -108,23 +108,30 @@ function PriceChart({
   trades: Trade[];
 }) {
   const [range, setRange] = useState<HistoryRange>('1m');
-  const [history, setHistory] = useState<History | null>(null);
-  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  // Keyed by request, so switching company (or retrying) never shows the previous
+  // company's history or error while the next load runs.
+  const requestKey = `${ticker}#${attempt}`;
+  const [loaded, setLoaded] = useState<{ key: string; history?: History; error?: string } | null>(null);
+  const current = loaded?.key === requestKey ? loaded : null;
+  const history = current?.history ?? null;
+  const error = current?.error ?? '';
   useEffect(() => {
     let live = true;
     fetch(`/api/price-history?ticker=${encodeURIComponent(ticker)}`)
       .then(async (r) => {
         const d = (await r.json()) as History & { error?: string };
         if (!r.ok) throw Error(d.error ?? 'Could not load price history.');
-        if (live) setHistory({ eod: d.eod, intraday: d.intraday });
+        if (live) setLoaded({ key: requestKey, history: { eod: d.eod, intraday: d.intraday } });
       })
       .catch((e: unknown) => {
-        if (live) setError(e instanceof Error ? e.message : 'Could not load price history.');
+        if (live)
+          setLoaded({ key: requestKey, error: e instanceof Error ? e.message : 'Could not load price history.' });
       });
     return () => {
       live = false;
     };
-  }, [ticker]);
+  }, [ticker, requestKey]);
 
   const points = useMemo(
     () => (history ? sliceRange(history.eod, history.intraday, range) : []),
@@ -174,7 +181,12 @@ function PriceChart({
         </div>
       </div>
       {error ? (
-        <p className="muted">{error}</p>
+        <p className="muted">
+          Price history unavailable: {error}{' '}
+          <button type="button" className="link-button" onClick={() => setAttempt((n) => n + 1)}>
+            Retry
+          </button>
+        </p>
       ) : !history ? (
         <TabLoader label="Loading price history…" />
       ) : points.length < 2 ? (
@@ -276,6 +288,7 @@ export default function CompanyDetail({
   onCorrectTrade,
   onCorrectDividend,
   onCorrectSplit,
+  onConfirmDividend,
 }: {
   portfolio: Portfolio;
   ticker: string;
@@ -292,6 +305,7 @@ export default function CompanyDetail({
   onCorrectTrade: (t: Trade) => void;
   onCorrectDividend: (d: Dividend) => void;
   onCorrectSplit: (s: StockSplit) => void;
+  onConfirmDividend: (d: Dividend) => void;
 }) {
   const trades = portfolio.trades.filter((t) => t.ticker === ticker);
   const dividends = (portfolio.dividends ?? []).filter((d) => d.ticker === ticker);
@@ -304,10 +318,14 @@ export default function CompanyDetail({
     onCorrectTrade,
     onCorrectDividend,
     onCorrectSplit,
+    onConfirmDividend,
   });
   const byId = new Map(taxed.map((t) => [t.id, t]));
+  const expectedDividends = dividends
+    .filter((d) => !d.voided && byId.get(d.id)?.status === 'expected')
+    .sort((a, b) => a.date.localeCompare(b.date));
   const received = dividends
-    .filter((d) => !d.voided)
+    .filter((d) => !d.voided && byId.get(d.id)?.status !== 'expected')
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((d) => {
       const t = byId.get(d.id);
@@ -395,7 +413,7 @@ export default function CompanyDetail({
           <small>
             {summary.dividendNet === null
               ? 'Gross · set filer status in Settings for net'
-              : `Net of tax · ${money(summary.dividendGross)} gross`}
+              : `Net of tax (estimated unless recorded) · ${money(summary.dividendGross)} gross`}
           </small>
         </article>
       </div>
@@ -411,6 +429,37 @@ export default function CompanyDetail({
         )}
       </section>
 
+      {expectedDividends.length > 0 && (
+        <section className="company-section">
+          <h2>Expected dividends</h2>
+          <p className="muted">
+            Announced by PSX but not confirmed as paid. They are not counted as income until you mark them received.
+          </p>
+          <div className="dividend-grid">
+            {expectedDividends.map((d) => {
+              const t = byId.get(d.id);
+              return (
+                <div className="dividend-card" key={d.id}>
+                  <span>
+                    Book closure {d.date}
+                    {d.financialYear ? ` · FY ${d.financialYear}` : ''}
+                  </span>
+                  <strong>{money(Math.round((t?.netAmount ?? t?.grossAmount ?? 0) * 100) / 100)}</strong>
+                  <small>
+                    {d.perShare === undefined ? '' : `${money(d.perShare)}/sh · `}
+                    {money(Math.round((t?.grossAmount ?? 0) * 100) / 100)} gross · estimated tax · entitled on{' '}
+                    {d.entitlementDate ?? 'unknown date'}
+                    {d.entitlementCertain === false ? ' (unconfirmed)' : ''}
+                  </small>
+                  <button type="button" className="secondary compact" onClick={() => onConfirmDividend(d)}>
+                    Mark received
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
       <section className="company-section">
         <h2>Dividends received</h2>
         {received.length === 0 ? (

@@ -1,5 +1,6 @@
 import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
+import { UserError } from '@/lib/user-error';
 
 export async function GET(req: Request) {
   try {
@@ -9,7 +10,7 @@ export async function GET(req: Request) {
       const tickers = Array.from(
         new Set(batch.split(',').map((t) => t.trim().toUpperCase()).filter(Boolean)),
       );
-      if (tickers.length > 60 || !tickers.every(tickerOK)) throw Error('Invalid symbols.');
+      if (tickers.length > 60 || !tickers.every(tickerOK)) throw new UserError('Invalid symbols.');
       const rows = tickers.length
         ? (
             await db()
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     const ticker = (new URL(req.url).searchParams.get('ticker') ?? '')
       .trim()
       .toUpperCase();
-    if (!tickerOK(ticker)) throw Error('Invalid symbol.');
+    if (!tickerOK(ticker)) throw new UserError('Invalid symbol.');
     const row = await db()
       .prepare(
         'SELECT eod, intraday, eod_fetched_at, intraday_fetched_at FROM price_history WHERE ticker=?',

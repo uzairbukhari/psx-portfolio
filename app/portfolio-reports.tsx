@@ -287,7 +287,7 @@ export default function PortfolioReports({
             </small>
           </div>
           <div className="reports-priced-value">
-            <span>Total dividend income</span>
+            <span>Dividend income received</span>
             <strong>
               {totalDividendNet === null
                 ? money(report.realized.totalDividendIncomeGross)
@@ -296,13 +296,15 @@ export default function PortfolioReports({
             <small>
               {totalDividendNet === null
                 ? 'Gross · set filer status in Settings for net'
-                : 'Net of withholding tax'}
+                : 'Net of tax (estimated unless a deduction is recorded)'}
+              {report.realized.expectedDividends.count > 0 &&
+                ` · ${report.realized.expectedDividends.count} expected, ${money(report.realized.expectedDividends.grossAmount)} gross not yet confirmed`}
             </small>
           </div>
           <div
             className={`reports-priced-value ${grandTotalReturn === null ? '' : grandTotalReturn >= 0 ? 'pos' : 'neg'}`}
           >
-            <span>Total return (net of tax)</span>
+            <span>Total return (after estimated tax)</span>
             <strong>
               {grandTotalReturn === null
                 ? '—'
@@ -310,7 +312,7 @@ export default function PortfolioReports({
             </strong>
             <small>
               {grandTotalReturn !== null
-                ? 'Unrealized + realized sales + dividends, after tax'
+                ? 'Unrealized + realized sales + received dividends, after estimated tax'
                 : !portfolio.taxProfile
                   ? 'Set your filer status in Settings to include tax'
                   : 'Add missing purchase prices or cost basis to calculate'}
@@ -397,7 +399,7 @@ export default function PortfolioReports({
               <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
               <h3>Realized gains by month</h3>
             </div>
-            <span>Capital gains 15% filer / 30% non-filer</span>
+            <span>Estimated tax (15% filer / 30% non-filer), unless a deduction is recorded</span>
           </div>
           {realizedActivity.length ? (
             <ChartContainer
@@ -470,7 +472,7 @@ export default function PortfolioReports({
               <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
               <h3>Realized gain / loss by company</h3>
             </div>
-            <span>Net of capital gains tax</span>
+            <span>Net of estimated capital gains tax</span>
           </div>
           {realizedCompanies.length ? (
             <ChartContainer

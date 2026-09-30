@@ -288,7 +288,7 @@ export default function SettingsView({
             id="tax"
             icon={<Receipt size={18} />}
             title="Tax status"
-            description="Sets the rate used for capital gains and manually entered dividends in Reports."
+            description="Sets the rate used to ESTIMATE capital gains tax (netted per July–June tax year) and tax on dividends without a recorded deduction. Broker/NCCPL/CDC deductions you record are kept as actual figures and never recalculated when you change this. Actual CGT depends on acquisition date and current rules, so treat estimates as indicative, not as your tax liability."
           >
             <RadioGroup
               className="option-cards"

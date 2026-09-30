@@ -61,6 +61,9 @@ import {
   type Dividend,
   type StockSplit,
   pendingAutoDividends,
+  quoteSupersedes,
+  supersedeAutoWithImports,
+  confirmDividendReceipt,
   type AppNotification,
 } from '@/lib/portfolio';
 import {
@@ -188,30 +191,6 @@ function parseCdcPaymentDate(s: string): string | null {
   if (!m) return null;
   const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   return dateOK(iso) ? iso : null;
-}
-/** A CDC row is the real paid amount, so it voids the PSX-announced estimate for the same payout (mutates `existing`). */
-function voidSupersededAuto(existing: Dividend[], imported: Dividend[]) {
-  const voided: Dividend[] = [];
-  const shift = (date: string, days: number) => {
-    const d = new Date(date + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() + days);
-    return d.toISOString().slice(0, 10);
-  };
-  for (const row of imported) {
-    const match = existing.find(
-      (d) =>
-        d.source === 'auto' &&
-        !d.voided &&
-        d.ticker === row.ticker &&
-        row.date >= shift(d.date, -7) &&
-        row.date <= shift(d.date, 60),
-    );
-    if (match) {
-      match.voided = true;
-      voided.push(match);
-    }
-  }
-  return voided;
 }
 type CdcImportSummary = {
   dividends: Dividend[];
@@ -350,6 +329,12 @@ export default function Dashboard({
     [stockSplit, setStockSplit] = useState<StockSplit | null>(null),
     [editingStockSplit, setEditingStockSplit] = useState<string | null>(null),
     [dividend, setDividend] = useState<Dividend | null>(null),
+    [receipt, setReceipt] = useState<{
+      dividend: Dividend;
+      paymentDate: string;
+      gross: string;
+      tax: string;
+    } | null>(null),
     [editingDividend, setEditingDividend] = useState<string | null>(null),
     [company, setCompany] = useState<Company | null>(null),
     [creatingCompany, setCreatingCompany] = useState(false),
@@ -386,45 +371,67 @@ export default function Dashboard({
       setBusy(false);
     }
   }
-  /** Books cash dividends PSX announced for held companies and posts payout news, in one revisioned save. */
+  /**
+   * Records cash dividends PSX announced for held companies (as expected, unconfirmed
+   * dividends) and posts payout news, in one revisioned save. If the portfolio changed
+   * meanwhile (409), it reloads the fresh copy and recomputes against that revision
+   * instead of giving up, so a background save never silently loses the update.
+   */
   async function recordAutoDividends(
     loaded: Portfolio,
     loadedRevision: number,
     announcements: PayoutAnnouncement[],
   ) {
-    let pending: Dividend[], news: AppNotification[];
-    const now = new Date().toISOString();
-    try {
-      pending = pendingAutoDividends(loaded, announcements);
-      news = [
-        ...dividendNotifications(pending, now),
-        ...announcementNotifications(loaded, announcements, today(), now),
-      ];
-    } catch {
-      return;
-    }
-    if (!news.length) return;
-    const next = clone(loaded);
-    if (pending.length)
-      next.dividends = [...(next.dividends ?? []), ...pending];
-    addNotifications(next, news);
-    try {
-      validate(next);
-      const r = await fetch('/api/portfolio', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolio: next, revision: loadedRevision }),
-      });
-      const saved = (await r.json()) as ApiResponse;
-      if (!r.ok) throw Error(saved.error);
-      setP(next);
-      setRevision(saved.revision);
+    let current = loaded,
+      currentRevision = loadedRevision;
+    for (let tries = 0; tries < 3; tries++) {
+      let pending: Dividend[], news: AppNotification[];
+      const now = new Date().toISOString();
+      try {
+        pending = pendingAutoDividends(current, announcements);
+        news = [
+          ...dividendNotifications(pending, now),
+          ...announcementNotifications(current, announcements, today(), now),
+        ];
+      } catch {
+        return;
+      }
+      if (!news.length) return;
+      const next = clone(current);
       if (pending.length)
-        notify(
-          `Recorded ${pending.length} dividend${pending.length === 1 ? '' : 's'} from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}.`,
-        );
-    } catch (e) {
-      notify('Could not record PSX dividends: ' + String(e), true);
+        next.dividends = [...(next.dividends ?? []), ...pending];
+      addNotifications(next, news);
+      try {
+        validate(next);
+        const r = await fetch('/api/portfolio', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ portfolio: next, revision: currentRevision }),
+        });
+        if (r.status === 409) {
+          const fresh = await fetch('/api/portfolio');
+          if (!fresh.ok) return;
+          const d = (await fresh.json()) as ApiResponse;
+          if (!d.portfolio) return;
+          current = d.portfolio;
+          currentRevision = d.revision;
+          setP(current);
+          setRevision(currentRevision);
+          continue;
+        }
+        const saved = (await r.json()) as ApiResponse;
+        if (!r.ok) throw Error(saved.error);
+        setP(next);
+        setRevision(saved.revision);
+        if (pending.length)
+          notify(
+            `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
+          );
+        return;
+      } catch (e) {
+        notify('Could not record PSX dividends: ' + String(e), true);
+        return;
+      }
     }
   }
   /** Persists read/cleared state of the notification list. */
@@ -578,10 +585,15 @@ export default function Dashboard({
       return;
     }
     const next = clone(p);
-    const replaced = voidSupersededAuto(
+    const { voided: replaced, ambiguous } = supersedeAutoWithImports(
+      next,
       next.dividends ?? [],
       result.dividends,
     );
+    if (ambiguous.length)
+      throw Error(
+        `Nothing was imported: ${ambiguous.map((d) => `${d.ticker} ${d.date}`).join(', ')} could belong to more than one expected PSX dividend. Void the expected record that does not apply (Purchase log), then import again.`,
+      );
     const superseded = replaced.length;
     const at = new Date().toISOString();
     addNotifications(next, [
@@ -768,10 +780,11 @@ export default function Dashboard({
       onCorrectTrade: correctTrade,
       onCorrectDividend: correctDividend,
       onCorrectSplit: correctStockSplit,
+      onConfirmDividend: openReceipt,
     });
   const companySummary = (ticker: string) => {
     const h = hs.find((x) => x.ticker === ticker);
-    const div = taxedDividends.filter((d) => d.ticker === ticker);
+    const div = taxedDividends.filter((d) => d.ticker === ticker && d.status === 'received');
     const dividendGross = round(div.reduce((a, d) => a + d.grossAmount, 0));
     const dividendNet = div.some((d) => d.netAmount === null)
       ? null
@@ -803,9 +816,41 @@ export default function Dashboard({
     setEditingDividend(d.id);
     setDividend(
       d.source === 'auto'
-        ? { ...d, source: 'manual', externalId: undefined }
+        ? {
+            ...d,
+            source: 'manual',
+            externalId: undefined,
+            status: undefined,
+            entitlementDate: undefined,
+            entitlementCertain: undefined,
+            paymentDate: undefined,
+          }
         : { ...d },
     );
+  }
+  function openReceipt(d: Dividend) {
+    setReceipt({ dividend: d, paymentDate: today(), gross: '', tax: '' });
+  }
+  async function confirmReceipt(e: { preventDefault: () => void }) {
+    e.preventDefault();
+    if (!receipt) return;
+    const next = clone(p!);
+    const target = next.dividends?.find((d) => d.id === receipt.dividend.id);
+    if (!target) return;
+    const gross = receipt.gross.trim() === '' ? undefined : Number(receipt.gross);
+    const tax = receipt.tax.trim() === '' ? undefined : Number(receipt.tax);
+    if ((gross !== undefined && !(gross >= 0)) || (tax !== undefined && !(tax >= 0)))
+      throw Error('Enter amounts as positive numbers, or leave them blank.');
+    Object.assign(
+      target,
+      confirmDividendReceipt(target, {
+        paymentDate: receipt.paymentDate,
+        grossAmount: gross,
+        taxWithheld: tax,
+      }),
+    );
+    await save(next, `${target.ticker} dividend marked as received.`);
+    setReceipt(null);
   }
   function correctStockSplit(entry: StockSplit) {
     setEditingStockSplit(entry.id);
@@ -823,10 +868,13 @@ export default function Dashboard({
       });
       const d = (await r.json()) as QuoteRefreshResponse;
       if (!r.ok) throw Error(d.error);
-      // A stale cached quote must not replace one the ledger already holds.
+      // A stale cached quote must not replace one the ledger already holds, and
+      // an older or same-day PSX price never replaces a newer or manual quote.
       const fresh = Object.fromEntries(
         Object.entries(d.quotes).filter(
-          ([ticker]) => !(d.stale?.[ticker] && p!.quotes[ticker]),
+          ([ticker, quote]) =>
+            !(d.stale?.[ticker] && p!.quotes[ticker]) &&
+            quoteSupersedes(quote, p!.quotes[ticker]),
         ),
       );
       const next = { ...p!, quotes: { ...p!.quotes, ...fresh } };
@@ -1489,6 +1537,7 @@ export default function Dashboard({
               onCorrectTrade={correctTrade}
               onCorrectDividend={correctDividend}
               onCorrectSplit={correctStockSplit}
+              onConfirmDividend={openReceipt}
             />
           )}
         </TabsContent>
@@ -1893,6 +1942,66 @@ export default function Dashboard({
                     Void entry
                   </button>
                 )}
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!receipt}
+        onOpenChange={(open) => {
+          if (!open) setReceipt(null);
+        }}
+      >
+        <DialogContent className="form-dialog">
+          <DialogTitle>Mark dividend as received</DialogTitle>
+          <DialogDescription>
+            Confirm that the cash arrived. Leave the amounts blank to keep PSX&apos;s
+            expected figure with estimated tax, or enter what your broker / CDC
+            statement shows.
+          </DialogDescription>
+          {receipt && (
+            <form onSubmit={(e) => attempt(() => confirmReceipt(e))}>
+              <div className="form-grid">
+                <label>
+                  Company symbol
+                  <input disabled value={receipt.dividend.ticker} />
+                </label>
+                <label>
+                  Payment date
+                  <input
+                    type="date"
+                    required
+                    max={today()}
+                    value={receipt.paymentDate}
+                    onChange={(e) => setReceipt({ ...receipt, paymentDate: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Actual gross amount (PKR, optional)
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={receipt.gross}
+                    onChange={(e) => setReceipt({ ...receipt, gross: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Tax withheld (PKR, optional)
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={receipt.tax}
+                    onChange={(e) => setReceipt({ ...receipt, tax: e.target.value })}
+                  />
+                </label>
+              </div>
+              <div className="row">
+                <button disabled={busy} type="submit">
+                  Mark received
+                </button>
               </div>
             </form>
           )}

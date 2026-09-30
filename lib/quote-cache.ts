@@ -1,7 +1,8 @@
-import type { Quote } from './portfolio.ts';
+import { quoteSupersedes, type Quote } from './portfolio.ts';
 import { fetchBudget, type FetchBudget } from './psx-fetch.ts';
 import { pakistanMarketState } from './psx-market.ts';
 import { fetchPsxQuote } from './psx-quotes.ts';
+import { isTradingDay } from './psx-calendar.ts';
 
 /**
  * `quote_refreshes` is the one shared, cross-user PSX quote cache. The cron
@@ -39,14 +40,14 @@ export const rowToQuote = (row: QuoteRow): Quote => ({
   fetchedAt: row.fetched_at,
 });
 
-/** Most recent regular-session close (plus grace) at or before `now`, ignoring holidays. */
+/** Most recent regular-session close (plus grace) at or before `now`, skipping weekends and PSX holidays. */
 export function lastSessionClose(now: Date): Date {
   const pkt = new Date(now.getTime() + PKT_OFFSET_MS);
   const midnight = Date.UTC(pkt.getUTCFullYear(), pkt.getUTCMonth(), pkt.getUTCDate());
   for (let back = 0; back < 8; back++) {
     const dayStart = midnight - back * 86_400_000;
     const weekday = new Date(dayStart).getUTCDay();
-    if (weekday === 0 || weekday === 6) continue;
+    if (!isTradingDay(new Date(dayStart).toISOString().slice(0, 10))) continue;
     const closeMin = (weekday === 5 ? 16 * 60 + 30 : 15 * 60 + 30) + CLOSE_GRACE_MIN;
     const close = dayStart + closeMin * 60_000 - PKT_OFFSET_MS;
     if (close <= now.getTime()) return new Date(close);
@@ -66,16 +67,9 @@ export function isFresh(fetchedAt: string | undefined, now = new Date()): boolea
   return fetched >= lastSessionClose(now).getTime();
 }
 
-/** Newer quote wins: later trading date first, then later fetch time. */
-export function isNewer(candidate: Quote, current: Quote | undefined): boolean {
-  if (!current) return true;
-  if (candidate.date !== current.date) return candidate.date > current.date;
-  return candidate.fetchedAt > current.fetchedAt;
-}
-
 /**
  * Overlays cached rows onto a portfolio's own quotes for the given tickers,
- * never replacing a manually verified quote or a newer one already saved.
+ * never replacing a newer saved quote (see `quoteSupersedes`).
  */
 export function mergeQuotes(
   quotes: Record<string, Quote>,
@@ -86,10 +80,8 @@ export function mergeQuotes(
   const merged = { ...quotes };
   for (const row of rows) {
     if (!wanted.has(row.ticker)) continue;
-    const current = merged[row.ticker];
-    if (current?.manual) continue;
     const cached = rowToQuote(row);
-    if (isNewer(cached, current)) merged[row.ticker] = cached;
+    if (quoteSupersedes(cached, merged[row.ticker])) merged[row.ticker] = cached;
   }
   return merged;
 }

@@ -1,5 +1,7 @@
 import { failure, requireSuperAdmin } from '@/lib/server';
 import { credibleResearchHost, isPrivateOrLocalHost } from '@/lib/research-policy.mjs';
+import { readLimited } from '@/lib/read-limited';
+import { UserError } from '@/lib/user-error';
 
 // The browser-side research runner cannot fetch PSX / issuer / search sites
 // directly (they don't send CORS headers), so this authenticated route
@@ -16,10 +18,10 @@ const MAX_REDIRECTS = 5;
 
 function checkAllowed(url: URL, mode: 'report' | 'search') {
   if (url.protocol !== 'https:' && url.protocol !== 'http:')
-    throw Error('Only http/https URLs can be fetched.');
-  if (isPrivateOrLocalHost(url.hostname)) throw Error('This host cannot be fetched.');
+    throw new UserError('Only http/https URLs can be fetched.');
+  if (isPrivateOrLocalHost(url.hostname)) throw new UserError('This host cannot be fetched.');
   if (mode === 'search' && url.hostname !== 'www.bing.com' && !credibleResearchHost(url.hostname))
-    throw Error('This host is not on the credible-source list.');
+    throw new UserError('This host is not on the credible-source list.');
 }
 
 // redirect: 'manual' + re-validating every hop closes an otherwise-open
@@ -37,9 +39,9 @@ async function fetchValidated(start: URL, mode: 'report' | 'search') {
       signal: AbortSignal.timeout(30_000),
     });
     if ([301, 302, 303, 307, 308].includes(upstream.status)) {
-      if (hop >= MAX_REDIRECTS) throw Error('Too many redirects.');
+      if (hop >= MAX_REDIRECTS) throw new UserError('Too many redirects.');
       const location = upstream.headers.get('location');
-      if (!location) throw Error('Redirected without a location.');
+      if (!location) throw new UserError('Redirected without a location.');
       target = new URL(location, target);
       continue;
     }
@@ -56,15 +58,14 @@ export async function POST(req: Request) {
     try {
       target = new URL(String(body.url || ''));
     } catch {
-      throw Error('A valid URL is required.');
+      throw new UserError('A valid URL is required.');
     }
     const { upstream, finalUrl } = await fetchValidated(target, mode);
-    if (!upstream.ok) throw Error(`${upstream.status} from ${finalUrl.hostname}`);
+    if (!upstream.ok) throw new UserError(`${upstream.status} from ${finalUrl.hostname}`);
     const contentType = upstream.headers.get('content-type') || '';
     const isPdf = contentType.includes('application/pdf') || /\.pdf(?:$|\?)/i.test(finalUrl.pathname);
     const limit = isPdf ? REPORT_BYTES_LIMIT : TEXT_BYTES_LIMIT;
-    const buffer = await upstream.arrayBuffer();
-    if (buffer.byteLength > limit) throw Error('The response was too large.');
+    const buffer = await readLimited(upstream, limit);
     return new Response(buffer, {
       headers: {
         'Content-Type': 'application/octet-stream',

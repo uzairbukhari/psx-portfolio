@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { ChevronDown, ExternalLink, RefreshCw } from 'lucide-react';
 import { money, type Portfolio } from '@/lib/portfolio';
-import { estimateMonthlyPicks, type CompanyOutlook, type MonthlyPickEstimate } from '@/lib/monthly-picks';
+import { estimateMonthlyPicks, summarizeEstimates, type CompanyOutlook, type MonthlyPickEstimate } from '@/lib/monthly-picks';
 import type { Recommendation } from './use-recommendations';
 
 // Growth off a tiny base can be thousands of percent; show it as a capped, honest bound.
@@ -53,7 +53,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
     ),
     [legacy, result, portfolio, run.amount, run.feePct],
   );
-  const allocated = estimates.reduce((sum, pick) => sum + pick.allocationPkr, 0);
+  const summary = useMemo(() => summarizeEstimates(estimates, run.amount), [estimates, run.amount]);
   const names = useMemo(() => new Map(portfolio.companies.map((company) => [company.ticker, company.name])), [portfolio.companies]);
 
   const [filter, setFilter] = useState<(typeof OUTLOOKS)[number] | 'All'>('All');
@@ -84,10 +84,17 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
         </div>
         <div className="mp-kpis">
           <div><span>Fresh money</span><b>{money(run.amount)}</b></div>
-          <div><span>Allocated</span><b>{money(allocated)}</b></div>
-          <div><span>Held as cash</span><b>{money((run.amount * result.unallocatedPct) / 100)}</b></div>
+          <div><span>Allocated to picks</span><b>{money(summary.allocatedPkr)}</b></div>
+          <div><span>Planned cash reserve</span><b>{money(summary.plannedCashPkr)}</b></div>
+          <div><span>Whole-share leftover</span><b>{summary.roundingLeftoverPkr === null ? 'Incomplete' : money(summary.roundingLeftoverPkr)}</b></div>
+          <div><span>Estimated unspent</span><b>{summary.unspentPkr === null ? 'Incomplete' : money(summary.unspentPkr)}</b></div>
           <div><span>Companies scored</span><b>{result.assessedCount ?? result.coverage.length}/{result.totalCount ?? result.coverage.length}</b></div>
         </div>
+        {summary.incomplete && (
+          <output className="notice">
+            Estimate incomplete: no recent price for {summary.missingPrices.join(', ')}, so whole-share leftover and unspent money cannot be calculated yet. Refresh prices or enter one.
+          </output>
+        )}
         {!!estimates.length && (
           <>
             <div className="mp-alloc" aria-hidden="true">

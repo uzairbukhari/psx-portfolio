@@ -23,9 +23,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
-      # ahl-import.test.mjs reads a private export file that is not in the repo.
       - name: Unit tests
-        run: node --test $(ls tests/*.test.mjs | grep -v ahl-import)
+        run: node --test 'tests/*.test.mjs'
 
   deploy:
     needs: check

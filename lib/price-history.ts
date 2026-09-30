@@ -56,27 +56,30 @@ const cents = (n: number) => Math.round(n * 100) / 100;
  * Rebuild the portfolio's market value, remaining cost and gain/loss per PSX trading day
  * from ledger positions and per-ticker daily closes (each carried forward over gaps).
  * Days before every held position can be priced are dropped; tickers with no history at
- * all are listed in `unpriced` and left out. `today` pins the final point to the live
+ * all are listed in `unpriced` and left out; tickers whose ledger sells more than was held
+ * are listed in `inconsistent` (their positions are clamped at zero). `today` pins the final point to the live
  * card figures.
  */
 export function portfolioValueSeries(
   p: Portfolio,
   eodByTicker: Record<string, PricePoint[]>,
   today?: ValuePoint,
-): { points: ValuePoint[]; unpriced: string[] } {
+): { points: ValuePoint[]; unpriced: string[]; inconsistent: string[] } {
   const live = p.trades.filter((t) => !t.voided);
   const start = live.map((t) => t.date).sort()[0];
   const unpriced: string[] = [];
   const priced: string[] = [];
+  const inconsistent: string[] = [];
   const timelines = new Map<string, ReturnType<typeof positionTimeline>>();
   for (const t of new Set(live.map((x) => x.ticker))) {
     const timeline = positionTimeline(p, t);
+    if (timeline.at(-1)?.oversold) inconsistent.push(t);
     if (eodByTicker[t]?.length) {
       priced.push(t);
       timelines.set(t, timeline);
     } else if ((timeline.at(-1)?.shares ?? 0) > 0) unpriced.push(t);
   }
-  if (!start || !priced.length) return { points: today ? [today] : [], unpriced };
+  if (!start || !priced.length) return { points: today ? [today] : [], unpriced, inconsistent };
 
   const closes = new Map(
     priced.map((t) => [t, eodByTicker[t].map(([sec, c]): [string, number] => [pktDate(sec), c])]),
@@ -114,7 +117,7 @@ export function portfolioValueSeries(
     if (points.at(-1)?.date === today.date) points[points.length - 1] = today;
     else points.push(today);
   }
-  return { points, unpriced };
+  return { points, unpriced, inconsistent };
 }
 
 export function sliceValueRange(points: ValuePoint[], range: ValueRange): ValuePoint[] {

@@ -71,3 +71,53 @@ test('missing or stale prices withhold only the share estimate', () => {
   delete missing.quotes.AAA;
   assert.equal(estimateMonthlyPicks(research, missing, 100000, 0)[0].shares, null);
 });
+
+import { summarizeEstimates } from '../lib/monthly-picks.ts';
+import { inputDifferences } from '../lib/monthly-picks-flow.ts';
+
+const twoPicks = {
+  ...research,
+  picks: [
+    { ...research.picks[0], allocationPct: 30 },
+    { ...research.picks[0], ticker: 'BBB', name: 'Beta', allocationPct: 30 },
+  ],
+  unallocatedPct: 40,
+};
+const pricedBoth = { ...portfolio, quotes: { ...portfolio.quotes, BBB: { price: 55, date: today(), asOf: today(), source: sourceB, fetchedAt: new Date().toISOString() } } };
+
+test('summary separates planned cash from whole-share leftovers and reconciles to fee-inclusive spend', () => {
+  const estimates = estimateMonthlyPicks(twoPicks, pricedBoth, 100000, 0.5);
+  const s = summarizeEstimates(estimates, 100000);
+  assert.equal(s.incomplete, false);
+  assert.deepEqual(s.missingPrices, []);
+  assert.equal(s.plannedCashPkr, 40000);
+  assert.equal(s.allocatedPkr, 60000);
+  const spend = estimates.reduce((a, e) => a + e.estimatedSpend, 0);
+  assert.equal(s.estimatedSpendPkr, Math.round(spend * 100) / 100);
+  assert.equal(s.roundingLeftoverPkr, Math.round((60000 - spend) * 100) / 100);
+  assert.equal(s.unspentPkr, Math.round((100000 - spend) * 100) / 100);
+  assert.equal(Math.round((s.plannedCashPkr + s.roundingLeftoverPkr) * 100) / 100, s.unspentPkr);
+});
+
+test('a missing price makes the estimate incomplete instead of treating that pick as cash-neutral', () => {
+  const estimates = estimateMonthlyPicks(twoPicks, portfolio, 100000, 0);
+  const s = summarizeEstimates(estimates, 100000);
+  assert.equal(s.incomplete, true);
+  assert.deepEqual(s.missingPrices, ['BBB']);
+  assert.equal(s.unspentPkr, null);
+  assert.equal(s.roundingLeftoverPkr, null);
+  assert.equal(s.plannedCashPkr, 40000, 'the planned reserve is known even when prices are missing');
+  assert.ok(s.estimatedSpendPkr > 0, 'spend so far counts priced picks');
+});
+
+test('no picks means everything is planned cash and nothing is incomplete', () => {
+  const s = summarizeEstimates([], 50000);
+  assert.deepEqual([s.plannedCashPkr, s.allocatedPkr, s.unspentPkr, s.incomplete], [50000, 0, 50000, false]);
+});
+
+test('inputDifferences lists each draft input that differs from the saved run', () => {
+  const run = { month: '2026-09', amount: 100000, feePct: 0.5, shortlist: ['AAA', 'BBB'] };
+  assert.deepEqual(inputDifferences(run, { month: '2026-09', amount: 100000, feePct: 0.5, shortlist: ['BBB', 'AAA'] }), []);
+  assert.deepEqual(inputDifferences(run, { month: '2026-10', amount: 120000, feePct: 0.25, shortlist: ['AAA'] }), ['month', 'amount', 'fees', 'shortlist']);
+  assert.deepEqual(inputDifferences(run, { month: '2026-09', amount: 100000, feePct: 0.5, shortlist: ['AAA', 'BBB', 'CCC'] }), ['shortlist']);
+});

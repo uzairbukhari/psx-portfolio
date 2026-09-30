@@ -1,4 +1,5 @@
 import { dateOK, round, today, type Portfolio } from './portfolio.ts';
+import { UserError } from './user-error.ts';
 
 export type SourceDetail = { url: string; title: string; date: string; sourceType?: 'primary' | 'secondary' | 'other' };
 export type EvidenceIssue = { ticker: string; kind: 'technical' | 'material_gap' | 'uncertainty'; message: string };
@@ -21,6 +22,8 @@ export type MonthlyPicksResearch = {
   marketOutlook: string; picks: MonthlyPick[]; coverage: CompanyOutlook[]; unallocatedPct: number;
   evidenceIssues?: EvidenceIssue[]; assessedCount?: number; totalCount?: number;
   method?: 'ai' | 'quant'; dataAsOf?: string;
+  /** Why a quant result was used instead of the AI ranking, when that is worth telling the user. */
+  fallbackReason?: string;
 };
 export type MonthlyPickEstimate = MonthlyPick & {
   allocationPkr: number; price: number | null; priceDate: string | null; shares: number | null;
@@ -29,8 +32,8 @@ export type MonthlyPickEstimate = MonthlyPick & {
 const ageDays = (date: string) => Math.floor((Date.parse(today()) - Date.parse(date)) / 86_400_000);
 
 export function estimateMonthlyPicks(result: MonthlyPicksResearch, portfolio: Portfolio, amount: number, feePct: number): MonthlyPickEstimate[] {
-  if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) throw Error('Investment amount must be between PKR 0 and PKR 1 billion.');
-  if (!Number.isFinite(feePct) || feePct < 0 || feePct > 10) throw Error('Fee estimate must be between 0% and 10%.');
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) throw new UserError('Investment amount must be between PKR 0 and PKR 1 billion.');
+  if (!Number.isFinite(feePct) || feePct < 0 || feePct > 10) throw new UserError('Fee estimate must be between 0% and 10%.');
   return result.picks.map((pick) => {
     const allocationPkr = Math.floor(Math.floor(amount * 100) * pick.allocationPct / 100) / 100;
     const quote = portfolio.quotes[pick.ticker];
@@ -47,14 +50,14 @@ export function validateMonthlyPicksResearch(value: unknown, shortlist: string[]
   const result = structuredClone(value) as MonthlyPicksResearch;
   const evidenceIssues: EvidenceIssue[] = [];
   const canonicalTickers = new Map(shortlist.map(ticker => [ticker.toUpperCase(), ticker]));
-  if (!result || typeof result.marketOutlook !== 'string') throw Error('The research response is incomplete.');
-  if (!Array.isArray(result.picks) || result.picks.length > 5) throw Error('The recommendation must contain no more than five picks.');
-  if (!Array.isArray(result.coverage) || result.coverage.length !== shortlist.length) throw Error('The research must cover every shortlisted company.');
-  if (!Number.isFinite(result.unallocatedPct) || result.unallocatedPct < 0 || result.unallocatedPct > 100) throw Error('Invalid unallocated percentage.');
+  if (!result || typeof result.marketOutlook !== 'string') throw new UserError('The research response is incomplete.');
+  if (!Array.isArray(result.picks) || result.picks.length > 5) throw new UserError('The recommendation must contain no more than five picks.');
+  if (!Array.isArray(result.coverage) || result.coverage.length !== shortlist.length) throw new UserError('The research must cover every shortlisted company.');
+  if (!Number.isFinite(result.unallocatedPct) || result.unallocatedPct < 0 || result.unallocatedPct > 100) throw new UserError('Invalid unallocated percentage.');
   const covered = new Set<string>();
   for (const item of result.coverage) {
     const ticker = typeof item?.ticker === 'string' ? canonicalTickers.get(item.ticker.trim().toUpperCase()) : undefined;
-    if (!ticker || covered.has(ticker) || !['Positive', 'Neutral', 'Negative', 'Insufficient evidence'].includes(item.outlook) || typeof item.summary !== 'string') throw Error('The recommendation contains invalid company coverage.');
+    if (!ticker || covered.has(ticker) || !['Positive', 'Neutral', 'Negative', 'Insufficient evidence'].includes(item.outlook) || typeof item.summary !== 'string') throw new UserError('The recommendation contains invalid company coverage.');
     item.ticker = ticker;
     const sourceUrls = validatedSources(item.sourceUrls, allowedSources);
     const assessed = item.assessmentStatus !== 'unassessed' && Boolean(sourceUrls);
@@ -67,21 +70,21 @@ export function validateMonthlyPicksResearch(value: unknown, shortlist: string[]
   const pickTickers = new Set<string>();
   for (const pick of result.picks) {
     const ticker = typeof pick?.ticker === 'string' ? canonicalTickers.get(pick.ticker.trim().toUpperCase()) : undefined;
-    if (!ticker) throw Error('The recommendation contains a company outside the shortlist.');
-    if (pickTickers.has(ticker)) throw Error(`The recommendation repeats ${ticker}.`);
+    if (!ticker) throw new UserError('The recommendation contains a company outside the shortlist.');
+    if (pickTickers.has(ticker)) throw new UserError(`The recommendation repeats ${ticker}.`);
     const coverage = result.coverage.find(item => item.ticker === ticker);
-    if (!coverage || coverage.assessmentStatus !== 'assessed') throw Error(`The recommendation selects unassessed company ${ticker}.`);
-    if (!Number.isFinite(pick.allocationPct) || pick.allocationPct <= 0 || pick.allocationPct > 100) throw Error(`The recommendation contains an invalid allocation for ${ticker}.`);
-    if (!['High', 'Medium', 'Low'].includes(pick.confidence) || typeof pick.thesis !== 'string' || typeof pick.name !== 'string' || !Array.isArray(pick.catalysts) || !Array.isArray(pick.risks) || !pick.catalysts.every(value => typeof value === 'string') || !pick.risks.every(value => typeof value === 'string')) throw Error(`The recommendation contains incomplete analysis for ${ticker}.`);
+    if (!coverage || coverage.assessmentStatus !== 'assessed') throw new UserError(`The recommendation selects unassessed company ${ticker}.`);
+    if (!Number.isFinite(pick.allocationPct) || pick.allocationPct <= 0 || pick.allocationPct > 100) throw new UserError(`The recommendation contains an invalid allocation for ${ticker}.`);
+    if (!['High', 'Medium', 'Low'].includes(pick.confidence) || typeof pick.thesis !== 'string' || typeof pick.name !== 'string' || !Array.isArray(pick.catalysts) || !Array.isArray(pick.risks) || !pick.catalysts.every(value => typeof value === 'string') || !pick.risks.every(value => typeof value === 'string')) throw new UserError(`The recommendation contains incomplete analysis for ${ticker}.`);
     const sourceUrls = validatedSources(pick.sourceUrls, allowedSources);
     pick.ticker = ticker;
     pickTickers.add(ticker);
-    if (!sourceUrls) throw Error(`The recommendation selects ${ticker} without company-specific supporting sources.`);
+    if (!sourceUrls) throw new UserError(`The recommendation selects ${ticker} without company-specific supporting sources.`);
     pick.sourceUrls = sourceUrls;
     pick.evidenceStatus = 'ready';
   }
   const total = result.unallocatedPct + result.picks.reduce((sum, pick) => sum + pick.allocationPct, 0);
-  if (Math.abs(total - 100) > 0.01) throw Error('Recommended allocations and cash must total 100%.');
+  if (Math.abs(total - 100) > 0.01) throw new UserError('Recommended allocations and cash must total 100%.');
   const existing = Array.isArray(result.evidenceIssues) ? result.evidenceIssues.filter(issue => issue && typeof issue === 'object') : [];
   result.evidenceIssues = [...existing, ...evidenceIssues].filter((issue, index, all) => all.findIndex(candidate => candidate.ticker === issue.ticker && candidate.kind === issue.kind) === index);
   if (!result.evidenceIssues.length) delete result.evidenceIssues;
@@ -108,4 +111,28 @@ function sourceKey(value: string) {
     for (const key of Array.from(url.searchParams.keys())) if (/^(utm_|fbclid$|gclid$)/i.test(key)) url.searchParams.delete(key);
     url.searchParams.sort(); return url.toString();
   } catch { return null; }
+}
+
+/**
+ * Reconciles an estimate to the fresh money. `plannedCashPkr` is the reserve the ranking
+ * left unallocated; `roundingLeftoverPkr` is what whole-share rounding and fees leave
+ * inside the allocated picks. Unspent money = fresh money − fee-inclusive estimated
+ * spend = planned cash + rounding leftover. A pick without a usable price makes the
+ * estimate incomplete: the figures that depend on it are null rather than guessed.
+ */
+export function summarizeEstimates(estimates: MonthlyPickEstimate[], amount: number) {
+  const allocatedPkr = round(estimates.reduce((sum, pick) => sum + pick.allocationPkr, 0));
+  const plannedCashPkr = round(amount - allocatedPkr);
+  const missingPrices = estimates.filter((pick) => pick.estimatedSpend === null).map((pick) => pick.ticker);
+  const incomplete = missingPrices.length > 0;
+  const estimatedSpendPkr = round(estimates.reduce((sum, pick) => sum + (pick.estimatedSpend ?? 0), 0));
+  return {
+    allocatedPkr,
+    plannedCashPkr,
+    estimatedSpendPkr,
+    roundingLeftoverPkr: incomplete ? null : round(allocatedPkr - estimatedSpendPkr),
+    unspentPkr: incomplete ? null : round(amount - estimatedSpendPkr),
+    incomplete,
+    missingPrices,
+  };
 }

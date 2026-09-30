@@ -1,4 +1,6 @@
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import { dividendEntitlement, lastTradingDay } from './psx-calendar.ts';
+import { UserError } from './user-error.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -38,6 +40,8 @@ export type Trade = {
   source?: 'manual' | 'finqalab' | 'ahl';
   externalId?: string;
   voided?: boolean;
+  /** Broker/NCCPL capital-gains-tax deduction recorded for a sale; an actual figure, never re-estimated. */
+  taxWithheld?: number;
 };
 export type StockSplit = {
   id: string;
@@ -60,6 +64,19 @@ export type Dividend = {
   financialYear?: string;
   note: string;
   voided?: boolean;
+  /**
+   * Automatic dividends are `expected` (the default when absent) until receipt is confirmed;
+   * manual and CDC-imported dividends are always received.
+   */
+  status?: 'expected' | 'received';
+  /** Last trade date that qualifies, derived from the PSX calendar (`date` stays the book-closure start). */
+  entitlementDate?: string;
+  /** False when the holiday calendar for the year is incomplete, so entitlement needs confirming. */
+  entitlementCertain?: boolean;
+  /** Date the cash actually arrived, set when receipt is confirmed. */
+  paymentDate?: string;
+  /** Actual tax withheld for a received manual/auto dividend; an actual figure, never re-estimated. */
+  taxWithheld?: number;
 };
 export type AppNotification = {
   id: string;
@@ -89,6 +106,16 @@ export type Quote = {
   fetchedAt: string;
   manual?: boolean;
 };
+/**
+ * Whether a fetched quote should replace the saved one: a later trading date
+ * wins, then a later fetch time. A manually verified quote holds until PSX
+ * publishes a price for a strictly later trading day.
+ */
+export function quoteSupersedes(candidate: Quote, current: Quote | undefined) {
+  if (!current) return true;
+  if (candidate.date !== current.date) return candidate.date > current.date;
+  return !current.manual && candidate.fetchedAt > current.fetchedAt;
+}
 export const RESEARCH_MODELS = ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'] as const;
 export type ResearchModel = (typeof RESEARCH_MODELS)[number];
 export const REASONING_EFFORTS = ['low', 'medium', 'high'] as const;
@@ -164,8 +191,11 @@ export const money = (n: number | null) =>
         currency: 'PKR',
         maximumFractionDigits: 2,
       }).format(n);
-export const round = (n: number) =>
-  Math.round((n + Number.EPSILON) * 100) / 100;
+/** Rounds to paisa, half away from zero for negative values as well as positive. */
+export const round = (n: number) => {
+  const r = (Math.sign(n) * Math.round((Math.abs(n) + Number.EPSILON) * 100)) / 100;
+  return r === 0 ? 0 : r;
+};
 const seeds: [string, string, number, number, Sector][] = [
   ['BFAGRO', 'Barkat Frisian Agro', 3102, 0, 'Foods'],
   ['BIPL', 'BankIslami Pakistan', 57, 0, 'Bank'],
@@ -311,7 +341,7 @@ function ledgerEventsFor(p: Portfolio, ticker: string, throughDate?: string) {
 function applySplit(shares: number, split: StockSplit) {
   const adjusted = (shares * split.newShares) / split.oldShares;
   if (!Number.isSafeInteger(adjusted))
-    throw Error(
+    throw new UserError(
       `${split.ticker}: ${split.newShares}-for-${split.oldShares} split on ${split.date} produces fractional shares.`,
     );
   return adjusted;
@@ -359,7 +389,7 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
       const t = event.value;
       if (t.kind === 'sell') {
         if (t.shares > shares)
-          throw Error(c.ticker + ': sale exceeds shares held on ' + t.date);
+          throw new UserError(c.ticker + ': sale exceeds shares held on ' + t.date);
         const avg: number | null =
           cost === null ? null : shares ? cost / shares : 0;
         out.push({
@@ -387,16 +417,9 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
   return out;
 }
 export const DEFAULT_FACE_VALUE = 10;
-/** Book-closure start minus two weekdays: PSX settles T+1, so a buyer must hold by then. Holidays are ignored. */
-export function entitlementDate(bookClosureStart: string) {
-  const d = new Date(bookClosureStart + 'T00:00:00Z');
-  let back = 2;
-  while (back > 0) {
-    d.setUTCDate(d.getUTCDate() - 1);
-    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) back--;
-  }
-  return d.toISOString().slice(0, 10);
-}
+/** Last qualifying trade date for a book closure start (PSX calendar and settlement rules; see `dividendEntitlement`). */
+export const entitlementDate = (bookClosureStart: string) =>
+  dividendEntitlement(bookClosureStart).date;
 const shiftDays = (date: string, days: number) => {
   const d = new Date(date + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() + days);
@@ -404,12 +427,53 @@ const shiftDays = (date: string, days: number) => {
 };
 export const autoDividendId = (a: PayoutAnnouncement) =>
   `psx:${a.ticker}:${a.bookClosureStart}:${a.announcedOn}`;
+
+/** Manual and CDC dividends are received income; an automatic one stays expected until receipt is confirmed. */
+export const dividendStatus = (d: Pick<Dividend, 'source' | 'status'>): 'expected' | 'received' =>
+  d.source === 'auto' ? (d.status ?? 'expected') : 'received';
+
+/** Marks an expected dividend as received, optionally recording the actual gross amount and tax withheld. */
+export function confirmDividendReceipt(
+  d: Dividend,
+  receipt: { paymentDate: string; grossAmount?: number; taxWithheld?: number },
+): Dividend {
+  if (!dateOK(receipt.paymentDate)) throw new UserError('Enter a valid payment date.');
+  const out: Dividend = { ...d, status: 'received', paymentDate: receipt.paymentDate };
+  if (receipt.grossAmount !== undefined) out.grossAmount = round(receipt.grossAmount);
+  if (receipt.taxWithheld !== undefined) out.taxWithheld = round(receipt.taxWithheld);
+  return out;
+}
+
+/** Pairing tolerance between a derived and a recorded amount (rounding, small share-count drift). */
+const AMOUNT_TOLERANCE = 0.02;
+const WINDOW_BEFORE_DAYS = 7;
+const WINDOW_AFTER_DAYS = 60;
+const inPayoutWindow = (date: string, bookClosureStart: string) =>
+  date >= shiftDays(bookClosureStart, -WINDOW_BEFORE_DAYS) &&
+  date <= shiftDays(bookClosureStart, WINDOW_AFTER_DAYS);
+const amountsAgree = (a: number, b: number) =>
+  a > 0 && b > 0 && Math.abs(a - b) / Math.max(a, b) <= AMOUNT_TOLERANCE;
+
+/** Gross amount of a dividend: recorded for imports and received ones, derived from the ledger while expected. */
+function dividendGross(p: Portfolio, d: Dividend) {
+  if (d.source === 'import') return d.grossAmount ?? 0;
+  if (d.source === 'auto' && dividendStatus(d) === 'expected')
+    return round(
+      (d.perShare ?? 0) *
+        sharesHeldOn(p, d.ticker, d.entitlementDate ?? entitlementDate(d.date)),
+    );
+  if (d.grossAmount !== undefined) return d.grossAmount;
+  return round((d.perShare ?? 0) * sharesHeldOn(p, d.ticker, d.date));
+}
+
 /**
  * Cash dividends PSX has announced for held companies whose book closure has
- * started and that the ledger has not recorded yet. Entitlement uses the shares
- * held on the entitlement date (split-aware). Skips ids already present (even
- * voided, so a voided entry never returns) and dates a manual/CDC entry already
- * covers, so CDC imports and hand-entered dividends are never double counted.
+ * started and that the ledger has not recorded yet. They are created as
+ * *expected* dividends: shares held on the entitlement date (split-aware) times
+ * the per-share amount, not income until receipt is confirmed. Skips ids already
+ * present (even voided, so a voided entry never returns). A manual or CDC entry
+ * covers at most one announcement (paired by amount, then date), so a second
+ * payout in the same window is still created.
  */
 export function pendingAutoDividends(
   p: Portfolio,
@@ -419,7 +483,8 @@ export function pendingAutoDividends(
   const tickers = new Map(p.companies.map((c) => [c.ticker, c]));
   const all = p.dividends ?? [];
   const seen = new Set(all.map((d) => d.externalId).filter(Boolean));
-  const out: Dividend[] = [];
+  type Candidate = { dividend: Dividend; perShare: number; gross: number };
+  const candidates: Candidate[] = [];
   for (const a of announcements) {
     const company = tickers.get(a.ticker);
     if (!company || a.kind !== 'cash' || a.bookClosureStart > asOf) continue;
@@ -431,92 +496,236 @@ export function pendingAutoDividends(
         ? null
         : round((a.percent / 100) * (company.faceValue ?? DEFAULT_FACE_VALUE)));
     if (perShare === null || !(perShare > 0)) continue;
-    const shares = sharesHeldOn(p, a.ticker, entitlementDate(a.bookClosureStart));
+    const entitlement = dividendEntitlement(a.bookClosureStart);
+    const shares = sharesHeldOn(p, a.ticker, entitlement.date);
     if (shares <= 0) continue;
-    const from = shiftDays(a.bookClosureStart, -7),
-      to = shiftDays(a.bookClosureStart, 60);
-    if (
-      all.some(
-        (d) =>
-          !d.voided &&
-          d.source !== 'auto' &&
-          d.ticker === a.ticker &&
-          d.date >= from &&
-          d.date <= to,
-      )
-    )
-      continue;
     seen.add(externalId);
-    out.push({
-      id: 'auto-' + externalId,
-      ticker: a.ticker,
-      date: a.bookClosureStart,
-      source: 'auto',
+    const gross = round(perShare * shares);
+    candidates.push({
       perShare,
-      grossAmount: round(perShare * shares),
-      externalId,
-      financialYear: a.period || undefined,
-      note: `PSX ${a.details}${a.period ? ', ' + a.period : ''}; book closure ${a.bookClosureStart} to ${a.bookClosureEnd}; ${shares} shares held on ${entitlementDate(a.bookClosureStart)}.`,
+      gross,
+      dividend: {
+        id: 'auto-' + externalId,
+        ticker: a.ticker,
+        date: a.bookClosureStart,
+        source: 'auto',
+        status: 'expected',
+        entitlementDate: entitlement.date,
+        entitlementCertain: entitlement.certain,
+        perShare,
+        grossAmount: gross,
+        externalId,
+        financialYear: a.period || undefined,
+        note: `PSX ${a.details}${a.period ? ', ' + a.period : ''}; book closure ${a.bookClosureStart} to ${a.bookClosureEnd}; ${shares} shares held on ${entitlement.date} (${entitlement.settlement} settlement${entitlement.certain ? '' : ', holiday calendar incomplete: confirm entitlement'}). Expected, not yet received.`,
+      },
     });
   }
-  return out;
+  // Pair each recorded manual/CDC dividend with at most one announcement it covers.
+  const recorded = all.filter((d) => !d.voided && d.source !== 'auto');
+  const pairs: { c: number; r: number; score: number }[] = [];
+  candidates.forEach((c, ci) =>
+    recorded.forEach((d, ri) => {
+      if (d.ticker !== c.dividend.ticker || !inPayoutWindow(d.date, c.dividend.date)) return;
+      if (d.source === 'import' && !amountsAgree(d.grossAmount ?? 0, c.gross)) return;
+      const diff =
+        d.perShare !== undefined
+          ? Math.abs(d.perShare - c.perShare) / c.perShare
+          : d.grossAmount !== undefined
+            ? Math.abs(d.grossAmount - c.gross) / c.gross
+            : 0.5;
+      const days = Math.abs(Date.parse(d.date) - Date.parse(c.dividend.date)) / 86_400_000;
+      pairs.push({ c: ci, r: ri, score: diff + days / 10_000 });
+    }),
+  );
+  pairs.sort((x, y) => x.score - y.score);
+  const coveredCandidate = new Set<number>(),
+    usedRecord = new Set<number>();
+  for (const pair of pairs) {
+    if (coveredCandidate.has(pair.c) || usedRecord.has(pair.r)) continue;
+    coveredCandidate.add(pair.c);
+    usedRecord.add(pair.r);
+  }
+  return candidates.filter((_, i) => !coveredCandidate.has(i)).map((c) => c.dividend);
 }
+
+/**
+ * A CDC import is the real paid amount, so it supersedes the matching automatic
+ * dividend (mutates `existing`: the auto record is voided). Only an amount-compatible
+ * record inside the payout window matches; when several do, nothing is voided and the
+ * import is returned as `ambiguous` so the user can decide.
+ */
+export function supersedeAutoWithImports(
+  p: Portfolio,
+  existing: Dividend[],
+  imported: Dividend[],
+) {
+  const voided: Dividend[] = [],
+    ambiguous: Dividend[] = [];
+  for (const row of imported) {
+    const matches = existing.filter(
+      (d) =>
+        d.source === 'auto' &&
+        !d.voided &&
+        d.ticker === row.ticker &&
+        inPayoutWindow(row.date, d.date) &&
+        amountsAgree(row.grossAmount ?? 0, dividendGross(p, d)),
+    );
+    if (matches.length === 1) {
+      matches[0].voided = true;
+      voided.push(matches[0]);
+    } else if (matches.length > 1) ambiguous.push(row);
+  }
+  return { voided, ambiguous };
+}
+
+/** Pakistani tax year (1 July – 30 June) a date falls in, e.g. "2025-26". */
+export function taxYearOf(date: string) {
+  const year = Number(date.slice(0, 4));
+  const start = Number(date.slice(5, 7)) >= 7 ? year : year - 1;
+  return `${start}-${String((start + 1) % 100).padStart(2, '0')}`;
+}
+export type TaxBasis = 'actual' | 'estimate';
 export type TaxedSale = RealizedSale & {
   tax: number | null;
   net: number | null;
+  /** `actual` = deduction recorded from the broker/NCCPL; `estimate` = filer-rate estimate. */
+  taxBasis: TaxBasis;
 };
 export type TaxedDividend = {
   id: string;
   ticker: string;
   date: string;
   source: 'manual' | 'import' | 'auto';
+  status: 'expected' | 'received';
+  paymentDate?: string;
+  entitlementDate?: string;
+  entitlementCertain?: boolean;
   grossAmount: number;
   tax: number | null;
   netAmount: number | null;
+  taxBasis: TaxBasis;
 };
+export type TaxYearSummary = {
+  taxYear: string;
+  /** Sum of gains / losses across sales with a known cost basis. */
+  gains: number;
+  losses: number;
+  /** Net gain left after offsetting losses within the year, for sales without a recorded deduction. */
+  netTaxableGain: number;
+  estimatedTax: number | null;
+  actualTax: number;
+  basis: TaxBasis | 'mixed';
+};
+/**
+ * Realised gains and received dividends with tax. Amounts recorded from a broker/NCCPL/CDC
+ * deduction are `actual` and never recalculated; everything else is a filer-rate `estimate`
+ * (capital gains netted per tax year, dividends taxed at the rate). Expected dividends are
+ * reported separately and stay out of income and realised-return totals.
+ */
 export function taxSummary(p: Portfolio) {
   const rate = p.taxProfile ? TAX_RATES[p.taxProfile.filerStatus] : null;
-  const sales: TaxedSale[] = realizedSales(p).map((s) => {
+  const realized = realizedSales(p);
+  const withheld = new Map(
+    p.trades.filter((t) => t.taxWithheld !== undefined).map((t) => [t.id, t.taxWithheld!]),
+  );
+  // Estimate pool: sales with a known gain and no recorded deduction, netted per tax year.
+  const pool = new Map<string, { gains: number; losses: number }>();
+  for (const s of realized) {
+    if (s.realizedGain === null || withheld.has(s.tradeId)) continue;
+    const y = pool.get(taxYearOf(s.date)) ?? { gains: 0, losses: 0 };
+    if (s.realizedGain > 0) y.gains += s.realizedGain;
+    else y.losses -= s.realizedGain;
+    pool.set(taxYearOf(s.date), y);
+  }
+  const yearTax = new Map<string, number | null>();
+  for (const [year, y] of pool)
+    yearTax.set(year, rate === null ? null : round(Math.max(0, y.gains - y.losses) * rate));
+  // Spread each year's tax over its gaining sales; the last one absorbs rounding.
+  const allocated = new Map<string, number>();
+  const remaining = new Map(yearTax);
+  const gainingLeft = new Map<string, number>();
+  for (const s of realized)
+    if (s.realizedGain !== null && s.realizedGain > 0 && !withheld.has(s.tradeId))
+      gainingLeft.set(taxYearOf(s.date), (gainingLeft.get(taxYearOf(s.date)) ?? 0) + 1);
+  for (const s of realized) {
+    if (s.realizedGain === null || s.realizedGain <= 0 || withheld.has(s.tradeId)) continue;
+    const year = taxYearOf(s.date),
+      total = yearTax.get(year);
+    if (total === null || total === undefined) continue;
+    const left = (gainingLeft.get(year) ?? 1) - 1;
+    gainingLeft.set(year, left);
+    const share = left === 0 ? remaining.get(year)! : round((total * s.realizedGain) / pool.get(year)!.gains);
+    allocated.set(s.tradeId, share);
+    remaining.set(year, round(remaining.get(year)! - share));
+  }
+  const sales: TaxedSale[] = realized.map((s) => {
+    const actual = withheld.get(s.tradeId);
     const tax =
-      s.realizedGain === null || rate === null
-        ? null
-        : round(Math.max(0, s.realizedGain) * rate);
+      actual !== undefined
+        ? actual
+        : s.realizedGain === null || rate === null
+          ? null
+          : s.realizedGain <= 0
+            ? 0
+            : (allocated.get(s.tradeId) ?? 0);
     const net =
-      s.realizedGain === null || tax === null
-        ? null
-        : round(s.realizedGain - tax);
-    return { ...s, tax, net };
+      s.realizedGain === null || tax === null ? null : round(s.realizedGain - tax);
+    return { ...s, tax, net, taxBasis: actual !== undefined ? 'actual' : 'estimate' };
   });
+  const years = new Map<string, TaxedSale[]>();
+  for (const s of sales) years.set(taxYearOf(s.date), [...(years.get(taxYearOf(s.date)) ?? []), s]);
+  const taxYears: TaxYearSummary[] = [...years]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([taxYear, list]) => {
+      const known = list.filter((s) => s.realizedGain !== null);
+      const actualCount = list.filter((s) => s.taxBasis === 'actual').length;
+      const y = pool.get(taxYear);
+      return {
+        taxYear,
+        gains: round(known.reduce((a, s) => a + Math.max(0, s.realizedGain!), 0)),
+        losses: round(known.reduce((a, s) => a + Math.max(0, -s.realizedGain!), 0)),
+        netTaxableGain: y ? round(Math.max(0, y.gains - y.losses)) : 0,
+        estimatedTax: y ? (yearTax.get(taxYear) ?? null) : 0,
+        actualTax: round(list.reduce((a, s) => a + (s.taxBasis === 'actual' ? (s.tax ?? 0) : 0), 0)),
+        basis: actualCount === 0 ? 'estimate' : actualCount === list.length ? 'actual' : 'mixed',
+      };
+    });
   const dividends: TaxedDividend[] = (p.dividends ?? [])
     .filter((d) => !d.voided)
     .map((d) => {
-      if (d.source === 'import') {
-        const grossAmount = d.grossAmount!,
-          netAmount = d.netAmount!;
-        return {
-          id: d.id,
-          ticker: d.ticker,
-          date: d.date,
-          source: d.source,
-          grossAmount,
-          tax: round(grossAmount - netAmount),
-          netAmount,
-        };
-      }
-      const grossAmount =
-        d.grossAmount ??
-        round((d.perShare ?? 0) * sharesHeldOn(p, d.ticker, d.date));
-      const tax = rate === null ? null : round(grossAmount * rate);
-      return {
+      const grossAmount = dividendGross(p, d);
+      const base = {
         id: d.id,
         ticker: d.ticker,
         date: d.date,
         source: d.source,
+        status: dividendStatus(d),
+        paymentDate: d.paymentDate,
+        entitlementDate: d.entitlementDate,
+        entitlementCertain: d.entitlementCertain,
         grossAmount,
+      };
+      if (d.source === 'import') {
+        const tax = round(grossAmount - d.netAmount!);
+        return { ...base, tax, netAmount: d.netAmount!, taxBasis: 'actual' as const };
+      }
+      if (d.taxWithheld !== undefined)
+        return {
+          ...base,
+          tax: d.taxWithheld,
+          netAmount: round(grossAmount - d.taxWithheld),
+          taxBasis: 'actual' as const,
+        };
+      const tax = rate === null ? null : round(grossAmount * rate);
+      return {
+        ...base,
         tax,
         netAmount: tax === null ? null : round(grossAmount - tax),
+        taxBasis: 'estimate' as const,
       };
     });
+  const received = dividends.filter((d) => d.status === 'received');
+  const expected = dividends.filter((d) => d.status === 'expected');
   const totalRealizedGain = round(
     sales.reduce((a, s) => a + (s.realizedGain ?? 0), 0),
   );
@@ -524,38 +733,54 @@ export function taxSummary(p: Portfolio) {
     ? null
     : round(sales.reduce((a, s) => a + (s.tax ?? 0), 0));
   const totalDividendIncomeGross = round(
-    dividends.reduce((a, d) => a + d.grossAmount, 0),
+    received.reduce((a, d) => a + d.grossAmount, 0),
   );
-  const totalDividendTax = dividends.some((d) => d.tax === null)
+  const totalDividendTax = received.some((d) => d.tax === null)
     ? null
-    : round(dividends.reduce((a, d) => a + (d.tax ?? 0), 0));
+    : round(received.reduce((a, d) => a + (d.tax ?? 0), 0));
   const netRealizedReturn =
     totalCapitalGainsTax === null || totalDividendTax === null
       ? null
       : round(
           sales.reduce((a, s) => a + (s.net ?? 0), 0) +
-            dividends.reduce((a, d) => a + (d.netAmount ?? 0), 0),
+            received.reduce((a, d) => a + (d.netAmount ?? 0), 0),
         );
   return {
     sales,
     dividends,
+    taxYears,
     totalRealizedGain,
     totalCapitalGainsTax,
     totalDividendIncomeGross,
     totalDividendTax,
     netRealizedReturn,
+    /** Announced but unconfirmed dividends: planning figures, never income. */
+    expectedDividends: {
+      count: expected.length,
+      grossAmount: round(expected.reduce((a, d) => a + d.grossAmount, 0)),
+      estimatedTax: expected.some((d) => d.tax === null)
+        ? null
+        : round(expected.reduce((a, d) => a + (d.tax ?? 0), 0)),
+      uncertainEntitlement: expected.filter((d) => d.entitlementCertain === false).length,
+    },
   };
 }
-/** Shares and remaining cost (average-cost method, as in `holdings`) after each ledger date. */
+/**
+ * Shares and remaining cost (average-cost method, as in `holdings`) after each ledger date.
+ * Where `holdings` throws on a sale larger than the position, this clamps at zero and sets
+ * `oversold` from that point on, so a chart can still render and flag the ledger.
+ */
 export function positionTimeline(p: Portfolio, ticker: string) {
-  const out: { date: string; shares: number; cost: number | null }[] = [];
+  const out: { date: string; shares: number; cost: number | null; oversold: boolean }[] = [];
   let shares = 0,
-    cost: number | null = 0;
+    cost: number | null = 0,
+    oversold = false;
   for (const event of ledgerEventsFor(p, ticker)) {
     if (event.type === 'split') shares = applySplit(shares, event.value);
     else {
       const t = event.value;
       if (t.kind === 'sell') {
+        if (t.shares > shares) oversold = true;
         const avg: number | null = cost === null ? null : shares ? cost / shares : 0;
         cost = avg === null ? null : Math.max(0, cost! - avg * Math.min(t.shares, shares));
         shares = Math.max(0, shares - t.shares);
@@ -565,7 +790,7 @@ export function positionTimeline(p: Portfolio, ticker: string) {
         cost = t.price === null || cost === null ? null : cost + t.shares * t.price + t.fees;
       }
     }
-    const snap = { date: event.value.date, shares, cost: cost === null ? null : round(cost) };
+    const snap = { date: event.value.date, shares, cost: cost === null ? null : round(cost), oversold };
     if (out.at(-1)?.date === snap.date) out[out.length - 1] = snap;
     else out.push(snap);
   }
@@ -584,7 +809,7 @@ export function holdings(p: Portfolio) {
       const t = event.value;
       if (t.kind === 'sell') {
         if (t.shares > shares)
-          throw Error(c.ticker + ': sale exceeds shares held on ' + t.date);
+          throw new UserError(c.ticker + ': sale exceeds shares held on ' + t.date);
         const avg: number | null =
           cost === null ? null : shares ? cost / shares : 0;
         if (avg === null) realized = null;
@@ -629,10 +854,10 @@ export function validate(p: Portfolio) {
     !p.quotes ||
     !p.budgets
   )
-    throw Error('Invalid portfolio format.');
+    throw new UserError('Invalid portfolio format.');
   if (p.research !== undefined) {
     if (!Array.isArray(p.research) || p.research.length > 200)
-      throw Error('Invalid research workspace.');
+      throw new UserError('Invalid research workspace.');
     const researchTickers = new Set<string>();
     for (const r of p.research) {
       if (
@@ -653,14 +878,28 @@ export function validate(p: Portfolio) {
           (v) => v.length > 5000,
         ) ||
         !Array.isArray(r.sources) ||
-        !Array.isArray(r.financials)
+        r.sources.length > 200 ||
+        r.sources.some((s) => typeof s !== 'string' || s.length > 2000) ||
+        !Array.isArray(r.financials) ||
+        r.financials.length > 40 ||
+        r.financials.some(
+          (f) =>
+            !f ||
+            typeof f.year !== 'string' ||
+            f.year.length > 20 ||
+            [f.revenue, f.profit, f.eps, f.roe, f.debt].some(
+              (v) => v != null && !Number.isFinite(v),
+            ),
+        ) ||
+        (r.details !== undefined &&
+          (!r.details || typeof r.details !== 'object' || Array.isArray(r.details)))
       )
-        throw Error('Invalid research dossier.');
+        throw new UserError('Invalid research dossier.');
       researchTickers.add(r.ticker);
     }
   }
   if (p.companies.length > 200 || p.trades.length > 20000)
-    throw Error('Portfolio exceeds supported size.');
+    throw new UserError('Portfolio exceeds supported size.');
   const tickers = new Set<string>();
   for (const c of p.companies) {
     if (
@@ -681,7 +920,7 @@ export function validate(p: Portfolio) {
       (c.faceValue !== undefined &&
         (!Number.isFinite(c.faceValue) || c.faceValue <= 0 || c.faceValue > 1000))
     )
-      throw Error('Invalid or duplicate company.');
+      throw new UserError('Invalid or duplicate company.');
     tickers.add(c.ticker);
   }
   const ids = new Set();
@@ -718,9 +957,14 @@ export function validate(p: Portfolio) {
       ((t.source === undefined || t.source === 'manual') &&
         t.externalId !== undefined) ||
       (t.month !== '' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(t.month)) ||
-      (t.voided !== undefined && typeof t.voided !== 'boolean')
+      (t.voided !== undefined && typeof t.voided !== 'boolean') ||
+      (t.taxWithheld !== undefined &&
+        (t.kind !== 'sell' ||
+          !Number.isFinite(t.taxWithheld) ||
+          t.taxWithheld < 0 ||
+          t.taxWithheld > 1e9))
     )
-      throw Error('Invalid transaction. Check dates, shares and price.');
+      throw new UserError('Invalid transaction. Check dates, shares and price.');
     if (
       !t.voided &&
       t.kind !== 'opening' &&
@@ -729,20 +973,20 @@ export function validate(p: Portfolio) {
       openings.has(t.ticker) &&
       t.date < openings.get(t.ticker)!
     )
-      throw Error(
+      throw new UserError(
         'Transaction predates the opening balance. Correct or void that opening balance before importing earlier history.',
       );
     ids.add(t.id);
     if (!t.voided && (t.source === 'finqalab' || t.source === 'ahl')) {
       const brokerKey = `${t.source}:${t.externalId}`;
       if (brokerImportIds.has(brokerKey))
-        throw Error(`Duplicate ${t.source === 'ahl' ? 'AHL' : 'Finqalab'} trade import.`);
+        throw new UserError(`Duplicate ${t.source === 'ahl' ? 'AHL' : 'Finqalab'} trade import.`);
       brokerImportIds.add(brokerKey);
     }
   }
   if (p.stockSplits !== undefined) {
     if (!Array.isArray(p.stockSplits) || p.stockSplits.length > 20000)
-      throw Error('Portfolio exceeds supported size.');
+      throw new UserError('Portfolio exceeds supported size.');
     const splitIds = new Set<string>(),
       activeDates = new Set<string>();
     for (const s of p.stockSplits) {
@@ -761,18 +1005,18 @@ export function validate(p: Portfolio) {
         s.note.length > 2000 ||
         (s.voided !== undefined && typeof s.voided !== 'boolean')
       )
-        throw Error('Invalid stock split. Use a forward split with whole-share ratios.');
+        throw new UserError('Invalid stock split. Use a forward split with whole-share ratios.');
       splitIds.add(s.id);
       if (!s.voided) {
         const key = `${s.ticker}:${s.date}`;
         if (activeDates.has(key))
-          throw Error(`${s.ticker}: duplicate stock split on ${s.date}.`);
+          throw new UserError(`${s.ticker}: duplicate stock split on ${s.date}.`);
         activeDates.add(key);
       }
     }
     for (const s of p.stockSplits.filter((entry) => !entry.voided))
       if (sharesHeldBefore(p, s.ticker, s.date) <= 0)
-        throw Error(
+        throw new UserError(
           `${s.ticker}: no shares were held before the stock split on ${s.date}.`,
         );
   }
@@ -790,7 +1034,7 @@ export function validate(p: Portfolio) {
       !q.source.startsWith('https://dps.psx.com.pk/company/' + t) ||
       typeof q.fetchedAt !== 'string'
     )
-      throw Error('Invalid quote.');
+      throw new UserError('Invalid quote.');
   }
   for (const [month, budget] of Object.entries(p.budgets))
     if (
@@ -799,7 +1043,7 @@ export function validate(p: Portfolio) {
       budget < 0 ||
       budget > 1e9
     )
-      throw Error('Invalid monthly budget.');
+      throw new UserError('Invalid monthly budget.');
   if (p.monthlyPicksShortlist !== undefined) {
     if (
       !Array.isArray(p.monthlyPicksShortlist) ||
@@ -807,7 +1051,7 @@ export function validate(p: Portfolio) {
       new Set(p.monthlyPicksShortlist).size !== p.monthlyPicksShortlist.length ||
       p.monthlyPicksShortlist.some((ticker) => !tickers.has(ticker))
     )
-      throw Error('Invalid Monthly Picks shortlist.');
+      throw new UserError('Invalid Monthly Picks shortlist.');
   }
   if (
     p.aiReview &&
@@ -815,9 +1059,16 @@ export function validate(p: Portfolio) {
       p.aiReview.summary.length > 20000 ||
       typeof p.aiReview.generatedAt !== 'string' ||
       typeof p.aiReview.snapshot !== 'string' ||
-      !p.aiReview.weights)
+      p.aiReview.snapshot.length > 200000 ||
+      !p.aiReview.weights ||
+      typeof p.aiReview.weights !== 'object' ||
+      Array.isArray(p.aiReview.weights) ||
+      Object.keys(p.aiReview.weights).length > 200 ||
+      Object.entries(p.aiReview.weights).some(
+        ([t, w]) => !tickersPlaceholder(t) || !Number.isFinite(w) || w < 0 || w > 100,
+      ))
   )
-    throw Error('Invalid saved AI review.');
+    throw new UserError('Invalid saved AI review.');
   if (p.researchSettings !== undefined) {
     const s = p.researchSettings;
     if (
@@ -834,11 +1085,11 @@ export function validate(p: Portfolio) {
       s.maxAttempts < 1 ||
       s.maxAttempts > 5
     )
-      throw Error('Invalid research settings.');
+      throw new UserError('Invalid research settings.');
   }
   if (p.dividends !== undefined) {
     if (!Array.isArray(p.dividends) || p.dividends.length > 20000)
-      throw Error('Portfolio exceeds supported size.');
+      throw new UserError('Portfolio exceeds supported size.');
     const dividendIds = new Set<string>(),
       importIds = new Set<string>();
     for (const d of p.dividends) {
@@ -854,8 +1105,25 @@ export function validate(p: Portfolio) {
         (d.financialYear !== undefined && typeof d.financialYear !== 'string') ||
         (d.voided !== undefined && typeof d.voided !== 'boolean')
       )
-        throw Error('Invalid dividend record.');
+        throw new UserError('Invalid dividend record.');
       dividendIds.add(d.id);
+      if (
+        (d.status !== undefined &&
+          (!['expected', 'received'].includes(d.status) ||
+            (d.source !== 'auto' && d.status !== 'received'))) ||
+        (d.entitlementDate !== undefined && !dateOK(d.entitlementDate)) ||
+        (d.entitlementCertain !== undefined && typeof d.entitlementCertain !== 'boolean') ||
+        (d.paymentDate !== undefined && (!dateOK(d.paymentDate) || d.paymentDate > today())) ||
+        (d.taxWithheld !== undefined &&
+          (d.source === 'import' ||
+            !Number.isFinite(d.taxWithheld) ||
+            d.taxWithheld < 0 ||
+            d.taxWithheld > (d.grossAmount ?? 0))) ||
+        (d.source === 'auto' &&
+          d.status === 'received' &&
+          d.paymentDate === undefined)
+      )
+        throw new UserError('Invalid dividend record.');
       if (d.source === 'manual' || d.source === 'auto') {
         if (
           !Number.isFinite(d.perShare) ||
@@ -868,21 +1136,21 @@ export function validate(p: Portfolio) {
           (d.source === 'auto' &&
             (typeof d.externalId !== 'string' || !d.externalId))
         )
-          throw Error('Invalid dividend record.');
+          throw new UserError('Invalid dividend record.');
         if (d.source === 'auto' && !d.voided) {
           if (importIds.has(d.externalId!))
-            throw Error('Duplicate dividend import event.');
+            throw new UserError('Duplicate dividend import event.');
           importIds.add(d.externalId!);
         }
+        // An automatic dividend is derived from the ledger, so it never blocks a save:
+        // if the holding behind it is later voided or corrected, its expected amount
+        // simply falls to zero. A manual entry must still be backed by shares.
         if (
           !d.voided &&
-          sharesHeldOn(
-            p,
-            d.ticker,
-            d.source === 'auto' ? entitlementDate(d.date) : d.date,
-          ) <= 0
+          d.source === 'manual' &&
+          sharesHeldOn(p, d.ticker, d.date) <= 0
         )
-          throw Error(
+          throw new UserError(
             d.ticker + ': no shares held on ' + d.date + ' for dividend.',
           );
       } else {
@@ -894,22 +1162,39 @@ export function validate(p: Portfolio) {
           d.netAmount! > d.grossAmount! ||
           d.perShare !== undefined
         )
-          throw Error('Invalid dividend record.');
+          throw new UserError('Invalid dividend record.');
         if (d.externalId !== undefined) {
           if (typeof d.externalId !== 'string')
-            throw Error('Invalid dividend record.');
+            throw new UserError('Invalid dividend record.');
           if (!d.voided) {
             if (importIds.has(d.externalId))
-              throw Error('Duplicate dividend import event.');
+              throw new UserError('Duplicate dividend import event.');
             importIds.add(d.externalId);
           }
         }
       }
     }
+    // An active CDC import and an active automatic record for the same payout would
+    // count the dividend twice; one of them must be voided.
+    const activeAutos = p.dividends.filter((d) => !d.voided && d.source === 'auto');
+    for (const row of p.dividends)
+      if (
+        !row.voided &&
+        row.source === 'import' &&
+        activeAutos.some(
+          (a) =>
+            a.ticker === row.ticker &&
+            inPayoutWindow(row.date, a.date) &&
+            amountsAgree(row.grossAmount ?? 0, dividendGross(p, a)),
+        )
+      )
+        throw new UserError(
+          `${row.ticker}: a CDC import and a PSX auto record cover the same payout. Void one of them.`,
+        );
   }
   if (p.notifications !== undefined) {
     if (!Array.isArray(p.notifications) || p.notifications.length > 500)
-      throw Error('Invalid notifications.');
+      throw new UserError('Invalid notifications.');
     const ids = new Set<string>();
     for (const n of p.notifications) {
       if (
@@ -929,9 +1214,9 @@ export function validate(p: Portfolio) {
         (n.clearedAt !== undefined &&
           (typeof n.clearedAt !== 'string' ||
             !Number.isFinite(Date.parse(n.clearedAt)))) ||
-        (n.ticker !== undefined && typeof n.ticker !== 'string')
+        (n.ticker !== undefined && !tickersPlaceholder(n.ticker))
       )
-        throw Error('Invalid notifications.');
+        throw new UserError('Invalid notifications.');
       ids.add(n.id);
     }
   }
@@ -939,7 +1224,7 @@ export function validate(p: Portfolio) {
     p.taxProfile !== undefined &&
     (!p.taxProfile || !(p.taxProfile.filerStatus in TAX_RATES))
   )
-    throw Error('Invalid tax profile.');
+    throw new UserError('Invalid tax profile.');
   holdings(p);
   return p;
 }
@@ -961,9 +1246,15 @@ export function plan(
 ) {
   const hs = holdings(p),
     budget = p.budgets[month] ?? 100000;
+  // A buy tagged to this SIP month counts, and so does an untagged buy dated in it.
   const already = round(
     p.trades
-      .filter((t) => !t.voided && t.kind === 'buy' && t.month === month)
+      .filter(
+        (t) =>
+          !t.voided &&
+          t.kind === 'buy' &&
+          (t.month === month || (!t.month && t.date.slice(0, 7) === month)),
+      )
       .reduce((a, t) => a + t.shares * t.price! + t.fees, 0),
   );
   const remaining = Math.max(0, round(budget - already));
@@ -971,7 +1262,7 @@ export function plan(
   const required = hs.filter((h) => h.shares > 0 || h.target > 0);
   const missing = required.filter((h) => !h.quote).map((h) => h.ticker);
   const stale = required
-    .filter((h) => h.quote && h.quote.date !== today())
+    .filter((h) => h.quote && h.quote.date < lastTradingDay(today()))
     .map((h) => h.ticker);
   const totalTarget = candidates.reduce((a, h) => a + h.target, 0);
   let errors: string[] = [];
@@ -1065,23 +1356,23 @@ export function validateReview(value: unknown, p: Portfolio) {
     !r.weights ||
     Array.isArray(r.weights)
   )
-    throw Error('Paste the complete AI JSON containing summary and weights.');
+    throw new UserError('Paste the complete AI JSON containing summary and weights.');
   const allowed = p.companies.filter((c) => c.target > 0).map((c) => c.ticker);
   if (
     Object.keys(r.weights).length !== allowed.length ||
     allowed.some((t) => !Object.hasOwn(r.weights, t))
   )
-    throw Error('The review must include every shortlisted ticker.');
+    throw new UserError('The review must include every shortlisted ticker.');
   let sum = 0;
   for (const [t, w] of Object.entries(r.weights)) {
     if (!allowed.includes(t) || !Number.isFinite(w) || w < 0 || w > 20)
-      throw Error(
+      throw new UserError(
         'AI weights must use shortlisted companies and stay within 0–20%.',
       );
     sum += w;
   }
   if (Math.abs(sum - 100) > 0.01)
-    throw Error('AI target weights must total 100%.');
+    throw new UserError('AI target weights must total 100%.');
   return r;
 }
 export type ResearchInsight = {

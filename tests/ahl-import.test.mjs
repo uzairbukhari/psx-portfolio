@@ -4,10 +4,11 @@ import { readFileSync } from 'node:fs';
 import { parseAhlHistory, importAhlTrades } from '../app/ahl-import.ts';
 import { validate } from '../lib/portfolio.ts';
 
-const history = JSON.parse(readFileSync(new URL('../../ahl-history.json', import.meta.url), 'utf8'));
+// Synthetic fixture (no broker data): tests/fixtures/ahl-history.json, generated to exercise the same cases.
+const history = JSON.parse(readFileSync(new URL('./fixtures/ahl-history.json', import.meta.url), 'utf8'));
 const portfolio = () => ({ companies: [], trades: [], quotes: {}, budgets: {} });
 
-test('parses the supplied AHL history and derives buy and sell fees', () => {
+test('parses the synthetic AHL history and derives buy and sell fees', () => {
   const rows = parseAhlHistory(history);
   assert.equal(rows.length, 80);
   assert.deepEqual(rows[0], {

@@ -16,6 +16,7 @@ import {
   researchReserveMicros,
   validateInvestmentDossier,
 } from '@/lib/research-policy.mjs';
+import { UserError } from '@/lib/user-error';
 
 const SCORE_RUBRIC = [
   { name: 'Business quality', max: 20 },
@@ -163,7 +164,7 @@ export async function POST(req: Request) {
   try {
     const userId = await requireSuperAdmin(req, true);
     if (!env.OPENAI_API_KEY)
-      throw Error('The secure AI connection is not configured.');
+      throw new UserError('The secure AI connection is not configured.');
     const body = (await req.json()) as {
       id?: string;
       runnerId?: string;
@@ -180,23 +181,23 @@ export async function POST(req: Request) {
     };
     jobId = String(body.id || '');
     const runnerId = String(body.runnerId || '');
-    if (!runnerId) throw Error('A runner id is required.');
+    if (!runnerId) throw new UserError('A runner id is required.');
     const row = await db()
       .prepare('SELECT * FROM research_jobs WHERE id=? AND user_id=?')
       .bind(jobId, userId)
       .first<ResearchJobRow>();
     if (!row || row.status !== 'researching' || row.cancel_requested || row.lease_owner !== runnerId || !row.lease_until || row.lease_until < new Date().toISOString())
-      throw Error('The active research lease was not found.');
+      throw new UserError('The active research lease was not found.');
     authorizedJob = true;
     const settings = await resolveResearchSettings(row.user_id);
     if (row.result) {
       const cached = JSON.parse(row.result);
       if (cached.status === 'Complete') return Response.json({ dossier: cached, costUsd: 0, cached: true });
     }
-    if (body.ticker !== row.ticker) throw Error('Research ticker mismatch.');
+    if (body.ticker !== row.ticker) throw new UserError('Research ticker mismatch.');
     const evidence = String(body.evidence || '');
     if (!evidence || evidence.length > 900_000)
-      throw Error('Research evidence is empty or too large.');
+      throw new UserError('Research evidence is empty or too large.');
     const documents = Array.isArray(body.documents)
       ? body.documents
           .slice(0, 30)
@@ -206,9 +207,9 @@ export async function POST(req: Request) {
           )
       : [];
     if (!documents.length)
-      throw Error('At least one official source document is required.');
+      throw new UserError('At least one official source document is required.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.market?.priceDate)))
-      throw Error('A dated reference quote is required.');
+      throw new UserError('A dated reference quote is required.');
     const marketPrice =
       typeof body.market?.price === 'number' && body.market.price > 0
         ? body.market.price
@@ -250,7 +251,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
         )
         .run();
       if (!budget.meta.changes)
-        throw Error(
+        throw new UserError(
           issues.length
             ? `The US$${settings.budgetUsd.toFixed(2)} research limit was reached after ${issues.length} correction attempt${issues.length === 1 ? '' : 's'}. Outstanding issues: ${issuesSummary(issues)}`
             : `The US$${settings.budgetUsd.toFixed(2)} research limit was reached.`,
@@ -334,7 +335,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
       if (!response.ok) {
         const code = result.error?.code ?? result.error?.type;
         if (code === 'credit_balance_exhausted' || code === 'insufficient_quota')
-          throw Error(
+          throw new UserError(
             'OpenAI API credit is exhausted. Partial research files were preserved.',
           );
         // Firing correction attempts back-to-back can trip the account's
@@ -374,7 +375,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
           return !assessment || assessment.finding.trim().length < 60 || assessment.limitation.trim().length < 60;
         }).map(({ name }) => name);
         if (shallowAssessments.length)
-          throw Error(`These assessments need a concrete finding and limitation of at least 60 characters: ${shallowAssessments.join(', ')}.`);
+          throw new UserError(`These assessments need a concrete finding and limitation of at least 60 characters: ${shallowAssessments.join(', ')}.`);
         analysis.scores = SCORE_RUBRIC.map(({ name }) => assessments[name].score);
         analysis.scoreNotes = SCORE_RUBRIC.map(({ name }) => {
           const item = assessments[name];
@@ -402,14 +403,14 @@ Explain findings simply. The narrative must cover the business, industry and mac
           // row points back to that manifest and a page, verification is deterministic.
           financial.verified = true;
         }
-        if (financialIssues.length) throw Error(financialIssues.join(' '));
+        if (financialIssues.length) throw new UserError(financialIssues.join(' '));
         validateInvestmentDossier(analysis, marketPrice);
         const uncitedAssessments = SCORE_RUBRIC.filter(({ name }) => {
           const source = assessments[name].source.toLowerCase();
           return !documents.some(d => source.includes(d.title.toLowerCase()) || source.includes(d.url.toLowerCase()));
         }).map(({ name }) => name);
         if (uncitedAssessments.length)
-          throw Error(`These assessments cite a source absent from the manifest: ${uncitedAssessments.join(', ')}.`);
+          throw new UserError(`These assessments cite a source absent from the manifest: ${uncitedAssessments.join(', ')}.`);
         const dataGaps = [
           ...describeNullFinancialFields(analysis.financials),
           ...SCORE_RUBRIC.filter(({ name }) => assessments[name].score == null).map(({ name }) => `${name} score`),
@@ -473,7 +474,7 @@ Explain findings simply. The narrative must cover the business, industry and mac
         issues.push(`Attempt ${attempt}: ${message}`);
       }
     }
-    throw Error(
+    throw new UserError(
       `Automatic correction could not produce a fully verified dossier after ${settings.maxAttempts} attempts. Outstanding issues: ${issuesSummary(issues)} The latest draft was preserved for manual review.`,
     );
   } catch (error) {
