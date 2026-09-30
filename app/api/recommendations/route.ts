@@ -14,6 +14,7 @@ import {
   type ProviderResponse, type SnapshotV8,
 } from '@/lib/monthly-picks-ai';
 import type { MonthlyPicksResearch } from '@/lib/monthly-picks';
+import { UserError } from '@/lib/user-error';
 
 type Row = {
   id: string; user_id: string; month: string; amount: number; fee_pct: number; shortlist: string;
@@ -279,7 +280,7 @@ export async function GET(req: Request) {
       });
     }
     const row = await readRow(id, owner);
-    if (!row) return failure(Error('Recommendation not found.'), 404);
+    if (!row) return failure(new UserError('Recommendation not found.'), 404);
     return privateJson(await viewOne(await advance(row)));
   } catch (error) { return failure(error); }
 }
@@ -293,20 +294,20 @@ export async function POST(req: Request) {
     if (body.action === 'refresh-facts') {
       const tickers = Array.isArray(body.tickers) ? body.tickers.filter((t): t is string => typeof t === 'string').map((t) => t.trim().toUpperCase()) : [];
       const owned = tickers.filter((ticker) => portfolio.companies.some((company) => company.ticker === ticker)).slice(0, 40);
-      if (!owned.length) throw Error('Choose companies to refresh.');
+      if (!owned.length) throw new UserError('Choose companies to refresh.');
       const result = await requestFacts(owned);
       return privateJson({ dispatched: result.dispatched, waiting: result.waiting, reason: result.reason ?? null });
     }
 
     const month = typeof body.month === 'string' ? body.month : '';
     const amount = Number(body.amount), fee = Number(body.feePct ?? 0);
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw Error('Choose a valid month.');
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) throw Error('Enter a valid investment amount.');
-    if (!Number.isFinite(fee) || fee < 0 || fee > 10) throw Error('Fee estimate must be between 0% and 10%.');
-    if (!Array.isArray(body.shortlist) || body.shortlist.some((ticker) => typeof ticker !== 'string')) throw Error('Choose 1–15 companies.');
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new UserError('Choose a valid month.');
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) throw new UserError('Enter a valid investment amount.');
+    if (!Number.isFinite(fee) || fee < 0 || fee > 10) throw new UserError('Fee estimate must be between 0% and 10%.');
+    if (!Array.isArray(body.shortlist) || body.shortlist.some((ticker) => typeof ticker !== 'string')) throw new UserError('Choose 1–15 companies.');
     const shortlist = [...new Set((body.shortlist as string[]).map((ticker) => ticker.trim().toUpperCase()))].sort();
-    if (!shortlist.length || shortlist.length > 15) throw Error('Choose 1–15 companies.');
-    if (shortlist.some((ticker) => !portfolio.companies.some((company) => company.ticker === ticker))) throw Error('Unknown shortlisted company.');
+    if (!shortlist.length || shortlist.length > 15) throw new UserError('Choose 1–15 companies.');
+    if (shortlist.some((ticker) => !portfolio.companies.some((company) => company.ticker === ticker))) throw new UserError('Unknown shortlisted company.');
 
     // Reuse only a completed run with identical inputs and same-day data; failed/old runs always start fresh.
     const day = today();
@@ -332,7 +333,7 @@ export async function POST(req: Request) {
       .bind(id, owner, month, amount, fee, JSON.stringify(shortlist), MODEL, WORKFLOW_VERSION, timestamp, timestamp, timestamp, owner).run();
     if (!saved.meta.changes) {
       const current = await db().prepare("SELECT * FROM monthly_recommendations WHERE user_id=? AND status IN ('queued','gathering','in_progress') LIMIT 1").bind(owner).first<Row>();
-      if (!current) throw Error('Another research request is starting.');
+      if (!current) throw new UserError('Another research request is starting.');
       return privateJson(await viewOne(current));
     }
     let row = (await readRow(id, owner))!;

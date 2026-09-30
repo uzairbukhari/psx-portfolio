@@ -1,6 +1,7 @@
 import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
 import { refreshQuotes } from '@/lib/quote-cache';
+import { UserError } from '@/lib/user-error';
 
 export async function POST(req: Request) {
   try {
@@ -18,12 +19,12 @@ export async function POST(req: Request) {
       tickers.length > 200 ||
       tickers.some((ticker) => !tickerOK(ticker))
     )
-      throw Error('Invalid symbols.');
+      throw new UserError('Invalid symbols.');
     const force = new URL(req.url).searchParams.get('force') === '1';
     const { quotes, stale, failed } = await refreshQuotes(db(), tickers, { force });
     const errors = Object.keys(failed);
     if (!Object.keys(quotes).length && errors.length)
-      throw Error('Every PSX quote request failed.');
+      throw new UserError('Every PSX quote request failed.');
     return Response.json(
       { quotes, errors, reasons: failed, stale },
       { headers: { 'Cache-Control': 'no-store' } },

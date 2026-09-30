@@ -4,6 +4,7 @@ import { applyFacts, newTickers } from '@/lib/company-enrichment';
 import { gatherFacts } from '@/lib/company-facts-store';
 import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';
 import { readAnnouncements } from '@/lib/dividend-announcements';
+import { UserError } from '@/lib/user-error';
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
@@ -35,11 +36,11 @@ export async function PUT(req: Request) {
   try {
     const user = await identity(req, true);
     const text = await req.text();
-    if (text.length > 4000000) throw Error('Portfolio file is too large.');
+    if (text.length > 4000000) throw new UserError('Portfolio file is too large.');
     const { portfolio, revision } = JSON.parse(text);
     validate(portfolio);
     if (!Number.isInteger(revision) || revision < 0)
-      throw Error('Invalid revision.');
+      throw new UserError('Invalid revision.');
     const previousRow = await db()
       .prepare('SELECT payload FROM portfolios WHERE user_id=?')
       .bind(user)
@@ -72,7 +73,7 @@ export async function PUT(req: Request) {
             .run();
     if (!result.meta.changes)
       return failure(
-        Error('Your portfolio changed in another tab. Reload before saving.'),
+        new UserError('Your portfolio changed in another tab. Reload before saving.'),
         409,
       );
     return Response.json(

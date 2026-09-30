@@ -2,6 +2,7 @@ import { type Portfolio } from '@/lib/portfolio';
 import { parsePypsxMessage } from '@/lib/pypsx-market';
 import { pypsxCredentialsFor } from '@/lib/pypsx-server';
 import { db, failure, identity } from '@/lib/server';
+import { UserError } from '@/lib/user-error';
 
 const encoder = new TextEncoder();
 const sse = (event: string, value: unknown) =>
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
   try {
     const user = await identity(req);
     const credentials = pypsxCredentialsFor(user);
-    if (!credentials) throw Error('The pyPSX live feed is not configured for this account.');
+    if (!credentials) throw new UserError('The pyPSX live feed is not configured for this account.');
     const row = await db()
       .prepare('SELECT payload FROM portfolios WHERE user_id=?')
       .bind(user)
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
           .filter((company) => company.target > 0)
           .map((company) => company.ticker);
     const allowed = new Set(shortlist);
-    if (!allowed.size) throw Error('Choose at least one company in Monthly Picks.');
+    if (!allowed.size) throw new UserError('Choose at least one company in Monthly Picks.');
 
     const upstreamResponse = await fetch('https://paper-api.pypsx.com/ws/market', {
       headers: {
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
     });
     const upstream = upstreamResponse.webSocket;
     if (!upstream || upstreamResponse.status !== 101)
-      throw Error(`pyPSX live feed rejected the connection (${upstreamResponse.status}).`);
+      throw new UserError(`pyPSX live feed rejected the connection (${upstreamResponse.status}).`);
     upstream.accept();
 
     const stream = new ReadableStream<Uint8Array>({

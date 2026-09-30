@@ -14,36 +14,37 @@ import {
   RESEARCH_STAGES,
   type ResearchJobRow,
 } from '@/lib/research-jobs';
+import { UserError } from '@/lib/user-error';
 
 const textValue = (value: unknown) =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
 function dossierResult(value: unknown, ticker: string) {
   if (!value || typeof value !== 'object')
-    throw Error('The dossier result is missing.');
+    throw new UserError('The dossier result is missing.');
   const details = value as Record<string, unknown>;
   if (
     details.ticker !== ticker ||
     !textValue(details.name).trim()
   )
-    throw Error('The dossier company does not match the research job.');
+    throw new UserError('The dossier company does not match the research job.');
   if (details.schemaVersion !== 2 || details.status !== 'Complete')
-    throw Error('The run must submit a completed version 2 dossier.');
+    throw new UserError('The run must submit a completed version 2 dossier.');
   if (!Array.isArray(details.financials) || !Array.isArray(details.documents))
-    throw Error('The dossier is missing financials or source documents.');
+    throw new UserError('The dossier is missing financials or source documents.');
   if (!Array.isArray(details.scoreRubric) || details.scoreRubric.length !== 7)
-    throw Error('The dossier must use the seven-category scorecard.');
+    throw new UserError('The dossier must use the seven-category scorecard.');
   const scores = details.scores as unknown[];
   if (!Array.isArray(scores) || scores.length !== 7)
-    throw Error(
+    throw new UserError(
       'The dossier must contain seven score values, including nulls.',
     );
   for (const document of details.documents as Array<Record<string, unknown>>) {
     if (!/^https?:\/\//.test(textValue(document.url)))
-      throw Error('Every dossier document must retain an official source URL.');
+      throw new UserError('Every dossier document must retain an official source URL.');
   }
   validateInvestmentDossier(details, details.price);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(details.priceDate))) throw Error('A dated reference quote is required.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(details.priceDate))) throw new UserError('A dated reference quote is required.');
   return details;
 }
 
@@ -125,7 +126,7 @@ async function completeJob(
     db().prepare("UPDATE research_jobs SET status='complete',stage='complete',message='Research complete',result=?,checkpoint=NULL,lease_owner=NULL,lease_until=NULL,completed_at=?,updated_at=? WHERE id=? AND status='researching' AND cancel_requested=0 AND lease_owner=? AND EXISTS (SELECT 1 FROM portfolios WHERE user_id=? AND payload=?)")
       .bind(JSON.stringify(details), now, now, row.id, row.lease_owner, row.user_id, payload),
   ]);
-  if (!results[1].meta.changes) throw Error('The portfolio changed or research was cancelled while saving. The saved analysis can be uploaded again without another AI call.');
+  if (!results[1].meta.changes) throw new UserError('The portfolio changed or research was cancelled while saving. The saved analysis can be uploaded again without another AI call.');
   await addEvent(
     row.id,
     'complete',
@@ -159,7 +160,7 @@ export async function POST(req: Request) {
       sector?: string;
     };
     const runnerId = String(body.runnerId || '');
-    if (!runnerId) throw Error('A runner id is required.');
+    if (!runnerId) throw new UserError('A runner id is required.');
 
     if (body.action === 'claim') {
       const now = new Date().toISOString();
@@ -196,10 +197,10 @@ export async function POST(req: Request) {
       .prepare('SELECT * FROM research_jobs WHERE id=? AND user_id=?')
       .bind(body.id, userId)
       .first<ResearchJobRow>();
-    if (!row) throw Error('Research job was not found.');
+    if (!row) throw new UserError('Research job was not found.');
     if (row.status === 'complete' && body.action === 'complete') return Response.json({ complete: true });
     if (row.status !== 'researching' || row.lease_owner !== runnerId)
-      throw Error('This job is being processed by another browser tab.');
+      throw new UserError('This job is being processed by another browser tab.');
     const now = new Date().toISOString();
     const leaseUntil = new Date(Date.now() + 120_000).toISOString();
     if (row.cancel_requested || body.action === 'cancelled') {
@@ -271,7 +272,7 @@ export async function POST(req: Request) {
       body.action !== 'progress' ||
       !RESEARCH_STAGES.includes(body.stage as never)
     )
-      throw Error('Invalid run update.');
+      throw new UserError('Invalid run update.');
     const message = String(body.message || '').slice(0, 1000);
     await db()
       .prepare(

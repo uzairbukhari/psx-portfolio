@@ -1,4 +1,5 @@
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import { UserError } from './user-error.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -311,7 +312,7 @@ function ledgerEventsFor(p: Portfolio, ticker: string, throughDate?: string) {
 function applySplit(shares: number, split: StockSplit) {
   const adjusted = (shares * split.newShares) / split.oldShares;
   if (!Number.isSafeInteger(adjusted))
-    throw Error(
+    throw new UserError(
       `${split.ticker}: ${split.newShares}-for-${split.oldShares} split on ${split.date} produces fractional shares.`,
     );
   return adjusted;
@@ -359,7 +360,7 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
       const t = event.value;
       if (t.kind === 'sell') {
         if (t.shares > shares)
-          throw Error(c.ticker + ': sale exceeds shares held on ' + t.date);
+          throw new UserError(c.ticker + ': sale exceeds shares held on ' + t.date);
         const avg: number | null =
           cost === null ? null : shares ? cost / shares : 0;
         out.push({
@@ -584,7 +585,7 @@ export function holdings(p: Portfolio) {
       const t = event.value;
       if (t.kind === 'sell') {
         if (t.shares > shares)
-          throw Error(c.ticker + ': sale exceeds shares held on ' + t.date);
+          throw new UserError(c.ticker + ': sale exceeds shares held on ' + t.date);
         const avg: number | null =
           cost === null ? null : shares ? cost / shares : 0;
         if (avg === null) realized = null;
@@ -629,10 +630,10 @@ export function validate(p: Portfolio) {
     !p.quotes ||
     !p.budgets
   )
-    throw Error('Invalid portfolio format.');
+    throw new UserError('Invalid portfolio format.');
   if (p.research !== undefined) {
     if (!Array.isArray(p.research) || p.research.length > 200)
-      throw Error('Invalid research workspace.');
+      throw new UserError('Invalid research workspace.');
     const researchTickers = new Set<string>();
     for (const r of p.research) {
       if (
@@ -655,12 +656,12 @@ export function validate(p: Portfolio) {
         !Array.isArray(r.sources) ||
         !Array.isArray(r.financials)
       )
-        throw Error('Invalid research dossier.');
+        throw new UserError('Invalid research dossier.');
       researchTickers.add(r.ticker);
     }
   }
   if (p.companies.length > 200 || p.trades.length > 20000)
-    throw Error('Portfolio exceeds supported size.');
+    throw new UserError('Portfolio exceeds supported size.');
   const tickers = new Set<string>();
   for (const c of p.companies) {
     if (
@@ -681,7 +682,7 @@ export function validate(p: Portfolio) {
       (c.faceValue !== undefined &&
         (!Number.isFinite(c.faceValue) || c.faceValue <= 0 || c.faceValue > 1000))
     )
-      throw Error('Invalid or duplicate company.');
+      throw new UserError('Invalid or duplicate company.');
     tickers.add(c.ticker);
   }
   const ids = new Set();
@@ -720,7 +721,7 @@ export function validate(p: Portfolio) {
       (t.month !== '' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(t.month)) ||
       (t.voided !== undefined && typeof t.voided !== 'boolean')
     )
-      throw Error('Invalid transaction. Check dates, shares and price.');
+      throw new UserError('Invalid transaction. Check dates, shares and price.');
     if (
       !t.voided &&
       t.kind !== 'opening' &&
@@ -729,20 +730,20 @@ export function validate(p: Portfolio) {
       openings.has(t.ticker) &&
       t.date < openings.get(t.ticker)!
     )
-      throw Error(
+      throw new UserError(
         'Transaction predates the opening balance. Correct or void that opening balance before importing earlier history.',
       );
     ids.add(t.id);
     if (!t.voided && (t.source === 'finqalab' || t.source === 'ahl')) {
       const brokerKey = `${t.source}:${t.externalId}`;
       if (brokerImportIds.has(brokerKey))
-        throw Error(`Duplicate ${t.source === 'ahl' ? 'AHL' : 'Finqalab'} trade import.`);
+        throw new UserError(`Duplicate ${t.source === 'ahl' ? 'AHL' : 'Finqalab'} trade import.`);
       brokerImportIds.add(brokerKey);
     }
   }
   if (p.stockSplits !== undefined) {
     if (!Array.isArray(p.stockSplits) || p.stockSplits.length > 20000)
-      throw Error('Portfolio exceeds supported size.');
+      throw new UserError('Portfolio exceeds supported size.');
     const splitIds = new Set<string>(),
       activeDates = new Set<string>();
     for (const s of p.stockSplits) {
@@ -761,18 +762,18 @@ export function validate(p: Portfolio) {
         s.note.length > 2000 ||
         (s.voided !== undefined && typeof s.voided !== 'boolean')
       )
-        throw Error('Invalid stock split. Use a forward split with whole-share ratios.');
+        throw new UserError('Invalid stock split. Use a forward split with whole-share ratios.');
       splitIds.add(s.id);
       if (!s.voided) {
         const key = `${s.ticker}:${s.date}`;
         if (activeDates.has(key))
-          throw Error(`${s.ticker}: duplicate stock split on ${s.date}.`);
+          throw new UserError(`${s.ticker}: duplicate stock split on ${s.date}.`);
         activeDates.add(key);
       }
     }
     for (const s of p.stockSplits.filter((entry) => !entry.voided))
       if (sharesHeldBefore(p, s.ticker, s.date) <= 0)
-        throw Error(
+        throw new UserError(
           `${s.ticker}: no shares were held before the stock split on ${s.date}.`,
         );
   }
@@ -790,7 +791,7 @@ export function validate(p: Portfolio) {
       !q.source.startsWith('https://dps.psx.com.pk/company/' + t) ||
       typeof q.fetchedAt !== 'string'
     )
-      throw Error('Invalid quote.');
+      throw new UserError('Invalid quote.');
   }
   for (const [month, budget] of Object.entries(p.budgets))
     if (
@@ -799,7 +800,7 @@ export function validate(p: Portfolio) {
       budget < 0 ||
       budget > 1e9
     )
-      throw Error('Invalid monthly budget.');
+      throw new UserError('Invalid monthly budget.');
   if (p.monthlyPicksShortlist !== undefined) {
     if (
       !Array.isArray(p.monthlyPicksShortlist) ||
@@ -807,7 +808,7 @@ export function validate(p: Portfolio) {
       new Set(p.monthlyPicksShortlist).size !== p.monthlyPicksShortlist.length ||
       p.monthlyPicksShortlist.some((ticker) => !tickers.has(ticker))
     )
-      throw Error('Invalid Monthly Picks shortlist.');
+      throw new UserError('Invalid Monthly Picks shortlist.');
   }
   if (
     p.aiReview &&
@@ -817,7 +818,7 @@ export function validate(p: Portfolio) {
       typeof p.aiReview.snapshot !== 'string' ||
       !p.aiReview.weights)
   )
-    throw Error('Invalid saved AI review.');
+    throw new UserError('Invalid saved AI review.');
   if (p.researchSettings !== undefined) {
     const s = p.researchSettings;
     if (
@@ -834,11 +835,11 @@ export function validate(p: Portfolio) {
       s.maxAttempts < 1 ||
       s.maxAttempts > 5
     )
-      throw Error('Invalid research settings.');
+      throw new UserError('Invalid research settings.');
   }
   if (p.dividends !== undefined) {
     if (!Array.isArray(p.dividends) || p.dividends.length > 20000)
-      throw Error('Portfolio exceeds supported size.');
+      throw new UserError('Portfolio exceeds supported size.');
     const dividendIds = new Set<string>(),
       importIds = new Set<string>();
     for (const d of p.dividends) {
@@ -854,7 +855,7 @@ export function validate(p: Portfolio) {
         (d.financialYear !== undefined && typeof d.financialYear !== 'string') ||
         (d.voided !== undefined && typeof d.voided !== 'boolean')
       )
-        throw Error('Invalid dividend record.');
+        throw new UserError('Invalid dividend record.');
       dividendIds.add(d.id);
       if (d.source === 'manual' || d.source === 'auto') {
         if (
@@ -868,10 +869,10 @@ export function validate(p: Portfolio) {
           (d.source === 'auto' &&
             (typeof d.externalId !== 'string' || !d.externalId))
         )
-          throw Error('Invalid dividend record.');
+          throw new UserError('Invalid dividend record.');
         if (d.source === 'auto' && !d.voided) {
           if (importIds.has(d.externalId!))
-            throw Error('Duplicate dividend import event.');
+            throw new UserError('Duplicate dividend import event.');
           importIds.add(d.externalId!);
         }
         if (
@@ -882,7 +883,7 @@ export function validate(p: Portfolio) {
             d.source === 'auto' ? entitlementDate(d.date) : d.date,
           ) <= 0
         )
-          throw Error(
+          throw new UserError(
             d.ticker + ': no shares held on ' + d.date + ' for dividend.',
           );
       } else {
@@ -894,13 +895,13 @@ export function validate(p: Portfolio) {
           d.netAmount! > d.grossAmount! ||
           d.perShare !== undefined
         )
-          throw Error('Invalid dividend record.');
+          throw new UserError('Invalid dividend record.');
         if (d.externalId !== undefined) {
           if (typeof d.externalId !== 'string')
-            throw Error('Invalid dividend record.');
+            throw new UserError('Invalid dividend record.');
           if (!d.voided) {
             if (importIds.has(d.externalId))
-              throw Error('Duplicate dividend import event.');
+              throw new UserError('Duplicate dividend import event.');
             importIds.add(d.externalId);
           }
         }
@@ -909,7 +910,7 @@ export function validate(p: Portfolio) {
   }
   if (p.notifications !== undefined) {
     if (!Array.isArray(p.notifications) || p.notifications.length > 500)
-      throw Error('Invalid notifications.');
+      throw new UserError('Invalid notifications.');
     const ids = new Set<string>();
     for (const n of p.notifications) {
       if (
@@ -931,7 +932,7 @@ export function validate(p: Portfolio) {
             !Number.isFinite(Date.parse(n.clearedAt)))) ||
         (n.ticker !== undefined && typeof n.ticker !== 'string')
       )
-        throw Error('Invalid notifications.');
+        throw new UserError('Invalid notifications.');
       ids.add(n.id);
     }
   }
@@ -939,7 +940,7 @@ export function validate(p: Portfolio) {
     p.taxProfile !== undefined &&
     (!p.taxProfile || !(p.taxProfile.filerStatus in TAX_RATES))
   )
-    throw Error('Invalid tax profile.');
+    throw new UserError('Invalid tax profile.');
   holdings(p);
   return p;
 }
@@ -1065,23 +1066,23 @@ export function validateReview(value: unknown, p: Portfolio) {
     !r.weights ||
     Array.isArray(r.weights)
   )
-    throw Error('Paste the complete AI JSON containing summary and weights.');
+    throw new UserError('Paste the complete AI JSON containing summary and weights.');
   const allowed = p.companies.filter((c) => c.target > 0).map((c) => c.ticker);
   if (
     Object.keys(r.weights).length !== allowed.length ||
     allowed.some((t) => !Object.hasOwn(r.weights, t))
   )
-    throw Error('The review must include every shortlisted ticker.');
+    throw new UserError('The review must include every shortlisted ticker.');
   let sum = 0;
   for (const [t, w] of Object.entries(r.weights)) {
     if (!allowed.includes(t) || !Number.isFinite(w) || w < 0 || w > 20)
-      throw Error(
+      throw new UserError(
         'AI weights must use shortlisted companies and stay within 0–20%.',
       );
     sum += w;
   }
   if (Math.abs(sum - 100) > 0.01)
-    throw Error('AI target weights must total 100%.');
+    throw new UserError('AI target weights must total 100%.');
   return r;
 }
 export type ResearchInsight = {
