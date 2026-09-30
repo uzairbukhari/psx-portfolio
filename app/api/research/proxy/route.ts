@@ -1,5 +1,6 @@
 import { failure, requireSuperAdmin } from '@/lib/server';
 import { credibleResearchHost, isPrivateOrLocalHost } from '@/lib/research-policy.mjs';
+import { readLimited } from '@/lib/read-limited';
 
 // The browser-side research runner cannot fetch PSX / issuer / search sites
 // directly (they don't send CORS headers), so this authenticated route
@@ -63,8 +64,7 @@ export async function POST(req: Request) {
     const contentType = upstream.headers.get('content-type') || '';
     const isPdf = contentType.includes('application/pdf') || /\.pdf(?:$|\?)/i.test(finalUrl.pathname);
     const limit = isPdf ? REPORT_BYTES_LIMIT : TEXT_BYTES_LIMIT;
-    const buffer = await upstream.arrayBuffer();
-    if (buffer.byteLength > limit) throw Error('The response was too large.');
+    const buffer = await readLimited(upstream, limit);
     return new Response(buffer, {
       headers: {
         'Content-Type': 'application/octet-stream',
