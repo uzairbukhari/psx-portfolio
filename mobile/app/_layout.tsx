@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
+import { BiometricLockProvider } from '@/auth/BiometricLock';
 import { SignIn } from '@/screens/SignIn';
 import { colors } from '@/theme/tokens';
 
@@ -41,7 +42,9 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <StatusBar style="light" />
-        <Root />
+        <BiometricLockProvider>
+          <Root />
+        </BiometricLockProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

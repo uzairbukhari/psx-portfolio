@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
 import { useAuth } from '@/auth/AuthProvider';
+import { useBiometricLock } from '@/auth/BiometricLock';
 import { clearPortfolioCache } from '@/data/portfolio-cache';
 import { config } from '@/config';
+import { colors } from '@/theme/tokens';
 import { Card, Muted, Notice, Screen, Title, styles } from '@/ui/kit';
 
 export default function Account() {
   const { state, api, signOut } = useAuth();
   const queryClient = useQueryClient();
+  const lock = useBiometricLock();
   const user = state.status === 'signedIn' ? state.user : null;
   const [error, setError] = useState<string | null>(null);
   const devices = useQuery({
@@ -55,6 +58,21 @@ export default function Account() {
       <Pressable style={styles.secondary} onPress={() => router.push('/import')}>
         <Text style={styles.secondaryText}>Import broker / CDC file</Text>
       </Pressable>
+      <Card>
+        <View style={styles.row}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.strong}>App lock</Text>
+            <Muted>Ask for fingerprint, face or screen lock when opening the app.</Muted>
+          </View>
+          <Switch
+            value={lock.enabled}
+            trackColor={{ true: colors.primary }}
+            onValueChange={(on) => {
+              void lock.setEnabled(on).then((problem) => problem && setError(problem));
+            }}
+          />
+        </View>
+      </Card>
       {usage.data ? (
         <Card>
           <Text style={styles.strong}>AI usage</Text>
