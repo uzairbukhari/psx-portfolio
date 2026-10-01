@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -187,11 +187,13 @@ export default function PortfolioReports({
 }) {
   const [view, setView] = useState<
     'all' | 'allocation' | 'performance' | 'income' | 'activity'
-  >('all');
-  // Phones start on Performance rather than rendering every chart at once.
-  useEffect(() => {
-    if (window.matchMedia('(max-width: 760px)').matches) setView('performance');
-  }, []);
+  >(() =>
+    // Phones start on Performance rather than rendering every chart at once.
+    typeof window !== 'undefined' &&
+    window.matchMedia('(max-width: 760px)').matches
+      ? 'performance'
+      : 'all',
+  );
   const report = portfolioReport(portfolio);
   const completeQuotes =
     report.summary.quoteCoverage.percentage === 100 &&
