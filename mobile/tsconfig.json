@@ -3,10 +3,9 @@
   "compilerOptions": {
     "strict": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ],
       "@shared/*": [
         "../lib/*"
