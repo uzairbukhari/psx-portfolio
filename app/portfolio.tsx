@@ -68,8 +68,6 @@ import {
   type Company,
   type Dividend,
   type StockSplit,
-  pendingAutoDividends,
-  startDividendTracking,
   quoteSupersedes,
   supersedeAutoWithImports,
   confirmDividendReceipt,
@@ -77,9 +75,9 @@ import {
 } from '@/lib/portfolio';
 import {
   addNotifications,
-  announcementNotifications,
   dividendNotifications,
 } from '@/lib/notifications';
+import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
 import PortfolioValueCard from './portfolio-value-card';
@@ -90,6 +88,7 @@ import ResearchDesk from './research-desk';
 import { SignIn, LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import NotificationsView from './notifications-view';
+import TargetsEditor from './targets-editor';
 import SettingsView from './settings-view';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import MonthlyPicks from './monthly-picks';
@@ -368,7 +367,8 @@ export default function Dashboard({
       dir: 'asc' | 'desc';
     } | null>(null),
     [sectorFilter, setSectorFilter] = useState<string>(''),
-    [showSoldOut, setShowSoldOut] = useState(false);
+    [showSoldOut, setShowSoldOut] = useState(false),
+    [targetsOpen, setTargetsOpen] = useState(false);
   // Status messages surface as toasts instead of an inline banner: errors
   // persist until dismissed, successes auto-dismiss. Before the first
   // portfolio load, the full-page LoadError screen shows `message` itself.
@@ -416,63 +416,45 @@ export default function Dashboard({
     loadedRevision: number,
     announcements: PayoutAnnouncement[],
   ) {
-    let current = loaded,
-      currentRevision = loadedRevision;
-    for (let tries = 0; tries < 3; tries++) {
-      let pending: Dividend[], news: AppNotification[];
-      const now = new Date().toISOString();
-      // Expected dividends only start from the day tracking began: set that date once and
-      // void unconfirmed auto dividends for earlier book closures.
-      const next = clone(current);
-      const tracking = startDividendTracking(next);
-      try {
-        pending = pendingAutoDividends(next, announcements);
-        news = [
-          ...dividendNotifications(pending, now),
-          ...announcementNotifications(next, announcements, today(), now),
-        ];
-      } catch {
-        return;
-      }
-      if (!news.length && !tracking.set && !tracking.voided.length) return;
-      if (pending.length)
-        next.dividends = [...(next.dividends ?? []), ...pending];
-      addNotifications(next, news);
-      try {
-        validate(next);
-        const r = await fetch('/api/portfolio', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ portfolio: next, revision: currentRevision }),
-        });
-        if (r.status === 409) {
+    const result = await syncAutoDividends(
+      { portfolio: loaded, revision: loadedRevision },
+      announcements,
+      {
+        save: async (next, revision) => {
+          const r = await fetch('/api/portfolio', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ portfolio: next, revision }),
+          });
+          if (r.status === 409) return { conflict: true };
+          const saved = (await r.json()) as ApiResponse;
+          if (!r.ok) throw Error(saved.error);
+          return { revision: saved.revision };
+        },
+        reload: async () => {
           const fresh = await fetch('/api/portfolio');
-          if (!fresh.ok) return;
+          if (!fresh.ok) return null;
           const d = (await fresh.json()) as ApiResponse;
-          if (!d.portfolio) return;
-          current = d.portfolio;
-          currentRevision = d.revision;
-          setP(current);
-          setRevision(currentRevision);
-          continue;
-        }
-        const saved = (await r.json()) as ApiResponse;
-        if (!r.ok) throw Error(saved.error);
-        setP(next);
-        setRevision(saved.revision);
-        if (tracking.voided.length)
-          notify(
-            `${tracking.voided.length} past expected dividend${tracking.voided.length === 1 ? '' : 's'} voided: expected dividends now start from ${next.dividendTrackingFrom}.`,
-          );
-        else if (pending.length)
-          notify(
-            `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
-          );
-        return;
-      } catch (e) {
-        notify('Could not record PSX dividends: ' + String(e), true);
-        return;
-      }
+          return d.portfolio ? { portfolio: d.portfolio, revision: d.revision } : null;
+        },
+      },
+    );
+    if (result.portfolio !== loaded) {
+      setP(result.portfolio);
+      setRevision(result.revision);
+    }
+    if (result.status === 'failed')
+      notify('Could not record PSX dividends: ' + result.error, true);
+    else if (result.status === 'saved' && result.update) {
+      const { next, pending, voided } = result.update;
+      if (voided.length)
+        notify(
+          `${voided.length} past expected dividend${voided.length === 1 ? '' : 's'} voided: expected dividends now start from ${next.dividendTrackingFrom}.`,
+        );
+      else if (pending.length)
+        notify(
+          `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
+        );
     }
   }
   /** Persists read/cleared state of the notification list. */
@@ -1430,6 +1412,13 @@ export default function Dashboard({
                 {held.length} {held.length === 1 ? 'holding' : 'holdings'}
               </span>
             </h2>
+            <button
+              className="secondary compact holdings-add holdings-targets"
+              disabled={busy}
+              onClick={() => setTargetsOpen(true)}
+            >
+              Targets
+            </button>
             <button
               className="secondary compact holdings-add"
               disabled={busy}
@@ -2420,6 +2409,13 @@ export default function Dashboard({
           )}
         </DialogContent>
       </Dialog>
+      <TargetsEditor
+        portfolio={p}
+        open={targetsOpen}
+        busy={busy}
+        onOpenChange={setTargetsOpen}
+        onSave={(next, message) => save(next, message)}
+      />
       <Dialog
         open={!!quoteTicker}
         onOpenChange={(open) => {

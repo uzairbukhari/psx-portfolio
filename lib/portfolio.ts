@@ -1320,6 +1320,10 @@ export function dateOK(s: string) {
     new Date(s).toISOString().slice(0, 10) === s
   );
 }
+/** A company can reach at most this share (%) of the portfolio; also the cap on AI-proposed weights. */
+export const WEIGHT_CAP = 20;
+/** A Shariah screen older than this many days pauses new SIP allocations. */
+export const SCREEN_MAX_AGE_DAYS = 183;
 export function plan(
   p: Portfolio,
   month: string,
@@ -1366,10 +1370,11 @@ export function plan(
       h.approved &&
       h.screenDate &&
       h.screenDate <= today() &&
-      (Date.parse(today()) - Date.parse(h.screenDate)) / 86400000 <= 183,
+      (Date.parse(today()) - Date.parse(h.screenDate)) / 86400000 <=
+        SCREEN_MAX_AGE_DAYS,
   );
   const rows = candidates.map((h) => {
-    const cap = (Math.min(h.target, 20) / 100) * post;
+    const cap = (Math.min(h.target, WEIGHT_CAP) / 100) * post;
     return {
       ticker: h.ticker,
       name: h.name,
@@ -1498,7 +1503,6 @@ export function researchInsights(
     };
   });
 }
-const WEIGHT_CAP = 20;
 function capAndNormalize(
   tickers: string[],
   units: number[],
