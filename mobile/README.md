@@ -33,3 +33,11 @@ The Worker needs `GOOGLE_MOBILE_CLIENT_IDS` (wrangler var) = the web + iOS (+ An
 ## Builds
 
 `eas build --profile staging --platform android` gives an APK install link; `--platform ios` gives an ad hoc build (devices registered once with `eas device:create`; needs an Apple Developer membership). JS-only changes can ship with `eas update --channel staging`.
+
+## Over-the-air updates
+
+Use the scripts, not a bare `eas update`: `app.config.ts` picks the API URL from `APP_VARIANT`, which `eas build` sets from `eas.json` but `eas update` does not (it would fall back to the `development` variant and point the app at localhost).
+
+```
+npm run update:staging -- --message "what changed"
+```
