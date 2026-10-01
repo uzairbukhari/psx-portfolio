@@ -180,12 +180,14 @@ export default function LedgerTimeline({
   entries,
   ticker,
   onOpenCompany,
+  hideKpis,
 }: {
   portfolio: Portfolio;
   entries: LedgerEntry[];
   /** When set the list is already scoped to one company: hides the ticker and search. */
   ticker?: string;
   onOpenCompany?: (ticker: string) => void;
+  hideKpis?: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -237,6 +239,7 @@ export default function LedgerTimeline({
 
   return (
     <div className="ledger">
+      {!hideKpis && (
       <div className="ledger-kpis">
         <div>
           <span>Invested</span>
@@ -255,6 +258,7 @@ export default function LedgerTimeline({
           <b>{money(cents(fees))}</b>
         </div>
       </div>
+      )}
       <div className="ledger-bar">
         <div className="seg" aria-label="Entry type">
           {FILTERS.map(([value, label]) => (
