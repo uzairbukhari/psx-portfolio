@@ -59,6 +59,9 @@ export default function Sip() {
   return (
     <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
       <Title>Monthly SIP</Title>
+      <Pressable onPress={() => router.push('/picks')} hitSlop={8}>
+        <Text style={{ color: colors.primary }}>Get Monthly Picks (AI ranking) ›</Text>
+      </Pressable>
       <View style={styles.row}>
         <Pressable onPress={() => setMonth(shiftMonth(month, -1))} hitSlop={12}>
           <Text style={{ color: colors.primary, fontSize: 22 }}>‹</Text>
