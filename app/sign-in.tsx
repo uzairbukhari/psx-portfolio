@@ -1,6 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+import { LogoMark, Wordmark } from '@/components/logo';
 import { BookOpenCheck, CalendarClock, Coins, Wallet } from 'lucide-react';
 import './sign-in.css';
 
@@ -115,8 +116,8 @@ const POINTS = [
 function Brand() {
   return (
     <div className="brand">
-      <Wallet size={24} />
-      <span>PSX / PERSONAL INVESTING</span>
+      <LogoMark size={28} />
+      <Wordmark />
     </div>
   );
 }
@@ -159,7 +160,7 @@ export function SignIn({ returnTo }: { returnTo: string }) {
           <span className="signin-mark">
             <Wallet size={22} />
           </span>
-          <h2>Sign in to PSX Portfolio</h2>
+          <h2>Sign in to Sipwise</h2>
           <p className="muted">
             Use your Google account. Your holdings stay private to it.
           </p>

@@ -45,6 +45,7 @@ import {
   Sparkles,
   FlaskConical,
 } from 'lucide-react';
+import { LogoMark, Wordmark } from '@/components/logo';
 import {
   holdings,
   plan,
@@ -657,8 +658,8 @@ export default function Dashboard({
     return (
       <main className="app-loading">
         <div className="brand">
-          <Wallet size={26} />
-          <span>PSX / PERSONAL INVESTING</span>
+          <LogoMark size={28} />
+          <Wordmark />
         </div>
         <Spinner className="size-6" />
         <p className="muted">Loading your holdings…</p>
@@ -1264,9 +1265,8 @@ export default function Dashboard({
           className="brand"
           onClick={() => setTab('holdings')}
         >
-          <Wallet size={22} />
-          <span className="brand-long">PSX / PERSONAL INVESTING</span>
-          <span className="brand-short">PSX</span>
+          <LogoMark size={28} />
+          <Wordmark />
         </button>
         <div className="header-right">
           <button
