@@ -7,7 +7,7 @@ import {
   ChartTooltip,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { money, type Portfolio } from '@/lib/portfolio';
+import { money, moneyShort, type Portfolio } from '@/lib/portfolio';
 import { TabLoader } from './tab-loader';
 import {
   portfolioValueSeries,
@@ -23,7 +23,7 @@ const RANGES: [ValueRange, string][] = [
   ['all', 'All'],
 ];
 const config = { gain: { label: 'Gain / loss', color: 'var(--primary)' } } satisfies ChartConfig;
-const signed = (n: number) => `${n >= 0 ? '+' : '−'}${money(Math.abs(n))}`;
+const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
 const compact = (v: number) => {
   const a = Math.abs(v);
   const t = a >= 1e6 ? `${(a / 1e6).toFixed(1)}M` : `${Math.round(a / 1000)}k`;
@@ -146,7 +146,7 @@ export default function PortfolioValueCard({
             {missingCount ? 'Priced holdings · incomplete' : 'Portfolio market value'}
           </span>
           <strong className="amount value-card-main">
-            {heldCount > 0 && missingCount === heldCount ? 'Prices needed' : money(value)}
+            {heldCount > 0 && missingCount === heldCount ? 'Prices needed' : moneyShort(value)}
           </strong>
           <small>
             {heldCount === 0
@@ -158,11 +158,11 @@ export default function PortfolioValueCard({
         </div>
         <div>
           <span className="value-card-label">Total remaining cost</span>
-          <strong className="amount value-card-stat">{money(cost)}</strong>
+          <strong className="amount value-card-stat">{moneyShort(cost)}</strong>
           <small>
             {unknownCount
               ? `${unknownCount} holdings have unknown opening costs`
-              : `New purchases recorded: ${money(newBuys)}`}
+              : `New purchases recorded: ${moneyShort(newBuys)}`}
           </small>
         </div>
         <div>
@@ -170,7 +170,7 @@ export default function PortfolioValueCard({
           <strong
             className={`amount value-card-stat${gain === null ? '' : gain >= 0 ? ' pos-text' : ' neg-text'}`}
           >
-            {gain === null ? 'Not yet known' : money(gain)}
+            {gain === null ? 'Not yet known' : moneyShort(gain)}
           </strong>
           <small>
             {gain === null

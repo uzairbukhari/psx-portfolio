@@ -490,6 +490,10 @@ export default function SettingsView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <p className="muted settings-about">
+        <b>About.</b> Plans are estimates. Actual execution prices, fees, taxes and corporate
+        actions may differ. No orders are placed by this dashboard.
+      </p>
     </div>
   );
 }

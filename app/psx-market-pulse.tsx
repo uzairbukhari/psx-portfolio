@@ -272,7 +272,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
           </p>
           {summary && (
             <span className="pulse-source">
-              {summary.market.label}{summary.market.estimated ? ' (estimated)' : ''} · {liveConnected ? 'Live via pyPSX' : intradayAvailable ? 'pyPSX intraday · live when open' : `${summary.source.delayMinutes}-minute delayed PSX data`}
+              {summary.market.label}{summary.market.estimated ? ' (estimated)' : ''} · {liveConnected ? 'Live' : intradayAvailable ? 'Intraday · live when open' : `Delayed ${summary.source.delayMinutes} min`}
             </span>
           )}
         </div>

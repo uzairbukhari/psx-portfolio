@@ -285,3 +285,11 @@ test('validate rejects malformed saved AI review, research and notification tick
   validate(note('TEST'));
   assert.throws(() => validate(note('<script>')), /notifications/);
 });
+
+test('moneyShort drops paise only for amounts of 10,000 or more', async () => {
+  const { money, moneyShort } = await import('../lib/portfolio.ts');
+  assert.equal(moneyShort(504565.4), money(504565).replace(/\.00$/, ''));
+  assert.equal(moneyShort(-12000.5).includes('.'), false);
+  assert.equal(moneyShort(9999.5), money(9999.5));
+  assert.equal(moneyShort(null), 'Unknown');
+});

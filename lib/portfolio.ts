@@ -196,6 +196,11 @@ export const money = (n: number | null) =>
         currency: 'PKR',
         maximumFractionDigits: 2,
       }).format(n);
+/** money() without paise for big summary figures (|amount| >= 10,000). */
+export const moneyShort = (n: number | null) =>
+  n === null || Math.abs(n) < 10000
+    ? money(n)
+    : new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(n);
 /** Rounds to paisa, half away from zero for negative values as well as positive. */
 export const round = (n: number) => {
   const r = (Math.sign(n) * Math.round((Math.abs(n) + Number.EPSILON) * 100)) / 100;

@@ -22,7 +22,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { money, round, type Portfolio } from '@/lib/portfolio';
+import { money, moneyShort, round, type Portfolio } from '@/lib/portfolio';
 import { TickerLink } from './ticker-link';
 import {
   portfolioReport,
@@ -265,7 +265,7 @@ export default function PortfolioReports({
         <div className="reports-hero-stats">
           <div className="reports-priced-value">
             <span>Priced market value</span>
-            <strong>{money(report.summary.pricedValue)}</strong>
+            <strong>{moneyShort(report.summary.pricedValue)}</strong>
             <small>
               {report.summary.quoteCoverage.priced} of{' '}
               {report.summary.quoteCoverage.held} held companies priced
@@ -278,7 +278,7 @@ export default function PortfolioReports({
             <strong>
               {totalGain === null
                 ? '—'
-                : `${totalGain >= 0 ? '+' : ''}${money(totalGain)}`}
+                : `${totalGain >= 0 ? '+' : ''}${moneyShort(totalGain)}`}
             </strong>
             <small>
               {totalGainPercent === null
@@ -290,8 +290,8 @@ export default function PortfolioReports({
             <span>Dividend income received</span>
             <strong>
               {totalDividendNet === null
-                ? money(report.realized.totalDividendIncomeGross)
-                : money(totalDividendNet)}
+                ? moneyShort(report.realized.totalDividendIncomeGross)
+                : moneyShort(totalDividendNet)}
             </strong>
             <small>
               {totalDividendNet === null
@@ -308,7 +308,7 @@ export default function PortfolioReports({
             <strong>
               {grandTotalReturn === null
                 ? '—'
-                : `${grandTotalReturn >= 0 ? '+' : ''}${money(grandTotalReturn)}`}
+                : `${grandTotalReturn >= 0 ? '+' : ''}${moneyShort(grandTotalReturn)}`}
             </strong>
             <small>
               {grandTotalReturn !== null
