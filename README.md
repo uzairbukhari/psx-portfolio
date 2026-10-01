@@ -1,4 +1,4 @@
-# PSX Portfolio & SIP
+# Sipwise — PSX Portfolio & SIP
 
 Multi-user investment ledger with D1 persistence, official PSX quote refresh (manual and automatic twice-daily), and sourced Monthly Picks research. Any Google account can sign in; each account gets its own fully isolated portfolio, starting empty. (The original owner's account was seeded from a private CDC statement before this app became multi-user — that seed data is not applied to new accounts.)
 

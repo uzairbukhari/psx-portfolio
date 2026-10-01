@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'PSX Portfolio & SIP',
+  title: 'Sipwise',
   icons: { icon: '/favicon.svg' },
 };
 
