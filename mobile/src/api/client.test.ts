@@ -55,3 +55,15 @@ test('network failure becomes a friendly error', async () => {
   });
   await assert.rejects(() => api.get('/api/me'), /Could not reach Sipwise/);
 });
+
+test('a 503 (server could not check the session) does not sign the phone out', async () => {
+  let signedOut = 0;
+  const api = createApiClient({
+    baseUrl: 'https://x.test',
+    getToken: async () => 'tok',
+    onUnauthorized: () => signedOut++,
+    fetcher: (async () => json(503, { error: 'Could not check your sign-in right now.' })) as unknown as typeof fetch,
+  });
+  await assert.rejects(() => api.get('/api/portfolio'), (e: unknown) => e instanceof ApiRequestError && e.status === 503);
+  assert.equal(signedOut, 0);
+});

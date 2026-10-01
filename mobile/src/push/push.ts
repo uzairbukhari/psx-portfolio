@@ -24,6 +24,7 @@ const PREF_KEY = 'sipwise.push';
 export const pushPreference = {
   get: async () => (await SecureStore.getItemAsync(PREF_KEY).catch(() => null)) === '1',
   set: (on: boolean) => SecureStore.setItemAsync(PREF_KEY, on ? '1' : '0'),
+  clear: () => SecureStore.deleteItemAsync(PREF_KEY),
 };
 
 export const pushAvailable = () => notificationsModule() !== null && Device.isDevice;

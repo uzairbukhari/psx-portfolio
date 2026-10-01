@@ -3,10 +3,9 @@ import { Alert, Image, Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
-import { useAuth } from '@/auth/AuthProvider';
+import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { useBiometricLock } from '@/auth/BiometricLock';
 import { pushAvailable, pushPreference, registerForPush, unregisterPush } from '@/push/push';
-import { clearPortfolioCache } from '@/data/portfolio-cache';
 import { config } from '@/config';
 import { colors } from '@/theme/tokens';
 import { Icon } from '@/ui/Icon';
@@ -15,6 +14,7 @@ import { Badge, Button, Card, Header, ListRow, Muted, Notice, Screen, SectionLab
 export default function Account() {
   const { state, api, signOut } = useAuth();
   const queryClient = useQueryClient();
+  const email = useEmail();
   const lock = useBiometricLock();
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -55,12 +55,12 @@ export default function Account() {
   const user = state.status === 'signedIn' ? state.user : null;
   const [error, setError] = useState<string | null>(null);
   const devices = useQuery({
-    queryKey: ['devices'],
+    queryKey: ['devices', email],
     queryFn: () => api.get<MobileSessionsResponse>('/api/mobile-sessions'),
   });
 
   const usage = useQuery({
-    queryKey: ['usage'],
+    queryKey: ['usage', email],
     queryFn: () => api.get<UsageResponse>('/api/usage'),
   });
 
@@ -73,7 +73,7 @@ export default function Account() {
         onPress: async () => {
           try {
             await api.delete(`/api/mobile-sessions?id=${encodeURIComponent(id)}`);
-            await queryClient.invalidateQueries({ queryKey: ['devices'] });
+            await queryClient.invalidateQueries({ queryKey: ['devices', email] });
           } catch (e) {
             setError(e instanceof Error ? e.message : 'Could not sign out that device.');
           }
@@ -194,13 +194,9 @@ export default function Account() {
         label="Sign out of this device"
         variant="danger"
         icon="logout"
-        onPress={async () => {
-          if (user) clearPortfolioCache(user.email);
-          // Stop notifications for this phone while the token still works.
-          await unregisterPush(api);
-          await pushPreference.set(false).catch(() => {});
-          await signOut();
-        }}
+        // Ends the server session (which also stops this phone's notifications) and clears all local data;
+        // when offline the server part is retried on the next launch.
+        onPress={() => void signOut()}
       />
       <Text style={[styles.muted, { textAlign: 'center' }]}>
         Sipwise {config.variant} · {config.apiBaseUrl}

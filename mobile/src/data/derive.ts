@@ -1,6 +1,6 @@
 // Pure view-model helpers over the shared portfolio code (no React / native imports,
 // so they can be unit tested with plain node).
-import { holdings, type AppNotification, type Portfolio } from '../../../lib/portfolio.ts';
+import { holdings, portfolioSummary, type AppNotification, type Portfolio } from '../../../lib/portfolio.ts';
 
 export type Holding = ReturnType<typeof holdings>[number];
 
@@ -12,31 +12,20 @@ export function safeHoldings(portfolio: Portfolio): { held: Holding[]; error: st
   }
 }
 
-export type Totals = {
-  value: number;
-  cost: number;
-  gain: number;
-  gainPercent: number | null;
-  /** Positions with shares but no usable price or unknown cost; excluded from the totals. */
-  unpriced: number;
-};
+/** Headline numbers shared with the web (value of priced holdings; cost and gain only when complete). */
+export const totals = (held: Holding[]) => portfolioSummary(held);
 
-/** Totals over open positions that have both a price and a known cost. */
-export function totals(held: Holding[]): Totals {
-  let value = 0;
-  let cost = 0;
-  let unpriced = 0;
-  for (const h of held) {
-    if (h.shares <= 0) continue;
-    if (h.value === null || h.cost === null) {
-      unpriced++;
-      continue;
-    }
-    value += h.value;
-    cost += h.cost;
-  }
-  const gain = value - cost;
-  return { value, cost, gain, gainPercent: cost > 0 ? (gain / cost) * 100 : null, unpriced };
+/**
+ * Companies whose price the plans need: everything held or targeted, the Monthly Picks shortlist, and any
+ * extra tickers (for example the selection on screen). Only companies in the portfolio, no duplicates.
+ */
+export function priceTickers(portfolio: Portfolio, extra: string[] = []): string[] {
+  const known = new Set(portfolio.companies.map((c) => c.ticker));
+  const wanted = new Set<string>();
+  const { held } = safeHoldings(portfolio);
+  for (const h of held) if (h.shares > 0 || h.target > 0) wanted.add(h.ticker);
+  for (const t of [...(portfolio.monthlyPicksShortlist ?? []), ...extra]) wanted.add(t);
+  return [...wanted].filter((t) => known.has(t));
 }
 
 export function openPositions(held: Holding[]): Holding[] {
@@ -104,6 +93,17 @@ export function activityEntries(p: Portfolio, ticker?: string): ActivityEntry[] 
     });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1));
+}
+
+/** Why an entry cannot be edited on the phone, or null when it can (or when no such entry exists). */
+export function readOnlyReason(p: Portfolio, id: string): string | null {
+  const t = p.trades.find((x) => x.id === id);
+  if (t) return t.voided ? "Voided entries can't be edited." : t.source && t.source !== 'manual' ? "Imported entries can't be edited." : null;
+  const d = p.dividends?.find((x) => x.id === id);
+  if (d) return d.voided ? "Voided entries can't be edited." : d.source !== 'manual' ? "Automatic and imported dividends can't be edited." : null;
+  const sp = p.stockSplits?.find((x) => x.id === id);
+  if (sp?.voided) return "Voided entries can't be edited.";
+  return null;
 }
 
 /** Notifications still in the bell (not cleared), newest first. */

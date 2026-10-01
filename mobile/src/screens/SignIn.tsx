@@ -9,7 +9,7 @@ import { Icon } from '@/ui/Icon';
 import { Button, Muted, Notice, Screen, styles } from '@/ui/kit';
 
 export function SignIn() {
-  const { signIn } = useAuth();
+  const { signIn, signOutPending } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
@@ -39,6 +39,7 @@ export function SignIn() {
         }}
       />
       {error ? <Notice tone="error">{error}</Notice> : null}
+      {signOutPending ? <Notice>Your last sign-out could not reach Sipwise (you were offline). It will finish the next time the app opens with a connection.</Notice> : null}
       {config.variant !== 'production' ? (
         <>
           <Muted>

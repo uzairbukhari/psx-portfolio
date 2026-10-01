@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import type { IndexPoint, IndexSummary, MarketState } from '@shared/psx-market.ts';
-import { useAuth } from '@/auth/AuthProvider';
+import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { formatPercent } from '@/data/derive';
 import { colors } from '@/theme/tokens';
 import { LineChart } from './LineChart';
@@ -15,8 +15,9 @@ const number = (n: number) => n.toLocaleString('en-PK', { minimumFractionDigits:
 /** KSE-100 snapshot from the shared market cache; refreshes every minute while on screen. */
 export function MarketPulse() {
   const { api } = useAuth();
+  const email = useEmail();
   const q = useQuery({
-    queryKey: ['market-summary'],
+    queryKey: ['market-summary', email],
     queryFn: () => api.get<Response>('/api/market-summary'),
     refetchInterval: 60_000,
     refetchOnMount: 'always',

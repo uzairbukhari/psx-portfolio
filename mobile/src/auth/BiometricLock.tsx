@@ -3,7 +3,7 @@ import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '@/theme/tokens';
-import { shouldLock } from './lock-policy';
+import { coversContent, shouldLock } from './lock-policy';
 
 const KEY = 'sipwise.lock';
 
@@ -27,6 +27,7 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [enabled, setEnabledState] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [appActive, setAppActive] = useState(true);
   const backgroundedAt = useRef<number | null>(null);
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!enabled) return;
     const sub = AppState.addEventListener('change', (next) => {
+      setAppActive(next === 'active');
       if (next === 'background') backgroundedAt.current = Date.now();
       else if (next === 'active') {
         if (shouldLock(backgroundedAt.current, Date.now())) setLocked(true);
@@ -77,14 +79,23 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ enabled, setEnabled }), [enabled, setEnabled]);
 
+  const covered = coversContent(enabled, locked, appActive);
+
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   return (
     <LockContext.Provider value={value}>
-      {children}
-      {/* An overlay, not a replacement, so screens (and half-typed forms) survive a lock. */}
-      {enabled && locked ? (
-        <View style={StyleSheet.absoluteFill}>
-          <LockScreen onUnlock={unlock} />
+      {/* The app stays mounted under the lock so screens (and half-typed forms) survive it, but screen
+          readers must not be able to reach it, so it is hidden from accessibility while covered. */}
+      <View
+        style={{ flex: 1 }}
+        importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={covered}
+      >
+        {children}
+      </View>
+      {covered ? (
+        <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+          {locked ? <LockScreen onUnlock={unlock} /> : <PrivacyCover />}
         </View>
       ) : null}
     </LockContext.Provider>
@@ -104,6 +115,15 @@ function LockScreen({ onUnlock }: { onUnlock: () => Promise<void> }) {
       >
         <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Unlock</Text>
       </Pressable>
+    </View>
+  );
+}
+
+/** Plain cover shown while the app is not in the foreground, so the app switcher shows no portfolio data. */
+function PrivacyCover() {
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: colors.foreground, fontSize: 22, fontWeight: '700' }}>Sipwise</Text>
     </View>
   );
 }

@@ -6,7 +6,11 @@ import type { MeResponse, MobileSignInRequest, MobileSignInResponse } from '@sha
 import { createApiClient, ApiRequestError, type ApiClient } from '@/api/client';
 import { config } from '@/config';
 import * as SecureStore from 'expo-secure-store';
-import { tokenStore } from './token-store';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearPortfolioCache } from '@/data/portfolio-cache';
+import { pushPreference } from '@/push/push';
+import { clearLocalState, retryPendingSignOut, signOutRemote } from './session-cleanup';
+import { pendingSignOut, tokenStore } from './token-store';
 
 const ME_KEY = 'sipwise.me';
 const rememberUser = (user: MeResponse) => SecureStore.setItemAsync(ME_KEY, JSON.stringify(user)).catch(() => {});
@@ -30,13 +34,19 @@ type AuthContextValue = {
   api: ApiClient;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** A sign-out the server has not confirmed yet (phone was offline); retried on the next launch. */
+  signOutPending: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
+  const queryClient = useQueryClient();
+  const [signOutPending, setSignOutPending] = useState(false);
   const signedOutRef = useRef<() => void>(() => {});
+  const emailRef = useRef<string | null>(null);
+  emailRef.current = state.status === 'signedIn' ? state.user.email : null;
 
   const api = useMemo(
     () =>
@@ -47,19 +57,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     [],
   );
+  const revokeWith = useCallback(
+    (token: string) => createApiClient({ baseUrl: config.apiBaseUrl, getToken: async () => token }).delete('/api/mobile-sessions?id=current'),
+    [],
+  );
 
-  // Local cleanup only; also what runs when the server rejects the token (so it must not call the server).
+  // Local cleanup only, run on every way out (button, revoked/expired token). It must not call the server.
+  // It clears everything that belongs to the account: token, profile, cached queries, cached portfolio, push preference.
   const clearLocal = useCallback(async () => {
-    await tokenStore.clear();
-    await SecureStore.deleteItemAsync(ME_KEY).catch(() => {});
-    await GoogleSignin.signOut().catch(() => {});
+    const email = emailRef.current ?? (await recallUser())?.email ?? null;
+    await clearLocalState({
+      email,
+      clearToken: tokenStore.clear,
+      clearProfile: () => SecureStore.deleteItemAsync(ME_KEY),
+      googleSignOut: () => GoogleSignin.signOut(),
+      clearQueries: () => queryClient.clear(),
+      clearPortfolioCache,
+      clearPushPreference: pushPreference.clear,
+    });
     setState({ status: 'signedOut' });
-  }, []);
+  }, [queryClient]);
   // User-initiated: also end the server-side session, which stops notifications and kills the token everywhere.
+  // Offline, the revoke is queued and retried on the next launch.
   const signOut = useCallback(async () => {
-    await api.delete('/api/mobile-sessions?id=current').catch(() => {});
+    const result = await signOutRemote({ token: await tokenStore.get(), revoke: revokeWith, queue: pendingSignOut.set });
+    if (result === 'queued') setSignOutPending(true);
     await clearLocal();
-  }, [api, clearLocal]);
+  }, [revokeWith, clearLocal]);
   signedOutRef.current = () => void clearLocal();
 
   useEffect(() => {
@@ -68,6 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       iosClientId: config.googleIosClientId || undefined,
     });
     let live = true;
+    void retryPendingSignOut({ read: pendingSignOut.get, revoke: revokeWith, clear: pendingSignOut.clear }).then(
+      (pending) => live && setSignOutPending(pending),
+    );
     (async () => {
       if (!(await tokenStore.get())) return live && setState({ status: 'signedOut' });
       try {
@@ -85,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, revokeWith]);
 
   const signIn = useCallback(async () => {
     await GoogleSignin.hasPlayServices();
@@ -103,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'signedIn', user: result.user });
   }, [api]);
 
-  const value = useMemo(() => ({ state, api, signIn, signOut }), [state, api, signIn, signOut]);
+  const value = useMemo(() => ({ state, api, signIn, signOut, signOutPending }), [state, api, signIn, signOut, signOutPending]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -111,4 +138,10 @@ export function useAuth(): AuthContextValue {
   const value = useContext(AuthContext);
   if (!value) throw new Error('useAuth must be used inside AuthProvider.');
   return value;
+}
+
+/** Signed-in email, used to scope query keys to the account so a second account never sees the first's cache. */
+export function useEmail(): string {
+  const { state } = useAuth();
+  return state.status === 'signedIn' ? state.user.email : '';
 }
