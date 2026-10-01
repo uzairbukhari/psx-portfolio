@@ -278,6 +278,9 @@ function PriceChart({
   );
 }
 
+/** History depth when the app loaded; anything above it was pushed by in-app navigation. */
+const ENTRY_HISTORY_LENGTH = typeof window === 'undefined' ? 0 : window.history.length;
+
 export default function CompanyDetail({
   portfolio,
   ticker,
@@ -344,15 +347,10 @@ export default function CompanyDetail({
       Math.round(received.slice(0, i + 1).reduce((a, x) => a + x.net, 0) * 100) / 100,
   }));
   const known = holding !== undefined;
+  // Only step back through history the app itself added; a direct link falls back to Holdings.
   const goBack = () => {
-    if (window.history.length > 1) {
-      const from = window.location.pathname;
-      window.history.back();
-      // Nothing to go back to inside the app (e.g. direct link): fall back to the parent tab.
-      window.setTimeout(() => {
-        if (window.location.pathname === from) onBack();
-      }, 300);
-    } else onBack();
+    if (window.history.length > ENTRY_HISTORY_LENGTH) window.history.back();
+    else onBack();
   };
   const held = (holding?.shares ?? 0) > 0;
 
