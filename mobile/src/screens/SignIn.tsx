@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Text, View } from 'react-native';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import { useAuth } from '@/auth/AuthProvider';
 import { config } from '@/config';
-import { colors } from '@/theme/tokens';
-import { Muted, Notice, Screen, styles } from '@/ui/kit';
+import { colors, type } from '@/theme/tokens';
+import { Icon } from '@/ui/Icon';
+import { Button, Muted, Notice, Screen, styles } from '@/ui/kit';
 
 export function SignIn() {
   const { signIn } = useAuth();
@@ -13,11 +14,18 @@ export function SignIn() {
   const [busy, setBusy] = useState(false);
   return (
     <Screen>
-      <Text style={{ color: colors.primary, fontSize: 32, fontWeight: '800', marginTop: 40 }}>Sipwise</Text>
-      <Muted>Your private PSX portfolio and monthly SIP planner.</Muted>
-      <Pressable
-        style={[styles.button, busy && { opacity: 0.5 }]}
-        disabled={busy}
+      <View style={{ alignItems: 'center', gap: 10, marginTop: 72, marginBottom: 28 }}>
+        <View style={{ width: 84, height: 84, borderRadius: 24, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="trendingUp" size={40} color={colors.primary} strokeWidth={2.2} />
+        </View>
+        <Text style={{ color: colors.foreground, ...type.largeTitle }}>Sipwise</Text>
+        <Text style={[styles.muted, { textAlign: 'center', maxWidth: 280 }]}>
+          Your private PSX portfolio and monthly SIP planner.
+        </Text>
+      </View>
+      <Button
+        label={busy ? 'Signing in…' : 'Sign in with Google'}
+        loading={busy}
         onPress={async () => {
           setBusy(true);
           setError(null);
@@ -29,9 +37,7 @@ export function SignIn() {
             setBusy(false);
           }
         }}
-      >
-        <Text style={styles.buttonText}>{busy ? 'Signing in…' : 'Sign in with Google'}</Text>
-      </Pressable>
+      />
       {error ? <Notice tone="error">{error}</Notice> : null}
       {config.variant !== 'production' ? (
         <>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import type { PriceHistoryResponse } from '@shared/api-types.ts';
@@ -11,7 +11,7 @@ import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
 import { ActivityRow } from '@/ui/ActivityRow';
 import { LineChart } from '@/ui/LineChart';
-import { Amount, Card, Muted, Notice, Screen, Stat, Title, styles } from '@/ui/kit';
+import { Amount, Avatar, Button, Card, Chip, EmptyState, Loading, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
 
 const RANGES: { key: HistoryRange; label: string }[] = [
   { key: 'today', label: '1D' },
@@ -43,12 +43,17 @@ export default function Company() {
   return (
     <Screen edges={[]} onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
       <Stack.Screen options={{ title: ticker }} />
-      {p.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
+      {p.isLoading ? <Loading /> : null}
       {!p.isLoading && !holding ? <Notice tone="error">{ticker} is not in your portfolio.</Notice> : null}
       {holding ? (
         <>
-          <Title>{holding.name}</Title>
-          <Muted>{holding.sector}</Muted>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Avatar ticker={ticker} size={48} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontSize: 20, fontWeight: '700' }} numberOfLines={2}>{holding.name}</Text>
+              <Muted>{ticker} · {holding.sector}</Muted>
+            </View>
+          </View>
           <Card>
             <View style={styles.row}>
               <Stat label="Shares">
@@ -87,50 +92,34 @@ export default function Company() {
             {points.length >= 2 ? <LineChart points={points} /> : null}
             <View style={[styles.row, { justifyContent: 'center' }]}>
               {RANGES.map((r) => (
-                <Pressable
-                  key={r.key}
-                  onPress={() => setRange(r.key)}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                    backgroundColor: range === r.key ? 'rgba(59,130,246,0.2)' : 'transparent',
-                  }}
-                >
-                  <Text style={{ color: range === r.key ? colors.primary : colors.muted, fontWeight: '600' }}>{r.label}</Text>
-                </Pressable>
+                <Chip key={r.key} label={r.label} selected={range === r.key} onPress={() => setRange(r.key)} />
               ))}
             </View>
           </Card>
 
-          <Pressable
-            style={styles.button}
-            onPress={() => router.push({ pathname: '/transaction', params: { ticker } })}
-          >
-            <Text style={styles.buttonText}>Add transaction</Text>
-          </Pressable>
-          <Pressable
-            style={styles.secondary}
-            onPress={() => router.push({ pathname: '/quote', params: { ticker } })}
-          >
-            <Text style={styles.secondaryText}>Enter price manually</Text>
-          </Pressable>
-          <Title>History</Title>
-          {entries.length === 0 ? <Muted>No trades or dividends recorded for {ticker}.</Muted> : null}
-          {entries.some((e) => e.editable) ? <Muted>Tap an entry to correct or void it.</Muted> : null}
-          <Card style={{ paddingVertical: 4 }}>
-            {entries.map((e, i) => (
-              <Pressable
-                key={e.id}
-                disabled={!e.editable}
-                onPress={() => router.push({ pathname: '/transaction', params: { id: e.id } })}
-              >
-                <View style={i ? { borderTopWidth: 1, borderTopColor: colors.border } : undefined}>
-                  <ActivityRow entry={e} showTicker={false} />
-                </View>
-              </Pressable>
-            ))}
-          </Card>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Button label="Add transaction" icon="plus" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/transaction', params: { ticker } })} />
+            <Button label="Set price" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/quote', params: { ticker } })} />
+          </View>
+          <SectionLabel>History</SectionLabel>
+          {entries.length === 0 ? (
+            <EmptyState icon="activity" title={`No entries for ${ticker}`} body="Trades and dividends for this company will be listed here." />
+          ) : (
+            <>
+              {entries.some((e) => e.editable) ? <Muted>Tap an entry to correct or void it.</Muted> : null}
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                {entries.map((e, i) => (
+                  <ActivityRow
+                    key={e.id}
+                    entry={e}
+                    showTicker={false}
+                    last={i === entries.length - 1}
+                    onPress={e.editable ? () => router.push({ pathname: '/transaction', params: { id: e.id } }) : undefined}
+                  />
+                ))}
+              </Card>
+            </>
+          )}
         </>
       ) : null}
     </Screen>

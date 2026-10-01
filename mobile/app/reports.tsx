@@ -1,21 +1,19 @@
 import { useMemo } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { money, moneyShort } from '@shared/portfolio.ts';
 import { portfolioReport } from '@shared/portfolio-reports.ts';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
-import { Card, Muted, Notice, Screen, Title, styles } from '@/ui/kit';
+import { Card, Header, Loading, Muted, Notice, ProgressBar, Screen, SectionLabel, styles } from '@/ui/kit';
 
 function Bar({ label, value, fraction, tone }: { label: string; value: string; fraction: number; tone?: string }) {
   return (
-    <View style={{ marginTop: 8 }}>
+    <View style={{ marginTop: 8, gap: 5 }}>
       <View style={styles.row}>
-        <Text style={{ color: colors.foreground }}>{label}</Text>
-        <Text style={{ color: colors.foreground }}>{value}</Text>
+        <Text style={{ color: colors.foreground, fontSize: 14 }}>{label}</Text>
+        <Text style={{ color: colors.muted, fontSize: 13, fontVariant: ['tabular-nums'] }}>{value}</Text>
       </View>
-      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, marginTop: 4 }}>
-        <View style={{ height: 6, borderRadius: 3, width: `${Math.max(0, Math.min(100, fraction * 100))}%`, backgroundColor: tone ?? colors.primary }} />
-      </View>
+      <ProgressBar fraction={fraction} tone={tone} />
     </View>
   );
 }
@@ -36,7 +34,7 @@ export default function Reports() {
   if (p.isLoading)
     return (
       <Screen edges={['bottom']}>
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
+        <Loading />
       </Screen>
     );
   if (!built?.report)
@@ -53,8 +51,8 @@ export default function Reports() {
 
   return (
     <Screen edges={['bottom']} onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
-      <Title>Reports</Title>
-      <Card>
+      <Header title="Reports" subtitle="Based on your saved prices and ledger" />
+      <Card tone="hero">
         <View style={styles.row}>
           <View>
             <Text style={styles.statLabel}>Priced value</Text>
@@ -74,14 +72,14 @@ export default function Reports() {
       </Card>
 
       <Card>
-        <Text style={styles.strong}>Allocation</Text>
+        <SectionLabel>Allocation</SectionLabel>
         {r.companyAllocation.map((a) => (
           <Bar key={a.ticker} label={a.ticker} value={pct(a.weight)} fraction={a.weight / maxAlloc} />
         ))}
       </Card>
 
       <Card>
-        <Text style={styles.strong}>Sectors</Text>
+        <SectionLabel>Sectors</SectionLabel>
         {r.sectorAllocation.map((a) => (
           <Bar key={a.sector} label={a.sector} value={pct(a.weight)} fraction={a.weight / 100} />
         ))}
@@ -89,7 +87,7 @@ export default function Reports() {
 
       {r.targetComparison.some((t) => t.target > 0) ? (
         <Card>
-          <Text style={styles.strong}>Actual vs target</Text>
+          <SectionLabel>Actual vs target</SectionLabel>
           {r.targetComparison
             .filter((t) => t.target > 0)
             .map((t) => (
@@ -104,7 +102,7 @@ export default function Reports() {
       ) : null}
 
       <Card>
-        <Text style={styles.strong}>Gain by company</Text>
+        <SectionLabel>Gain by company</SectionLabel>
         {r.performance.map((a) => (
           <View key={a.ticker} style={[styles.row, { marginTop: 6 }]}>
             <Text style={{ color: colors.foreground }}>{a.ticker}</Text>
@@ -117,7 +115,7 @@ export default function Reports() {
 
       {lastMonths.length ? (
         <Card>
-          <Text style={styles.strong}>Invested, last {lastMonths.length} months</Text>
+          <SectionLabel>Invested, last {lastMonths.length} months</SectionLabel>
           {lastMonths.map((m) => (
             <Bar key={m.month} label={m.month} value={moneyShort(m.invested)} fraction={m.invested / maxMonth} />
           ))}
@@ -125,7 +123,7 @@ export default function Reports() {
       ) : null}
 
       <Card>
-        <Text style={styles.strong}>Realized</Text>
+        <SectionLabel>Realized</SectionLabel>
         <Muted>
           Gains {money(r.realized.totalRealizedGain)}. Dividends (gross) {money(r.realized.totalDividendIncomeGross)}.
           {r.realized.totalCapitalGainsTax !== null ? ` Capital gains tax ${money(r.realized.totalCapitalGainsTax)}.` : ''}

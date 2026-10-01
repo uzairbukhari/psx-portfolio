@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { money } from '@shared/portfolio.ts';
@@ -9,7 +9,7 @@ import { parseNumber } from '@/data/mutations';
 import { currentMonth } from '@/data/sip';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
-import { Card, Muted, Notice, Screen, Title, styles } from '@/ui/kit';
+import { Avatar, Badge, Button, Card, Chip, Header, Input, Loading, Muted, Notice, Screen, SectionLabel, styles } from '@/ui/kit';
 
 type Run = {
   id: string;
@@ -78,7 +78,7 @@ export default function Picks() {
   if (p.isLoading || !portfolio)
     return (
       <Screen edges={['bottom']}>
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
+        <Loading />
       </Screen>
     );
 
@@ -113,61 +113,42 @@ export default function Picks() {
 
   return (
     <Screen edges={['bottom']} onRefresh={() => void run.refetch()} refreshing={run.isRefetching}>
-      <Title>Monthly Picks</Title>
-      <Muted>Ranks the companies you choose and suggests how to split this month's money. Not financial advice.</Muted>
+      <Header title="Monthly Picks" subtitle="Ranks the companies you choose and suggests how to split this month's money. Not financial advice." />
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <Card>
-        <Text style={styles.statLabel}>Companies to consider ({selected.length}/{MAX})</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-          {portfolio.companies.map((c) => {
-            const on = selected.includes(c.ticker);
-            return (
-              <Pressable
-                key={c.ticker}
-                onPress={() => toggle(c.ticker)}
-                style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary : 'transparent' }}
-              >
-                <Text style={{ color: on ? '#fff' : colors.foreground }}>{c.ticker}</Text>
-              </Pressable>
-            );
-          })}
+        <SectionLabel>Companies to consider · {selected.length}/{MAX}</SectionLabel>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {portfolio.companies.map((c) => (
+            <Chip key={c.ticker} label={c.ticker} selected={selected.includes(c.ticker)} onPress={() => toggle(c.ticker)} />
+          ))}
         </View>
+        <View style={styles.divider} />
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.statLabel}>Amount (PKR)</Text>
-            <TextInput
-              style={{ backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, padding: 10, color: colors.foreground, fontSize: 16, marginTop: 4 }}
-              value={budget}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-            />
+            <Input label="Amount (PKR)" value={budget} onChangeText={setAmount} keyboardType="decimal-pad" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.statLabel}>Fee estimate (%)</Text>
-            <TextInput
-              style={{ backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, padding: 10, color: colors.foreground, fontSize: 16, marginTop: 4 }}
-              value={fee}
-              onChangeText={setFee}
-              keyboardType="decimal-pad"
-            />
+            <Input label="Fee estimate (%)" value={fee} onChangeText={setFee} keyboardType="decimal-pad" />
           </View>
         </View>
-        <Pressable style={[styles.button, (starting || active) && { opacity: 0.4 }]} disabled={starting || active} onPress={() => void start(current?.status === 'completed')}>
-          <Text style={styles.buttonText}>{current?.status === 'completed' ? 'Run again' : 'Get picks'}</Text>
-        </Pressable>
+        <Button
+          label={current?.status === 'completed' ? 'Run again' : 'Get picks'}
+          icon="sparkle"
+          loading={starting}
+          disabled={active}
+          onPress={() => void start(current?.status === 'completed')}
+        />
       </Card>
 
       {active ? (
         <Card>
-          <View style={[styles.row, { justifyContent: 'flex-start', gap: 10 }]}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.strong}>{current.status === 'gathering' ? 'Gathering company data' : 'Ranking'}</Text>
-          </View>
-          <Muted>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[styles.strong, { textAlign: 'center' }]}>{current.status === 'gathering' ? 'Gathering company data' : 'Ranking your shortlist'}</Text>
+          <Text style={[styles.muted, { textAlign: 'center' }]}>
             {current.progress?.pending?.length ? `Waiting on ${current.progress.pending.join(', ')}. ` : ''}
             This can take a few minutes. You can leave this screen and come back.
-          </Muted>
+          </Text>
         </Card>
       ) : null}
 
@@ -175,23 +156,26 @@ export default function Picks() {
 
       {current?.status === 'completed' && current.result ? (
         <>
-          {current.method === 'quant' ? (
-            <Notice>{current.result.fallbackReason ?? 'Ranked by the numbers only (no AI commentary).'}</Notice>
-          ) : null}
+          {current.method === 'quant' ? <Notice>{current.result.fallbackReason ?? 'Ranked by the numbers only (no AI commentary).'}</Notice> : null}
           <Card>
             <Text style={styles.strong}>Market outlook</Text>
-            <Muted>{current.result.marketOutlook}</Muted>
+            <Text style={{ color: colors.foreground, fontSize: 14, lineHeight: 21 }}>{current.result.marketOutlook}</Text>
           </Card>
+          <SectionLabel>Top picks</SectionLabel>
           {rows.map((r) => (
             <Card key={r.ticker}>
               <View style={styles.row}>
+                <Avatar ticker={r.ticker} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.strong}>{r.ticker} · {r.allocationPct}%</Text>
-                  <Muted>{r.name} · {r.confidence} confidence</Muted>
+                  <Muted>{r.name}</Muted>
                 </View>
-                <Text style={styles.strong}>{money(r.allocationPkr)}</Text>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <Text style={[styles.strong, { fontVariant: ['tabular-nums'] }]}>{money(r.allocationPkr)}</Text>
+                  <Badge text={`${r.confidence} confidence`} tone={r.confidence === 'High' ? 'success' : r.confidence === 'Low' ? 'warn' : 'neutral'} />
+                </View>
               </View>
-              <Text style={{ color: colors.foreground }}>{r.thesis}</Text>
+              <Text style={{ color: colors.foreground, fontSize: 14, lineHeight: 21 }}>{r.thesis}</Text>
               {r.risks.length ? <Muted>Risks: {r.risks.join('; ')}</Muted> : null}
               {r.shares !== null && r.price !== null ? (
                 <>
@@ -199,17 +183,17 @@ export default function Picks() {
                     About {r.shares} shares at {money(r.price)}; spend {money(r.estimatedSpend ?? 0)}.
                   </Muted>
                   {r.shares > 0 ? (
-                    <Pressable
-                      style={styles.button}
+                    <Button
+                      label="Record this buy"
+                      variant="secondary"
+                      icon="check"
                       onPress={() =>
                         router.push({
                           pathname: '/transaction',
                           params: { ticker: r.ticker, kind: 'buy', shares: String(r.shares), price: String(r.price), month },
                         })
                       }
-                    >
-                      <Text style={styles.buttonText}>Record this buy</Text>
-                    </Pressable>
+                    />
                   ) : null}
                 </>
               ) : (

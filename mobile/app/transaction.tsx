@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { QuotesResponse } from '@shared/api-types.ts';
@@ -8,7 +8,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { addCompany, isIsoDate, isValidSymbol, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry, type EntryKind } from '@/data/mutations';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
-import { Muted, Notice, styles as kit } from '@/ui/kit';
+import { Button, Chip, Input, Muted, Notice, SectionLabel } from '@/ui/kit';
 
 type Kind = 'buy' | 'sell' | 'dividend' | 'split' | 'opening';
 const KINDS: { key: Kind; label: string }[] = [
@@ -28,35 +28,25 @@ function Field({ label, value, onChangeText, placeholder, keyboard = 'default', 
   multiline?: boolean;
 }) {
   return (
-    <View style={{ gap: 6 }}>
-      <Text style={kit.statLabel}>{label}</Text>
-      <TextInput
-        style={[s.input, multiline && { minHeight: 70, textAlignVertical: 'top' }]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.muted}
-        keyboardType={keyboard}
-        multiline={multiline}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-    </View>
+    <Input
+      label={label}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      keyboardType={keyboard}
+      multiline={multiline}
+      autoCapitalize="none"
+      autoCorrect={false}
+      style={multiline ? { minHeight: 70, textAlignVertical: 'top' } : undefined}
+    />
   );
 }
 
 function Chips<T extends string>({ items, value, onChange, disabled }: { items: { key: T; label: string }[]; value: T | ''; onChange: (k: T) => void; disabled?: boolean }) {
   return (
-    <View style={s.chips}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, opacity: disabled ? 0.6 : 1 }} pointerEvents={disabled ? 'none' : 'auto'}>
       {items.map((i) => (
-        <Pressable
-          key={i.key}
-          disabled={disabled}
-          onPress={() => onChange(i.key)}
-          style={[s.chip, value === i.key && s.chipOn, disabled && value !== i.key && { opacity: 0.35 }]}
-        >
-          <Text style={{ color: value === i.key ? colors.primary : colors.foreground, fontWeight: '600' }}>{i.label}</Text>
-        </Pressable>
+        <Chip key={i.key} label={i.label} selected={value === i.key} onPress={() => onChange(i.key)} />
       ))}
     </View>
   );
@@ -218,11 +208,11 @@ export default function Transaction() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <Stack.Screen options={{ title: editing ? 'Edit entry' : 'Add transaction' }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
           {editingId && !existing && !p.isLoading ? <Notice tone="error">That entry no longer exists.</Notice> : null}
-          <Text style={kit.statLabel}>Type</Text>
+          <SectionLabel>Type</SectionLabel>
           <Chips items={KINDS} value={kind} onChange={setKind} disabled={editing} />
-          <Text style={kit.statLabel}>Company</Text>
+          <SectionLabel>Company</SectionLabel>
           <Chips
             items={[...companies, ...(editing ? [] : [{ key: '__new', label: '+ New company' }])]}
             value={newCompany ? '__new' : tickerChoice}
@@ -236,7 +226,7 @@ export default function Transaction() {
             <>
               <Field label="PSX symbol" value={symbol} onChangeText={(v) => setSymbol(v.toUpperCase())} placeholder="e.g. MEBL" />
               <Field label="Company name" value={companyName} onChangeText={setCompanyName} />
-              <Text style={kit.statLabel}>Sector</Text>
+              <SectionLabel>Sector</SectionLabel>
               <Chips items={SECTORS.map((x) => ({ key: x, label: x }))} value={sector} onChange={setSector} />
               <Muted>The symbol is confirmed against PSX when you save.</Muted>
             </>
@@ -265,23 +255,16 @@ export default function Transaction() {
           <Field label="Note" value={note} onChangeText={setNote} multiline />
           {kind === 'dividend' ? <Muted>The gross amount is worked out from the shares you held on that date.</Muted> : null}
           {error ? <Notice tone="error">{error}</Notice> : null}
-          <Pressable style={[kit.button, busy && { opacity: 0.5 }]} disabled={busy || (editing && !existing)} onPress={() => void submit()}>
-            <Text style={kit.buttonText}>{busy ? 'Saving…' : editing ? 'Save correction' : 'Save'}</Text>
-          </Pressable>
-          {editing && existing ? (
-            <Pressable style={kit.secondary} disabled={busy} onPress={confirmVoid}>
-              <Text style={{ color: colors.danger, fontSize: 15 }}>Void this entry</Text>
-            </Pressable>
-          ) : null}
+          <Button
+            label={editing ? 'Save correction' : 'Save'}
+            icon="check"
+            loading={busy}
+            disabled={editing && !existing}
+            onPress={() => void submit()}
+          />
+          {editing && existing ? <Button label="Void this entry" variant="danger" disabled={busy} onPress={confirmVoid} /> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-const s = StyleSheet.create({
-  input: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 10, padding: 12, color: colors.foreground, fontSize: 16 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderColor: colors.border, borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  chipOn: { borderColor: colors.primary, backgroundColor: 'rgba(59,130,246,0.15)' },
-});

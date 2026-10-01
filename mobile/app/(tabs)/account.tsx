@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, Switch, Text, View } from 'react-native';
+import { Alert, Image, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
@@ -8,7 +8,8 @@ import { useBiometricLock } from '@/auth/BiometricLock';
 import { clearPortfolioCache } from '@/data/portfolio-cache';
 import { config } from '@/config';
 import { colors } from '@/theme/tokens';
-import { Card, Muted, Notice, Screen, Title, styles } from '@/ui/kit';
+import { Icon } from '@/ui/Icon';
+import { Badge, Button, Card, Header, ListRow, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
 
 export default function Account() {
   const { state, api, signOut } = useAuth();
@@ -43,24 +44,46 @@ export default function Account() {
       },
     ]);
 
+  const initials = (user?.name ?? user?.email ?? '?').slice(0, 1).toUpperCase();
+  const iconBox = (name: Parameters<typeof Icon>[0]['name']) => (
+    <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+      <Icon name={name} size={18} color={colors.primary} />
+    </View>
+  );
+
   return (
     <Screen>
-      <Title>Account</Title>
+      <Header title="Account" />
       <Card>
-        <Text style={styles.strong}>{user?.name ?? user?.email}</Text>
-        <Muted>
-          {user?.email} · {user?.role === 'super_admin' ? 'admin' : 'member'}
-        </Muted>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          {user?.picture ? (
+            <Image source={{ uri: user.picture }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+          ) : (
+            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: colors.primary, fontSize: 22, fontWeight: '700' }}>{initials}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.strong} numberOfLines={1}>{user?.name ?? user?.email}</Text>
+            <Muted>{user?.email}</Muted>
+          </View>
+          {user?.role === 'super_admin' ? <Badge text="Admin" tone="primary" /> : null}
+        </View>
       </Card>
-      <Pressable style={styles.button} onPress={() => router.push('/reports')}>
-        <Text style={styles.buttonText}>Reports</Text>
-      </Pressable>
-      <Pressable style={styles.secondary} onPress={() => router.push('/import')}>
-        <Text style={styles.secondaryText}>Import broker / CDC file</Text>
-      </Pressable>
+      {error ? <Notice tone="error">{error}</Notice> : null}
+
+      <SectionLabel>Tools</SectionLabel>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <ListRow left={iconBox('chart')} title="Reports" subtitle="Allocation, gains, income and tax" onPress={() => router.push('/reports')} />
+        <ListRow left={iconBox('sparkle')} title="Monthly Picks" subtitle="AI-ranked ideas for this month's SIP" onPress={() => router.push('/picks')} />
+        <ListRow left={iconBox('upload')} title="Import" subtitle="AHL trades and CDC dividends" onPress={() => router.push('/import')} last />
+      </Card>
+
+      <SectionLabel>Security</SectionLabel>
       <Card>
         <View style={styles.row}>
-          <View style={{ flex: 1, paddingRight: 12 }}>
+          {iconBox('lock')}
+          <View style={{ flex: 1 }}>
             <Text style={styles.strong}>App lock</Text>
             <Muted>Ask for fingerprint, face or screen lock when opening the app.</Muted>
           </View>
@@ -73,44 +96,50 @@ export default function Account() {
           />
         </View>
       </Card>
+
       {usage.data ? (
-        <Card>
-          <Text style={styles.strong}>AI usage</Text>
-          <Muted>
-            ${usage.data.costUsd.toFixed(3)} spent · {(usage.data.inputTokens + usage.data.outputTokens).toLocaleString()} tokens
-          </Muted>
-        </Card>
-      ) : null}
-      <Title>Signed-in devices</Title>
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {devices.error ? <Notice tone="error">{devices.error.message}</Notice> : null}
-      <Card style={{ paddingVertical: 4 }}>
-        {(devices.data?.sessions ?? []).map((d, i) => (
-          <View key={d.id} style={[styles.row, { paddingVertical: 12 }, i ? { borderTopWidth: 1, borderTopColor: 'rgba(148,178,225,0.16)' } : undefined]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.strong}>{d.deviceName}</Text>
-              <Muted>
-                {d.platform} · last used {new Date(d.lastSeenAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
-              </Muted>
+        <>
+          <SectionLabel>AI usage</SectionLabel>
+          <Card>
+            <View style={styles.row}>
+              <Stat label="Spent">
+                <Text style={styles.strong}>${usage.data.costUsd.toFixed(3)}</Text>
+              </Stat>
+              <Stat label="Tokens">
+                <Text style={styles.strong}>{(usage.data.inputTokens + usage.data.outputTokens).toLocaleString()}</Text>
+              </Stat>
             </View>
-            <Pressable onPress={() => revoke(d.id, d.deviceName)}>
-              <Text style={{ color: '#ff5d6c' }}>Sign out</Text>
-            </Pressable>
-          </View>
+          </Card>
+        </>
+      ) : null}
+
+      <SectionLabel>Signed-in devices</SectionLabel>
+      {devices.error ? <Notice tone="error">{devices.error.message}</Notice> : null}
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        {(devices.data?.sessions ?? []).map((d, i, all) => (
+          <ListRow
+            key={d.id}
+            left={iconBox('phone')}
+            title={d.deviceName}
+            subtitle={`${d.platform} · last used ${new Date(d.lastSeenAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}`}
+            right={<Text style={{ color: colors.danger, fontWeight: '600' }} onPress={() => revoke(d.id, d.deviceName)}>Sign out</Text>}
+            last={i === all.length - 1}
+          />
         ))}
       </Card>
-      <Pressable
-        style={styles.secondary}
+
+      <Button
+        label="Sign out of this device"
+        variant="danger"
+        icon="logout"
         onPress={async () => {
           if (user) clearPortfolioCache(user.email);
           await signOut();
         }}
-      >
-        <Text style={styles.secondaryText}>Sign out of this device</Text>
-      </Pressable>
-      <Muted>
+      />
+      <Text style={[styles.muted, { textAlign: 'center' }]}>
         Sipwise {config.variant} · {config.apiBaseUrl}
-      </Muted>
+      </Text>
     </Screen>
   );
 }
