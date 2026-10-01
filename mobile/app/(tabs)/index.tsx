@@ -60,32 +60,46 @@ export default function Holdings() {
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <Card tone="hero">
-        <Text style={[styles.sectionLabel]}>Portfolio value</Text>
-        <Text style={{ color: colors.foreground, ...type.hero, fontVariant: ['tabular-nums'] }}>{moneyShort(totals.value)}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <View style={{ transform: [{ scaleY: totals.gain !== null && totals.gain < 0 ? -1 : 1 }] }}>
-            <Icon name="trendingUp" size={16} color={gainColor} />
-          </View>
-          <Text style={{ color: gainColor, fontWeight: '600', fontSize: 15 }}>
-            {moneyShort(totals.gain)} · {formatPercent(totals.gainPercent)}
-          </Text>
-          <Text style={styles.muted}>all time</Text>
-        </View>
+        <Text style={[styles.sectionLabel]}>{totals.incomplete.includes('missing-price') ? 'Priced holdings · incomplete' : 'Portfolio value'}</Text>
+        <Text style={{ color: colors.foreground, ...type.hero, fontVariant: ['tabular-nums'] }}>
+          {totals.heldCount > 0 && totals.missingPrice.length === totals.heldCount ? 'Prices needed' : moneyShort(totals.value)}
+        </Text>
+        {totals.gain === null ? (
+          <Text style={styles.muted}>Unrealised gain on current holdings: not yet known</Text>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ transform: [{ scaleY: totals.gain < 0 ? -1 : 1 }] }}>
+                <Icon name="trendingUp" size={16} color={gainColor} />
+              </View>
+              <Text style={{ color: gainColor, fontWeight: '600', fontSize: 15 }}>
+                {moneyShort(totals.gain)} · {formatPercent(totals.gainPercent)}
+              </Text>
+            </View>
+            <Text style={styles.muted}>Unrealised gain on current holdings</Text>
+          </>
+        )}
         <View style={styles.divider} />
         <View style={styles.row}>
-          <Stat label="Invested">
-            <Text style={styles.strong}>{moneyShort(totals.cost)}</Text>
+          <Stat label="Cost of current holdings">
+            <Text style={styles.strong}>{totals.cost === null ? 'Not yet known' : moneyShort(totals.cost)}</Text>
           </Stat>
           <Stat label="Open positions">
             <Text style={styles.strong}>{open.length}</Text>
           </Stat>
-          <Stat label="Return">
-            <Amount value={totals.gain} text={formatPercent(totals.gainPercent)} />
+          <Stat label="Oldest price">
+            <Text style={styles.strong}>{totals.oldestQuoteDate ?? '—'}</Text>
           </Stat>
         </View>
-        {totals.unpriced ? (
-          <Text style={styles.muted}>{totals.unpriced} position(s) without a price or known cost are left out of these totals.</Text>
+        {totals.missingPrice.length ? (
+          <Text style={styles.muted}>
+            {totals.missingPrice.length} position(s) need a price ({totals.missingPrice.join(', ')}), so the gain is not shown. Realised gains and dividends are not included.
+          </Text>
         ) : null}
+        {totals.unknownCost.length ? (
+          <Text style={styles.muted}>Cost is not known for {totals.unknownCost.join(', ')}, so cost and gain are not shown.</Text>
+        ) : null}
+        {!totals.incomplete.length ? <Text style={styles.muted}>Realised gains and dividends are not included. See Reports for total return.</Text> : null}
       </Card>
 
       <MarketPulse />

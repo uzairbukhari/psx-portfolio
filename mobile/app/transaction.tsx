@@ -6,6 +6,7 @@ import type { QuotesResponse } from '@shared/api-types.ts';
 import { SECTORS, today, type Dividend, type StockSplit, type Trade } from '@shared/portfolio.ts';
 import { useAuth } from '@/auth/AuthProvider';
 import { addCompany, isIsoDate, isValidSymbol, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry, type EntryKind } from '@/data/mutations';
+import { readOnlyReason } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
 import { Button, Chip, Input, Muted, Notice, SectionLabel } from '@/ui/kit';
@@ -125,6 +126,8 @@ export default function Transaction() {
     [p.portfolio],
   );
   const editing = Boolean(editingId);
+  // Deep links can reach any entry id; imported, automatic and voided entries are not editable here.
+  const locked = editingId && p.portfolio ? readOnlyReason(p.portfolio, editingId) : null;
 
   async function submit() {
     setError(null);
@@ -203,6 +206,17 @@ export default function Transaction() {
       },
     ]);
   }
+
+  if (locked)
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+        <Stack.Screen options={{ title: 'Edit entry' }} />
+        <View style={{ padding: 16, gap: 14 }}>
+          <Notice>{locked}</Notice>
+          <Button label="Back" variant="secondary" onPress={() => router.back()} />
+        </View>
+      </SafeAreaView>
+    );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>

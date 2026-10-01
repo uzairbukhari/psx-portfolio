@@ -4,7 +4,7 @@ import type { PortfolioResponse, QuotesResponse, SavePortfolioRequest, SavePortf
 import { validate, type Portfolio } from '@shared/portfolio.ts';
 import { ApiRequestError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
-import { openPositions, safeHoldings, totals } from './derive';
+import { openPositions, priceTickers, safeHoldings, totals } from './derive';
 import { readPortfolioCache, writePortfolioCache } from './portfolio-cache';
 
 export function usePortfolio() {
@@ -38,9 +38,12 @@ export function usePortfolio() {
     return { held, error, open: openPositions(held), totals: totals(held) };
   }, [data]);
 
-  /** Asks the server for fresh PSX prices for open positions (cached server-side), then reloads. */
-  async function refreshPrices() {
-    const tickers = view?.open.map((h) => h.ticker) ?? [];
+  /**
+   * Asks the server for fresh PSX prices (cached server-side), then reloads. Covers held and targeted
+   * companies and the Monthly Picks shortlist, since the SIP plan needs a price for each; `extra` adds tickers.
+   */
+  async function refreshPrices(extra: string[] = []) {
+    const tickers = data ? priceTickers(data.portfolio, extra) : [];
     if (tickers.length) await api.post<QuotesResponse>('/api/quotes', { tickers });
     await queryClient.invalidateQueries({ queryKey: ['portfolio', email] });
   }

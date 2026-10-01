@@ -15,6 +15,11 @@ const VARIANTS = {
 // forgets APP_VARIANT lands on staging instead of breaking the installed app.
 const variant = (process.env.APP_VARIANT || 'staging') as keyof typeof VARIANTS;
 const v = VARIANTS[variant] ?? VARIANTS.staging;
+// A production build or update without its environment would ship an app that cannot sign in or load data.
+if (variant === 'production') {
+  const missing = [!v.api && 'API_BASE_URL', !process.env.GOOGLE_WEB_CLIENT_ID && 'GOOGLE_WEB_CLIENT_ID'].filter(Boolean);
+  if (missing.length) throw new Error(`APP_VARIANT=production needs ${missing.join(' and ')}. Use the EAS production environment (npm run update:production) or set them locally.`);
+}
 const bundleId = `com.uzairbukhari.sipwise${v.suffix}`;
 // Reversed iOS OAuth client id, e.g. com.googleusercontent.apps.123-abc
 const iosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;

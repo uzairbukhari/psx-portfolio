@@ -49,6 +49,7 @@ import {
 import { LogoMark, Wordmark } from '@/components/logo';
 import {
   holdings,
+  portfolioSummary,
   plan,
   money,
   moneyShort,
@@ -744,13 +745,8 @@ export default function Dashboard({
       .slice()
       .sort((a, b) => (b.value ?? -1) - (a.value ?? -1)),
     held = hs.filter((h) => h.shares > 0),
-    missing = held.filter((h) => !h.quote),
-    unknown = held.filter((h) => h.cost === null),
-    value = round(held.reduce((a, h) => a + (h.value ?? 0), 0)),
-    cost = unknown.length
-      ? null
-      : round(held.reduce((a, h) => a + (h.cost ?? 0), 0)),
-    gain = cost === null || missing.length ? null : round(value - cost);
+    { value, cost, gain, missingPrice: missing, unknownCost: unknown } =
+      portfolioSummary(hs);
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)

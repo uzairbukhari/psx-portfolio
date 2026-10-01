@@ -5,3 +5,6 @@ export function shouldLock(backgroundedAt: number | null, now: number, graceMs: 
   if (backgroundedAt === null) return false;
   return now - backgroundedAt >= graceMs;
 }
+
+/** The app switcher snapshot is taken when the app leaves the foreground, so hide the content from that moment. */
+export const coversContent = (enabled: boolean, locked: boolean, appActive: boolean) => enabled && (locked || !appActive);

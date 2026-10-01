@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { PriceHistoryResponse } from '@shared/api-types.ts';
 import { money, moneyShort } from '@shared/portfolio.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '@shared/price-history.ts';
-import { useAuth } from '@/auth/AuthProvider';
+import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { activityEntries, formatPercent } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
@@ -24,6 +24,7 @@ export default function Company() {
   const { ticker: raw } = useLocalSearchParams<{ ticker: string }>();
   const ticker = String(raw ?? '').toUpperCase();
   const { api } = useAuth();
+  const email = useEmail();
   const p = usePortfolio();
   const [range, setRange] = useState<HistoryRange>('1m');
 
@@ -31,7 +32,7 @@ export default function Company() {
   const entries = useMemo(() => (p.portfolio ? activityEntries(p.portfolio, ticker) : []), [p.portfolio, ticker]);
 
   const history = useQuery({
-    queryKey: ['history', ticker],
+    queryKey: ['history', email, ticker],
     queryFn: () => api.get<PriceHistoryResponse>(`/api/price-history?ticker=${encodeURIComponent(ticker)}`),
   });
   const points = useMemo(() => {

@@ -59,11 +59,18 @@ export default function Reports() {
             <Text style={styles.strong}>{moneyShort(s.pricedValue)}</Text>
           </View>
           <View>
-            <Text style={styles.statLabel}>Gain</Text>
+            <Text style={styles.statLabel}>Unrealised gain</Text>
             <Text style={styles.strong}>
-              {s.totalGain === null ? '—' : `${moneyShort(s.totalGain)} (${pct(s.totalGainPercent)})`}
+              {s.totalGain === null ? 'Not yet known' : `${moneyShort(s.totalGain)} (${pct(s.totalGainPercent)})`}
             </Text>
           </View>
+        </View>
+        <View style={{ marginTop: 8 }}>
+          <Text style={styles.statLabel}>Total return</Text>
+          <Text style={styles.strong}>{s.grandTotalReturn === null ? 'Not yet known' : moneyShort(s.grandTotalReturn)}</Text>
+          <Muted>
+            Unrealised gain plus realised gains and received dividends, after estimated tax. Shown as not yet known when a price or cost is missing.
+          </Muted>
         </View>
         <Muted>
           Quotes for {s.quoteCoverage.priced} of {s.quoteCoverage.held} holdings. Top three are {pct(s.topThreeWeight, 0)} of value.

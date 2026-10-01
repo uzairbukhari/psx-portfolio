@@ -25,9 +25,15 @@ export function PushBridge() {
       if (typeof ticker === 'string' && /^[A-Z0-9]{2,12}$/.test(ticker))
         router.push({ pathname: '/company/[ticker]', params: { ticker } });
     };
+    // The last response outlives the launch it came from (notably on Android), so clear it once handled;
+    // otherwise a later cold start would open the same company again.
+    const handle = (r: Parameters<typeof open>[0]) => {
+      open(r);
+      if (r) void N?.clearLastNotificationResponseAsync?.().catch(() => {});
+    };
     // A notification tapped while the app was closed.
-    void N?.getLastNotificationResponseAsync().then(open);
-    const sub = N?.addNotificationResponseReceivedListener(open);
+    void N?.getLastNotificationResponseAsync().then(handle);
+    const sub = N?.addNotificationResponseReceivedListener(handle);
     return () => {
       live = false;
       sub?.remove();

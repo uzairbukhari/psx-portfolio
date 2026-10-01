@@ -15,9 +15,20 @@ export default function Sip() {
   const [month, setMonth] = useState(now);
   const [fee, setFee] = useState('0');
   const [allowOld, setAllowOld] = useState(false);
-  const [budgetText, setBudgetText] = useState<string | null>(null);
+  // Budget drafts are kept per month, so what is typed for one month can never be saved to another.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [pricing, setPricing] = useState(false);
   const [savingBudget, setSavingBudget] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+
+  const budgetText: string | null = drafts[month] ?? null;
+  const setBudgetText = (text: string | null) =>
+    setDrafts((d) => {
+      const next = { ...d };
+      if (text === null) delete next[month];
+      else next[month] = text;
+      return next;
+    });
 
   const result = useMemo(
     () => (p.portfolio ? buildPlan(p.portfolio, month, parseNumber(fee) ?? 0, allowOld) : null),
@@ -41,6 +52,9 @@ export default function Sip() {
 
   const plan = result.plan;
   const monthLabel = new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const monthName = new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+  // plan() falls back to PKR 100,000 for a month with no budget; that is not something the user chose.
+  const budgetSet = p.portfolio.budgets[month] !== undefined;
 
   async function saveBudget() {
     if (!p.portfolio || budgetText === null) return;
@@ -51,7 +65,7 @@ export default function Sip() {
       if (amount === null) throw new Error('Enter the monthly budget.');
       await p.save(setBudget(p.portfolio, month, amount));
       setBudgetText(null);
-      setMessage({ text: 'Budget saved.', error: false });
+      setMessage({ text: `Budget for ${monthLabel} saved.`, error: false });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : 'Could not save the budget.', error: true });
     } finally {
@@ -70,7 +84,18 @@ export default function Sip() {
       <Icon name={dir < 0 ? 'chevronLeft' : 'chevronRight'} size={18} color={colors.foreground} />
     </Pressable>
   );
-  const spentFraction = plan && plan.budget > 0 ? plan.already / plan.budget : 0;
+  const spentFraction = plan && budgetSet && plan.budget > 0 ? plan.already / plan.budget : 0;
+  async function refreshPrices() {
+    setPricing(true);
+    setMessage(null);
+    try {
+      await p.refreshPrices();
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : 'Could not refresh prices.', error: true });
+    } finally {
+      setPricing(false);
+    }
+  }
 
   return (
     <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
@@ -87,13 +112,13 @@ export default function Sip() {
         <Card tone="hero">
           <View style={styles.row}>
             <Stat label="Budget">
-              <Text style={styles.strong}>{moneyShort(plan.budget)}</Text>
+              <Text style={styles.strong}>{budgetSet ? moneyShort(plan.budget) : 'Not set'}</Text>
             </Stat>
-            <Stat label="Invested">
+            <Stat label="Bought this month">
               <Text style={styles.strong}>{moneyShort(plan.already)}</Text>
             </Stat>
             <Stat label="Remaining">
-              <Text style={styles.strong}>{moneyShort(plan.remaining)}</Text>
+              <Text style={styles.strong}>{budgetSet ? moneyShort(plan.remaining) : '—'}</Text>
             </Stat>
           </View>
           <ProgressBar fraction={spentFraction} tone={spentFraction >= 1 ? colors.success : colors.primary} />
@@ -101,13 +126,14 @@ export default function Sip() {
           <View style={[styles.row, { alignItems: 'flex-end' }]}>
             <View style={{ flex: 1 }}>
               <Input
-                label="This month's budget (PKR)"
-                value={budgetText ?? String(plan.budget)}
+                label={`Budget for ${monthLabel} (PKR)`}
+                placeholder="e.g. 100000"
+                value={budgetText ?? (budgetSet ? String(plan.budget) : '')}
                 onChangeText={setBudgetText}
                 keyboardType="decimal-pad"
               />
             </View>
-            <Button label="Save" disabled={budgetText === null} loading={savingBudget} onPress={() => void saveBudget()} style={{ minHeight: 48 }} />
+            <Button label={`Save ${monthName}`} disabled={budgetText === null} loading={savingBudget} onPress={() => void saveBudget()} style={{ minHeight: 48 }} />
           </View>
           <View style={[styles.row, { alignItems: 'flex-end' }]}>
             <View style={{ flex: 1 }}>
@@ -133,9 +159,18 @@ export default function Sip() {
         <Icon name="chevronRight" size={16} color={colors.primary} />
       </Pressable>
 
-      {plan && plan.errors.length ? <Notice>{plan.errors.join('\n')}</Notice> : null}
+      <Button
+        label={pricing ? 'Refreshing prices…' : 'Refresh PSX prices'}
+        variant="secondary"
+        icon="refresh"
+        loading={pricing}
+        onPress={() => void refreshPrices()}
+      />
 
-      {plan && !plan.errors.length ? (
+      {plan && !budgetSet ? <Notice>Set a budget for {monthLabel} to see suggested buys.</Notice> : null}
+      {plan && budgetSet && plan.errors.length ? <Notice>{plan.errors.join('\n')}</Notice> : null}
+
+      {plan && budgetSet && !plan.errors.length ? (
         <>
           <SectionLabel>Suggested buys</SectionLabel>
           <Muted>

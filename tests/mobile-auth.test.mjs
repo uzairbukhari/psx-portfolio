@@ -121,3 +121,35 @@ test('cookie writes need a same-origin Origin header; bearer writes do not', asy
   globalThis.__via = undefined;
   await assert.rejects(() => cookie.identity(noOrigin, true), /Sign in/);
 });
+
+// --- session lookup failures are a 503, never "revoked" ---
+async function loadMobileSessions(db) {
+  const base = new URL('../', import.meta.url);
+  const source = readFileSync(new URL('lib/mobile-sessions.ts', base), 'utf8')
+    .replace("import { env } from 'cloudflare:workers';", 'const env = globalThis.__env;')
+    .replace("import { UserError } from '@/lib/user-error';", `import { UserError } from '${new URL('lib/user-error.ts', base).href}';`);
+  const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
+  globalThis.__env = { DB: db };
+  return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}#${Math.random()}`);
+}
+const lookup = (row) => ({ prepare: () => ({ bind: () => ({ first: async () => row, run: async () => ({}) }) }) });
+
+test('a throwing session lookup answers 503 (the phone keeps its token), not false/401', async () => {
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    const sessions = await loadMobileSessions({ prepare: () => { throw new Error('D1 unavailable'); } });
+    await assert.rejects(() => sessions.mobileSessionActive('sid-1', 'a@example.com'), (e) => e.name === 'UserError' && e.status === 503);
+    const { publicError } = await import('../lib/user-error.ts');
+    const err = await sessions.mobileSessionActive('sid-1', 'a@example.com').catch((e) => e);
+    assert.equal(publicError(err).status, 503);
+  } finally {
+    console.error = quiet;
+  }
+});
+
+test('a missing or revoked session is still false (401), and an active one is true', async () => {
+  assert.equal(await (await loadMobileSessions(lookup(null))).mobileSessionActive('s', 'a@example.com'), false);
+  assert.equal(await (await loadMobileSessions(lookup({ revokedAt: '2026-01-01', lastSeenAt: new Date().toISOString() }))).mobileSessionActive('s', 'a@example.com'), false);
+  assert.equal(await (await loadMobileSessions(lookup({ revokedAt: null, lastSeenAt: new Date().toISOString() }))).mobileSessionActive('s', 'a@example.com'), true);
+});

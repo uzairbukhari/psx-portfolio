@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { money } from '@shared/portfolio.ts';
 import { estimateMonthlyPicks, type MonthlyPicksResearch } from '@shared/monthly-picks.ts';
-import { useAuth } from '@/auth/AuthProvider';
+import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { parseNumber } from '@/data/mutations';
 import { currentMonth } from '@/data/sip';
 import { usePortfolio } from '@/data/usePortfolio';
@@ -27,6 +27,7 @@ const MAX = 15;
 
 export default function Picks() {
   const { api } = useAuth();
+  const email = useEmail();
   const p = usePortfolio();
   const qc = useQueryClient();
   const month = currentMonth();
@@ -50,7 +51,7 @@ export default function Picks() {
 
   // Resume the latest run (or pick up one that's still going) when the screen opens.
   const latest = useQuery({
-    queryKey: ['recommendations'],
+    queryKey: ['recommendations', email],
     queryFn: () => api.get<{ recommendations: Run[] }>('/api/recommendations'),
   });
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function Picks() {
   }, [latest.data, runId, month]);
 
   const run = useQuery({
-    queryKey: ['recommendation', runId],
+    queryKey: ['recommendation', email, runId],
     enabled: Boolean(runId),
     queryFn: () => api.get<Run>(`/api/recommendations?id=${runId}`),
     refetchInterval: (q) => (q.state.data && ACTIVE.includes(q.state.data.status) ? 4000 : false),
@@ -85,7 +86,8 @@ export default function Picks() {
       </Screen>
     );
 
-  const budget = amount || String(portfolio.budgets[month] ?? 100000);
+  const savedBudget = portfolio.budgets[month];
+  const budget = amount || (savedBudget === undefined ? '' : String(savedBudget));
 
   async function start(rerun: boolean) {
     setError(null);
@@ -101,7 +103,7 @@ export default function Picks() {
         shortlist: selected,
         rerun,
       });
-      qc.setQueryData(['recommendation', started.id], started);
+      qc.setQueryData(['recommendation', email, started.id], started);
       setRunId(started.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start the research.');
@@ -129,19 +131,32 @@ export default function Picks() {
         <View style={styles.divider} />
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Input label="Amount (PKR)" value={budget} onChangeText={setAmount} keyboardType="decimal-pad" />
+            <Input
+              label="Amount (PKR)"
+              value={budget}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholder="e.g. 100000"
+              hint={budget === '' ? 'Not set. Enter this month\'s budget.' : undefined}
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Input label="Fee estimate (%)" value={fee} onChangeText={setFee} keyboardType="decimal-pad" />
           </View>
         </View>
         <Button
-          label={current?.status === 'completed' ? 'Run again' : 'Get picks'}
+          label={current?.status === 'completed' ? 'Update picks' : 'Get picks'}
           icon="sparkle"
           loading={starting}
           disabled={active}
-          onPress={() => void start(current?.status === 'completed')}
+          onPress={() => void start(false)}
         />
+        {current?.status === 'completed' ? (
+          <>
+            <Button label="Run fresh research" variant="secondary" icon="refresh" disabled={starting || active} onPress={() => void start(true)} />
+            <Muted>Same amount, fee and companies reuse the saved result. Fresh research ignores it and uses AI budget.</Muted>
+          </>
+        ) : null}
       </Card>
 
       {active ? (
