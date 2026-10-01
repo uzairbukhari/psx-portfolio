@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppState, Pressable, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '@/theme/tokens';
@@ -80,7 +80,13 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   return (
     <LockContext.Provider value={value}>
-      {enabled && locked ? <LockScreen onUnlock={unlock} /> : children}
+      {children}
+      {/* An overlay, not a replacement, so screens (and half-typed forms) survive a lock. */}
+      {enabled && locked ? (
+        <View style={StyleSheet.absoluteFill}>
+          <LockScreen onUnlock={unlock} />
+        </View>
+      ) : null}
     </LockContext.Provider>
   );
 }

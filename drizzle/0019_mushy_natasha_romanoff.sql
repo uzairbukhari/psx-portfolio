@@ -1,0 +1,1 @@
+ALTER TABLE `mobile_sessions` ADD `push_token` text;

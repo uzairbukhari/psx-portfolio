@@ -5,7 +5,20 @@ import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/goo
 import type { MeResponse, MobileSignInRequest, MobileSignInResponse } from '@shared/api-types.ts';
 import { createApiClient, ApiRequestError, type ApiClient } from '@/api/client';
 import { config } from '@/config';
+import * as SecureStore from 'expo-secure-store';
 import { tokenStore } from './token-store';
+
+const ME_KEY = 'sipwise.me';
+const rememberUser = (user: MeResponse) => SecureStore.setItemAsync(ME_KEY, JSON.stringify(user)).catch(() => {});
+const recallUser = async (): Promise<MeResponse | null> => {
+  try {
+    const raw = await SecureStore.getItemAsync(ME_KEY);
+    const user = raw ? (JSON.parse(raw) as MeResponse) : null;
+    return user && typeof user.email === 'string' ? user : null;
+  } catch {
+    return null;
+  }
+};
 
 type AuthState =
   | { status: 'loading' }
@@ -35,12 +48,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const signOut = useCallback(async () => {
+  // Local cleanup only; also what runs when the server rejects the token (so it must not call the server).
+  const clearLocal = useCallback(async () => {
     await tokenStore.clear();
+    await SecureStore.deleteItemAsync(ME_KEY).catch(() => {});
     await GoogleSignin.signOut().catch(() => {});
     setState({ status: 'signedOut' });
   }, []);
-  signedOutRef.current = () => void signOut();
+  // User-initiated: also end the server-side session, which stops notifications and kills the token everywhere.
+  const signOut = useCallback(async () => {
+    await api.delete('/api/mobile-sessions?id=current').catch(() => {});
+    await clearLocal();
+  }, [api, clearLocal]);
+  signedOutRef.current = () => void clearLocal();
 
   useEffect(() => {
     GoogleSignin.configure({
@@ -52,10 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!(await tokenStore.get())) return live && setState({ status: 'signedOut' });
       try {
         const user = await api.get<MeResponse>('/api/me');
+        void rememberUser(user);
         if (live) setState({ status: 'signedIn', user });
       } catch (e) {
-        // Offline at launch keeps the token; only a rejected token signs out (via onUnauthorized).
-        if (live && !(e instanceof ApiRequestError && e.status === 401)) setState({ status: 'signedOut' });
+        // A rejected token signs out (via onUnauthorized). Offline or a server hiccup at launch keeps the
+        // saved profile so the cached portfolio still opens.
+        if (e instanceof ApiRequestError && e.status === 401) return;
+        const saved = await recallUser();
+        if (live) setState(saved ? { status: 'signedIn', user: saved } : { status: 'signedOut' });
       }
     })();
     return () => {
@@ -75,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     const result = await api.post<MobileSignInResponse>('/api/auth/mobile/google', body, false);
     await tokenStore.set(result.token);
+    void rememberUser(result.user);
     setState({ status: 'signedIn', user: result.user });
   }, [api]);
 

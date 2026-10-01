@@ -27,9 +27,16 @@ const config: ExpoConfig = {
   version: '0.1.0',
   scheme: `sipwise${v.suffix.replace('.', '-')}`,
   orientation: 'portrait',
-  userInterfaceStyle: 'automatic',
+  icon: './assets/icon.png',
+  userInterfaceStyle: 'dark',
+  backgroundColor: '#05070d',
   ios: { bundleIdentifier: bundleId, supportsTablet: false },
-  android: { package: bundleId },
+  android: {
+    package: bundleId,
+    adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#2563eb' },
+    // Push notifications on Android need the Firebase config file; EAS supplies it as a file env var.
+    ...(process.env.GOOGLE_SERVICES_JSON ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON } : {}),
+  },
   // Lets JS-only changes ship over the air (eas update) without using a build.
   runtimeVersion: { policy: 'appVersion' },
   updates: { url: `https://u.expo.dev/${EAS_PROJECT_ID}`, checkAutomatically: 'ON_LOAD' },
@@ -37,6 +44,8 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-local-authentication',
     'expo-secure-store',
+    ['expo-splash-screen', { image: './assets/splash-icon.png', imageWidth: 160, backgroundColor: '#05070d' }],
+    ['expo-notifications', { icon: './assets/notification-icon.png', color: '#3b82f6' }],
     ...(iosUrlScheme ? [['@react-native-google-signin/google-signin', { iosUrlScheme }] as [string, object]] : []),
   ],
   experiments: { typedRoutes: true },

@@ -66,9 +66,18 @@ export async function listMobileSessions(email: string): Promise<MobileSession[]
   return results;
 }
 
+/** Stores (or clears, with null) the Expo push token for one active device session. */
+export async function setPushToken(sid: string, email: string, token: string | null): Promise<boolean> {
+  const result = await env.DB
+    .prepare('UPDATE mobile_sessions SET push_token=? WHERE id=? AND email=? AND revoked_at IS NULL')
+    .bind(token, sid, email.toLowerCase())
+    .run();
+  return result.meta.changes > 0;
+}
+
 export async function revokeMobileSession(email: string, id: string): Promise<boolean> {
   const result = await env.DB
-    .prepare('UPDATE mobile_sessions SET revoked_at=? WHERE id=? AND email=? AND revoked_at IS NULL')
+    .prepare('UPDATE mobile_sessions SET revoked_at=?, push_token=NULL WHERE id=? AND email=? AND revoked_at IS NULL')
     .bind(new Date().toISOString(), id, email.toLowerCase())
     .run();
   return result.meta.changes > 0;

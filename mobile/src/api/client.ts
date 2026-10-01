@@ -1,5 +1,7 @@
 import type { ApiError } from '../../../lib/api-types.ts';
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export class ApiRequestError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -27,13 +29,19 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized, fetcher = f
       const token = await getToken();
       if (token) headers.set('Authorization', `Bearer ${token}`);
     }
+    // A flaky connection must not leave a screen or a Save button spinning forever.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let response: Response;
+    let body: (T & Partial<ApiError>) | null;
     try {
-      response = await fetcher(`${baseUrl}${path}`, { ...init, headers });
+      response = await fetcher(`${baseUrl}${path}`, { ...init, headers, signal: init.signal ?? controller.signal });
+      body = (await response.json().catch(() => null)) as (T & Partial<ApiError>) | null;
     } catch {
       throw new ApiRequestError('Could not reach Sipwise. Check your connection.', 0);
+    } finally {
+      clearTimeout(timer);
     }
-    const body = (await response.json().catch(() => null)) as (T & Partial<ApiError>) | null;
     if (!response.ok) {
       if (response.status === 401 && authed) onUnauthorized?.();
       throw new ApiRequestError(body?.error ?? `Request failed (${response.status}).`, response.status);

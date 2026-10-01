@@ -10,6 +10,7 @@ import { d1, heldTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsxPayoutsHtml } from '../lib/psx-fetch.ts';
 import { parsePayouts } from '../lib/psx-payouts.ts';
+import { announcementKey, buildPushMessages, newAnnouncements } from '../lib/dividend-push.ts';
 
 // D1 allows 100 bound parameters per statement; 10 per row.
 const ROWS_PER_STATEMENT = 9;
@@ -35,6 +36,42 @@ async function upsert(rows, fetchedAt) {
   }
 }
 
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+/** Tells phones that hold a company about its newly seen announcements. Never fails the scrape. */
+async function notifyPhones(rows, before) {
+  const fresh = newAnnouncements(rows, before.keys, before.tickers);
+  if (!fresh.length) return;
+  const sessions = await d1(
+    `SELECT s.email AS email, s.push_token AS token, p.payload AS payload
+     FROM mobile_sessions s JOIN portfolios p ON lower(p.user_id)=lower(s.email)
+     WHERE s.revoked_at IS NULL AND s.push_token IS NOT NULL`,
+  );
+  const recipients = sessions.map((row) => ({
+    email: row.email,
+    token: row.token,
+    tickers: new Set(
+      (JSON.parse(row.payload).companies ?? []).map((c) => String(c.ticker).toUpperCase()),
+    ),
+  }));
+  const messages = buildPushMessages(fresh, recipients);
+  console.log(`Push: ${fresh.length} new announcements, ${messages.length} notifications.`);
+  for (let i = 0; i < messages.length; i += 100) {
+    const batch = messages.slice(i, i + 100);
+    const response = await fetch(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(batch),
+    });
+    const body = await response.json().catch(() => null);
+    const tickets = Array.isArray(body?.data) ? body.data : [];
+    // A token Expo no longer knows belongs to an uninstalled app: forget it.
+    for (const [index, ticket] of tickets.entries())
+      if (ticket?.details?.error === 'DeviceNotRegistered')
+        await d1('UPDATE mobile_sessions SET push_token=NULL WHERE push_token=?', [batch[index].to]);
+  }
+}
+
 async function main() {
   const tickers = await heldTickers(tickerArg);
   const rows = [];
@@ -53,7 +90,14 @@ async function main() {
   if (dryRun) {
     for (const r of rows.slice(0, 40))
       console.log(`  ${r.ticker} ${r.bookClosureStart} ${r.kind} ${r.percent ?? 'Rs' + r.perShareRs} (${r.details})`);
-  } else await upsert(rows, new Date().toISOString());
+  } else {
+    const stored = await d1(
+      'SELECT ticker, book_closure_start AS bookClosureStart, announced_on AS announcedOn, kind FROM dividend_announcements',
+    );
+    const before = { keys: new Set(stored.map(announcementKey)), tickers: new Set(stored.map((r) => r.ticker)) };
+    await upsert(rows, new Date().toISOString());
+    await notifyPhones(rows, before).catch((error) => console.log(`Push notifications skipped: ${error instanceof Error ? error.message : error}`));
+  }
   process.exitCode = scrapeExitCode(tickers.length, failed.length);
 }
 

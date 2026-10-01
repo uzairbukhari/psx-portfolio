@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Alert, Image, Switch, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Image, Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
 import { useAuth } from '@/auth/AuthProvider';
 import { useBiometricLock } from '@/auth/BiometricLock';
+import { pushAvailable, pushPreference, registerForPush, unregisterPush } from '@/push/push';
 import { clearPortfolioCache } from '@/data/portfolio-cache';
 import { config } from '@/config';
 import { colors } from '@/theme/tokens';
@@ -15,6 +16,42 @@ export default function Account() {
   const { state, api, signOut } = useAuth();
   const queryClient = useQueryClient();
   const lock = useBiometricLock();
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushNote, setPushNote] = useState<string | null>(null);
+  useEffect(() => {
+    void pushPreference.get().then(setPushOn);
+  }, []);
+
+  async function togglePush(on: boolean) {
+    setPushBusy(true);
+    setPushNote(null);
+    try {
+      if (on) {
+        const problem = await registerForPush(api);
+        if (problem) return setPushNote(problem);
+      } else await unregisterPush(api);
+      await pushPreference.set(on);
+      setPushOn(on);
+    } catch (e) {
+      setPushNote(e instanceof Error ? e.message : 'Could not change notifications.');
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function sendTest() {
+    setPushBusy(true);
+    setPushNote(null);
+    try {
+      await api.post('/api/mobile-push/test');
+      setPushNote('Test sent. It should arrive in a few seconds.');
+    } catch (e) {
+      setPushNote(e instanceof Error ? e.message : 'Could not send the test.');
+    } finally {
+      setPushBusy(false);
+    }
+  }
   const user = state.status === 'signedIn' ? state.user : null;
   const [error, setError] = useState<string | null>(null);
   const devices = useQuery({
@@ -97,6 +134,27 @@ export default function Account() {
         </View>
       </Card>
 
+      <SectionLabel>Notifications</SectionLabel>
+      <Card>
+        <View style={styles.row}>
+          {iconBox('bell')}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.strong}>Dividend alerts</Text>
+            <Muted>
+              {pushAvailable() ? 'Get a notification when a company you hold announces a payout.' : 'Needs the latest build of the app, on a real phone.'}
+            </Muted>
+          </View>
+          <Switch
+            value={pushOn}
+            disabled={pushBusy || !pushAvailable()}
+            trackColor={{ true: colors.primary }}
+            onValueChange={(on) => void togglePush(on)}
+          />
+        </View>
+        {pushNote ? <Muted>{pushNote}</Muted> : null}
+        {pushOn ? <Button label="Send a test notification" variant="secondary" loading={pushBusy} onPress={() => void sendTest()} /> : null}
+      </Card>
+
       {usage.data ? (
         <>
           <SectionLabel>AI usage</SectionLabel>
@@ -122,7 +180,11 @@ export default function Account() {
             left={iconBox('phone')}
             title={d.deviceName}
             subtitle={`${d.platform} · last used ${new Date(d.lastSeenAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}`}
-            right={<Text style={{ color: colors.danger, fontWeight: '600' }} onPress={() => revoke(d.id, d.deviceName)}>Sign out</Text>}
+            right={
+              <Pressable hitSlop={12} onPress={() => revoke(d.id, d.deviceName)} style={{ paddingVertical: 8, paddingLeft: 8 }}>
+                <Text style={{ color: colors.danger, fontWeight: '600' }}>Sign out</Text>
+              </Pressable>
+            }
             last={i === all.length - 1}
           />
         ))}
@@ -134,6 +196,9 @@ export default function Account() {
         icon="logout"
         onPress={async () => {
           if (user) clearPortfolioCache(user.email);
+          // Stop notifications for this phone while the token still works.
+          await unregisterPush(api);
+          await pushPreference.set(false).catch(() => {});
           await signOut();
         }}
       />

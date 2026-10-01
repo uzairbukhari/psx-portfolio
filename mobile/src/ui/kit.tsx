@@ -32,6 +32,7 @@ export function Screen({
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         refreshControl={
           onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined
         }
@@ -111,7 +112,11 @@ export function Notice({ children, tone = 'warn' }: { children: ReactNode; tone?
 
 export function Amount({ value, text, size = 16 }: { value: number | null; text: string; size?: number }) {
   const color = value === null || value === 0 ? colors.foreground : value > 0 ? colors.success : colors.danger;
-  return <Text style={{ color, fontSize: size, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{text}</Text>;
+  return (
+    <Text numberOfLines={1} adjustsFontSizeToFit style={{ color, fontSize: size, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
+      {text}
+    </Text>
+  );
 }
 
 export function Stat({ label, children }: { label: string; children: ReactNode }) {
