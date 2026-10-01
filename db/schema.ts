@@ -231,6 +231,8 @@ export const mobileSessions = sqliteTable(
     createdAt: text('created_at').notNull(),
     lastSeenAt: text('last_seen_at').notNull(),
     revokedAt: text('revoked_at'),
+    // Expo push token of this device, set by the app after sign-in; used by the dividend notifier.
+    pushToken: text('push_token'),
   },
   (table) => [index('mobile_sessions_email_idx').on(table.email)],
 );
