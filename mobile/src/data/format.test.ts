@@ -37,8 +37,10 @@ test('pakistan time and month titles', () => {
 
 test('chart summary says direction, amount and range', async () => {
   const { changeSummary } = await import('./format.ts');
-  assert.match(changeSummary({ change: 12.3, percent: 4.2 }, 'one month') ?? '', /^Up .*12\.30 \(\+4\.20%\) over one month$/);
-  assert.match(changeSummary({ change: -5, percent: -2 }, 'one week') ?? '', /^Down .*5\.00 \(−2\.00%\) over one week$/);
+  const { money } = await import('../../../lib/portfolio.ts');
+  // money() follows the runtime's ICU data for PKR decimals (Rs 12.3 vs Rs 12.30), so compare against it.
+  assert.equal(changeSummary({ change: 12.3, percent: 4.2 }, 'one month'), `Up ${money(12.3)} (+4.20%) over one month`);
+  assert.equal(changeSummary({ change: -5, percent: -2 }, 'one week'), `Down ${money(5)} (−2.00%) over one week`);
   assert.equal(changeSummary({ change: 0, percent: 0 }, 'one day'), 'Unchanged over one day');
   assert.equal(changeSummary(null, 'one day'), null);
 });
