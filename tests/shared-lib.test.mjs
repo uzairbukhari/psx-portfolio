@@ -15,6 +15,8 @@ const SHARED = [
   'monthly-picks-flow',
   'price-history',
   'user-error',
+  'ahl-import',
+  'cdc-import',
 ];
 const FORBIDDEN = /from\s+['"](cloudflare:|next\/|@\/|react-dom|node:)/;
 
