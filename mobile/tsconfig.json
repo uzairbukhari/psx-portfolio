@@ -10,7 +10,10 @@
       "@shared/*": [
         "../lib/*"
       ]
-    }
+    },
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "**/*.ts",
