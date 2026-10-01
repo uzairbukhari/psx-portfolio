@@ -21,7 +21,11 @@ function Root() {
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.foreground,
+        headerTintColor: colors.primary,
+        headerTitleStyle: { color: colors.foreground, fontWeight: '700' },
+        headerShadowVisible: false,
+        headerBackButtonDisplayMode: 'minimal',
+        animation: 'slide_from_right',
         contentStyle: { backgroundColor: colors.background },
       }}
     >

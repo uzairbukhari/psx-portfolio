@@ -1,8 +1,8 @@
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { money } from '@shared/portfolio.ts';
 import type { ActivityEntry } from '@/data/derive';
 import { colors } from '@/theme/tokens';
-import { Muted, styles } from '@/ui/kit';
+import { Avatar, ListRow } from '@/ui/kit';
 
 const tone: Record<ActivityEntry['kind'], string> = {
   buy: colors.foreground,
@@ -12,20 +12,30 @@ const tone: Record<ActivityEntry['kind'], string> = {
   split: colors.muted,
 };
 
-export function ActivityRow({ entry, showTicker = true }: { entry: ActivityEntry; showTicker?: boolean }) {
+/** One ledger line. Put several inside a padding-less Card; `last` drops the final divider. */
+export function ActivityRow({
+  entry,
+  showTicker = true,
+  onPress,
+  last,
+}: {
+  entry: ActivityEntry;
+  showTicker?: boolean;
+  onPress?: () => void;
+  last?: boolean;
+}) {
   return (
-    <View style={[styles.row, { paddingVertical: 12 }]}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ color: tone[entry.kind], fontSize: 15, fontWeight: '600' }}>
-          {showTicker ? `${entry.ticker} · ` : ''}
-          {entry.title}
-        </Text>
-        <Muted>
-          {entry.date}
-          {entry.detail ? ` · ${entry.detail}` : ''}
-        </Muted>
-      </View>
-      {entry.amount !== null ? <Text style={styles.strong}>{money(entry.amount)}</Text> : null}
-    </View>
+    <ListRow
+      left={showTicker ? <Avatar ticker={entry.ticker} size={36} /> : undefined}
+      title={`${showTicker ? `${entry.ticker} · ` : ''}${entry.title}`}
+      subtitle={`${entry.date}${entry.detail ? ` · ${entry.detail}` : ''}`}
+      right={
+        entry.amount !== null ? (
+          <Text style={{ color: tone[entry.kind], fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{money(entry.amount)}</Text>
+        ) : undefined
+      }
+      onPress={onPress}
+      last={last}
+    />
   );
 }

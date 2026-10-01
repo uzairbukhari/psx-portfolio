@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { money, moneyShort } from '@shared/portfolio.ts';
 import { formatPercent } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
-import { colors } from '@/theme/tokens';
+import { colors, type } from '@/theme/tokens';
+import { Icon } from '@/ui/Icon';
 import { MarketPulse } from '@/ui/MarketPulse';
-import { Amount, Card, Muted, Notice, Screen, Stat, Title, styles } from '@/ui/kit';
+import { Amount, Avatar, Button, Card, EmptyState, Header, ListRow, Loading, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
 
 export default function Holdings() {
   const p = usePortfolio();
@@ -16,49 +17,84 @@ export default function Holdings() {
   if (p.isLoading)
     return (
       <Screen>
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
+        <Loading />
       </Screen>
     );
   if (!p.view)
     return (
       <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
+        <Header title="Holdings" />
         <Notice tone="error">{p.error?.message ?? 'Could not load your portfolio.'}</Notice>
+        <Button label="Try again" variant="secondary" onPress={() => void p.refetch()} />
       </Screen>
     );
 
   const { totals, open, error } = p.view;
+  const gainColor = totals.gain === null || totals.gain === 0 ? colors.muted : totals.gain > 0 ? colors.success : colors.danger;
   return (
     <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
-      <View style={styles.row}>
-        <Title>Holdings</Title>
-        <Pressable onPress={() => router.push('/transaction')} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
-          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 15 }}>+ Add</Text>
-        </Pressable>
-      </View>
+      <Header
+        title="Holdings"
+        right={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add transaction"
+            onPress={() => router.push('/transaction')}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: colors.primarySoft,
+              borderRadius: 999,
+              paddingVertical: 8,
+              paddingHorizontal: 14,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Icon name="plus" size={16} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>Add</Text>
+          </Pressable>
+        }
+      />
       {p.offline ? <Notice>Offline. Showing your last saved portfolio.</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
-      <Card>
-        <Muted>Portfolio value</Muted>
-        <Text style={{ color: colors.foreground, fontSize: 34, fontWeight: '700' }}>{moneyShort(totals.value)}</Text>
+
+      <Card tone="hero">
+        <Text style={[styles.sectionLabel]}>Portfolio value</Text>
+        <Text style={{ color: colors.foreground, ...type.hero, fontVariant: ['tabular-nums'] }}>{moneyShort(totals.value)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ transform: [{ scaleY: totals.gain !== null && totals.gain < 0 ? -1 : 1 }] }}>
+            <Icon name="trendingUp" size={16} color={gainColor} />
+          </View>
+          <Text style={{ color: gainColor, fontWeight: '600', fontSize: 15 }}>
+            {moneyShort(totals.gain)} · {formatPercent(totals.gainPercent)}
+          </Text>
+          <Text style={styles.muted}>all time</Text>
+        </View>
+        <View style={styles.divider} />
         <View style={styles.row}>
-          <Stat label="Cost">
+          <Stat label="Invested">
             <Text style={styles.strong}>{moneyShort(totals.cost)}</Text>
           </Stat>
-          <Stat label="Gain">
-            <Amount value={totals.gain} text={moneyShort(totals.gain)} />
+          <Stat label="Open positions">
+            <Text style={styles.strong}>{open.length}</Text>
           </Stat>
           <Stat label="Return">
             <Amount value={totals.gain} text={formatPercent(totals.gainPercent)} />
           </Stat>
         </View>
         {totals.unpriced ? (
-          <Muted>{totals.unpriced} position(s) without a price or known cost are left out of these totals.</Muted>
+          <Text style={styles.muted}>{totals.unpriced} position(s) without a price or known cost are left out of these totals.</Text>
         ) : null}
       </Card>
+
       <MarketPulse />
-      <Pressable
-        style={[styles.secondary, pricing && { opacity: 0.5 }]}
-        disabled={pricing}
+
+      <Button
+        label={pricing ? 'Refreshing prices…' : 'Refresh PSX prices'}
+        variant="secondary"
+        icon="refresh"
+        loading={pricing}
         onPress={async () => {
           setPricing(true);
           setPriceError(null);
@@ -70,31 +106,37 @@ export default function Holdings() {
             setPricing(false);
           }
         }}
-      >
-        <Text style={styles.secondaryText}>{pricing ? 'Refreshing prices…' : 'Refresh PSX prices'}</Text>
-      </Pressable>
+      />
       {priceError ? <Notice tone="error">{priceError}</Notice> : null}
-      {open.length === 0 ? <Muted>No open positions yet.</Muted> : null}
-      {open.map((h) => (
-        <Pressable key={h.ticker} onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}>
-          <Card>
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.strong}>{h.ticker}</Text>
-                <Muted>{h.name}</Muted>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.strong}>{h.value === null ? 'No price' : moneyShort(h.value)}</Text>
-                <Amount value={h.gain} text={h.gain === null ? '—' : moneyShort(h.gain)} size={13} />
-              </View>
-            </View>
-            <Muted>
-              {new Intl.NumberFormat('en-PK').format(h.shares)} shares · avg {h.average === null ? '—' : money(h.average)}
-              {h.quote ? ` · last ${money(h.quote.price)}` : ''}
-            </Muted>
-          </Card>
-        </Pressable>
-      ))}
+
+      <SectionLabel>Your companies</SectionLabel>
+      {open.length === 0 ? (
+        <EmptyState
+          icon="holdings"
+          title="No open positions yet"
+          body="Add your first trade or import your broker history from the Account tab."
+          action={<Button label="Add a trade" icon="plus" onPress={() => router.push('/transaction')} />}
+        />
+      ) : (
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          {open.map((h, i) => (
+            <ListRow
+              key={h.ticker}
+              left={<Avatar ticker={h.ticker} />}
+              title={h.ticker}
+              subtitle={`${new Intl.NumberFormat('en-PK').format(h.shares)} shares · avg ${h.average === null ? '—' : money(h.average)}`}
+              right={
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                  <Text style={[styles.strong, { fontVariant: ['tabular-nums'] }]}>{h.value === null ? 'No price' : moneyShort(h.value)}</Text>
+                  <Amount value={h.gain} text={h.gain === null ? '—' : moneyShort(h.gain)} size={13} />
+                </View>
+              }
+              onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}
+              last={i === open.length - 1}
+            />
+          ))}
+        </Card>
+      )}
     </Screen>
   );
 }
