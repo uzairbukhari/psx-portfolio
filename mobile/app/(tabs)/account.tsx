@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Image, Switch, Text, View } from 'react-native';
+import { Alert, Image, Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
@@ -180,7 +180,11 @@ export default function Account() {
             left={iconBox('phone')}
             title={d.deviceName}
             subtitle={`${d.platform} · last used ${new Date(d.lastSeenAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}`}
-            right={<Text style={{ color: colors.danger, fontWeight: '600' }} onPress={() => revoke(d.id, d.deviceName)}>Sign out</Text>}
+            right={
+              <Pressable hitSlop={12} onPress={() => revoke(d.id, d.deviceName)} style={{ paddingVertical: 8, paddingLeft: 8 }}>
+                <Text style={{ color: colors.danger, fontWeight: '600' }}>Sign out</Text>
+              </Pressable>
+            }
             last={i === all.length - 1}
           />
         ))}

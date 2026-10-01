@@ -39,7 +39,7 @@ export default function ManualQuote() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <Stack.Screen options={{ title: `${ticker} price` }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
           {current ? (
             <Card>

@@ -52,6 +52,8 @@ export function usePortfolio() {
   async function save(next: Portfolio) {
     if (!data) throw new Error('Portfolio is not loaded yet.');
     validate(next);
+    // A refetch that started before this save must not land afterwards and overwrite the new data.
+    await queryClient.cancelQueries({ queryKey: ['portfolio', email] });
     try {
       const saved = await api.put<SavePortfolioResponse>('/api/portfolio', {
         portfolio: next,
@@ -63,7 +65,7 @@ export function usePortfolio() {
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 409) {
         await queryClient.invalidateQueries({ queryKey: ['portfolio', email] });
-        throw new Error('Your portfolio changed on another device. It has been reloaded; please make the change again.');
+        throw new Error('Your portfolio changed (on another device, or this save did not reach us). It has been reloaded. Check Activity before entering the change again.');
       }
       throw e;
     }

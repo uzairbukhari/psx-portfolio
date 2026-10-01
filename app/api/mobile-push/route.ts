@@ -1,20 +1,12 @@
-import { env } from 'cloudflare:workers';
-import { headers } from 'next/headers';
 import { isExpoPushToken } from '@/lib/dividend-push';
-import { readBearerToken, verifyMobileToken } from '@/lib/mobile-token';
+import { currentMobileSid } from '@/lib/mobile-current';
 import { setPushToken } from '@/lib/mobile-sessions';
 import { failure, identity } from '@/lib/server';
 import { UserError } from '@/lib/user-error';
 
 // The phone registers (PUT) or clears (DELETE) its Expo push token. Only an app bearer token can do this:
 // the token is stored on that device's session row, so signing the device out also stops its notifications.
-async function currentSession(email: string) {
-  const bearer = readBearerToken((await headers()).get('authorization'));
-  const mobile = bearer && env.SESSION_SECRET ? await verifyMobileToken(bearer, env.SESSION_SECRET) : null;
-  if (!mobile || mobile.email.toLowerCase() !== email.toLowerCase())
-    throw new UserError('Push notifications are only available in the phone app.', 400);
-  return mobile.sid;
-}
+const currentSession = currentMobileSid;
 
 export async function PUT(req: Request) {
   try {

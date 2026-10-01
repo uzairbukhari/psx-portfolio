@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -36,6 +36,7 @@ export default function Picks() {
   const [runId, setRunId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const estimateError = useRef<string | null>(null);
 
   const portfolio = p.portfolio;
   const selected =
@@ -68,9 +69,11 @@ export default function Picks() {
 
   const rows = useMemo(() => {
     if (!portfolio || !current?.result || current.status !== 'completed') return [];
+    estimateError.current = null;
     try {
       return estimateMonthlyPicks(current.result, portfolio, current.amount, current.feePct);
-    } catch {
+    } catch (e) {
+      estimateError.current = e instanceof Error ? e.message : 'Could not work out share counts.';
       return [];
     }
   }, [portfolio, current]);
@@ -161,6 +164,7 @@ export default function Picks() {
             <Text style={styles.strong}>Market outlook</Text>
             <Text style={{ color: colors.foreground, fontSize: 14, lineHeight: 21 }}>{current.result.marketOutlook}</Text>
           </Card>
+          {estimateError.current && rows.length === 0 ? <Notice tone="error">{estimateError.current}</Notice> : null}
           <SectionLabel>Top picks</SectionLabel>
           {rows.map((r) => (
             <Card key={r.ticker}>

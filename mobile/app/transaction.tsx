@@ -207,7 +207,7 @@ export default function Transaction() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <Stack.Screen options={{ title: editing ? 'Edit entry' : 'Add transaction' }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
           {editingId && !existing && !p.isLoading ? <Notice tone="error">That entry no longer exists.</Notice> : null}
           <SectionLabel>Type</SectionLabel>
