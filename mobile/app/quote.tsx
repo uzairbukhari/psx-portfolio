@@ -5,11 +5,12 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { money, today } from '@shared/portfolio.ts';
 import { isIsoDate, parseNumber, setManualQuote } from '@/data/mutations';
 import { usePortfolio } from '@/data/usePortfolio';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeProvider';
 import { Button, Card, Input, Muted, Notice } from '@/ui/kit';
 
 // Enter a price by hand, e.g. when PSX has no fresh quote. It holds until PSX publishes a later trading day.
 export default function ManualQuote() {
+  const { colors } = useTheme();
   const { ticker: raw } = useLocalSearchParams<{ ticker: string }>();
   const ticker = String(raw ?? '').toUpperCase();
   const p = usePortfolio();
@@ -37,7 +38,7 @@ export default function ManualQuote() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
       <Stack.Screen options={{ title: `${ticker} price` }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">

@@ -5,11 +5,13 @@ import { useQuery } from '@tanstack/react-query';
 import type { IndexPoint, IndexSummary, MarketState } from '@shared/psx-market.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
-import { formatPercent } from '@/data/derive';
+import { signedPercent } from '@/data/format';
 import { MARKET_POLL_MS, shouldPollMarket } from '@/data/market-hours';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeProvider';
+import { type } from '@/theme/tokens';
 import { LineChart } from './LineChart';
-import { Card, Muted, styles } from './kit';
+import { Icon } from './Icon';
+import { Card, Muted, StatusChip, useKitStyles } from './kit';
 
 type Summary = { index: IndexSummary | null; series: IndexPoint[]; market: MarketState };
 type Response = { summary?: Summary; fetchedAt?: string | null };
@@ -21,6 +23,8 @@ const number = (n: number) => n.toLocaleString('en-PK', { minimumFractionDigits:
  * refreshes every minute only while the screen is focused and the PSX session is open; no requests otherwise.
  */
 export function MarketPulse() {
+  const styles = useKitStyles();
+  const { colors } = useTheme();
   const { api } = useAuth();
   const email = useEmail();
   const focused = useIsFocused();
@@ -47,28 +51,34 @@ export function MarketPulse() {
   const updated = q.data?.fetchedAt
     ? new Date(q.data.fetchedAt).toLocaleTimeString('en-PK', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit' })
     : null;
+  const tone = up ? colors.gain : colors.loss;
   return (
     <Card
       accessibilityLabel={`${index.name} ${number(index.close)}, ${signedAmountLabel(index.change, number)} points, ${signedPercentLabel(index.changePercent)}. Market ${summary.market.label.toLowerCase()}${summary.market.estimated ? ', estimated' : ''}, delayed prices${updated ? `, updated ${updated} Pakistan time` : ''}.`}
     >
+      <Text style={styles.sectionLabel}>Market</Text>
       <View style={styles.row}>
-        <View>
+        <View style={{ flexShrink: 1 }}>
           <Muted>{index.name}</Muted>
-          <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: '700' }}>{number(index.close)}</Text>
+          <Text style={{ color: colors.ink, ...type.title, fontVariant: ['tabular-nums'] }}>{number(index.close)}</Text>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ color: up ? colors.success : colors.danger, fontWeight: '600' }}>
-            {up ? '+' : ''}
-            {number(index.change)}
-          </Text>
-          <Text style={{ color: up ? colors.success : colors.danger }}>{formatPercent(index.changePercent)}</Text>
+        <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Icon name={up ? 'arrowUp' : 'arrowDown'} size={14} color={tone} strokeWidth={2.4} />
+            <Text style={{ color: tone, ...type.number }}>
+              {up ? '+' : '−'}
+              {number(Math.abs(index.change))}
+            </Text>
+          </View>
+          <Text style={{ color: tone, ...type.caption, fontVariant: ['tabular-nums'] }}>{signedPercent(index.changePercent)}</Text>
         </View>
       </View>
       {points.length > 1 ? <LineChart points={points} height={70} label={`${index.name} today`} /> : null}
-      <Muted>
-        Market {summary.market.label.toLowerCase()}
-        {summary.market.estimated ? ' (estimated)' : ''} · delayed prices{updated ? ` · updated ${updated} PKT` : ''}
-      </Muted>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <StatusChip tone="neutral" text={`Market ${summary.market.label.toLowerCase()}${summary.market.estimated ? ' (estimated)' : ''}`} />
+        <StatusChip tone="neutral" text="Delayed" icon="info" />
+      </View>
+      {updated ? <Muted>Updated {updated} PKT</Muted> : null}
     </Card>
   );
 }

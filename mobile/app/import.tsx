@@ -1,34 +1,45 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { validate } from '@shared/portfolio.ts';
+import { validate, type Portfolio } from '@shared/portfolio.ts';
 import { parseJsonFile, previewImport, type ImportKind, type ImportPreview } from '@/data/imports';
 import { usePortfolio } from '@/data/usePortfolio';
-import { colors } from '@/theme/tokens';
-import { Button, Card, Header, Loading, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
+import { plural } from '@/data/format';
+import { useTheme } from '@/theme/ThemeProvider';
+import { Icon } from '@/ui/Icon';
+import { Button, Card, Loading, Muted, Notice, Screen, SectionLabel, Stat, useKitStyles } from '@/ui/kit';
 import { useToast } from '@/ui/Toast';
 
 const SOURCES: { kind: ImportKind; title: string; help: string }[] = [
   { kind: 'ahl', title: 'AHL trade history', help: 'The JSON trade history exported from AHL. Duplicates are skipped.' },
   { kind: 'cdc', title: 'CDC dividend history', help: 'The JSON dividend history from CDC. Paid dividends replace matching PSX estimates.' },
 ];
-const SHOWN_ROWS = 50;
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const SHOWN_ROWS = 5;
 
 type Pending = { preview: ImportPreview; fileName: string; baseRevision: number };
+type Done = { summary: string; added: string; previous: Portfolio };
 
 export default function Import() {
+  const params = useLocalSearchParams<{ kind?: string }>();
+  const only = params.kind === 'ahl' || params.kind === 'cdc' ? params.kind : null;
+  const styles = useKitStyles();
+  const { colors } = useTheme();
   const p = usePortfolio();
   const toast = useToast();
   const [busy, setBusy] = useState<ImportKind | 'saving' | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  const [allRows, setAllRows] = useState(false);
 
   async function choose(kind: ImportKind) {
     if (!p.portfolio) return;
     setMessage(null);
     setPending(null);
+    setAllRows(false);
     setBusy(kind);
     try {
       const picked = await DocumentPicker.getDocumentAsync({
@@ -66,7 +77,7 @@ export default function Import() {
         counts.dividends ? plural(counts.dividends, 'dividend') : '',
       ].filter(Boolean).join(' and ');
       setPending(null);
-      setMessage({ text: summary, error: false });
+      setDone({ summary, added, previous });
       // Batch undo: one revisioned save puts the whole portfolio back as it was before the import.
       toast.show({
         message: `Imported ${added}`,
@@ -74,6 +85,7 @@ export default function Import() {
         durationMs: 12000,
         onAction: async () => {
           await p.save(previous);
+          setDone(null);
           setMessage({ text: 'Import undone. Your portfolio is back as it was.', error: false });
           toast.show({ message: 'Import undone' });
         },
@@ -88,33 +100,70 @@ export default function Import() {
   if (p.isLoading) return <Screen edges={['bottom']}><Loading /></Screen>;
 
   const pv = pending?.preview;
+  const sources = only ? SOURCES.filter((s) => s.kind === only) : SOURCES;
+  const rowsShown = pv ? (allRows ? pv.rows : pv.rows.slice(0, SHOWN_ROWS)) : [];
+
+  async function undo() {
+    if (!done || undoing) return;
+    setUndoing(true);
+    try {
+      await p.save(done.previous);
+      setDone(null);
+      setMessage({ text: 'Import undone. Your portfolio is back as it was.', error: false });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : 'Could not undo the import.', error: true });
+    } finally {
+      setUndoing(false);
+    }
+  }
+
+  if (done)
+    return (
+      <Screen edges={['bottom']}>
+        <View style={{ alignItems: 'center', gap: 12, paddingTop: 32, paddingBottom: 8 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: colors.gainSoft, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="check" size={32} color={colors.gain} strokeWidth={2.6} />
+          </View>
+          <Text style={[styles.title, { textAlign: 'center' }]} accessibilityRole="header" accessibilityLiveRegion="polite">
+            {done.added ? `${done.added.charAt(0).toUpperCase()}${done.added.slice(1)} imported` : 'Import saved'}
+          </Text>
+          <Text style={[styles.muted, { textAlign: 'center' }]}>{done.summary} Saved as one change you can undo.</Text>
+        </View>
+        <Button label="Set this month’s budget and targets" onPress={() => router.replace('/plan')} />
+        <Button label="View in Activity" variant="outline" onPress={() => router.replace('/activity')} />
+        <Button label="Undo import" variant="text" loading={undoing} onPress={() => void undo()} />
+      </Screen>
+    );
+
   return (
     <Screen edges={['bottom']}>
-      <Header title="Import" subtitle="Pick a file from your phone's Files app. You see what it would add before anything is saved." />
-      {message ? <Notice tone={message.error ? 'error' : 'warn'}>{message.text}</Notice> : null}
+      <Text style={styles.muted}>Pick a file from your phone's Files app. You see what it would add before anything is saved.</Text>
+      {message ? <Notice tone={message.error ? 'error' : 'success'}>{message.text}</Notice> : null}
       {pending && pv ? (
         <>
           <Card accessibilityLabel={`Preview of ${pending.fileName}: ${plural(pv.counts.trades, 'trade')}, ${plural(pv.counts.dividends, 'dividend')} to add. Nothing is saved yet.`}>
-            <Text style={styles.strong}>Preview · {pending.fileName}</Text>
+            <Text style={styles.sectionLabel}>Check before importing</Text>
+            <Text style={styles.strong}>{pending.fileName}</Text>
             <View style={styles.row}>
-              <Stat label="Trades to add"><Text style={styles.strong}>{pv.counts.trades}</Text></Stat>
-              <Stat label="Dividends to add"><Text style={styles.strong}>{pv.counts.dividends}</Text></Stat>
+              <Stat label="Trades to add"><Text style={styles.number}>{pv.counts.trades}</Text></Stat>
+              <Stat label="Dividends to add"><Text style={styles.number}>{pv.counts.dividends}</Text></Stat>
             </View>
-            {pv.counts.voided || pv.counts.companies ? (
-              <Muted>
-                {[pv.counts.voided ? `${plural(pv.counts.voided, 'existing entry', 'existing entries')} marked voided (duplicates or replaced estimates)` : '', pv.counts.companies ? `${plural(pv.counts.companies, 'new company', 'new companies')} added` : ''].filter(Boolean).join(' · ')}
-              </Muted>
-            ) : null}
+            <View style={styles.row}>
+              <Stat label="New companies"><Text style={styles.number}>{pv.counts.companies}</Text></Stat>
+              <Stat label="Replaced or duplicate entries"><Text style={styles.number}>{pv.counts.voided}</Text></Stat>
+            </View>
+            {pv.counts.voided ? <Muted>Existing entries marked voided (duplicates or replaced PSX estimates) stay in your history.</Muted> : null}
             <Muted>{pv.message}</Muted>
           </Card>
-          <SectionLabel>{pv.rows.length > SHOWN_ROWS ? `First ${SHOWN_ROWS} of ${pv.rows.length} rows` : `${plural(pv.rows.length, 'row')} to add`}</SectionLabel>
-          <Card style={{ padding: 0, overflow: 'hidden' }}>
-            {pv.rows.slice(0, SHOWN_ROWS).map((r, i, list) => (
+          {pv.counts.companies ? <Notice>{plural(pv.counts.companies, 'company', 'companies')} will be added without targets. You can set targets after importing.</Notice> : null}
+          <SectionLabel>{pv.rows.length > rowsShown.length ? `First ${rowsShown.length} of ${pv.rows.length} rows` : `${plural(pv.rows.length, 'row')} to add`}</SectionLabel>
+          <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
+            {rowsShown.map((r, i, list) => (
               <View
                 key={r.id}
                 accessible
                 accessibilityLabel={`${r.ticker}, ${r.label}, ${r.date}${r.detail ? `, ${r.detail}` : ''}`}
-                style={[styles.listRow, i < list.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                style={[styles.listRow, i < list.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.line }]}
               >
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.strong}>{r.ticker} · {r.label}</Text>
@@ -122,12 +171,13 @@ export default function Import() {
                 </View>
               </View>
             ))}
-          </Card>
-          <Button label={busy === 'saving' ? 'Saving…' : `Save ${plural(pv.rows.length, 'entry', 'entries')}`} icon="check" loading={busy === 'saving'} onPress={() => void confirm()} />
-          <Button label="Cancel" variant="secondary" disabled={busy === 'saving'} onPress={() => setPending(null)} />
+          </View>
+          {pv.rows.length > SHOWN_ROWS ? <Button label={allRows ? `Show the first ${SHOWN_ROWS} only` : `Show all ${pv.rows.length} rows`} variant="text" onPress={() => setAllRows((v) => !v)} /> : null}
+          <Button label={busy === 'saving' ? 'Saving…' : `Import ${plural(pv.rows.length, 'entry', 'entries')}`} icon="check" loading={busy === 'saving'} disabled={p.offline} onPress={() => void confirm()} />
+          <Button label="Choose another file" variant="outline" disabled={busy === 'saving'} onPress={() => setPending(null)} />
         </>
       ) : (
-        SOURCES.map((s) => (
+        sources.map((s) => (
           <Card key={s.kind}>
             <Text style={styles.strong}>{s.title}</Text>
             <Muted>{s.help}</Muted>
@@ -135,6 +185,7 @@ export default function Import() {
           </Card>
         ))
       )}
+      {only && !pending ? <Button label={only === 'ahl' ? 'Import CDC dividends instead' : 'Import AHL trades instead'} variant="text" onPress={() => router.setParams({ kind: only === 'ahl' ? 'cdc' : 'ahl' })} /> : null}
       <Muted>Finqalab PDF reports are still web-only.</Muted>
     </Screen>
   );

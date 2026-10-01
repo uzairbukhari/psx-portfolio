@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { filterCompanies } from '@/data/entry-form';
-import { colors, radii } from '@/theme/tokens';
+import { makeStyles, useTheme } from '@/theme/ThemeProvider';
+import { layout, radii } from '@/theme/tokens';
 import { Input, Muted } from './kit';
 
 const VISIBLE = 6;
@@ -25,6 +26,8 @@ export function CompanyPicker({
   newSelected?: boolean;
   disabled?: boolean;
 }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const matches = useMemo(() => filterCompanies(companies, query), [companies, query]);
   // Keep the chosen company visible even when the search would hide it.
@@ -65,9 +68,9 @@ export function CompanyPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 14, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border },
-  rowOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  ticker: { color: colors.foreground, fontSize: 15, fontWeight: '700', minWidth: 64 },
-  name: { flex: 1, color: colors.muted, fontSize: 13 },
-});
+const useStyles = makeStyles((c) => ({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: layout.minTarget, paddingHorizontal: 14, borderRadius: radii.control, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface },
+  rowOn: { borderColor: c.primary, backgroundColor: c.primarySoft },
+  ticker: { color: c.ink, fontSize: 15, fontWeight: '700', minWidth: 64 },
+  name: { flex: 1, color: c.muted, fontSize: 13 },
+}));

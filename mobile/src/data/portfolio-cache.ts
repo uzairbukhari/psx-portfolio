@@ -8,12 +8,22 @@ import { createDeferredWriter } from './deferred-writer';
 const fileFor = (email: string) =>
   new File(Paths.cache, `portfolio-${email.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`);
 
-export async function readPortfolioCache(email: string): Promise<PortfolioResponse | null> {
+/** The saved portfolio and when it was written (ms since epoch; null when the file time is unavailable). */
+export type CachedPortfolio = { data: PortfolioResponse; savedAt: number | null };
+
+export async function readPortfolioCache(email: string): Promise<CachedPortfolio | null> {
   try {
     const file = fileFor(email);
     if (!file.exists) return null;
     const data = JSON.parse(await file.text()) as PortfolioResponse;
-    return data?.portfolio && Array.isArray(data.portfolio.companies) ? data : null;
+    if (!data?.portfolio || !Array.isArray(data.portfolio.companies)) return null;
+    let savedAt: number | null = null;
+    try {
+      savedAt = file.info().modificationTime ?? null;
+    } catch {
+      // the time is only used for the offline notice
+    }
+    return { data, savedAt };
   } catch {
     return null;
   }

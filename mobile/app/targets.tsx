@@ -7,9 +7,9 @@ import { applyTargets, evenWeights, screenStatus, targetRows, targetTotals } fro
 import { isIsoDate, parseNumber } from '@/data/mutations';
 import { searchCompanies } from '@/data/picks';
 import { usePortfolio } from '@/data/usePortfolio';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeProvider';
 import { Icon } from '@/ui/Icon';
-import { Avatar, Badge, Button, Card, Input, Loading, Muted, Notice, SectionLabel, styles } from '@/ui/kit';
+import { Avatar, Button, Card, Input, Loading, Muted, Notice, SectionLabel, StatusChip, useKitStyles } from '@/ui/kit';
 
 type Draft = { ticker: string; weight: string; approved: boolean; screenDate: string };
 
@@ -17,21 +17,24 @@ const weightOf = (text: string) => parseNumber(text) ?? 0;
 const bump = (text: string, delta: number) => String(Math.min(100, Math.max(0, round(weightOf(text) + delta))));
 
 function Step({ label, glyph, onPress }: { label: string; glyph: string; onPress: () => void }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
       hitSlop={6}
-      style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.cardRaised, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
+      style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
     >
-      <Text style={{ color: colors.foreground, fontSize: 22, lineHeight: 26 }}>{glyph}</Text>
+      <Text style={{ color: colors.ink, fontSize: 22, lineHeight: 26 }}>{glyph}</Text>
     </Pressable>
   );
 }
 
 /** Choose the companies the monthly SIP buys and their target weights (must total 100%). */
 export default function Targets() {
+  const styles = useKitStyles();
+  const { colors } = useTheme();
   const p = usePortfolio();
   const [rows, setRows] = useState<Draft[] | null>(null);
   const [adding, setAdding] = useState(false);
@@ -48,7 +51,7 @@ export default function Targets() {
 
   if (p.isLoading || !portfolio)
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
         <Stack.Screen options={{ title: 'Targets' }} />
         <Loading />
       </SafeAreaView>
@@ -80,7 +83,7 @@ export default function Targets() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
       <Stack.Screen options={{ title: 'Targets' }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
@@ -92,7 +95,7 @@ export default function Targets() {
           <Card>
             <View style={styles.row} accessible accessibilityLiveRegion="polite">
               <Text style={styles.strong}>Total {totals.total}%</Text>
-              <Badge
+              <StatusChip
                 text={totals.status === 'exact' ? 'Ready to save' : totals.status === 'over' ? `${-totals.remaining}% over` : `${totals.remaining}% to go`}
                 tone={badTone}
               />
@@ -120,7 +123,7 @@ export default function Targets() {
                     accessibilityLabel={`Remove ${r.ticker} from targets`}
                     onPress={() => edit(draft.filter((x) => x.ticker !== r.ticker))}
                     hitSlop={10}
-                    style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+                    style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Icon name="close" size={20} color={colors.muted} />
                   </Pressable>
@@ -156,7 +159,8 @@ export default function Targets() {
                       accessibilityLabel={`Enable new SIP purchases for ${r.ticker}`}
                       value={r.approved}
                       onValueChange={(approved) => patch(r.ticker, { approved })}
-                      trackColor={{ true: colors.primary }}
+                      trackColor={{ true: colors.primary, false: colors.line }}
+                      thumbColor={colors.surface}
                     />
                   </View>
                 </View>
@@ -191,15 +195,15 @@ export default function Targets() {
               ))}
               {available.length === 0 ? <Muted>No other company matches. A company that is not in your portfolio yet is added by recording a transaction for it.</Muted> : null}
               {available.length > 8 ? <Muted>Showing 8 of {available.length}. Type to narrow the list.</Muted> : null}
-              <Button label="Cancel" variant="ghost" onPress={() => { setAdding(false); setQuery(''); }} />
+              <Button label="Cancel" variant="text" onPress={() => { setAdding(false); setQuery(''); }} />
             </Card>
           ) : (
-            <Button label="Add company" variant="secondary" icon="plus" onPress={() => setAdding(true)} />
+            <Button label="Add company" variant="outline" icon="plus" onPress={() => setAdding(true)} />
           )}
           {draft.length >= 2 ? (
             <Button
               label="Spread evenly"
-              variant="ghost"
+              variant="text"
               onPress={() => {
                 const weights = evenWeights(draft.length);
                 edit(draft.map((r, i) => ({ ...r, weight: String(weights[i]) })));

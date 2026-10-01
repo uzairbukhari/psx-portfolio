@@ -2,7 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
-import { colors } from '@/theme/tokens';
+import { Icon } from '@/ui/Icon';
+import { useTheme } from '@/theme/ThemeProvider';
+import { type } from '@/theme/tokens';
 import { coversContent, shouldLock } from './lock-policy';
 
 const KEY = 'sipwise.lock';
@@ -24,6 +26,7 @@ const authenticate = (promptMessage: string) =>
 
 /** Optional lock: when on, opening the app (or returning after 30 seconds away) asks for fingerprint / face / device PIN. */
 export function BiometricLockProvider({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
   const [ready, setReady] = useState(false);
   const [enabled, setEnabledState] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -81,7 +84,7 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
 
   const covered = coversContent(enabled, locked, appActive);
 
-  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   return (
     <LockContext.Provider value={value}>
       {/* The app stays mounted under the lock so screens (and half-typed forms) survive it, but screen
@@ -103,17 +106,23 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
 }
 
 function LockScreen({ onUnlock }: { onUnlock: () => Promise<void> }) {
+  const { colors } = useTheme();
   useEffect(() => {
     void onUnlock();
   }, [onUnlock]);
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
-      <Text style={{ color: colors.foreground, fontSize: 22, fontWeight: '700' }}>Sipwise is locked</Text>
+    <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
+      <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="steps" size={36} color={colors.onPrimary} strokeWidth={2.4} />
+      </View>
+      <Text style={{ color: colors.ink, ...type.title }}>Sipwise is locked</Text>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Unlock"
         onPress={() => void onUnlock()}
-        style={{ backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 }}
+        style={{ backgroundColor: colors.primary, borderRadius: 12, minHeight: 48, justifyContent: 'center', paddingHorizontal: 32 }}
       >
-        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Unlock</Text>
+        <Text style={{ color: colors.onPrimary, fontWeight: '600', fontSize: 16 }}>Unlock</Text>
       </Pressable>
     </View>
   );
@@ -121,9 +130,10 @@ function LockScreen({ onUnlock }: { onUnlock: () => Promise<void> }) {
 
 /** Plain cover shown while the app is not in the foreground, so the app switcher shows no portfolio data. */
 function PrivacyCover() {
+  const { colors } = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: colors.foreground, fontSize: 22, fontWeight: '700' }}>Sipwise</Text>
+    <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: colors.ink, ...type.title }}>Sipwise</Text>
     </View>
   );
 }
