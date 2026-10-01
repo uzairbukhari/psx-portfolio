@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse } from '@shared/api-types.ts';
 import { useAuth } from '@/auth/AuthProvider';
@@ -43,6 +44,9 @@ export default function Account() {
           {user?.email} · {user?.role === 'super_admin' ? 'admin' : 'member'}
         </Muted>
       </Card>
+      <Pressable style={styles.button} onPress={() => router.push('/reports')}>
+        <Text style={styles.buttonText}>Reports</Text>
+      </Pressable>
       <Title>Signed-in devices</Title>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {devices.error ? <Notice tone="error">{devices.error.message}</Notice> : null}
