@@ -1,10 +1,11 @@
 // Review harness (audit evidence only, not app code). Compares the mobile Holdings hero
-// (mobile/src/data/derive.ts#totals) with the web value card formula (app/portfolio.tsx:743-753)
-// and the shared report (lib/portfolio-reports.ts) on illustrative fixtures.
+// (mobile/src/data/derive.ts#totals) with the web value card formula (app/portfolio.tsx) and the
+// shared report (lib/portfolio-reports.ts) on illustrative fixtures. Since Phase 1.1 both clients
+// use lib/portfolio.ts#portfolioSummary, so F1, F4 and F5 assert the fixed (shared) behaviour.
 // Run: node --test --experimental-strip-types docs/reviews/2026-10-02-sipwise-mobile/harness/parity-fixtures.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blankPortfolio, holdings, round } from '../../../../lib/portfolio.ts';
+import { blankPortfolio, holdings, portfolioSummary, round } from '../../../../lib/portfolio.ts';
 import { portfolioReport } from '../../../../lib/portfolio-reports.ts';
 import { safeHoldings, totals } from '../../../../mobile/src/data/derive.ts';
 import { buildPlan } from '../../../../mobile/src/data/sip.ts';
@@ -12,14 +13,9 @@ import { buildPlan } from '../../../../mobile/src/data/sip.ts';
 const co = (ticker, target = 0) => ({ ticker, name: ticker, sector: 'Others', target, approved: true, screenDate: '2026-09-01', note: '' });
 const q = (price, date = '2026-09-30') => ({ price, date, asOf: date, source: '', fetchedAt: '' });
 
-/** Web value card, copied from app/portfolio.tsx:743-753. */
+/** Web value card (app/portfolio.tsx): the shared summary over the same holdings. */
 function web(p) {
-  const held = holdings(p).filter((h) => h.shares > 0);
-  const missing = held.filter((h) => !h.quote);
-  const unknown = held.filter((h) => h.cost === null);
-  const value = round(held.reduce((a, h) => a + (h.value ?? 0), 0));
-  const cost = unknown.length ? null : round(held.reduce((a, h) => a + (h.cost ?? 0), 0));
-  const gain = cost === null || missing.length ? null : round(value - cost);
+  const { value, cost, gain } = portfolioSummary(holdings(p));
   return { value, cost, gain };
 }
 const mobile = (p) => totals(safeHoldings(p).held);
@@ -35,7 +31,7 @@ function base() {
   return p;
 }
 
-test('F1 buy/sell with fees: web and mobile agree on unrealised gain; mobile "all time" omits realised gain', () => {
+test('F1 buy/sell with fees: web and mobile agree on unrealised gain; it excludes realised gain and is labelled so', () => {
   const p = base();
   const w = web(p), m = mobile(p);
   assert.deepEqual([w.value, w.cost, w.gain], [3300, 3030, 270]);
@@ -44,7 +40,8 @@ test('F1 buy/sell with fees: web and mobile agree on unrealised gain; mobile "al
   assert.equal(realized, 360); // 40 x (60 - 50.5) - 20
   const r = portfolioReport(p).summary;
   console.log('F1 report', { totalGain: r.totalGain, grandTotalReturn: r.grandTotalReturn });
-  assert.notEqual(m.gain, round(m.gain + (realized ?? 0)), 'hero "all time" figure excludes realised gain of 360');
+  assert.notEqual(m.gain, round(m.gain + (realized ?? 0)), 'unrealised gain excludes realised gain of 360; mobile shows it as "Unrealised gain on current holdings" and total return in Reports');
+  assert.deepEqual(m, portfolioSummary(holdings(p)));
 });
 
 test('F2 received dividend is excluded from both hero figures', () => {
@@ -67,25 +64,29 @@ test('F3 split before trade on same date, quote must be on/after split', () => {
   assert.equal(holdings(p)[0].value, 3300);
 });
 
-test('F4 unknown cost: web shows priced value and gain "Not yet known"; mobile drops the position from value', () => {
+test('F4 unknown cost: web and mobile both show priced value, cost and gain "Not yet known"', () => {
   const p = base();
   p.companies.push(co('BBB'));
   p.trades.push({ id: 't3', ticker: 'BBB', kind: 'opening', date: '2026-01-01', shares: 10, price: null, fees: 0, month: '', note: '' });
   p.quotes.BBB = q(100);
   const w = web(p), m = mobile(p);
   assert.deepEqual([w.value, w.cost, w.gain], [4300, null, null]);
-  assert.deepEqual([m.value, m.cost, m.gain, m.unpriced], [3300, 3030, 270, 1]);
+  assert.deepEqual([m.value, m.cost, m.gain], [4300, null, null]);
+  assert.deepEqual(m.unknownCost, ['BBB']);
+  assert.deepEqual(m.incomplete, ['unknown-cost']);
 });
 
-test('F5 missing quote: web gain null; mobile shows a partial gain', () => {
+test('F5 missing quote: web and mobile both report gain null and list the unpriced holding', () => {
   const p = base();
   p.companies.push(co('CCC'));
   p.trades.push({ id: 't4', ticker: 'CCC', kind: 'buy', date: '2026-02-01', shares: 10, price: 10, fees: 0, month: '', note: '' });
   const w = web(p), m = mobile(p);
   assert.equal(w.gain, null);
   assert.equal(w.value, 3300);
-  assert.equal(m.gain, 270);
-  assert.equal(m.unpriced, 1);
+  assert.equal(m.gain, null);
+  assert.equal(m.value, 3300);
+  assert.deepEqual(m.missingPrice, ['CCC']);
+  assert.deepEqual(m.incomplete, ['missing-price']);
 });
 
 test('F6 empty portfolio', () => {

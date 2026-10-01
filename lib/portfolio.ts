@@ -879,6 +879,52 @@ export function holdings(p: Portfolio) {
     };
   });
 }
+export type PortfolioSummaryHolding = Pick<
+  ReturnType<typeof holdings>[number],
+  'ticker' | 'shares' | 'cost' | 'value' | 'quote'
+>;
+export type PortfolioSummary = {
+  /** Open positions (shares > 0). */
+  heldCount: number;
+  /** Market value of the open positions that have a usable price. */
+  value: number;
+  /** Remaining cost of all open positions; null while any cost is unknown. */
+  cost: number | null;
+  /** Unrealised gain; null unless every open position has both a price and a known cost. */
+  gain: number | null;
+  gainPercent: number | null;
+  /** Open positions without a usable price (none, or one dated before the latest split). */
+  missingPrice: string[];
+  /** Open positions whose remaining cost is unknown. */
+  unknownCost: string[];
+  incomplete: ('missing-price' | 'unknown-cost')[];
+  /** Oldest quote date (YYYY-MM-DD) among the priced open positions. */
+  oldestQuoteDate: string | null;
+};
+/**
+ * One definition of the headline numbers for web and mobile. Value counts every priced holding,
+ * cost and gain are only reported when they are complete, and `incomplete` says why not.
+ */
+export function portfolioSummary(held: PortfolioSummaryHolding[]): PortfolioSummary {
+  const open = held.filter((h) => h.shares > 0);
+  const missing = open.filter((h) => !h.quote || h.value === null);
+  const unknown = open.filter((h) => h.cost === null);
+  const value = round(open.reduce((a, h) => a + (h.value ?? 0), 0));
+  const cost = unknown.length ? null : round(open.reduce((a, h) => a + (h.cost ?? 0), 0));
+  const gain = cost === null || missing.length ? null : round(value - cost);
+  const dates = open.flatMap((h) => (h.quote && h.value !== null ? [h.quote.date] : [])).sort();
+  return {
+    heldCount: open.length,
+    value,
+    cost,
+    gain,
+    gainPercent: gain !== null && cost !== null && cost > 0 ? (gain / cost) * 100 : null,
+    missingPrice: missing.map((h) => h.ticker),
+    unknownCost: unknown.map((h) => h.ticker),
+    incomplete: [...(missing.length ? ['missing-price' as const] : []), ...(unknown.length ? ['unknown-cost' as const] : [])],
+    oldestQuoteDate: dates[0] ?? null,
+  };
+}
 export function validate(p: Portfolio) {
   if (
     !p ||
