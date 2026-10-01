@@ -1,7 +1,7 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from './portfolio';
 export const metadata = {
-  title: 'PSX Portfolio | SIP desk',
+  title: 'Sipwise | SIP desk',
   description:
     'Your private portfolio, purchase ledger and monthly SIP planner.',
 };

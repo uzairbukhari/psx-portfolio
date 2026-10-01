@@ -1,0 +1,60 @@
+name: Seed staging
+
+# Fills the STAGING D1 database with public PSX market data for a few tickers (using
+# the same scrapers as production, aimed at the staging DB) plus a small fictional
+# portfolio. Never reads or writes the production database: scripts refuse to run
+# the seed against the production id, and D1_DATABASE_ID comes from the staging
+# environment variable STAGING_D1_DATABASE_ID.
+on:
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: 'Comma-separated tickers to scrape'
+        required: false
+        default: 'MEBL,LUCK,OGDC,HUBC,ENGRO,SYS'
+  workflow_call:
+    inputs:
+      tickers:
+        type: string
+        required: false
+        default: 'MEBL,LUCK,OGDC,HUBC,ENGRO,SYS'
+
+concurrency:
+  group: seed-staging
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      D1_DATABASE_ID: ${{ vars.STAGING_D1_DATABASE_ID }}
+      TICKERS: ${{ inputs.tickers }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Require staging database id
+        run: |
+          if [ -z "$D1_DATABASE_ID" ]; then
+            echo "::error::Set the STAGING_D1_DATABASE_ID variable in the staging environment."
+            exit 1
+          fi
+          if ! printf '%s' "$TICKERS" | grep -Eq '^[A-Za-z0-9]{2,12}(,[A-Za-z0-9]{2,12})*$'; then
+            echo "::error::tickers must be a comma-separated list like MEBL,LUCK."
+            exit 1
+          fi
+      - name: Seed fictional portfolio
+        run: node scripts/seed-staging.mjs
+      - name: Scrape quotes
+        run: node scripts/psx-quote-scrape.mjs "--tickers=$TICKERS"
+      - name: Scrape company facts
+        run: node scripts/psx-facts-scrape.mjs "--tickers=$TICKERS"
+      - name: Scrape price history
+        run: node scripts/psx-history-scrape.mjs "--tickers=$TICKERS"
+      - name: Scrape dividend announcements
+        run: node scripts/psx-payout-scrape.mjs "--tickers=$TICKERS"
