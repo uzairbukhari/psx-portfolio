@@ -1,6 +1,6 @@
 // Pure view-model helpers over the shared portfolio code (no React / native imports,
 // so they can be unit tested with plain node).
-import { holdings, portfolioSummary, type AppNotification, type Portfolio } from '../../../lib/portfolio.ts';
+import { holdings, portfolioSummary, taxSummary, type AppNotification, type Portfolio } from '../../../lib/portfolio.ts';
 
 export type Holding = ReturnType<typeof holdings>[number];
 
@@ -93,6 +93,50 @@ export function activityEntries(p: Portfolio, ticker?: string): ActivityEntry[] 
     });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1));
+}
+
+export type DividendRow = {
+  id: string;
+  status: 'expected' | 'received';
+  /** Book-closure start (auto) or the dividend date. */
+  date: string;
+  paymentDate: string | null;
+  /** Last trade date that qualifies for an automatic dividend. */
+  entitlementDate: string | null;
+  perShare: number | null;
+  gross: number;
+  /** Tax withheld (actual) or estimated at the filer setting; null when unknown. */
+  tax: number | null;
+  taxIsActual: boolean;
+  net: number | null;
+  source: 'auto' | 'manual' | 'import';
+};
+
+/** A company's dividends, newest first: expected PSX ones awaiting "Mark received", then received income. */
+export function companyDividends(p: Portfolio, ticker: string): DividendRow[] {
+  let taxed: ReturnType<typeof taxSummary>['dividends'];
+  try {
+    taxed = taxSummary(p).dividends;
+  } catch {
+    return [];
+  }
+  const recorded = new Map((p.dividends ?? []).map((d) => [d.id, d]));
+  return taxed
+    .filter((d) => d.ticker === ticker)
+    .map((d) => ({
+      id: d.id,
+      status: d.status,
+      date: d.date,
+      paymentDate: d.paymentDate ?? null,
+      entitlementDate: d.entitlementDate ?? null,
+      perShare: recorded.get(d.id)?.perShare ?? null,
+      gross: d.grossAmount,
+      tax: d.tax,
+      taxIsActual: d.taxBasis === 'actual',
+      net: d.netAmount,
+      source: d.source,
+    }))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1));
 }
 
 /** Why an entry cannot be edited on the phone, or null when it can (or when no such entry exists). */

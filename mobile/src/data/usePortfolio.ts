@@ -4,6 +4,7 @@ import type { PortfolioResponse, QuotesResponse, SavePortfolioRequest, SavePortf
 import { validate, type Portfolio } from '@shared/portfolio.ts';
 import { ApiRequestError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
+import { syncAnnouncementsOnLoad } from './auto-dividends';
 import { openPositions, priceTickers, safeHoldings, totals } from './derive';
 import { readPortfolioCache, writePortfolioCache } from './portfolio-cache';
 
@@ -25,7 +26,10 @@ export function usePortfolio() {
     queryKey: ['portfolio', email],
     enabled: Boolean(email),
     queryFn: async () => {
-      const data = await api.get<PortfolioResponse>('/api/portfolio');
+      const loaded = await api.get<PortfolioResponse>('/api/portfolio');
+      // Same as the web on load: book PSX announcements as expected dividends and alerts (saves only when
+      // something is new), so the phone alone keeps them current.
+      const data = await syncAnnouncementsOnLoad(api, loaded);
       writePortfolioCache(email, data);
       return data;
     },

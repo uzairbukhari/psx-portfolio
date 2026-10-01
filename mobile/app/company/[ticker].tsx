@@ -6,12 +6,12 @@ import type { PriceHistoryResponse } from '@shared/api-types.ts';
 import { money, moneyShort } from '@shared/portfolio.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '@shared/price-history.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
-import { activityEntries, formatPercent } from '@/data/derive';
+import { activityEntries, companyDividends, formatPercent } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
 import { ActivityRow } from '@/ui/ActivityRow';
 import { LineChart } from '@/ui/LineChart';
-import { Amount, Avatar, Button, Card, Chip, EmptyState, Loading, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
+import { Amount, Avatar, Badge, Button, Card, Chip, EmptyState, ListRow, Loading, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
 
 const RANGES: { key: HistoryRange; label: string }[] = [
   { key: 'today', label: '1D' },
@@ -29,6 +29,7 @@ export default function Company() {
   const [range, setRange] = useState<HistoryRange>('1m');
 
   const holding = p.view?.held.find((h) => h.ticker === ticker);
+  const dividends = useMemo(() => (p.portfolio ? companyDividends(p.portfolio, ticker) : []), [p.portfolio, ticker]);
   const entries = useMemo(() => (p.portfolio ? activityEntries(p.portfolio, ticker) : []), [p.portfolio, ticker]);
 
   const history = useQuery({
@@ -102,6 +103,46 @@ export default function Company() {
             <Button label="Add transaction" icon="plus" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/transaction', params: { ticker } })} />
             <Button label="Set price" variant="secondary" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/quote', params: { ticker } })} />
           </View>
+          {dividends.length ? (
+            <>
+              <SectionLabel>Dividends</SectionLabel>
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                {dividends.map((d, i) => (
+                  <View key={d.id} style={i < dividends.length - 1 ? { borderBottomWidth: 1, borderBottomColor: colors.border } : undefined}>
+                    <ListRow
+                      title={`${d.status === 'expected' ? 'Expected' : 'Received'}${d.perShare ? ` · ${money(d.perShare)}/share` : ''}`}
+                      subtitle={
+                        d.status === 'expected'
+                          ? `Book closure ${d.date} · not received yet`
+                          : `${d.paymentDate ? `Paid ${d.paymentDate}` : `Dated ${d.date}`}${d.tax !== null ? ` · tax ${d.taxIsActual ? 'withheld' : 'estimated'} ${money(d.tax)}` : ''}`
+                      }
+                      right={
+                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                          <Text style={{ color: d.status === 'expected' ? colors.muted : colors.success, fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
+                            {d.status === 'expected' ? '≈ ' : '+'}
+                            {money(d.gross)}
+                          </Text>
+                          {d.status === 'expected' ? <Badge text="Expected" tone="warn" /> : <Badge text="Received" tone="success" />}
+                        </View>
+                      }
+                      last
+                    />
+                    {d.status === 'expected' ? (
+                      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                        <Button
+                          label="Mark received"
+                          variant="secondary"
+                          icon="check"
+                          onPress={() => router.push({ pathname: '/received', params: { id: d.id } })}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </Card>
+              <Muted>Expected dividends are planning figures until you mark them received.</Muted>
+            </>
+          ) : null}
           <SectionLabel>History</SectionLabel>
           {entries.length === 0 ? (
             <EmptyState icon="activity" title={`No entries for ${ticker}`} body="Trades and dividends for this company will be listed here." />

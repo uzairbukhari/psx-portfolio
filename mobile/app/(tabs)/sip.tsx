@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { money, moneyShort } from '@shared/portfolio.ts';
+import { WEIGHT_CAP, money, moneyShort } from '@shared/portfolio.ts';
+import { targetTotals } from '@shared/targets.ts';
 import { parseNumber } from '@/data/mutations';
 import { buildPlan, currentMonth, setBudget, shiftMonth } from '@/data/sip';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
 import { Icon } from '@/ui/Icon';
-import { Avatar, Button, Card, EmptyState, Header, Input, Loading, Muted, Notice, ProgressBar, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
+import { Avatar, Button, Card, Header, Input, Loading, Muted, Notice, ProgressBar, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
 
 export default function Sip() {
   const p = usePortfolio();
@@ -51,6 +52,10 @@ export default function Sip() {
     );
 
   const plan = result.plan;
+  const targeted = p.portfolio.companies.filter((c) => c.target > 0);
+  // The targets total gets its own notice with a way to fix it, so it is not repeated among the plan's errors.
+  const planErrors = (plan?.errors ?? []).filter((e) => e !== 'Target weights must total 100%.');
+  const targetState = targetTotals(targeted.map((c) => ({ ticker: c.ticker, target: c.target })));
   const monthLabel = new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const monthName = new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
   // plan() falls back to PKR 100,000 for a month with no budget; that is not something the user chose.
@@ -96,6 +101,25 @@ export default function Sip() {
       setPricing(false);
     }
   }
+
+  if (targeted.length === 0)
+    return (
+      <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
+        <Header title="Monthly SIP" subtitle="Split this month's money across your targets" />
+        <Card tone="hero">
+          <Text style={styles.strong}>Choose your companies and targets</Text>
+          <Muted>
+            Sipwise splits each month's money toward the companies furthest below their target weight, in whole shares. Targets must add up to 100%, and any one
+            company is capped at {WEIGHT_CAP}% of the portfolio.
+          </Muted>
+          {p.portfolio.companies.length === 0 ? (
+            <Muted>Add your first company by recording a purchase or importing your trades, then set its target here.</Muted>
+          ) : null}
+          <Button label="Set targets" icon="check" disabled={p.portfolio.companies.length === 0} onPress={() => router.push('/targets')} />
+          <Button label="Or start with Monthly Picks" variant="ghost" onPress={() => router.push('/picks')} />
+        </Card>
+      </Screen>
+    );
 
   return (
     <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
@@ -167,8 +191,15 @@ export default function Sip() {
         onPress={() => void refreshPrices()}
       />
 
+      {targetState.status !== 'exact' ? (
+        <Notice>
+          Your targets add up to {targetState.total}%, not 100%. Adjust them to get suggested buys.
+        </Notice>
+      ) : null}
+      <Button label="Edit targets" variant="secondary" onPress={() => router.push('/targets')} />
+
       {plan && !budgetSet ? <Notice>Set a budget for {monthLabel} to see suggested buys.</Notice> : null}
-      {plan && budgetSet && plan.errors.length ? <Notice>{plan.errors.join('\n')}</Notice> : null}
+      {plan && budgetSet && planErrors.length ? <Notice>{planErrors.join('\n')}</Notice> : null}
 
       {plan && budgetSet && !plan.errors.length ? (
         <>
@@ -210,9 +241,6 @@ export default function Sip() {
               ) : null}
             </Card>
           ))}
-          {plan.rows.length === 0 ? (
-            <EmptyState icon="calendar" title="No targets yet" body="Set target weights for your companies on the web app, then come back for a plan." />
-          ) : null}
         </>
       ) : null}
     </Screen>

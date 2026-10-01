@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankPortfolio } from '../../../lib/portfolio.ts';
-import { activeNotifications, activityEntries, formatPercent, openPositions, priceTickers, readOnlyReason, safeHoldings, totals } from './derive.ts';
+import { companyDividends, activeNotifications, activityEntries, formatPercent, openPositions, priceTickers, readOnlyReason, safeHoldings, totals } from './derive.ts';
 
 function sample() {
   const p = blankPortfolio();
@@ -111,4 +111,23 @@ test('readOnlyReason refuses imported, automatic and voided entries but not hand
   assert.equal(readOnlyReason(p, 't2'), null, 'legacy entries without a source stay editable');
   assert.equal(readOnlyReason(p, 'hand'), null);
   assert.equal(readOnlyReason(p, 'missing'), null);
+});
+
+test('companyDividends lists a company\'s expected and received dividends newest first', () => {
+  const p = sample();
+  p.dividends = [
+    { id: 'm1', ticker: 'AAA', date: '2026-01-15', source: 'manual', perShare: 2, grossAmount: 20, note: '' },
+    { id: 'a1', ticker: 'AAA', date: '2026-03-10', source: 'auto', status: 'expected', entitlementDate: '2026-03-09', perShare: 5, grossAmount: 50, externalId: 'x', note: '' },
+    { id: 'a2', ticker: 'AAA', date: '2026-02-10', source: 'auto', status: 'received', paymentDate: '2026-02-20', taxWithheld: 7.5, perShare: 5, grossAmount: 50, externalId: 'y', note: '' },
+    { id: 'v1', ticker: 'AAA', date: '2026-04-01', source: 'manual', perShare: 1, grossAmount: 10, note: '', voided: true },
+    { id: 'o1', ticker: 'BBB', date: '2026-03-01', source: 'manual', perShare: 1, grossAmount: 5, note: '' },
+  ];
+  const rows = companyDividends(p, 'AAA');
+  assert.deepEqual(rows.map((r) => [r.id, r.status]), [['a1', 'expected'], ['a2', 'received'], ['m1', 'received']]);
+  const expected = rows[0];
+  assert.deepEqual([expected.gross, expected.perShare, expected.entitlementDate, expected.paymentDate], [50, 5, '2026-03-09', null]);
+  const received = rows[1];
+  assert.deepEqual([received.paymentDate, received.tax, received.taxIsActual, received.net], ['2026-02-20', 7.5, true, 42.5]);
+  assert.deepEqual(companyDividends(p, 'CCC'), []);
+  assert.deepEqual(companyDividends(blankPortfolio(), 'AAA'), []);
 });
