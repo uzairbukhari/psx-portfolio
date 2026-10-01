@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { env } from 'cloudflare:workers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import './ledger.css';
@@ -17,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'PSX Portfolio & SIP',
+  title: 'Sipwise',
   icons: { icon: '/favicon.svg' },
 };
 
@@ -27,7 +28,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      data-app-env={env.APP_ENV === 'staging' ? 'staging' : undefined}
+    >
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
