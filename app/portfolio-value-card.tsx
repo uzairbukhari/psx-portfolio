@@ -146,6 +146,8 @@ export default function PortfolioValueCard({
 
   return (
     <section className="panel value-card">
+      <div className="value-card-body">
+      <div className="value-card-left">
       <div className="value-card-top">
         <div>
           <span className="value-card-label">
@@ -185,7 +187,6 @@ export default function PortfolioValueCard({
           </small>
         </div>
       </div>
-      <div className="value-card-body">
       <div className="value-card-chart">
       <div className="company-chart-head">
         <div>
@@ -297,6 +298,7 @@ export default function PortfolioValueCard({
           Not in the chart (no price history yet): {series.unpriced.join(', ')}
         </p>
       )}
+      </div>
       </div>
       {aside && <aside className="value-card-aside">{aside}</aside>}
       </div>

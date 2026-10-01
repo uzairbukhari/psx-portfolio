@@ -397,6 +397,7 @@ export default function Dashboard({
     () => null,
   );
   const initialPathname = usePathname();
+  const [bellOpen, setBellOpen] = useState(false);
   const [tab, setTabState] = useState(() =>
     allowTab(tabFromPathname(initialPathname), isAdmin),
   );
@@ -1327,7 +1328,17 @@ export default function Dashboard({
             <Plus size={18} />
             <span className="hdr-label">Add transaction</span>
           </button>
-          <Popover>
+          <Popover
+            open={bellOpen}
+            onOpenChange={(next) => {
+              // Phones skip the popover (it can't fit): go straight to the page.
+              if (next && window.matchMedia('(max-width:760px)').matches) {
+                setTab('notifications');
+                return;
+              }
+              setBellOpen(next);
+            }}
+          >
             <PopoverTrigger
               className="bell-trigger hdr-btn"
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
@@ -1410,7 +1421,10 @@ export default function Dashboard({
                   type="button"
                   data-slot="link"
                   className="link-button"
-                  onClick={() => setTab('notifications')}
+                  onClick={() => {
+                    setBellOpen(false);
+                    setTab('notifications');
+                  }}
                 >
                   View all notifications
                 </button>
