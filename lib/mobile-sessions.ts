@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { UserError } from '@/lib/user-error';
 
 export type MobileSession = {
   id: string;
@@ -35,7 +36,11 @@ export async function createMobileSession(
   return id;
 }
 
-/** True while the device session exists, belongs to the email and is not revoked. */
+/**
+ * True while the device session exists, belongs to the email and is not revoked. A failed lookup
+ * (for example a transient D1 error) throws a 503 instead of answering false: false means "revoked"
+ * and makes the phone delete its token, which a database hiccup must never do.
+ */
 export async function mobileSessionActive(sid: string, email: string): Promise<boolean> {
   try {
     const row = await env.DB
@@ -51,8 +56,9 @@ export async function mobileSessionActive(sid: string, email: string): Promise<b
         .catch(() => {});
     }
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    console.error('mobile session lookup failed', e);
+    throw new UserError('Could not check your sign-in right now. Try again in a moment.', 503);
   }
 }
 
