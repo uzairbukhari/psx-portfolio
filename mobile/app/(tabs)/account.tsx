@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MobileSessionsResponse } from '@shared/api-types.ts';
+import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
 import { useAuth } from '@/auth/AuthProvider';
 import { clearPortfolioCache } from '@/data/portfolio-cache';
 import { config } from '@/config';
@@ -16,6 +16,11 @@ export default function Account() {
   const devices = useQuery({
     queryKey: ['devices'],
     queryFn: () => api.get<MobileSessionsResponse>('/api/mobile-sessions'),
+  });
+
+  const usage = useQuery({
+    queryKey: ['usage'],
+    queryFn: () => api.get<UsageResponse>('/api/usage'),
   });
 
   const revoke = (id: string, name: string) =>
@@ -47,6 +52,14 @@ export default function Account() {
       <Pressable style={styles.button} onPress={() => router.push('/reports')}>
         <Text style={styles.buttonText}>Reports</Text>
       </Pressable>
+      {usage.data ? (
+        <Card>
+          <Text style={styles.strong}>AI usage</Text>
+          <Muted>
+            ${usage.data.costUsd.toFixed(3)} spent · {(usage.data.inputTokens + usage.data.outputTokens).toLocaleString()} tokens
+          </Muted>
+        </Card>
+      ) : null}
       <Title>Signed-in devices</Title>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {devices.error ? <Notice tone="error">{devices.error.message}</Notice> : null}
