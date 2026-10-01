@@ -2,9 +2,12 @@
 // corrections void the old line (kept for the audit trail) and insert a new one after it.
 // Callers run validate() on the result before saving.
 import {
+  confirmDividendReceipt,
+  dividendStatus,
   round,
   today,
   sharesHeldOn,
+  type AppNotification,
   type Dividend,
   type Portfolio,
   type Quote,
@@ -136,5 +139,33 @@ export function addCompany(
     screenDate: '',
     note: '',
   });
+  return next;
+}
+
+/**
+ * Marks an expected PSX dividend received, optionally with the actual gross amount and tax withheld, exactly as
+ * the web does (shared confirmDividendReceipt). Blank amounts keep the expected figure and the tax estimate.
+ */
+export function markDividendReceived(
+  p: Portfolio,
+  id: string,
+  receipt: { paymentDate: string; grossAmount?: number | null; taxWithheld?: number | null },
+): Portfolio {
+  const next = clonePortfolio(p);
+  const target = next.dividends?.find((d) => d.id === id);
+  if (!target || target.voided) throw new Error('That dividend no longer exists. Reload and try again.');
+  if (target.source !== 'auto' || dividendStatus(target) !== 'expected') throw new Error('That dividend is already received.');
+  const gross = receipt.grossAmount ?? undefined;
+  const tax = receipt.taxWithheld ?? undefined;
+  if ((gross !== undefined && !(gross >= 0)) || (tax !== undefined && !(tax >= 0)))
+    throw new Error('Enter amounts as positive numbers, or leave them blank.');
+  Object.assign(target, confirmDividendReceipt(target, { paymentDate: receipt.paymentDate, grossAmount: gross, taxWithheld: tax }));
+  return next;
+}
+
+/** Applies a change to the notification list (read, clear, restore, delete cleared) on a copy of the portfolio. */
+export function changeNotifications(p: Portfolio, change: (list: AppNotification[]) => AppNotification[]): Portfolio {
+  const next = clonePortfolio(p);
+  next.notifications = change(next.notifications ?? []);
   return next;
 }

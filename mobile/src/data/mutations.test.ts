@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankPortfolio, holdings, validate } from '../../../lib/portfolio.ts';
-import { isIsoDate, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry } from './mutations.ts';
+import { changeNotifications, isIsoDate, markDividendReceived, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry } from './mutations.ts';
+import { clearOne } from '../../../lib/notification-actions.ts';
+import { taxSummary } from '../../../lib/portfolio.ts';
 
 function base() {
   const p = blankPortfolio();
@@ -101,4 +103,57 @@ test('adding a company stores the confirmed quote and starts unapproved with no 
   assert.throws(() => addCompany(base(), { ticker: 'a b', name: '', sector: 'Bank' }, quote), /valid PSX symbol/);
   assert.equal(isValidSymbol('MEBL'), true);
   assert.equal(isValidSymbol('x'), false);
+});
+
+function withExpected() {
+  const p = recordTrade(base(), buy(100, 100, '2025-01-02'));
+  p.dividends = [
+    {
+      id: 'auto-1', ticker: 'AAA', date: '2026-02-10', source: 'auto', status: 'expected', entitlementDate: '2026-02-09',
+      perShare: 5, grossAmount: 500, externalId: 'psx:AAA:2026-02-10:2026-02-01', note: '',
+    },
+  ];
+  return p;
+}
+
+test('markDividendReceived confirms with payment date, gross and tax, and leaves the input alone', () => {
+  const p = withExpected();
+  const next = markDividendReceived(p, 'auto-1', { paymentDate: '2026-02-20', grossAmount: 480, taxWithheld: 72 });
+  validate(next);
+  assert.equal(p.dividends![0].status, 'expected');
+  const d = next.dividends![0];
+  assert.deepEqual([d.status, d.paymentDate, d.grossAmount, d.taxWithheld], ['received', '2026-02-20', 480, 72]);
+  const row = taxSummary(next).dividends[0];
+  assert.deepEqual([row.status, row.grossAmount, row.tax, row.netAmount], ['received', 480, 72, 408]);
+  assert.equal(taxSummary(next).totalDividendIncomeGross, 480);
+  assert.equal(taxSummary(p).totalDividendIncomeGross, 0);
+});
+
+test('markDividendReceived keeps the expected figure when gross and tax are blank', () => {
+  const next = markDividendReceived(withExpected(), 'auto-1', { paymentDate: '2026-02-20', grossAmount: null, taxWithheld: null });
+  const d = next.dividends![0];
+  assert.deepEqual([d.status, d.grossAmount, d.taxWithheld], ['received', 500, undefined]);
+  assert.equal(taxSummary(next).totalDividendIncomeGross, 500);
+});
+
+test('markDividendReceived rejects bad dates, negative amounts, unknown, voided and already received dividends', () => {
+  const p = withExpected();
+  assert.throws(() => markDividendReceived(p, 'auto-1', { paymentDate: '2026-02-30' }), /valid payment date/);
+  assert.throws(() => markDividendReceived(p, 'auto-1', { paymentDate: '2026-02-20', grossAmount: -1 }), /positive numbers/);
+  assert.throws(() => markDividendReceived(p, 'auto-1', { paymentDate: '2026-02-20', taxWithheld: -1 }), /positive numbers/);
+  assert.throws(() => markDividendReceived(p, 'nope', { paymentDate: '2026-02-20' }), /no longer exists/);
+  const voided = voidEntry(p, 'dividend', 'auto-1');
+  assert.throws(() => markDividendReceived(voided, 'auto-1', { paymentDate: '2026-02-20' }), /no longer exists/);
+  const done = markDividendReceived(p, 'auto-1', { paymentDate: '2026-02-20' });
+  assert.throws(() => markDividendReceived(done, 'auto-1', { paymentDate: '2026-02-21' }), /already received/);
+});
+
+test('changeNotifications edits a copy of the notification list', () => {
+  const p = base();
+  p.notifications = [{ id: 'n1', at: '2026-02-01T00:00:00Z', kind: 'info', title: 't', body: '', read: false }];
+  const next = changeNotifications(p, (list) => clearOne(list, 'n1', '2026-02-02T00:00:00Z'));
+  validate(next);
+  assert.equal(p.notifications[0].clearedAt, undefined);
+  assert.deepEqual([next.notifications![0].read, next.notifications![0].clearedAt], [true, '2026-02-02T00:00:00Z']);
+  assert.deepEqual(changeNotifications(base(), (list) => list).notifications, []);
 });

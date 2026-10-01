@@ -37,6 +37,8 @@ function Root() {
         <Stack.Screen name="import" options={{ title: 'Import' }} />
         <Stack.Screen name="reports" options={{ title: 'Reports' }} />
         <Stack.Screen name="picks" options={{ title: 'Monthly Picks' }} />
+        <Stack.Screen name="targets" options={{ presentation: 'modal', title: 'Targets' }} />
+        <Stack.Screen name="received" options={{ presentation: 'modal', title: 'Dividend' }} />
         <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
         <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
       </Stack>

@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { money } from '@shared/portfolio.ts';
 import { estimateMonthlyPicks, type MonthlyPicksResearch } from '@shared/monthly-picks.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { parseNumber } from '@/data/mutations';
+import { MAX_SHORTLIST, initialShortlist, pickSources, searchCompanies, withPicksInputs } from '@/data/picks';
 import { currentMonth } from '@/data/sip';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
+import { Icon } from '@/ui/Icon';
 import { Avatar, Badge, Button, Card, Chip, Header, Input, Loading, Muted, Notice, Screen, SectionLabel, styles } from '@/ui/kit';
 
 type Run = {
@@ -23,7 +25,33 @@ type Run = {
   progress?: { phase: 'gathering' | 'ranking'; pending: string[] };
 };
 const ACTIVE = ['queued', 'gathering', 'in_progress'];
-const MAX = 15;
+const MAX = MAX_SHORTLIST;
+
+/** Where a pick's numbers and thesis came from; each opens in the browser. */
+function Sources({ item }: { item: Parameters<typeof pickSources>[0] }) {
+  const sources = pickSources(item);
+  if (!sources.length) return null;
+  return (
+    <View style={{ gap: 4 }}>
+      <Text style={styles.statLabel}>Sources</Text>
+      {sources.map((s) => (
+        <Pressable
+          key={s.url}
+          accessibilityRole="link"
+          accessibilityLabel={`Open source ${s.title}${s.date ? `, ${s.date}` : ''}`}
+          onPress={() => void Linking.openURL(s.url).catch(() => {})}
+          style={({ pressed }) => [styles.row, { justifyContent: 'flex-start', minHeight: 44, opacity: pressed ? 0.6 : 1 }]}
+        >
+          <Icon name="chevronRight" size={14} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontSize: 14, flexShrink: 1 }} numberOfLines={2}>
+            {s.title}
+            {s.date ? ` · ${s.date}` : ''}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
 
 export default function Picks() {
   const { api } = useAuth();
@@ -34,20 +62,14 @@ export default function Picks() {
   const [shortlist, setShortlist] = useState<string[] | null>(null);
   const [amount, setAmount] = useState('');
   const [fee, setFee] = useState('0');
+  const [query, setQuery] = useState('');
   const [runId, setRunId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const estimateError = useRef<string | null>(null);
 
   const portfolio = p.portfolio;
-  const selected =
-    shortlist ??
-    (portfolio
-      ? (portfolio.monthlyPicksShortlist?.length
-          ? portfolio.monthlyPicksShortlist
-          : portfolio.companies.filter((c) => c.target > 0).map((c) => c.ticker)
-        ).slice(0, MAX)
-      : []);
+  const selected = shortlist ?? (portfolio ? initialShortlist(portfolio) : []);
 
   // Resume the latest run (or pick up one that's still going) when the screen opens.
   const latest = useQuery({
@@ -96,6 +118,9 @@ export default function Picks() {
       const amt = parseNumber(budget);
       if (amt === null) throw new Error('Enter the amount to invest.');
       if (!selected.length) throw new Error('Choose at least one company.');
+      // Remember the shortlist and this month's amount, as the web does, so they are here next time (and on the web).
+      const withInputs = portfolio ? withPicksInputs(portfolio, month, selected, amt) : null;
+      if (withInputs) await p.save(withInputs);
       const started = await api.post<Run>('/api/recommendations', {
         month,
         amount: amt,
@@ -112,6 +137,8 @@ export default function Picks() {
     }
   }
 
+  const targeted = portfolio.companies.filter((c) => c.target > 0).map((c) => c.ticker);
+  const shown = searchCompanies(portfolio.companies, query);
   const active = current !== null && ACTIVE.includes(current.status);
   const toggle = (t: string) =>
     setShortlist(selected.includes(t) ? selected.filter((x) => x !== t) : selected.length < MAX ? [...selected, t] : selected);
@@ -123,11 +150,18 @@ export default function Picks() {
 
       <Card>
         <SectionLabel>Companies to consider · {selected.length}/{MAX}</SectionLabel>
+        <Input label="Search companies" value={query} onChangeText={setQuery} placeholder="Ticker or name" autoCapitalize="none" autoCorrect={false} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {portfolio.companies.map((c) => (
+          {targeted.length ? <Chip label="Target holdings" onPress={() => setShortlist(targeted.slice(0, MAX))} /> : null}
+          <Chip label="Clear" onPress={() => setShortlist([])} />
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {shown.map((c) => (
             <Chip key={c.ticker} label={c.ticker} selected={selected.includes(c.ticker)} onPress={() => toggle(c.ticker)} />
           ))}
         </View>
+        {shown.length === 0 ? <Muted>No company matches that search.</Muted> : null}
+        <Muted>Your shortlist and amount are saved when you get picks.</Muted>
         <View style={styles.divider} />
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
@@ -196,6 +230,7 @@ export default function Picks() {
               </View>
               <Text style={{ color: colors.foreground, fontSize: 14, lineHeight: 21 }}>{r.thesis}</Text>
               {r.risks.length ? <Muted>Risks: {r.risks.join('; ')}</Muted> : null}
+              <Sources item={r} />
               {r.shares !== null && r.price !== null ? (
                 <>
                   <Muted>
