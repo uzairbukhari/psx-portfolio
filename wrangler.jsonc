@@ -1,26 +1,32 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "psx-portfolio-sip",
-  "compatibility_date": "2026-05-22",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "psx-portfolio-sip",
-      "database_id": "f72a6264-371b-49ff-89e3-20eef1ce2b19",
-      "migrations_dir": "drizzle"
-    }
-  ],
-  "vars": {
-    // Comma-separated list of Google account emails allowed to sign in.
-    // Empty (default) allows any verified Google account to sign up.
-    "ALLOWED_EMAILS": "",
-    // Public OAuth client ID from Google Cloud Console (not a secret).
-    "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
-    // Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
-    // data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
-    "GITHUB_REPO": "uzairbukhari/psx-portfolio",
-    // Per-user AI spend cap per PKT calendar month, in USD. Over the cap, Monthly
-    // Picks runs use the quantitative ranking instead of the AI call. "0" disables AI.
-    "AI_MONTHLY_CAP_USD": "1"
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "psx-portfolio-sip",
+	"compatibility_date": "2026-05-22",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "psx-portfolio-sip",
+			"database_id": "f72a6264-371b-49ff-89e3-20eef1ce2b19",
+			"migrations_dir": "drizzle"
+		},
+		{
+			"binding": "psx_portfolio_sip_staging",
+			"database_name": "psx-portfolio-sip-staging",
+			"database_id": "f4ee7f4b-bfe7-4dc3-95ab-475917aee59b",
+			"remote": true
+		}
+	],
+	"vars": {
+		// Comma-separated list of Google account emails allowed to sign in.
+		// Empty (default) allows any verified Google account to sign up.
+		"ALLOWED_EMAILS": "",
+		// Public OAuth client ID from Google Cloud Console (not a secret).
+		"GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+		// Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
+		// data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
+		"GITHUB_REPO": "uzairbukhari/psx-portfolio",
+		// Per-user AI spend cap per PKT calendar month, in USD. Over the cap, Monthly
+		// Picks runs use the quantitative ranking instead of the AI call. "0" disables AI.
+		"AI_MONTHLY_CAP_USD": "1"
+	}
 }
