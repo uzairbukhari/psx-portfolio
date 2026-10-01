@@ -2,9 +2,9 @@ import { getViewer } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
   title: 'Activity | Sipwise',
-  description: 'Full ledger of recorded trades and corrections.',
+  description: 'Every buy, sale, dividend and split, newest first.',
 };
-export default async function HistoryPage() {
+export default async function ActivityPage() {
   const user = await getViewer();
   return (
     <Dashboard
