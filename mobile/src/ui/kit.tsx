@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii, radius, type } from '@/theme/tokens';
+import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
 import { Icon, type IconName } from './Icon';
 
 export function Screen({
@@ -63,16 +64,24 @@ export function Card({
   style,
   onPress,
   tone = 'default',
+  accessibilityLabel,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
   tone?: 'default' | 'hero';
+  /** Reads the whole card as one item with this label (use for summary cards). */
+  accessibilityLabel?: string;
 }) {
   const base = [styles.card, tone === 'hero' && styles.cardHero, style];
-  if (!onPress) return <View style={base}>{children}</View>;
+  if (!onPress)
+    return (
+      <View style={base} accessible={accessibilityLabel ? true : undefined} accessibilityLabel={accessibilityLabel}>
+        {children}
+      </View>
+    );
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [base, pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={({ pressed }) => [base, pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }]}>
       {children}
     </Pressable>
   );
@@ -110,10 +119,15 @@ export function Notice({ children, tone = 'warn' }: { children: ReactNode; tone?
   );
 }
 
-export function Amount({ value, text, size = 16 }: { value: number | null; text: string; size?: number }) {
+/**
+ * A coloured gain/loss figure. Readers hear "gain of Rs 1,200" or "loss of Rs 300" instead of a bare sign,
+ * and the text scales with the system font size (no shrink-to-fit). `label` names what it is.
+ */
+export function Amount({ value, text, size = 16, label, percent = false }: { value: number | null; text: string; size?: number; label?: string; percent?: boolean }) {
   const color = value === null || value === 0 ? colors.foreground : value > 0 ? colors.success : colors.danger;
+  const spoken = percent ? signedPercentLabel(value) : signedAmountLabel(value);
   return (
-    <Text numberOfLines={1} adjustsFontSizeToFit style={{ color, fontSize: size, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
+    <Text accessibilityLabel={label ? `${label}, ${spoken}` : spoken} style={{ color, fontSize: size, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
       {text}
     </Text>
   );
@@ -179,6 +193,8 @@ export function Input({ label, hint, error, style, ...props }: TextInputProps & 
     <View style={{ gap: 6 }}>
       <Text style={styles.statLabel}>{label}</Text>
       <TextInput
+        accessibilityLabel={label}
+        accessibilityHint={hint}
         placeholderTextColor={colors.muted}
         selectionColor={colors.primary}
         {...props}
@@ -197,12 +213,14 @@ export function Input({ label, hint, error, style, ...props }: TextInputProps & 
   );
 }
 
-export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress?: () => void }) {
+export function Chip({ label, selected, onPress, accessibilityLabel, role = 'button' }: { label: string; selected?: boolean; onPress?: () => void; accessibilityLabel?: string; role?: 'button' | 'tab' | 'radio' }) {
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityRole={role}
       accessibilityState={{ selected: Boolean(selected) }}
       onPress={onPress}
+      hitSlop={4}
       style={({ pressed }) => [styles.chip, selected && styles.chipOn, pressed && { opacity: 0.7 }]}
     >
       <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 14, fontWeight: selected ? '600' : '400' }}>{label}</Text>
@@ -241,7 +259,11 @@ export function Avatar({ ticker, size = 40 }: { ticker: string; size?: number })
 
 export function ProgressBar({ fraction, tone = colors.primary }: { fraction: number; tone?: string }) {
   return (
-    <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}
+    >
       <View style={{ height: 6, borderRadius: 3, width: `${Math.max(0, Math.min(1, fraction)) * 100}%`, backgroundColor: tone }} />
     </View>
   );
@@ -255,6 +277,8 @@ export function ListRow({
   left,
   onPress,
   last,
+  accessibilityLabel,
+  accessibilityHint,
 }: {
   title: string;
   subtitle?: string;
@@ -262,9 +286,16 @@ export function ListRow({
   left?: ReactNode;
   onPress?: () => void;
   last?: boolean;
+  /** Spoken in full for the row (defaults to title and subtitle); use it to include the right-hand value. */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }) {
   return (
     <Pressable
+      accessible
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={accessibilityLabel ?? (subtitle ? `${title}, ${subtitle}` : title)}
+      accessibilityHint={onPress ? accessibilityHint : undefined}
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [styles.listRow, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, pressed && { backgroundColor: colors.cardRaised }]}

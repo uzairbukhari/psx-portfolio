@@ -34,6 +34,16 @@ export function ActivityRow({
           <Text style={{ color: tone[entry.kind], fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{money(entry.amount)}</Text>
         ) : undefined
       }
+      accessibilityLabel={[
+        showTicker ? entry.ticker : '',
+        entry.title,
+        entry.date,
+        entry.detail,
+        entry.amount !== null ? `amount ${money(entry.amount)}` : '',
+      ]
+        .filter(Boolean)
+        .join(', ')}
+      accessibilityHint={onPress ? (showTicker ? 'Opens the company' : 'Opens this entry to correct or void it') : undefined}
       onPress={onPress}
       last={last}
     />

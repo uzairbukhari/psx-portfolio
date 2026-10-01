@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankPortfolio } from '../../../lib/portfolio.ts';
-import { companyDividends, activeNotifications, activityEntries, formatPercent, openPositions, priceTickers, readOnlyReason, safeHoldings, totals } from './derive.ts';
+import { companyDividends, activeNotifications, activityEntries, formatPercent, openPositions, priceTickers, readOnlyReason, safeHoldings, soldOutPositions, totals } from './derive.ts';
 
 function sample() {
   const p = blankPortfolio();
@@ -130,4 +130,12 @@ test('companyDividends lists a company\'s expected and received dividends newest
   assert.deepEqual([received.paymentDate, received.tax, received.taxIsActual, received.net], ['2026-02-20', 7.5, true, 42.5]);
   assert.deepEqual(companyDividends(p, 'CCC'), []);
   assert.deepEqual(companyDividends(blankPortfolio(), 'AAA'), []);
+});
+
+test('soldOutPositions lists fully sold companies only', () => {
+  const p = sample();
+  const { held } = safeHoldings(p);
+  assert.deepEqual(soldOutPositions(p, held).map((h) => h.ticker), ['CCC']);
+  p.trades[3].voided = true;
+  assert.deepEqual(soldOutPositions(p, safeHoldings(p).held).map((h) => h.ticker), [], 'voided sell reopens the position');
 });

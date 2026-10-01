@@ -13,11 +13,11 @@ import { ActivityRow } from '@/ui/ActivityRow';
 import { LineChart } from '@/ui/LineChart';
 import { Amount, Avatar, Badge, Button, Card, Chip, EmptyState, ListRow, Loading, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
 
-const RANGES: { key: HistoryRange; label: string }[] = [
-  { key: 'today', label: '1D' },
-  { key: '7d', label: '1W' },
-  { key: '1m', label: '1M' },
-  { key: '1y', label: '1Y' },
+const RANGES: { key: HistoryRange; label: string; spoken: string }[] = [
+  { key: 'today', label: '1D', spoken: 'One day' },
+  { key: '7d', label: '1W', spoken: 'One week' },
+  { key: '1m', label: '1M', spoken: 'One month' },
+  { key: '1y', label: '1Y', spoken: 'One year' },
 ];
 
 export default function Company() {
@@ -74,10 +74,10 @@ export default function Company() {
                 <Text style={styles.strong}>{holding.value === null ? '—' : moneyShort(holding.value)}</Text>
               </Stat>
               <Stat label="Unrealised gain">
-                <Amount value={holding.gain} text={holding.gain === null ? '—' : moneyShort(holding.gain)} />
+                <Amount value={holding.gain} text={holding.gain === null ? '—' : moneyShort(holding.gain)} label="Unrealised" />
               </Stat>
               <Stat label="Realised">
-                <Amount value={holding.realized} text={holding.realized === null ? '—' : moneyShort(holding.realized)} />
+                <Amount value={holding.realized} text={holding.realized === null ? '—' : moneyShort(holding.realized)} label="Realised" />
               </Stat>
             </View>
             {holding.quote ? <Muted>Price as of {holding.quote.date}{holding.quote.manual ? ' (entered by you)' : ''}.</Muted> : null}
@@ -86,15 +86,15 @@ export default function Company() {
           <Card>
             <View style={styles.row}>
               <Text style={styles.strong}>Price</Text>
-              {change ? <Amount value={change.change} text={formatPercent(change.percent)} size={14} /> : null}
+              {change ? <Amount value={change.percent} text={formatPercent(change.percent)} size={14} percent label="Change over the range" /> : null}
             </View>
             {history.isPending ? <ActivityIndicator color={colors.primary} style={{ height: 150 }} /> : null}
             {history.error ? <Notice tone="error">{history.error.message}</Notice> : null}
             {history.data && points.length < 2 ? <Muted>Not enough price history for this range.</Muted> : null}
-            {points.length >= 2 ? <LineChart points={points} /> : null}
+            {points.length >= 2 ? <LineChart points={points} label={`${ticker} price, ${RANGES.find((r) => r.key === range)?.spoken.toLowerCase()}`} /> : null}
             <View style={[styles.row, { justifyContent: 'center' }]}>
               {RANGES.map((r) => (
-                <Chip key={r.key} label={r.label} selected={range === r.key} onPress={() => setRange(r.key)} />
+                <Chip key={r.key} label={r.label} accessibilityLabel={`${r.spoken} price range`} selected={range === r.key} onPress={() => setRange(r.key)} />
               ))}
             </View>
           </Card>
@@ -116,6 +116,7 @@ export default function Company() {
                           ? `Book closure ${d.date} · not received yet`
                           : `${d.paymentDate ? `Paid ${d.paymentDate}` : `Dated ${d.date}`}${d.tax !== null ? ` · tax ${d.taxIsActual ? 'withheld' : 'estimated'} ${money(d.tax)}` : ''}`
                       }
+                      accessibilityLabel={`${d.status === 'expected' ? 'Expected' : 'Received'} dividend${d.perShare ? `, ${money(d.perShare)} per share` : ''}, ${d.status === 'expected' ? `book closure ${d.date}, not received yet, about ${money(d.gross)}` : `${d.paymentDate ? `paid ${d.paymentDate}` : `dated ${d.date}`}, ${money(d.gross)} gross`}`}
                       right={
                         <View style={{ alignItems: 'flex-end', gap: 4 }}>
                           <Text style={{ color: d.status === 'expected' ? colors.muted : colors.success, fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] }}>

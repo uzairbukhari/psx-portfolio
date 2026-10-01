@@ -54,7 +54,8 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized, fetcher = f
     post: <T>(path: string, data?: unknown, authed = true) =>
       request<T>(path, { method: 'POST', body: data === undefined ? undefined : JSON.stringify(data) }, authed),
     put: <T>(path: string, data: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    delete: <T>(path: string, data?: unknown) =>
+      request<T>(path, { method: 'DELETE', body: data === undefined ? undefined : JSON.stringify(data) }),
   };
 }
 

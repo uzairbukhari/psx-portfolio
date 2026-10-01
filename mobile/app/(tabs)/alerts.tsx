@@ -81,7 +81,7 @@ export default function Alerts() {
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="tablist">
         {FILTERS.map((f) => (
-          <Chip key={f.key} label={`${f.label} ${counts[f.key]}`} selected={filter === f.key} onPress={() => setFilter(f.key)} />
+          <Chip key={f.key} role="tab" label={`${f.label} ${counts[f.key]}`} selected={filter === f.key} onPress={() => setFilter(f.key)} />
         ))}
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

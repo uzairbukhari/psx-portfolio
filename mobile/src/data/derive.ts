@@ -34,6 +34,12 @@ export function openPositions(held: Holding[]): Holding[] {
     .sort((a, b) => (b.value ?? -1) - (a.value ?? -1) || a.ticker.localeCompare(b.ticker));
 }
 
+/** Companies that were held and fully sold (no shares now, at least one live trade), for the "Show sold out" toggle. */
+export function soldOutPositions(p: Portfolio, held: Holding[]): Holding[] {
+  const traded = new Set(p.trades.filter((t) => !t.voided).map((t) => t.ticker));
+  return held.filter((h) => h.shares === 0 && traded.has(h.ticker)).sort((a, b) => a.ticker.localeCompare(b.ticker));
+}
+
 export type ActivityEntry = {
   id: string;
   date: string;

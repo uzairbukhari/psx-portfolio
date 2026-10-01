@@ -198,6 +198,30 @@ export default function SettingsView({
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteReady = deleteConfirm.trim().toLowerCase() === email.toLowerCase();
+  async function deleteAccount() {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch('/api/me', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: deleteConfirm.trim() }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Could not delete your account.');
+      }
+      window.location.href = '/';
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete your account.');
+      setDeleteBusy(false);
+    }
+  }
   const [active, setActive] = useState('profile');
   const sections = [
     { id: 'profile', label: 'Profile', icon: UserRound },
@@ -389,6 +413,18 @@ export default function SettingsView({
                 onFile={setPendingRestore}
               />
             </div>
+            <div className="danger-zone">
+              <div className="set-row-text">
+                <strong>Delete account</strong>
+                <span>
+                  Permanently deletes your portfolio, AI reviews and usage, research jobs and signed-in
+                  phones. This cannot be undone. Export a backup first.
+                </span>
+              </div>
+              <button type="button" className="secondary compact" onClick={() => setDeleting(true)}>
+                Delete account…
+              </button>
+            </div>
           </Section>
 
           {isAdmin && (
@@ -486,6 +522,50 @@ export default function SettingsView({
               }}
             >
               Replace portfolio
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={deleting}
+        onOpenChange={(open) => {
+          if (deleteBusy) return;
+          setDeleting(open);
+          if (!open) {
+            setDeleteConfirm('');
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes everything stored for {email}: your portfolio and ledger, AI
+              reviews, research jobs and signed-in phones. Type your email address to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <input
+            type="email"
+            className="set-input"
+            aria-label="Type your email address to confirm"
+            placeholder={email}
+            autoComplete="off"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+          />
+          {deleteError && <p className="set-hint" role="alert">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!deleteReady || deleteBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                void deleteAccount();
+              }}
+            >
+              {deleteBusy ? 'Deleting…' : 'Delete everything'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

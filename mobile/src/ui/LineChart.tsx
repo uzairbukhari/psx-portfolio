@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import { chartSummary } from '@/data/a11y';
 import { colors } from '@/theme/tokens';
 
 /** Minimal price line with a soft fill. `points` are chronological [time, value] pairs. */
-export function LineChart({ points, height = 150 }: { points: [number, number][]; height?: number }) {
+export function LineChart({ points, height = 150, label = 'Price chart' }: { points: [number, number][]; height?: number; label?: string }) {
   const [width, setWidth] = useState(0);
   const pad = 6;
   let line = '';
@@ -23,7 +24,13 @@ export function LineChart({ points, height = 150 }: { points: [number, number][]
   }
   const color = up ? colors.success : colors.danger;
   return (
-    <View style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <View
+      style={{ height }}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={chartSummary(points, label)}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+    >
       {line ? (
         <Svg width={width} height={height}>
           <Defs>

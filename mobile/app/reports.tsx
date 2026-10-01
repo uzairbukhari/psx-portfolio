@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { money, moneyShort } from '@shared/portfolio.ts';
 import { portfolioReport } from '@shared/portfolio-reports.ts';
+import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
 import { Card, Header, Loading, Muted, Notice, ProgressBar, Screen, SectionLabel, styles } from '@/ui/kit';
 
 function Bar({ label, value, fraction, tone }: { label: string; value: string; fraction: number; tone?: string }) {
   return (
-    <View style={{ marginTop: 8, gap: 5 }}>
+    <View style={{ marginTop: 8, gap: 5 }} accessible accessibilityRole="text" accessibilityLabel={`${label}, ${value}`}>
       <View style={styles.row}>
         <Text style={{ color: colors.foreground, fontSize: 14 }}>{label}</Text>
         <Text style={{ color: colors.muted, fontSize: 13, fontVariant: ['tabular-nums'] }}>{value}</Text>
@@ -60,14 +61,19 @@ export default function Reports() {
           </View>
           <View>
             <Text style={styles.statLabel}>Unrealised gain</Text>
-            <Text style={styles.strong}>
+            <Text
+              style={styles.strong}
+              accessibilityLabel={s.totalGain === null ? 'Unrealised gain not yet known' : `Unrealised ${signedAmountLabel(s.totalGain)}, ${signedPercentLabel(s.totalGainPercent)}`}
+            >
               {s.totalGain === null ? 'Not yet known' : `${moneyShort(s.totalGain)} (${pct(s.totalGainPercent)})`}
             </Text>
           </View>
         </View>
         <View style={{ marginTop: 8 }}>
           <Text style={styles.statLabel}>Total return</Text>
-          <Text style={styles.strong}>{s.grandTotalReturn === null ? 'Not yet known' : moneyShort(s.grandTotalReturn)}</Text>
+          <Text style={styles.strong} accessibilityLabel={s.grandTotalReturn === null ? 'Total return not yet known' : `Total return, ${signedAmountLabel(s.grandTotalReturn)}`}>
+            {s.grandTotalReturn === null ? 'Not yet known' : moneyShort(s.grandTotalReturn)}
+          </Text>
           <Muted>
             Unrealised gain plus realised gains and received dividends, after estimated tax. Shown as not yet known when a price or cost is missing.
           </Muted>
@@ -98,7 +104,7 @@ export default function Reports() {
           {r.targetComparison
             .filter((t) => t.target > 0)
             .map((t) => (
-              <View key={t.ticker} style={[styles.row, { marginTop: 6 }]}>
+              <View key={t.ticker} style={[styles.row, { marginTop: 6 }]} accessible accessibilityLabel={`${t.ticker}, actual ${pct(t.actual)} of the portfolio, target ${pct(t.target)}`}>
                 <Text style={{ color: colors.foreground }}>{t.ticker}</Text>
                 <Text style={{ color: colors.foreground }}>
                   {pct(t.actual)} / {pct(t.target)}
@@ -111,7 +117,12 @@ export default function Reports() {
       <Card>
         <SectionLabel>Gain by company</SectionLabel>
         {r.performance.map((a) => (
-          <View key={a.ticker} style={[styles.row, { marginTop: 6 }]}>
+          <View
+            key={a.ticker}
+            style={[styles.row, { marginTop: 6 }]}
+            accessible
+            accessibilityLabel={`${a.ticker}, ${signedAmountLabel(a.gain, money)}, ${signedPercentLabel(a.gainPercent)}`}
+          >
             <Text style={{ color: colors.foreground }}>{a.ticker}</Text>
             <Text style={{ color: a.gain >= 0 ? colors.success : colors.danger }}>
               {money(a.gain)} ({pct(a.gainPercent)})

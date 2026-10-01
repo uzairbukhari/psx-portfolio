@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
-import type { MeResponse, MobileSignInRequest, MobileSignInResponse } from '@shared/api-types.ts';
+import type { DeleteAccountRequest, DeleteAccountResponse, MeResponse, MobileSignInRequest, MobileSignInResponse } from '@shared/api-types.ts';
 import { createApiClient, ApiRequestError, type ApiClient } from '@/api/client';
 import { config } from '@/config';
 import * as SecureStore from 'expo-secure-store';
@@ -34,6 +34,8 @@ type AuthContextValue = {
   api: ApiClient;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the account's server data (typed email as confirmation), then clears this phone. */
+  deleteAccount: (confirm: string) => Promise<void>;
   /** A sign-out the server has not confirmed yet (phone was offline); retried on the next launch. */
   signOutPending: boolean;
 };
@@ -84,6 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (result === 'queued') setSignOutPending(true);
     await clearLocal();
   }, [revokeWith, clearLocal]);
+  const deleteAccount = useCallback(
+    async (confirm: string) => {
+      await api.delete<DeleteAccountResponse>('/api/me', { confirm } satisfies DeleteAccountRequest);
+      // The server removed every device session with the account, so there is nothing left to revoke.
+      await clearLocal();
+    },
+    [api, clearLocal],
+  );
   signedOutRef.current = () => void clearLocal();
 
   useEffect(() => {
@@ -130,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'signedIn', user: result.user });
   }, [api]);
 
-  const value = useMemo(() => ({ state, api, signIn, signOut, signOutPending }), [state, api, signIn, signOut, signOutPending]);
+  const value = useMemo(() => ({ state, api, signIn, signOut, deleteAccount, signOutPending }), [state, api, signIn, signOut, deleteAccount, signOutPending]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

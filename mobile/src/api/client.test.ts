@@ -67,3 +67,19 @@ test('a 503 (server could not check the session) does not sign the phone out', a
   await assert.rejects(() => api.get('/api/portfolio'), (e: unknown) => e instanceof ApiRequestError && e.status === 503);
   assert.equal(signedOut, 0);
 });
+
+test('delete can carry a JSON body (account deletion confirmation)', async () => {
+  let seen: { method?: string; body?: unknown; auth?: string | null } = {};
+  const api = createApiClient({
+    baseUrl: 'https://x.test',
+    getToken: async () => 'tok',
+    fetcher: (async (_url: string, init: RequestInit) => {
+      seen = { method: init.method, body: init.body, auth: new Headers(init.headers).get('Authorization') };
+      return json(200, { deleted: true });
+    }) as unknown as typeof fetch,
+  });
+  await api.delete('/api/me', { confirm: 'a@b.co' });
+  assert.deepEqual(seen, { method: 'DELETE', body: '{"confirm":"a@b.co"}', auth: 'Bearer tok' });
+  await api.delete('/api/mobile-sessions?id=1');
+  assert.equal(seen.body, undefined);
+});

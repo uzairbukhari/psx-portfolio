@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { QuotesResponse } from '@shared/api-types.ts';
-import { SECTORS, today, type Dividend, type StockSplit, type Trade } from '@shared/portfolio.ts';
+import { SECTORS, money, today, type Dividend, type StockSplit, type Trade } from '@shared/portfolio.ts';
 import { useAuth } from '@/auth/AuthProvider';
 import { addCompany, isIsoDate, isValidSymbol, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry, type EntryKind } from '@/data/mutations';
 import { readOnlyReason } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
-import { Button, Chip, Input, Muted, Notice, SectionLabel } from '@/ui/kit';
+import { splitPreview, tradeTotals } from '@/data/entry-form';
+import { CompanyPicker, NEW_COMPANY } from '@/ui/CompanyPicker';
+import { DatePicker } from '@/ui/DatePicker';
+import { useToast } from '@/ui/Toast';
+import { Button, Card, Chip, Input, Muted, Notice, SectionLabel, styles as kit } from '@/ui/kit';
 
 type Kind = 'buy' | 'sell' | 'dividend' | 'split' | 'opening';
 const KINDS: { key: Kind; label: string }[] = [
@@ -57,6 +61,7 @@ export default function Transaction() {
   const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string; shares?: string; price?: string; month?: string }>();
   const p = usePortfolio();
   const { api } = useAuth();
+  const toast = useToast();
   const editingId = params.id || undefined;
 
   // Editing: find the existing entry and lock its kind and company.
@@ -122,8 +127,17 @@ export default function Transaction() {
   }
 
   const companies = useMemo(
-    () => (p.portfolio?.companies ?? []).map((c) => ({ key: c.ticker, label: c.ticker })).sort((a, b) => a.key.localeCompare(b.key)),
+    () => (p.portfolio?.companies ?? []).map((c) => ({ ticker: c.ticker, name: c.name })),
     [p.portfolio],
+  );
+  // Live figures shown above Save so the amount is known before it is recorded.
+  const totals = useMemo(
+    () => (kind === 'buy' || kind === 'sell' || kind === 'opening' ? tradeTotals(kind, parseNumber(shares), parseNumber(price), parseNumber(fees)) : null),
+    [kind, shares, price, fees],
+  );
+  const split = useMemo(
+    () => (kind === 'split' && p.portfolio && !newCompany && isIsoDate(date) ? splitPreview(p.portfolio, tickerChoice, date, parseNumber(oldShares), parseNumber(newShares)) : null),
+    [kind, p.portfolio, newCompany, date, tickerChoice, oldShares, newShares],
   );
   const editing = Boolean(editingId);
   // Deep links can reach any entry id; imported, automatic and voided entries are not editable here.
@@ -176,7 +190,18 @@ export default function Transaction() {
         );
       }
       setBusy(true);
+      const previous = p.portfolio;
       await p.save(next);
+      // Undo is a second revisioned save of the portfolio as it was; a change from another device in between
+      // makes it fail with the usual "portfolio changed" message instead of overwriting that change.
+      toast.show({
+        message: `${editing ? 'Correction saved' : `${kind === 'buy' ? 'Buy' : kind === 'sell' ? 'Sale' : kind === 'dividend' ? 'Dividend' : kind === 'split' ? 'Split' : 'Opening balance'} recorded`} for ${ticker}`,
+        actionLabel: 'Undo',
+        onAction: async () => {
+          await p.save(previous);
+          toast.show({ message: 'Undone. Your portfolio is back as it was.' });
+        },
+      });
       router.back();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.');
@@ -195,7 +220,16 @@ export default function Transaction() {
         onPress: async () => {
           try {
             setBusy(true);
-            await p.save(voidEntry(p.portfolio!, existing.entryKind, editingId));
+            const previous = p.portfolio!;
+            await p.save(voidEntry(previous, existing.entryKind, editingId));
+            toast.show({
+              message: 'Entry voided',
+              actionLabel: 'Undo',
+              onAction: async () => {
+                await p.save(previous);
+                toast.show({ message: 'Undone. The entry counts again.' });
+              },
+            });
             router.back();
           } catch (e) {
             setError(e instanceof Error ? e.message : 'Could not void.');
@@ -227,14 +261,16 @@ export default function Transaction() {
           <SectionLabel>Type</SectionLabel>
           <Chips items={KINDS} value={kind} onChange={setKind} disabled={editing} />
           <SectionLabel>Company</SectionLabel>
-          <Chips
-            items={[...companies, ...(editing ? [] : [{ key: '__new', label: '+ New company' }])]}
-            value={newCompany ? '__new' : tickerChoice}
-            onChange={(k) => {
-              setNewCompany(k === '__new');
-              if (k !== '__new') setTicker(k);
-            }}
+          <CompanyPicker
+            companies={companies}
+            value={tickerChoice}
+            allowNew={!editing}
+            newSelected={newCompany}
             disabled={editing}
+            onChange={(k) => {
+              setNewCompany(k === NEW_COMPANY);
+              if (k !== NEW_COMPANY) setTicker(k);
+            }}
           />
           {newCompany ? (
             <>
@@ -245,7 +281,7 @@ export default function Transaction() {
               <Muted>The symbol is confirmed against PSX when you save.</Muted>
             </>
           ) : null}
-          <Field label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} />
+          <DatePicker label="Date" value={date} onChange={setDate} />
           {kind === 'dividend' ? (
             <Field label="Dividend per share (PKR)" value={perShare} onChangeText={setPerShare} keyboard="decimal-pad" />
           ) : kind === 'split' ? (
@@ -266,6 +302,28 @@ export default function Transaction() {
               {kind === 'buy' ? <Field label="SIP month (optional, YYYY-MM)" value={month} onChangeText={setMonth} placeholder="2026-10" /> : null}
             </>
           )}
+          {totals ? (
+            <Card accessibilityLabel={`${totals.label}: ${money(totals.total)}. Shares times price ${money(totals.gross)}, fees ${money(totals.fees)}.`}>
+              <Text style={kit.statLabel}>{totals.label}</Text>
+              <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{money(totals.total)}</Text>
+              <Muted>
+                {money(totals.gross)} {kind === 'sell' ? 'less' : 'plus'} {money(totals.fees)} fees
+              </Muted>
+            </Card>
+          ) : null}
+          {split ? (
+            'error' in split ? (
+              <Notice>{split.error}</Notice>
+            ) : (
+              <Card accessibilityLabel={`Split preview: you hold ${split.before} shares on that date and will hold ${split.after} after the split.`}>
+                <Text style={kit.statLabel}>Split preview</Text>
+                <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: '700' }}>
+                  {split.before.toLocaleString('en-PK')} → {split.after.toLocaleString('en-PK')} shares
+                </Text>
+                <Muted>Held on {date}, before and after the split. Cost stays the same, so the average cost per share falls.</Muted>
+              </Card>
+            )
+          ) : null}
           <Field label="Note" value={note} onChangeText={setNote} multiline />
           {kind === 'dividend' ? <Muted>The gross amount is worked out from the shares you held on that date.</Muted> : null}
           {error ? <Notice tone="error">{error}</Notice> : null}
