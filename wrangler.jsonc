@@ -35,11 +35,10 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "psx-portfolio-sip-staging",
-          // PLACEHOLDER: the owner replaces this with the id printed by
-          // `npx wrangler d1 create psx-portfolio-sip-staging`. While it is all
-          // zeros, the deploy-staging workflow skips deploying.
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_name": "psx_portfolio_sip_staging",
+          // Created by the owner with `npx wrangler d1 create`. If this is ever reset
+          // to all zeros, the deploy-staging workflow skips deploying.
+          "database_id": "f4ee7f4b-bfe7-4dc3-95ab-475917aee59b",
           "migrations_dir": "drizzle"
         }
       ],
