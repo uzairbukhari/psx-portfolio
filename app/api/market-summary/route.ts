@@ -9,6 +9,7 @@ import {
   type IndexSummary,
   type MarketWatchQuote,
 } from '@/lib/psx-market';
+import { fillChangeFromHistory, parseEod, pktDate, type PricePoint } from '@/lib/price-history';
 import { fetchBudget, type FetchBudget } from '@/lib/psx-fetch';
 import {
   mergeQuotes,
@@ -94,7 +95,7 @@ async function personalized(
     ]),
   );
   const intraday = await fetchPypsxIntradayFor(user, shortlist.slice(0, MAX_INTRADAY));
-  const companies = selectShortlistPerformance(
+  const withIntraday = selectShortlistPerformance(
     shortlist,
     portfolio.companies,
     rebaseWatchQuotes(cache.quotes ?? [], quotes),
@@ -116,6 +117,31 @@ async function personalized(
         }
       : company;
   });
+  // Quotes with a price but no day change (the scraped summary can be a day old) fall back
+  // to the previous close from the shared daily price history, read in one query.
+  const needsChange = withIntraday
+    .filter((company) => company.price !== null && company.change === null)
+    .map((company) => company.ticker);
+  const eod: Record<string, PricePoint[]> = {};
+  if (needsChange.length) {
+    const rows = await db()
+      .prepare(
+        `SELECT ticker, eod FROM price_history WHERE ticker IN (${needsChange.map(() => '?').join(',')})`,
+      )
+      .bind(...needsChange)
+      .all<{ ticker: string; eod: string }>()
+      .catch(() => ({ results: [] as { ticker: string; eod: string }[] }));
+    for (const row of rows.results)
+      try {
+        eod[row.ticker] = parseEod(JSON.parse(row.eod));
+      } catch {}
+  }
+  const companies = fillChangeFromHistory(
+    withIntraday,
+    eod,
+    Object.fromEntries(Object.entries(quotes).map(([ticker, quote]) => [ticker, quote.date])),
+    pktDate(Date.now() / 1000),
+  );
   // The Worker cannot reach PSX's index ticks; the history scraper stores them.
   const indexRow = await db()
     .prepare("SELECT intraday FROM price_history WHERE ticker='KSE100'")

@@ -49,7 +49,7 @@ export function rangeChange(points: PricePoint[]) {
 export type ValuePoint = { date: string; value: number; cost: number | null; gain: number | null };
 export type ValueRange = '1m' | '1y' | 'all';
 
-const pktDate = (sec: number) => new Date((sec + 5 * 3600) * 1000).toISOString().slice(0, 10);
+export const pktDate = (sec: number) => new Date((sec + 5 * 3600) * 1000).toISOString().slice(0, 10);
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 /**
@@ -126,4 +126,37 @@ export function sliceValueRange(points: ValuePoint[], range: ValueRange): ValueP
   end.setUTCDate(end.getUTCDate() - (range === '1m' ? 31 : 366));
   const from = end.toISOString().slice(0, 10);
   return points.filter((pt) => pt.date >= from);
+}
+
+/**
+ * Day change from the previous close for quotes that have a price but no change
+ * (the per-ticker price cache carries none, and the scraped summary may be a day old).
+ * The previous close is the last eod close dated strictly before the quote's PKT date;
+ * holidays and weekends simply fall back to the earlier trading day. Rows that already
+ * have a change, have no price, or have no earlier close are returned untouched.
+ */
+export function fillChangeFromHistory<
+  T extends {
+    ticker: string;
+    price: number | null;
+    change: number | null;
+    changePercent: number | null;
+    previousClose: number | null;
+  },
+>(companies: T[], eod: Record<string, PricePoint[]>, quoteDates: Record<string, string | undefined>, today: string): T[] {
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  return companies.map((company) => {
+    if (company.price === null || company.change !== null) return company;
+    const date = quoteDates[company.ticker] ?? today;
+    let previous: number | null = null;
+    let at = -Infinity;
+    for (const [sec, close] of eod[company.ticker] ?? [])
+      if (pktDate(sec) < date && close > 0 && sec > at) {
+        previous = close;
+        at = sec;
+      }
+    if (previous === null) return company;
+    const change = round2(company.price - previous);
+    return { ...company, change, changePercent: round2((change / previous) * 100), previousClose: previous };
+  });
 }

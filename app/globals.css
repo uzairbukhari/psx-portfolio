@@ -309,15 +309,30 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 .invested-vs-current-row small{margin-bottom:4px}
 .invested-vs-current-row strong{margin:0;font-size:21px;letter-spacing:-.4px}
 .invested-vs-current-arrow{flex-shrink:0;color:var(--muted-foreground)}
-.holdings-toolbar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin:0 0 16px}
-.holdings-toolbar-filter{display:flex;flex-direction:row;align-items:center;gap:10px;font-size:13px;font-weight:500;margin:0;color:var(--muted-foreground)}
-.holdings-toolbar-filter select{width:auto;min-width:170px;padding:8px 10px;font-size:13px}
 .sort-head{background:transparent!important;color:var(--muted-foreground)!important;box-shadow:none!important;padding:0!important;font-size:14px!important;font-weight:600!important;white-space:nowrap}
 .sort-head:hover{color:var(--foreground)!important}
 .icon-btn{padding:7px 9px!important}
 .holdings-table td>small{display:block}
 .shortlist-dot{display:inline-block;width:7px;height:7px;margin-left:7px;border-radius:50%;background:var(--primary);vertical-align:middle}
 .holdings-cards,.holdings-sort{display:none}
+/* Compact Your companies header: one row on desktop, two on phones */
+.holdings-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:22px 0 12px}
+.holdings-head h2{margin:0 auto 0 0;display:flex;align-items:baseline;gap:10px;font-size:20px}
+.count-badge{font-size:12px;font-weight:500;letter-spacing:0;color:var(--muted-foreground);background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.holdings-head select{width:auto;min-width:150px;padding:6px 10px;font-size:13px}
+.holdings-add{padding:7px 12px!important;gap:6px;order:3}
+.holdings-filter{order:2}
+.holdings-soldout{order:1;margin:0;font-size:13px;white-space:nowrap;gap:8px}
+@media(max-width:760px){
+  .holdings-head{gap:8px;margin:14px 0 10px}
+  .holdings-head h2{order:1;font-size:18px;margin:0;flex:1 1 calc(100% - 50px)}
+  .holdings-add{order:2;width:36px;height:34px;padding:0!important}
+  .holdings-add__label{display:none}
+  .holdings-filter{order:3;min-width:0!important;padding:7px 10px!important;font-size:14px!important}
+  .holdings-sort{order:4}
+  .holdings-sort select{width:auto;min-width:0;padding:7px 10px;font-size:14px}
+  .holdings-soldout{order:5;flex:1 1 100%}
+}
 .holding-card{border:1px solid var(--card-border);border-radius:var(--radius);background:var(--card);padding:14px}
 .holding-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
 .holding-card__title{display:block!important;min-width:0;padding:0!important;background:transparent!important;color:var(--foreground)!important;box-shadow:none!important;text-align:left}
@@ -330,13 +345,11 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 .holding-card__grid dd small{display:block;margin-top:2px;font-size:12px;font-weight:400;color:var(--muted-foreground)}
 .holding-card__grid dd.pos-text small{color:var(--success)}.holding-card__grid dd.neg-text small{color:var(--danger)}
 @media(max-width:760px){
-  .holdings-toolbar{gap:12px}
   .holdings-table{display:none}
   .holdings-cards{display:grid;gap:10px;margin-bottom:20px}
-  .holdings-sort{display:flex;align-items:center;gap:8px;margin:0 0 12px}
-  .holdings-sort label{display:flex;flex-direction:row;align-items:center;gap:10px;flex:1;margin:0;font-size:13px;font-weight:500;color:var(--muted-foreground)}
-  .holdings-sort select,.holdings-toolbar-filter select{padding:8px 10px;font-size:14px;flex:1;min-width:0}
-  .holdings-toolbar-filter{width:100%}
+  .holdings-sort{display:flex;align-items:center;gap:6px;flex:1 1 0;min-width:0}
+  .holdings-sort select{flex:1;min-width:0}
+  .holdings-filter{flex:1 1 0}
 }
 
 /* Monthly Picks */
@@ -391,12 +404,12 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 }
 @media(max-width:760px){
   .app-header{--hdr-h:52px;grid-template-rows:var(--hdr-h)}
-  .app-header::before{inset:0 -18px}
+  .app-header::before{inset:0 -18px;background:linear-gradient(var(--card),var(--card)),var(--background);backdrop-filter:none;-webkit-backdrop-filter:none}
   .app-header>.brand{font-size:18px;gap:8px}
   .app-header>.brand svg{width:20px;height:20px}
   .app-header .brand-long{display:none}.app-header .brand-short{display:inline;font-size:15px;letter-spacing:1.5px}
   .app-header .tab-long{display:none}.app-header .tab-short,.app-header .tab-icon{display:block}
-  .app-header [data-slot=tabs-list]{position:fixed;left:0;right:0;bottom:0;z-index:40;width:100%;height:calc(var(--bar-h) + env(safe-area-inset-bottom));padding:0 0 env(safe-area-inset-bottom);gap:0;justify-content:space-around;overflow:hidden;border-top:1px solid var(--border);background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);-webkit-mask-image:none;mask-image:none}
+  .app-header [data-slot=tabs-list]{position:fixed;left:0;right:0;bottom:0;z-index:40;width:100%;height:calc(var(--bar-h) + env(safe-area-inset-bottom));padding:0 0 env(safe-area-inset-bottom);gap:0;justify-content:space-around;overflow:hidden;border-top:1px solid var(--border);background:linear-gradient(var(--card),var(--card)),var(--background);-webkit-mask-image:none;mask-image:none}
   .app-header [data-slot=tabs-trigger]{flex:1 1 0;min-width:0;flex-direction:column;gap:3px;padding:6px 2px;font-size:11px;height:var(--bar-h)}
   .app-header [data-slot=tabs-trigger]::after{inset:0 auto auto 25%;width:50%;height:2px;bottom:auto;top:0}
   .app-header .tab-icon{width:20px;height:20px}
@@ -419,3 +432,35 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 @media(max-width:760px){.app-header>.brand .logo-mark{width:26px;height:26px}.app-header>.brand .logo-word{font-size:18px}}
 /* Staging deployments (APP_ENV=staging) mark the app bar brand so they can't be mistaken for production. */
 html[data-app-env=staging] .app-header>.brand::after{content:'STAGING';margin-left:2px;padding:2px 7px;border-radius:999px;border:1px solid rgba(211,154,41,.45);background:rgba(211,154,41,.14);color:#e8c27a;font-size:10px;font-weight:700;letter-spacing:1.2px;line-height:1.4}
+
+/* Value card: chart column + optional market pulse aside (>=1100px: 70 / 30) */
+.value-card-chart{min-width:0}
+.value-card-aside{display:none}
+@media(min-width:1100px){
+  .value-card-body{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:28px;align-items:start}
+  .value-card-aside{display:block;min-width:0;padding-left:28px;border-left:1px solid var(--border)}
+  .value-card-aside .pulse{border:0;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;margin:0;overflow:visible}
+  .value-card-aside .pulse::before{display:none}
+  .value-card-aside .pulse-head{margin-bottom:10px;gap:8px;flex-wrap:wrap}
+  .value-card-aside .pulse-source,.value-card-aside .pulse-stale{display:none}
+  .value-card-aside .pulse-grid{grid-template-columns:1fr;gap:14px}
+  .value-card-aside .pulse-index{padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .value-card-aside .pulse-index__value{font-size:26px;margin:0 0 2px}
+  .value-card-aside .pulse-sparkline{height:36px;margin-top:8px}
+  .value-card-aside .pulse-stats{margin-top:10px;gap:16px}
+  .value-card-aside .pulse-index-source{margin-top:8px}
+  .value-card-aside .pulse-company-list{grid-template-columns:1fr;gap:0;border-top:1px solid var(--border);max-height:260px;overflow-y:auto}
+  .value-card-aside .pulse-company{grid-template-columns:1fr auto auto;grid-template-rows:auto;gap:10px;padding:8px 2px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent}
+  .value-card-aside .pulse-company::before{display:none}
+  .value-card-aside .pulse-company:hover{transform:none}
+  .value-card-aside .pulse-company__ticker{grid-column:1;grid-row:1}
+  .value-card-aside .pulse-company__price small{display:inline}
+  .value-card-aside .pulse-company__price{grid-column:2;grid-row:1;justify-self:end;font-size:13px!important}
+  .value-card-aside .pulse-company__change{grid-column:3;grid-row:1;min-width:64px;text-align:center}
+}
+
+/* Activity header: title left, Add transaction right, subtitle below */
+.activity-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:12px;margin:22px 0 14px}
+.activity-head h2{margin:0}
+.activity-head p{grid-column:1/-1;margin:4px 0 0;font-size:14px}
+@media(max-width:760px){.activity-head{margin:12px 0 12px}.activity-head h2{font-size:22px}.activity-head p{font-size:13px;line-height:1.5}}

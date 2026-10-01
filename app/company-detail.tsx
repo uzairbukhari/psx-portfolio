@@ -356,7 +356,7 @@ export default function CompanyDetail({
 
   return (
     <div className="company-page">
-      <button type="button" className="secondary compact company-back" onClick={goBack}>
+      <button type="button" data-slot="link" className="back-link company-back" onClick={goBack}>
         <ArrowLeft size={15} /> Back
       </button>
       <div className="company-head">
