@@ -36,7 +36,7 @@ The Worker needs `GOOGLE_MOBILE_CLIENT_IDS` (wrangler var) = the web + iOS (+ An
 
 ## Over-the-air updates
 
-Use the scripts, not a bare `eas update`: `app.config.ts` picks the API URL from `APP_VARIANT`, which `eas build` sets from `eas.json` but `eas update` does not (it would fall back to the `development` variant and point the app at localhost).
+Use the scripts rather than a bare `eas update`: `app.config.ts` picks the API URL from `APP_VARIANT`, which `eas build` sets from `eas.json` but `eas update` does not. When it is unset the config now falls back to staging (only `npm start` / `android` / `ios` use localhost), so a forgotten variant no longer points the app at localhost.
 
 ```
 npm run update:staging -- --message "what changed"

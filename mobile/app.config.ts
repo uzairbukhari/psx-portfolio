@@ -1,14 +1,20 @@
 import type { ExpoConfig } from 'expo/config';
 
 // One codebase, three installable variants that can sit side by side on a phone.
+// Public identifiers (not secrets) used when an `eas update` runs without the EAS environment variables.
+const STAGING_API = 'https://psx-portfolio-sip-staging.suzairbukhari.workers.dev';
+const WEB_CLIENT_ID = '50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com';
+
 const VARIANTS = {
   development: { suffix: '.dev', label: 'Sipwise Dev', api: 'http://localhost:3000' },
-  staging: { suffix: '.staging', label: 'Sipwise Staging', api: process.env.API_BASE_URL ?? '' },
+  staging: { suffix: '.staging', label: 'Sipwise Staging', api: process.env.API_BASE_URL || STAGING_API },
   production: { suffix: '', label: 'Sipwise', api: process.env.API_BASE_URL ?? '' },
 } as const;
 
-const variant = (process.env.APP_VARIANT ?? 'development') as keyof typeof VARIANTS;
-const v = VARIANTS[variant] ?? VARIANTS.development;
+// Only `npm start` (which sets APP_VARIANT=development) points at localhost; a bare `eas update` that
+// forgets APP_VARIANT lands on staging instead of breaking the installed app.
+const variant = (process.env.APP_VARIANT || 'staging') as keyof typeof VARIANTS;
+const v = VARIANTS[variant] ?? VARIANTS.staging;
 const bundleId = `com.uzairbukhari.sipwise${v.suffix}`;
 // Reversed iOS OAuth client id, e.g. com.googleusercontent.apps.123-abc
 const iosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
@@ -37,7 +43,7 @@ const config: ExpoConfig = {
   extra: {
     variant,
     apiBaseUrl: v.api,
-    googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID ?? '',
+    googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID || (variant === 'production' ? '' : WEB_CLIENT_ID),
     googleIosClientId: process.env.GOOGLE_IOS_CLIENT_ID ?? '',
     // Public identifier (not a secret); EAS cloud builds don't see the local .env.
     eas: { projectId: EAS_PROJECT_ID },
