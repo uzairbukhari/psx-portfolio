@@ -81,7 +81,7 @@ export default function Sip() {
   const arrow = (dir: -1 | 1) => (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={dir < 0 ? 'Previous month' : 'Next month'}
+      accessibilityLabel={dir < 0 ? `Previous month, ${shiftMonth(month, -1)}` : `Next month, ${shiftMonth(month, 1)}`}
       onPress={() => setMonth(shiftMonth(month, dir))}
       hitSlop={10}
       style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.cardRaised, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
@@ -126,7 +126,7 @@ export default function Sip() {
       <Header title="Monthly SIP" subtitle="Split this month's money across your targets" />
       <View style={styles.row}>
         {arrow(-1)}
-        <Text style={styles.strong}>{monthLabel}</Text>
+        <Text style={styles.strong} accessibilityLiveRegion="polite">{monthLabel}</Text>
         {arrow(1)}
       </View>
       {message ? <Notice tone={message.error ? 'error' : 'warn'}>{message.text}</Notice> : null}
@@ -165,13 +165,15 @@ export default function Sip() {
             </View>
             <View style={{ alignItems: 'flex-end', gap: 6, paddingBottom: 8 }}>
               <Text style={styles.statLabel}>Use older quotes</Text>
-              <Switch value={allowOld} onValueChange={setAllowOld} trackColor={{ true: colors.primary }} />
+              <Switch accessibilityLabel="Use older quotes" value={allowOld} onValueChange={setAllowOld} trackColor={{ true: colors.primary }} />
             </View>
           </View>
         </Card>
       ) : null}
 
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Get Monthly Picks. AI-ranked ideas from your shortlist."
         onPress={() => router.push('/picks')}
         style={({ pressed }) => [styles.row, { backgroundColor: colors.primarySoft, borderRadius: 14, padding: 14, opacity: pressed ? 0.75 : 1 }]}
       >

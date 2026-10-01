@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankPortfolio, holdings, validate } from '../../../lib/portfolio.ts';
-import { changeNotifications, isIsoDate, markDividendReceived, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry } from './mutations.ts';
+import { changeNotifications, isIsoDate, markDividendReceived, parseNumber, recordDividend, recordSplit, recordTrade, setFilerStatus, voidEntry } from './mutations.ts';
 import { clearOne } from '../../../lib/notification-actions.ts';
 import { taxSummary } from '../../../lib/portfolio.ts';
 
@@ -156,4 +156,14 @@ test('changeNotifications edits a copy of the notification list', () => {
   assert.equal(p.notifications[0].clearedAt, undefined);
   assert.deepEqual([next.notifications![0].read, next.notifications![0].clearedAt], [true, '2026-02-02T00:00:00Z']);
   assert.deepEqual(changeNotifications(base(), (list) => list).notifications, []);
+});
+
+test('setFilerStatus writes the web taxProfile field without touching the original', () => {
+  const p = base();
+  const next = setFilerStatus(p, 'non-filer');
+  assert.deepEqual(next.taxProfile, { filerStatus: 'non-filer' });
+  assert.notEqual(next, p);
+  assert.deepEqual(p.taxProfile, { filerStatus: 'filer' }, 'blank portfolio default is untouched');
+  validate(next);
+  assert.deepEqual(setFilerStatus(next, 'filer').taxProfile, { filerStatus: 'filer' });
 });

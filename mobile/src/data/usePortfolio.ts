@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PortfolioResponse, QuotesResponse, SavePortfolioRequest, SavePortfolioResponse } from '@shared/api-types.ts';
 import { validate, type Portfolio } from '@shared/portfolio.ts';
@@ -6,21 +6,14 @@ import { ApiRequestError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { syncAnnouncementsOnLoad } from './auto-dividends';
 import { openPositions, priceTickers, safeHoldings, totals } from './derive';
-import { readPortfolioCache, writePortfolioCache } from './portfolio-cache';
+import { useCachedPortfolio } from './PortfolioCacheProvider';
+import { writePortfolioCache } from './portfolio-cache';
 
 export function usePortfolio() {
   const { api, state } = useAuth();
   const queryClient = useQueryClient();
   const email = state.status === 'signedIn' ? state.user.email : '';
-  const [cached, setCached] = useState<PortfolioResponse | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    if (email) void readPortfolioCache(email).then((c) => live && setCached(c));
-    return () => {
-      live = false;
-    };
-  }, [email]);
+  const cached = useCachedPortfolio();
 
   const query = useQuery({
     queryKey: ['portfolio', email],
@@ -54,19 +47,22 @@ export function usePortfolio() {
 
   /**
    * Validates and saves a new version of the portfolio. The server rejects a stale revision
-   * with 409 (edited elsewhere); then we reload and ask the user to retry.
+   * with 409 (edited elsewhere); then we reload and ask the user to retry. The revision is read from the
+   * query cache at call time, so a save started later (an undo from a toast, after the screen that made the
+   * change has closed) still uses the revision of the previous save.
    */
   async function save(next: Portfolio) {
-    if (!data) throw new Error('Portfolio is not loaded yet.');
+    const current = queryClient.getQueryData<PortfolioResponse>(['portfolio', email]) ?? data;
+    if (!current) throw new Error('Portfolio is not loaded yet.');
     validate(next);
     // A refetch that started before this save must not land afterwards and overwrite the new data.
     await queryClient.cancelQueries({ queryKey: ['portfolio', email] });
     try {
       const saved = await api.put<SavePortfolioResponse>('/api/portfolio', {
         portfolio: next,
-        revision: data.revision,
+        revision: current.revision,
       } satisfies SavePortfolioRequest);
-      const updated: PortfolioResponse = { ...data, portfolio: next, revision: saved.revision };
+      const updated: PortfolioResponse = { ...current, portfolio: next, revision: saved.revision };
       queryClient.setQueryData(['portfolio', email], updated);
       writePortfolioCache(email, updated);
     } catch (e) {

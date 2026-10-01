@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, Switch, Text, View } from 'react-native';
+import { Alert, Image, Pressable, Share, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { useBiometricLock } from '@/auth/BiometricLock';
+import { backupShare } from '@/data/backup';
+import { setFilerStatus, type FilerStatus } from '@/data/mutations';
+import { usePortfolio } from '@/data/usePortfolio';
 import { pushAvailable, pushPreference, registerForPush, unregisterPush } from '@/push/push';
 import { config } from '@/config';
 import { colors } from '@/theme/tokens';
+import { DeleteAccountSheet } from '@/ui/DeleteAccountSheet';
 import { Icon } from '@/ui/Icon';
-import { Badge, Button, Card, Header, ListRow, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
+import { Badge, Button, Card, Chip, Header, ListRow, Muted, Notice, Screen, SectionLabel, Stat, styles } from '@/ui/kit';
 
 export default function Account() {
-  const { state, api, signOut } = useAuth();
+  const { state, api, signOut, deleteAccount } = useAuth();
+  const p = usePortfolio();
+  const [taxBusy, setTaxBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const queryClient = useQueryClient();
   const email = useEmail();
   const lock = useBiometricLock();
@@ -53,6 +60,33 @@ export default function Account() {
     }
   }
   const user = state.status === 'signedIn' ? state.user : null;
+  const filerStatus = p.portfolio?.taxProfile?.filerStatus ?? '';
+
+  async function chooseFilerStatus(status: FilerStatus) {
+    if (!p.portfolio || status === filerStatus) return;
+    setTaxBusy(true);
+    setError(null);
+    try {
+      await p.save(setFilerStatus(p.portfolio, status));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save your tax status.');
+    } finally {
+      setTaxBusy(false);
+    }
+  }
+
+  async function exportBackup() {
+    if (!p.portfolio) return;
+    setError(null);
+    const result = backupShare(p.portfolio);
+    if (!result.ok) return setError(result.reason);
+    try {
+      // Share sheet with the JSON as text: save it to Files, Drive or email it to yourself.
+      await Share.share({ title: result.title, message: result.text });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open the share sheet.');
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const devices = useQuery({
     queryKey: ['devices', email],
@@ -94,7 +128,7 @@ export default function Account() {
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           {user?.picture ? (
-            <Image source={{ uri: user.picture }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+            <Image accessibilityIgnoresInvertColors accessible={false} source={{ uri: user.picture }} style={{ width: 52, height: 52, borderRadius: 26 }} />
           ) : (
             <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: colors.primary, fontSize: 22, fontWeight: '700' }}>{initials}</Text>
@@ -116,6 +150,16 @@ export default function Account() {
         <ListRow left={iconBox('upload')} title="Import" subtitle="AHL trades and CDC dividends" onPress={() => router.push('/import')} last />
       </Card>
 
+      <SectionLabel>Tax status</SectionLabel>
+      <Card>
+        <Muted>Sets the rate Reports use to estimate tax on gains and dividends. Estimates are indicative, not your tax liability.</Muted>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
+          <Chip role="radio" label="Filer · 15%" accessibilityLabel="Filer, 15 percent tax" selected={filerStatus === 'filer'} onPress={() => void chooseFilerStatus('filer')} />
+          <Chip role="radio" label="Non-filer · 30%" accessibilityLabel="Non-filer, 30 percent tax" selected={filerStatus === 'non-filer'} onPress={() => void chooseFilerStatus('non-filer')} />
+        </View>
+        {!p.portfolio ? <Muted>Loading your portfolio…</Muted> : taxBusy ? <Muted>Saving…</Muted> : null}
+      </Card>
+
       <SectionLabel>Security</SectionLabel>
       <Card>
         <View style={styles.row}>
@@ -125,6 +169,7 @@ export default function Account() {
             <Muted>Ask for fingerprint, face or screen lock when opening the app.</Muted>
           </View>
           <Switch
+            accessibilityLabel="App lock"
             value={lock.enabled}
             trackColor={{ true: colors.primary }}
             onValueChange={(on) => {
@@ -145,6 +190,7 @@ export default function Account() {
             </Muted>
           </View>
           <Switch
+            accessibilityLabel="Dividend alerts"
             value={pushOn}
             disabled={pushBusy || !pushAvailable()}
             trackColor={{ true: colors.primary }}
@@ -181,7 +227,13 @@ export default function Account() {
             title={d.deviceName}
             subtitle={`${d.platform} · last used ${new Date(d.lastSeenAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}`}
             right={
-              <Pressable hitSlop={12} onPress={() => revoke(d.id, d.deviceName)} style={{ paddingVertical: 8, paddingLeft: 8 }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Sign out ${d.deviceName}`}
+                hitSlop={12}
+                onPress={() => revoke(d.id, d.deviceName)}
+                style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 8 }}
+              >
                 <Text style={{ color: colors.danger, fontWeight: '600' }}>Sign out</Text>
               </Pressable>
             }
@@ -189,6 +241,16 @@ export default function Account() {
           />
         ))}
       </Card>
+
+      <SectionLabel>Your data</SectionLabel>
+      <Card>
+        <Muted>Share a backup of your whole ledger as a JSON file. The website's Settings can restore it.</Muted>
+        <Button label="Export backup" variant="secondary" icon="upload" disabled={!p.portfolio} onPress={() => void exportBackup()} />
+        <View style={styles.divider} />
+        <Muted>Permanently delete your account and everything stored for it on Sipwise.</Muted>
+        <Button label="Delete account…" variant="danger" onPress={() => setDeleting(true)} />
+      </Card>
+      {user ? <DeleteAccountSheet email={user.email} visible={deleting} onClose={() => setDeleting(false)} onDelete={deleteAccount} /> : null}
 
       <Button
         label="Sign out of this device"

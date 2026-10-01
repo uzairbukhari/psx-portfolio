@@ -5,9 +5,11 @@ import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { BiometricLockProvider } from '@/auth/BiometricLock';
+import { PortfolioCacheProvider } from '@/data/PortfolioCacheProvider';
 import { PushBridge } from '@/push/PushBridge';
 import { SignIn } from '@/screens/SignIn';
 import { colors } from '@/theme/tokens';
+import { ToastProvider } from '@/ui/Toast';
 
 function Root() {
   const { state } = useAuth();
@@ -19,30 +21,32 @@ function Root() {
     );
   if (state.status === 'signedOut') return <SignIn />;
   return (
-    <>
-      <PushBridge />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.primary,
-          headerTitleStyle: { color: colors.foreground, fontWeight: '700' },
-          headerShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
-          animation: 'slide_from_right',
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="company/[ticker]" options={{ title: '' }} />
-        <Stack.Screen name="import" options={{ title: 'Import' }} />
-        <Stack.Screen name="reports" options={{ title: 'Reports' }} />
-        <Stack.Screen name="picks" options={{ title: 'Monthly Picks' }} />
-        <Stack.Screen name="targets" options={{ presentation: 'modal', title: 'Targets' }} />
-        <Stack.Screen name="received" options={{ presentation: 'modal', title: 'Dividend' }} />
-        <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
-        <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
-      </Stack>
-    </>
+    <PortfolioCacheProvider email={state.user.email}>
+      <ToastProvider>
+        <PushBridge />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.primary,
+            headerTitleStyle: { color: colors.foreground, fontWeight: '700' },
+            headerShadowVisible: false,
+            headerBackButtonDisplayMode: 'minimal',
+            animation: 'slide_from_right',
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="company/[ticker]" options={{ title: '' }} />
+          <Stack.Screen name="import" options={{ title: 'Import' }} />
+          <Stack.Screen name="reports" options={{ title: 'Reports' }} />
+          <Stack.Screen name="picks" options={{ title: 'Monthly Picks' }} />
+          <Stack.Screen name="targets" options={{ presentation: 'modal', title: 'Targets' }} />
+          <Stack.Screen name="received" options={{ presentation: 'modal', title: 'Dividend' }} />
+          <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
+          <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
+        </Stack>
+      </ToastProvider>
+    </PortfolioCacheProvider>
   );
 }
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankPortfolio, validate } from '../../../lib/portfolio.ts';
-import { applyCdcImport, parseJsonFile } from './imports.ts';
+import { applyCdcImport, diffImport, parseJsonFile, previewImport } from './imports.ts';
 
 const company = { ticker: 'AAA', name: 'A', sector: 'Bank', target: 10, approved: true, screenDate: '', note: '' };
 const row = (over: Record<string, unknown> = {}) => ({
@@ -41,4 +41,27 @@ test('CDC import accepts the {data: []} wrapper and rejects net above gross', ()
   const wrapped = applyCdcImport(p, { data: [row({ netDividendAmount: '2,000' })] });
   assert.equal(wrapped.next, null);
   assert.match(wrapped.message, /1 invalid/);
+});
+
+test('import preview counts equal what saving would add', () => {
+  const p = blankPortfolio();
+  p.companies = [company];
+  const preview = previewImport('cdc', p, [row(), row({ eventId: 'ev2', paymentDate: '16/09/2026' }), row({ eventId: 'ev3', securitySymbol: 'ZZZ' })]);
+  assert.ok(preview.next);
+  assert.equal(preview.counts.dividends, 2);
+  assert.equal(preview.rows.length, 2);
+  assert.equal(preview.counts.trades, 0);
+  const saved = preview.next;
+  assert.equal((saved.dividends?.length ?? 0) - (p.dividends?.length ?? 0), preview.counts.dividends);
+  assert.ok(preview.rows.every((r) => r.ticker === 'AAA' && r.label === 'Dividend'));
+  assert.deepEqual(diffImport(p, saved).counts, preview.counts);
+});
+
+test('import preview of nothing new has no rows and no saved version', () => {
+  const p = blankPortfolio();
+  p.companies = [company];
+  const preview = previewImport('cdc', p, [row({ securitySymbol: 'ZZZ' })]);
+  assert.equal(preview.next, null);
+  assert.equal(preview.rows.length, 0);
+  assert.deepEqual(preview.counts, { trades: 0, dividends: 0, voided: 0, companies: 0 });
 });

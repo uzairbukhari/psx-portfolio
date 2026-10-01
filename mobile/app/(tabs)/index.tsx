@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { money, moneyShort } from '@shared/portfolio.ts';
-import { formatPercent } from '@/data/derive';
+import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
+import { formatPercent, soldOutPositions } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors, type } from '@/theme/tokens';
 import { Icon } from '@/ui/Icon';
@@ -13,6 +14,8 @@ export default function Holdings() {
   const p = usePortfolio();
   const [pricing, setPricing] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [showSoldOut, setShowSoldOut] = useState(false);
+  const soldOut = useMemo(() => (p.portfolio && p.view ? soldOutPositions(p.portfolio, p.view.held) : []), [p.portfolio, p.view]);
 
   if (p.isLoading)
     return (
@@ -68,7 +71,11 @@ export default function Holdings() {
           <Text style={styles.muted}>Unrealised gain on current holdings: not yet known</Text>
         ) : (
           <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              accessible
+              accessibilityLabel={`Unrealised gain on current holdings: ${signedAmountLabel(totals.gain)}, ${signedPercentLabel(totals.gainPercent)}`}
+            >
               <View style={{ transform: [{ scaleY: totals.gain < 0 ? -1 : 1 }] }}>
                 <Icon name="trendingUp" size={16} color={gainColor} />
               </View>
@@ -123,7 +130,23 @@ export default function Holdings() {
       />
       {priceError ? <Notice tone="error">{priceError}</Notice> : null}
 
-      <SectionLabel>Your companies</SectionLabel>
+      <SectionLabel
+        right={
+          soldOut.length ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 }}>
+              <Text style={styles.muted}>Show sold out ({soldOut.length})</Text>
+              <Switch
+                value={showSoldOut}
+                onValueChange={setShowSoldOut}
+                accessibilityLabel={`Show sold out companies, ${soldOut.length} available`}
+                trackColor={{ true: colors.primary, false: colors.border }}
+              />
+            </View>
+          ) : undefined
+        }
+      >
+        Your companies
+      </SectionLabel>
       {open.length === 0 ? (
         <EmptyState
           icon="holdings"
@@ -142,15 +165,45 @@ export default function Holdings() {
               right={
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
                   <Text style={[styles.strong, { fontVariant: ['tabular-nums'] }]}>{h.value === null ? 'No price' : moneyShort(h.value)}</Text>
-                  <Amount value={h.gain} text={h.gain === null ? '—' : moneyShort(h.gain)} size={13} />
+                  <Amount value={h.gain} text={h.gain === null ? '—' : moneyShort(h.gain)} size={13} label="Unrealised" />
                 </View>
               }
+              accessibilityLabel={[
+                h.ticker,
+                `${new Intl.NumberFormat('en-PK').format(h.shares)} shares`,
+                h.average === null ? '' : `average cost ${money(h.average)}`,
+                h.value === null ? 'no price yet' : `value ${moneyShort(h.value)}`,
+                h.gain === null ? '' : `unrealised ${signedAmountLabel(h.gain)}`,
+              ]
+                .filter(Boolean)
+                .join(', ')}
+              accessibilityHint="Opens the company"
               onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}
               last={i === open.length - 1}
             />
           ))}
         </Card>
       )}
+      {showSoldOut && soldOut.length ? (
+        <>
+          <SectionLabel>Sold out</SectionLabel>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            {soldOut.map((h, i) => (
+              <ListRow
+                key={h.ticker}
+                left={<Avatar ticker={h.ticker} />}
+                title={h.ticker}
+                subtitle={`${h.name} · fully sold`}
+                right={<Amount value={h.realized} text={h.realized === null ? '—' : moneyShort(h.realized)} size={13} label="Realised" />}
+                accessibilityLabel={`${h.ticker}, ${h.name}, fully sold, realised ${signedAmountLabel(h.realized)}`}
+                accessibilityHint="Opens the company"
+                onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}
+                last={i === soldOut.length - 1}
+              />
+            ))}
+          </Card>
+        </>
+      ) : null}
     </Screen>
   );
 }
