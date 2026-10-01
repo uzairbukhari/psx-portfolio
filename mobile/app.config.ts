@@ -33,7 +33,8 @@ const config: ExpoConfig = {
     apiBaseUrl: v.api,
     googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID ?? '',
     googleIosClientId: process.env.GOOGLE_IOS_CLIENT_ID ?? '',
-    eas: { projectId: process.env.EAS_PROJECT_ID },
+    // Public identifier (not a secret); EAS cloud builds don't see the local .env.
+    eas: { projectId: process.env.EAS_PROJECT_ID ?? '0e6be082-0810-45d2-9036-d8a93e53fdff' },
   },
 };
 

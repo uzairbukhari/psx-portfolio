@@ -48,7 +48,7 @@
       "vars": {
         "ALLOWED_EMAILS": "suzairbukhari@gmail.com",
         "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
-        "GOOGLE_MOBILE_CLIENT_IDS": "",
+        "GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
         "GITHUB_REPO": "uzairbukhari/psx-portfolio",
         "AI_MONTHLY_CAP_USD": "0.25",
         "APP_ENV": "staging"
