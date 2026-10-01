@@ -27,7 +27,6 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      D1_DATABASE_ID: ${{ vars.STAGING_D1_DATABASE_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,12 +34,16 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Require staging database id
+      # The staging database id comes from wrangler.jsonc (env.staging), the same
+      # source the deploy uses, so there is no separate GitHub variable to keep in sync.
+      - name: Read staging database id
         run: |
-          if [ -z "$D1_DATABASE_ID" ]; then
-            echo "::error::Set the STAGING_D1_DATABASE_ID variable in the staging environment."
+          id=$(awk '/"staging": \{/,0' wrangler.jsonc | grep -oE '"database_id": *"[0-9a-fA-F-]{36}"' | head -n 1 | grep -oE '[0-9a-fA-F-]{36}')
+          if [ -z "$id" ] || [ "$id" = "00000000-0000-0000-0000-000000000000" ]; then
+            echo "::error::env.staging database_id in wrangler.jsonc is missing or still the placeholder."
             exit 1
           fi
+          echo "D1_DATABASE_ID=$id" >> "$GITHUB_ENV"
       - name: Drop all staging tables
         run: node scripts/reset-staging.mjs
       - name: Re-apply migrations
