@@ -168,10 +168,7 @@ export default function PortfolioValueCard({
         <div>
           <span className="value-card-label">Unrealised gain / loss</span>
           <strong
-            className="amount value-card-stat"
-            style={{
-              color: gain === null ? 'inherit' : gain >= 0 ? '#22e0a0' : '#ff5d6c',
-            }}
+            className={`amount value-card-stat${gain === null ? '' : gain >= 0 ? ' pos-text' : ' neg-text'}`}
           >
             {gain === null ? 'Not yet known' : money(gain)}
           </strong>

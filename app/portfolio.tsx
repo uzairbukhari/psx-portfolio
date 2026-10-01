@@ -139,6 +139,7 @@ type QuoteRefreshResponse = {
   stale?: Record<string, string>;
   error?: string;
 };
+const SHORTLISTED = '__shortlisted';
 type HoldingsSortKey =
   | 'name'
   | 'shares'
@@ -841,9 +842,11 @@ export default function Dashboard({
       new Set(hs.map((h) => h.sector).filter((s): s is string => !!s)),
     ),
     rowsBase = showSoldOut ? held.concat(soldOut) : held,
-    rowsFiltered = sectorFilter
-      ? rowsBase.filter((h) => h.sector === sectorFilter)
-      : rowsBase,
+    rowsFiltered = !sectorFilter
+      ? rowsBase
+      : sectorFilter === SHORTLISTED
+        ? rowsBase.filter((h) => h.target > 0)
+        : rowsBase.filter((h) => h.sector === sectorFilter),
     holdingsSortAccessor: Record<
       HoldingsSortKey,
       (h: (typeof hs)[number]) => number | string
@@ -875,6 +878,68 @@ export default function Dashboard({
         : { key, dir: 'desc' },
     );
   }
+  const gainPct = (h: (typeof hs)[number]) =>
+    h.gain !== null && h.cost !== null && h.cost > 0
+      ? (h.gain / h.cost) * 100
+      : null;
+  const gainText = (h: (typeof hs)[number]) => {
+    const pct = gainPct(h);
+    return pct === null
+      ? ''
+      : `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)}%`;
+  };
+  const gainClass = (h: (typeof hs)[number]) =>
+    h.gain === null ? undefined : h.gain >= 0 ? 'pos-text' : 'neg-text';
+  const openQuoteEntry = (h: (typeof hs)[number]) => {
+    setQuoteTicker(h.ticker);
+    setQuotePrice(h.quote?.price.toString() ?? '');
+    setQuoteDate(h.quote?.date ?? today());
+  };
+  const holdingActions = (h: (typeof hs)[number]) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="secondary compact icon-btn"
+        aria-label={`Actions for ${h.ticker}`}
+      >
+        <MoreHorizontal size={16} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onClick={() => openCompany(h.ticker)}
+        >
+          View company
+        </DropdownMenuItem>
+        {h.shares > 0 && (
+          <DropdownMenuItem
+            onClick={() =>
+              openTx('sell', h.ticker, h.quote?.price ?? null)
+            }
+          >
+            Sell
+          </DropdownMenuItem>
+        )}
+        {h.shares > 0 && (
+          <DropdownMenuItem
+            onClick={() => openTx('dividend', h.ticker)}
+          >
+            Dividend
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          onClick={() => {
+            setCreatingCompany(false);
+            setCompany({
+              ...p.companies.find(
+                (c) => c.ticker === h.ticker,
+              )!,
+            });
+          }}
+        >
+          Edit
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   function sortIndicator(key: HoldingsSortKey) {
     if (!holdingsSort || holdingsSort.key !== key) return null;
     return holdingsSort.dir === 'asc' ? ' ▲' : ' ▼';
@@ -1387,7 +1452,6 @@ export default function Dashboard({
         )}
       </header>
         <TabsContent value="holdings">
-          <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
           <PortfolioValueCard
             p={p}
             value={value}
@@ -1403,7 +1467,9 @@ export default function Dashboard({
               <h2>Your companies</h2>
               <p>
                 {held.length} {held.length === 1 ? 'holding' : 'holdings'}
-                {sectorFilter ? ` · filtered to ${sectorFilter}` : ''}
+                {sectorFilter
+                  ? ` · filtered to ${sectorFilter === SHORTLISTED ? 'SIP shortlist' : sectorFilter}`
+                  : ''}
                 {showSoldOut && soldOut.length
                   ? ` · ${soldOut.length} sold out shown`
                   : ''}
@@ -1430,12 +1496,13 @@ export default function Dashboard({
           </div>
           <div className="holdings-toolbar">
             <label className="holdings-toolbar-filter">
-              Sector
+              Show
               <select
                 value={sectorFilter}
                 onChange={(e) => setSectorFilter(e.target.value)}
               >
                 <option value="">All sectors</option>
+                <option value={SHORTLISTED}>Shortlisted only</option>
                 {sectorsInUse.map((sector) => (
                   <option key={sector} value={sector}>
                     {sector}
@@ -1453,7 +1520,109 @@ export default function Dashboard({
               </label>
             )}
           </div>
-          <section className="panel table-panel">
+          <div className="holdings-sort">
+            <label>
+              Sort by
+              <select
+                value={holdingsSort?.key ?? ''}
+                onChange={(e) => {
+                  const key = e.target.value as HoldingsSortKey | '';
+                  if (!key) setHoldingsSort(null);
+                  else if (holdingsSort?.key !== key) toggleHoldingsSort(key);
+                }}
+              >
+                <option value="">Default (market value)</option>
+                {(
+                  [
+                    ['name', 'Company'],
+                    ['value', 'Market value'],
+                    ['gain', 'Gain / loss'],
+                    ['shares', 'Shares'],
+                    ['average', 'Avg. cost'],
+                    ['price', 'Latest price'],
+                    ['weight', 'Portfolio weight'],
+                  ] as [HoldingsSortKey, string][]
+                ).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {holdingsSort && (
+              <button
+                type="button"
+                className="secondary compact"
+                aria-label="Reverse sort order"
+                onClick={() => toggleHoldingsSort(holdingsSort.key)}
+              >
+                {holdingsSort.dir === 'asc' ? '▲' : '▼'}
+              </button>
+            )}
+          </div>
+          <div className="holdings-cards">
+            {displayedHoldings.map((h) => (
+              <article className="holding-card" key={h.ticker}>
+                <div className="holding-card__head">
+                  <button
+                    type="button"
+                    className="holding-card__title"
+                    onClick={() => openCompany(h.ticker)}
+                  >
+                    <b className="ticker">
+                      {h.ticker}
+                    </b>
+                    <small>{h.name}</small>
+                  </button>
+                  {holdingActions(h)}
+                </div>
+                <dl className="holding-card__grid">
+                  <div>
+                    <dt>Value</dt>
+                    <dd className="amount">
+                      {h.value === null ? '—' : money(h.value)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Gain</dt>
+                    <dd className={gainClass(h)}>
+                      {h.gain === null ? '—' : money(h.gain)}
+                      {gainPct(h) !== null && <small>{gainText(h)}</small>}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Shares @ avg cost</dt>
+                    <dd>
+                      {h.shares.toLocaleString()}
+                      <small>
+                        @ {h.average === null ? '—' : money(h.average)}
+                      </small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Price</dt>
+                    <dd>
+                      <button
+                        type="button"
+                        className="quote-btn"
+                        onClick={() => openQuoteEntry(h)}
+                      >
+                        {h.quote ? money(h.quote.price) : 'Add price'}
+                      </button>
+                      {h.quote && (
+                        <small>
+                          {h.quote.date}
+                          {h.quote.manual ? ' · manual' : ''}
+                          {h.quote.date !== today() ? ' · older quote' : ''}
+                        </small>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+          <section className="panel table-panel holdings-table">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1492,12 +1661,23 @@ export default function Dashboard({
                       >
                         {h.ticker}
                       </button>
+                      {h.target > 0 && (
+                        <span
+                          className="shortlist-dot"
+                          title="On SIP shortlist"
+                          aria-label="On SIP shortlist"
+                        />
+                      )}
                       <small>
                         {h.name}
                         {h.sector ? ` · ${h.sector}` : ''}
                       </small>
                       {h.target > 0 && (
-                        <span className="tag">SIP shortlist</span>
+                        <span
+                          className="shortlist-dot"
+                          title="On SIP shortlist"
+                          aria-label="On SIP shortlist"
+                        />
                       )}
                     </TableCell>
                     <TableCell className="amount">
@@ -1528,17 +1708,9 @@ export default function Dashboard({
                     <TableCell>
                       {h.value === null ? '—' : money(h.value)}
                     </TableCell>
-                    <TableCell
-                      style={{
-                        color:
-                          h.gain === null
-                            ? 'inherit'
-                            : h.gain >= 0
-                              ? '#22e0a0'
-                              : '#ff5d6c',
-                      }}
-                    >
+                    <TableCell className={gainClass(h)}>
                       {h.gain === null ? '—' : money(h.gain)}
+                      {gainPct(h) !== null && <small>{gainText(h)}</small>}
                     </TableCell>
                     <TableCell>
                       {!missing.length && value > 0 ? (
@@ -1559,49 +1731,7 @@ export default function Dashboard({
                       )}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          className="secondary compact icon-btn"
-                          aria-label={`Actions for ${h.ticker}`}
-                        >
-                          <MoreHorizontal size={16} />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => openCompany(h.ticker)}
-                          >
-                            View company
-                          </DropdownMenuItem>
-                          {h.shares > 0 && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openTx('sell', h.ticker, h.quote?.price ?? null)
-                              }
-                            >
-                              Sell
-                            </DropdownMenuItem>
-                          )}
-                          {h.shares > 0 && (
-                            <DropdownMenuItem
-                              onClick={() => openTx('dividend', h.ticker)}
-                            >
-                              Dividend
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setCreatingCompany(false);
-                              setCompany({
-                                ...p.companies.find(
-                                  (c) => c.ticker === h.ticker,
-                                )!,
-                              });
-                            }}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {holdingActions(h)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1612,6 +1742,7 @@ export default function Dashboard({
               values exclude cash and unrecorded corporate actions.
             </p>
           </section>
+          <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
         </TabsContent>
         <TabsContent value="reports">
           <PortfolioReports portfolio={p} />
