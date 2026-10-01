@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 import { useAuth } from '@/auth/AuthProvider';
 import { config } from '@/config';
 import { colors } from '@/theme/tokens';
@@ -32,9 +34,16 @@ export function SignIn() {
       </Pressable>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {config.variant !== 'production' ? (
-        <Muted>
-          {config.variant} build · {config.apiBaseUrl || 'no API URL set'}
-        </Muted>
+        <>
+          <Muted>
+            {config.variant} build · {config.apiBaseUrl || 'no API URL set'}
+          </Muted>
+          <Muted>
+            Debug: package {Constants.expoConfig?.android?.package ?? '?'} · web client{' '}
+            {config.googleWebClientId ? `${config.googleWebClientId.slice(0, 12)}…${config.googleWebClientId.slice(-26)}` : 'NOT SET'} ·{' '}
+            {Updates.isEmbeddedLaunch ? 'built-in code (no update applied)' : `update ${Updates.updateId?.slice(0, 8) ?? '?'}`}
+          </Muted>
+        </>
       ) : null}
     </Screen>
   );
