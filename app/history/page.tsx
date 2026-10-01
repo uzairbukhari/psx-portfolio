@@ -1,7 +1,7 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
-  title: 'Purchase log | PSX Portfolio',
+  title: 'Purchase log | Sipwise',
   description: 'Full ledger of recorded trades and corrections.',
 };
 export default async function HistoryPage() {
