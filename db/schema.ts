@@ -218,3 +218,19 @@ export const rateLimits = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.action] })],
 );
+
+// One row per signed-in phone/tablet. The app token carries the row id (`sid`),
+// so revoking a row signs that device out on its next request.
+export const mobileSessions = sqliteTable(
+  'mobile_sessions',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull(),
+    deviceName: text('device_name').notNull(),
+    platform: text('platform').notNull(),
+    createdAt: text('created_at').notNull(),
+    lastSeenAt: text('last_seen_at').notNull(),
+    revokedAt: text('revoked_at'),
+  },
+  (table) => [index('mobile_sessions_email_idx').on(table.email)],
+);

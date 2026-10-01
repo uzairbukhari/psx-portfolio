@@ -1,4 +1,17 @@
+// App (bearer) tokens for the native apps. Signed with the same secret as the
+// web session cookie but carry `aud: "mobile"` and a device-session id, so one
+// can never be replayed as the other, and a device can be revoked server-side.
 const encoder = new TextEncoder();
+
+export const MOBILE_AUDIENCE = 'mobile';
+export const MOBILE_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+export type MobileTokenUser = {
+  email: string;
+  name: string | null;
+  picture: string | null;
+  sid: string;
+};
 
 async function hmacKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
@@ -10,31 +23,30 @@ async function hmacKey(secret: string): Promise<CryptoKey> {
   );
 }
 
-export type SessionUser = {
-  email: string;
-  name: string | null;
-  picture: string | null;
-};
-
-export async function signSession(
-  email: string,
-  name: string | null,
+export async function signMobileToken(
+  user: MobileTokenUser,
   secret: string,
-  ttlMs = 30 * 24 * 60 * 60 * 1000,
-  picture: string | null = null,
+  ttlMs = MOBILE_TOKEN_TTL_MS,
 ): Promise<string> {
   const payload = Buffer.from(
-    JSON.stringify({ email, name, picture, exp: Date.now() + ttlMs }),
+    JSON.stringify({
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      sid: user.sid,
+      aud: MOBILE_AUDIENCE,
+      exp: Date.now() + ttlMs,
+    }),
   ).toString('base64url');
   const key = await hmacKey(secret);
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
   return `${payload}.${Buffer.from(signature).toString('base64url')}`;
 }
 
-export async function verifySession(
+export async function verifyMobileToken(
   token: string,
   secret: string,
-): Promise<SessionUser | null> {
+): Promise<MobileTokenUser | null> {
   try {
     const [payload, signature] = token.split('.');
     if (!payload || !signature) return null;
@@ -50,41 +62,26 @@ export async function verifySession(
       email?: string;
       name?: string | null;
       picture?: string | null;
-      exp?: number;
+      sid?: string;
       aud?: string;
+      exp?: number;
     };
-    // App tokens share the signing key; they are only valid as bearer tokens.
-    if (data.aud) return null;
-    if (!data.email || typeof data.exp !== 'number' || data.exp < Date.now())
+    if (data.aud !== MOBILE_AUDIENCE) return null;
+    if (!data.email || !data.sid || typeof data.exp !== 'number' || data.exp < Date.now())
       return null;
     return {
       email: data.email,
       name: data.name ?? null,
       picture: typeof data.picture === 'string' ? data.picture : null,
+      sid: data.sid,
     };
   } catch {
     return null;
   }
 }
 
-export function serializeCookie(
-  name: string,
-  value: string,
-  { maxAge }: { maxAge: number },
-): string {
-  return `${name}=${encodeURIComponent(value)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
-}
-
-export function serializeExpiredCookie(name: string): string {
-  return `${name}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
-}
-
-export function readCookieValue(cookieHeader: string, name: string): string | null {
-  for (const part of cookieHeader.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq === -1) continue;
-    const key = part.slice(0, eq).trim();
-    if (key === name) return decodeURIComponent(part.slice(eq + 1));
-  }
-  return null;
+export function readBearerToken(authorization: string | null): string | null {
+  if (!authorization) return null;
+  const match = /^Bearer\s+(\S+)$/i.exec(authorization.trim());
+  return match ? match[1] : null;
 }

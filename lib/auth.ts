@@ -1,12 +1,16 @@
 import { headers } from 'next/headers';
 import { env } from 'cloudflare:workers';
 import { readCookieValue, verifySession } from '@/lib/session';
+import { readBearerToken, verifyMobileToken } from '@/lib/mobile-token';
+import { mobileSessionActive } from '@/lib/mobile-sessions';
 import { getUserRole, type Role } from '@/lib/roles';
 
 export type AuthUser = {
   email: string;
   name: string | null;
   picture: string | null;
+  /** How the request authenticated; native apps use bearer tokens and are not subject to the cookie origin check. */
+  via?: 'cookie' | 'bearer' | 'dev';
 };
 export type Viewer = AuthUser & { role: Role };
 
@@ -19,14 +23,23 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const requestHeaders = await headers();
 
   const devUser = devAuthUser(requestHeaders.get('host'));
-  if (devUser) return devUser;
+  if (devUser) return { ...devUser, via: 'dev' };
 
   if (!env.SESSION_SECRET) return null;
+
+  const bearer = readBearerToken(requestHeaders.get('authorization'));
+  if (bearer) {
+    const mobile = await verifyMobileToken(bearer, env.SESSION_SECRET);
+    if (!mobile || !(await mobileSessionActive(mobile.sid, mobile.email))) return null;
+    return { email: mobile.email, name: mobile.name, picture: mobile.picture, via: 'bearer' };
+  }
+
   const cookieHeader = requestHeaders.get('cookie');
   if (!cookieHeader) return null;
   const token = readCookieValue(cookieHeader, SESSION_COOKIE);
   if (!token) return null;
-  return verifySession(token, env.SESSION_SECRET);
+  const user = await verifySession(token, env.SESSION_SECRET);
+  return user ? { ...user, via: 'cookie' } : null;
 }
 
 export async function getViewer(): Promise<Viewer | null> {

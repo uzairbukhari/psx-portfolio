@@ -21,6 +21,8 @@ declare namespace Cloudflare {
     PYPSX_OWNER_EMAIL?: string;
     GOOGLE_CLIENT_ID?: string;
     GOOGLE_CLIENT_SECRET?: string;
+    /** Comma-separated Google OAuth client IDs (iOS + Android) accepted as ID-token audiences from the native apps. */
+    GOOGLE_MOBILE_CLIENT_IDS?: string;
     SESSION_SECRET?: string;
   }
 }
