@@ -32,3 +32,9 @@ declare namespace Cloudflare {
     DEV_AUTH_NAME?: string;
   }
 }
+declare namespace Cloudflare {
+  interface Env {
+    /** "staging" on the staging Worker (shows a STAGING badge); "production" otherwise. */
+    APP_ENV?: string;
+  }
+}
