@@ -1,6 +1,6 @@
 'use client';
 import { useConfirm } from '@/components/confirm-dialog';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -110,6 +110,11 @@ const PATH_TABS: Record<string, string> = Object.fromEntries(
   [...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]), ['/history', 'history']],
 );
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
+function subscribeWide(onChange: () => void) {
+  const query = window.matchMedia('(min-width: 1100px)');
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
 function companyFromPathname(pathname: string): string {
   const match = COMPANY_PATH.exec(pathname);
   return match ? match[1].toUpperCase() : '';
@@ -385,7 +390,14 @@ export default function Dashboard({
 }) {
   const isAdmin = role === 'super_admin';
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
+  // From 1100px the market pulse sits beside the value card's chart; below it stays under the table.
+  const widePulse = useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia('(min-width: 1100px)').matches,
+    () => null,
+  );
   const initialPathname = usePathname();
+  const [bellOpen, setBellOpen] = useState(false);
   const [tab, setTabState] = useState(() =>
     allowTab(tabFromPathname(initialPathname), isAdmin),
   );
@@ -1316,7 +1328,17 @@ export default function Dashboard({
             <Plus size={18} />
             <span className="hdr-label">Add transaction</span>
           </button>
-          <Popover>
+          <Popover
+            open={bellOpen}
+            onOpenChange={(next) => {
+              // Phones skip the popover (it can't fit): go straight to the page.
+              if (next && window.matchMedia('(max-width:760px)').matches) {
+                setTab('notifications');
+                return;
+              }
+              setBellOpen(next);
+            }}
+          >
             <PopoverTrigger
               className="bell-trigger hdr-btn"
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
@@ -1399,7 +1421,10 @@ export default function Dashboard({
                   type="button"
                   data-slot="link"
                   className="link-button"
-                  onClick={() => setTab('notifications')}
+                  onClick={() => {
+                    setBellOpen(false);
+                    setTab('notifications');
+                  }}
                 >
                   View all notifications
                 </button>
@@ -1494,23 +1519,19 @@ export default function Dashboard({
             missingCount={missing.length}
             unknownCount={unknown.length}
             newBuys={newBuys}
+            aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} /> : undefined}
           />
-          <div className="section-top">
-            <div>
-              <h2>Your companies</h2>
-              <p>
+          <div className="holdings-head">
+            <h2>
+              Your companies
+              <span className="count-badge">
                 {held.length} {held.length === 1 ? 'holding' : 'holdings'}
-                {sectorFilter
-                  ? ` · filtered to ${sectorFilter === SHORTLISTED ? 'SIP shortlist' : sectorFilter}`
-                  : ''}
-                {showSoldOut && soldOut.length
-                  ? ` · ${soldOut.length} sold out shown`
-                  : ''}
-              </p>
-            </div>
+              </span>
+            </h2>
             <button
-              className="secondary"
+              className="secondary compact holdings-add"
               disabled={busy}
+              aria-label="Add company"
               onClick={() => {
                 setCreatingCompany(true);
                 setCompany({
@@ -1524,39 +1545,25 @@ export default function Dashboard({
                 });
               }}
             >
-              <Plus size={16} /> Add company
+              <Plus size={15} /> <span className="holdings-add__label">Add company</span>
             </button>
-          </div>
-          <div className="holdings-toolbar">
-            <label className="holdings-toolbar-filter">
-              Show
+            <select
+              className="holdings-filter"
+              aria-label="Filter companies"
+              value={sectorFilter}
+              onChange={(e) => setSectorFilter(e.target.value)}
+            >
+              <option value="">All sectors</option>
+              <option value={SHORTLISTED}>Shortlisted only</option>
+              {sectorsInUse.map((sector) => (
+                <option key={sector} value={sector}>
+                  {sector}
+                </option>
+              ))}
+            </select>
+            <div className="holdings-sort">
               <select
-                value={sectorFilter}
-                onChange={(e) => setSectorFilter(e.target.value)}
-              >
-                <option value="">All sectors</option>
-                <option value={SHORTLISTED}>Shortlisted only</option>
-                {sectorsInUse.map((sector) => (
-                  <option key={sector} value={sector}>
-                    {sector}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {soldOut.length > 0 && (
-              <label className="check-row">
-                <Checkbox
-                  checked={showSoldOut}
-                  onCheckedChange={(v) => setShowSoldOut(!!v)}
-                />{' '}
-                Show companies fully sold ({soldOut.length})
-              </label>
-            )}
-          </div>
-          <div className="holdings-sort">
-            <label>
-              Sort by
-              <select
+                aria-label="Sort holdings"
                 value={holdingsSort?.key ?? ''}
                 onChange={(e) => {
                   const key = e.target.value as HoldingsSortKey | '';
@@ -1564,7 +1571,7 @@ export default function Dashboard({
                   else if (holdingsSort?.key !== key) toggleHoldingsSort(key);
                 }}
               >
-                <option value="">Default (market value)</option>
+                <option value="">Sort: market value</option>
                 {(
                   [
                     ['name', 'Company'],
@@ -1577,20 +1584,29 @@ export default function Dashboard({
                   ] as [HoldingsSortKey, string][]
                 ).map(([key, label]) => (
                   <option key={key} value={key}>
-                    {label}
+                    Sort: {label}
                   </option>
                 ))}
               </select>
-            </label>
-            {holdingsSort && (
-              <button
-                type="button"
-                className="secondary compact"
-                aria-label="Reverse sort order"
-                onClick={() => toggleHoldingsSort(holdingsSort.key)}
-              >
-                {holdingsSort.dir === 'asc' ? '▲' : '▼'}
-              </button>
+              {holdingsSort && (
+                <button
+                  type="button"
+                  className="secondary compact"
+                  aria-label="Reverse sort order"
+                  onClick={() => toggleHoldingsSort(holdingsSort.key)}
+                >
+                  {holdingsSort.dir === 'asc' ? '▲' : '▼'}
+                </button>
+              )}
+            </div>
+            {soldOut.length > 0 && (
+              <label className="check-row holdings-soldout">
+                <Checkbox
+                  checked={showSoldOut}
+                  onCheckedChange={(v) => setShowSoldOut(!!v)}
+                />{' '}
+                Show sold out ({soldOut.length})
+              </label>
             )}
           </div>
           <div className="holdings-cards">
@@ -1775,7 +1791,7 @@ export default function Dashboard({
               values exclude cash and unrecorded corporate actions.
             </p>
           </section>
-          <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
+          {widePulse === false && <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />}
           </>
           )}
         </TabsContent>
@@ -1802,17 +1818,16 @@ export default function Dashboard({
           />
         </TabsContent>
         <TabsContent value="history">
-          <div className="section-top">
-            <div>
-              <h2>Activity</h2>
-              <p>Every buy, sale, dividend and split, newest first.</p>
-            </div>
+          <div className="activity-head">
+            <h2>Activity</h2>
             <button
+              className="compact"
               disabled={busy}
               onClick={() => openTx('buy')}
             >
-              <Plus size={16} /> Add transaction
+              <Plus size={15} /> Add transaction
             </button>
+            <p>Every buy, sale, dividend and split, newest first.</p>
           </div>
           <LedgerTimeline
             portfolio={p}

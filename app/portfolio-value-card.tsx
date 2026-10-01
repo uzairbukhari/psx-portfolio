@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from 'recharts';
 import {
   ChartContainer,
@@ -48,6 +48,7 @@ export default function PortfolioValueCard({
   missingCount,
   unknownCount,
   newBuys,
+  aside,
 }: {
   p: Portfolio;
   value: number;
@@ -57,6 +58,8 @@ export default function PortfolioValueCard({
   missingCount: number;
   unknownCount: number;
   newBuys: number;
+  /** Sits beside the chart (30%) on wide screens; the page renders it elsewhere otherwise. */
+  aside?: ReactNode;
 }) {
   const [range, setRange] = useState<ValueRange>('all');
   const [attempt, setAttempt] = useState(0);
@@ -135,11 +138,16 @@ export default function PortfolioValueCard({
     top <= 0 ? 0 : bottom >= 0 ? 1 : top / (top - bottom);
   const strokeSplit = at(hi, lo);
   const fillSplit = at(Math.max(hi, 0), Math.min(lo, 0));
+  // Sized to the widest tick label so the plot starts right at the card edge.
+  const yWidth =
+    Math.max(compact(Math.min(lo, 0) - pad).length, compact(Math.max(hi, 0) + pad).length) * 7 + 8;
   const change = data.length > 1 ? data[data.length - 1].gain - data[0].gain : null;
   const rangeLabel = range === 'all' ? 'all time' : RANGES.find(([v]) => v === range)![1];
 
   return (
     <section className="panel value-card">
+      <div className="value-card-body">
+      <div className="value-card-left">
       <div className="value-card-top">
         <div>
           <span className="value-card-label">
@@ -179,6 +187,7 @@ export default function PortfolioValueCard({
           </small>
         </div>
       </div>
+      <div className="value-card-chart">
       <div className="company-chart-head">
         <div>
           <strong className="value-card-chart-title">Remaining unrealised gain / loss</strong>
@@ -220,7 +229,7 @@ export default function PortfolioValueCard({
         </p>
       ) : (
         <ChartContainer config={config} className="company-chart">
-          <AreaChart data={data} margin={{ top: 10, right: 12, bottom: 4, left: 8 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 8, bottom: 4, left: 0 }}>
             <defs>
               <linearGradient id="gainStroke" x1="0" y1="0" x2="0" y2="1">
                 <stop offset={strokeSplit} stopColor="var(--success)" />
@@ -243,7 +252,7 @@ export default function PortfolioValueCard({
             />
             <YAxis
               domain={[Math.min(lo, 0) - pad, Math.max(hi, 0) + pad]}
-              width={64}
+              width={yWidth}
               tickLine={false}
               axisLine={false}
               tickFormatter={compact}
@@ -289,6 +298,10 @@ export default function PortfolioValueCard({
           Not in the chart (no price history yet): {series.unpriced.join(', ')}
         </p>
       )}
+      </div>
+      </div>
+      {aside && <aside className="value-card-aside">{aside}</aside>}
+      </div>
     </section>
   );
 }
