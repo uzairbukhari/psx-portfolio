@@ -53,6 +53,8 @@ export type ActivityEntry = {
   title: string;
   detail: string;
   amount: number | null;
+  /** Entered by hand (or legacy), so it can be corrected here; imported/automatic lines are read-only. */
+  editable: boolean;
 };
 
 const num = (n: number) => new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(n);
@@ -71,6 +73,7 @@ export function activityEntries(p: Portfolio, ticker?: string): ActivityEntry[] 
       title: `${t.kind === 'sell' ? 'Sold' : t.kind === 'opening' ? 'Opening' : 'Bought'} ${num(t.shares)}`,
       detail: `${price}${t.fees ? ` · fees ${num(t.fees)}` : ''}`,
       amount: t.price === null ? null : t.shares * t.price,
+      editable: !t.source || t.source === 'manual',
     });
   }
   for (const d of p.dividends ?? []) {
@@ -84,6 +87,7 @@ export function activityEntries(p: Portfolio, ticker?: string): ActivityEntry[] 
       title: expected ? 'Dividend (expected)' : 'Dividend',
       detail: d.perShare ? `${num(d.perShare)} per share` : d.note,
       amount: d.netAmount ?? d.grossAmount ?? null,
+      editable: d.source === 'manual',
     });
   }
   for (const s of p.stockSplits ?? []) {
@@ -96,6 +100,7 @@ export function activityEntries(p: Portfolio, ticker?: string): ActivityEntry[] 
       title: 'Stock split',
       detail: `${num(s.oldShares)} → ${num(s.newShares)} shares`,
       amount: null,
+      editable: true,
     });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1));

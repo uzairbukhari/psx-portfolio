@@ -26,6 +26,7 @@ function Root() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="company/[ticker]" options={{ title: '' }} />
+      <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
     </Stack>
   );
 }

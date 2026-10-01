@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PortfolioResponse, QuotesResponse } from '@shared/api-types.ts';
+import type { PortfolioResponse, QuotesResponse, SavePortfolioRequest, SavePortfolioResponse } from '@shared/api-types.ts';
+import { validate, type Portfolio } from '@shared/portfolio.ts';
+import { ApiRequestError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { openPositions, safeHoldings, totals } from './derive';
 import { readPortfolioCache, writePortfolioCache } from './portfolio-cache';
@@ -43,7 +45,32 @@ export function usePortfolio() {
     await queryClient.invalidateQueries({ queryKey: ['portfolio', email] });
   }
 
+  /**
+   * Validates and saves a new version of the portfolio. The server rejects a stale revision
+   * with 409 (edited elsewhere); then we reload and ask the user to retry.
+   */
+  async function save(next: Portfolio) {
+    if (!data) throw new Error('Portfolio is not loaded yet.');
+    validate(next);
+    try {
+      const saved = await api.put<SavePortfolioResponse>('/api/portfolio', {
+        portfolio: next,
+        revision: data.revision,
+      } satisfies SavePortfolioRequest);
+      const updated: PortfolioResponse = { ...data, portfolio: next, revision: saved.revision };
+      queryClient.setQueryData(['portfolio', email], updated);
+      writePortfolioCache(email, updated);
+    } catch (e) {
+      if (e instanceof ApiRequestError && e.status === 409) {
+        await queryClient.invalidateQueries({ queryKey: ['portfolio', email] });
+        throw new Error('Your portfolio changed on another device. It has been reloaded; please make the change again.');
+      }
+      throw e;
+    }
+  }
+
   return {
+    save,
     portfolio: data?.portfolio ?? null,
     revision: data?.revision ?? 0,
     view,

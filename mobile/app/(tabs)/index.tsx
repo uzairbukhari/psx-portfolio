@@ -28,7 +28,12 @@ export default function Holdings() {
   const { totals, open, error } = p.view;
   return (
     <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
-      <Title>Holdings</Title>
+      <View style={styles.row}>
+        <Title>Holdings</Title>
+        <Pressable onPress={() => router.push('/transaction')} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+          <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 15 }}>+ Add</Text>
+        </Pressable>
+      </View>
       {p.offline ? <Notice>Offline. Showing your last saved portfolio.</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       <Card>

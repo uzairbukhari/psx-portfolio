@@ -1,0 +1,91 @@
+// Pure ledger edits, mirroring what the web app does when you record or correct an entry:
+// corrections void the old line (kept for the audit trail) and insert a new one after it.
+// Callers run validate() on the result before saving.
+import {
+  round,
+  sharesHeldOn,
+  type Dividend,
+  type Portfolio,
+  type StockSplit,
+  type Trade,
+} from '../../../lib/portfolio.ts';
+import { addNotifications, dividendNotifications } from '../../../lib/notifications.ts';
+
+export const clonePortfolio = (p: Portfolio): Portfolio => JSON.parse(JSON.stringify(p)) as Portfolio;
+
+let counter = 0;
+const newId = () =>
+  (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.() ??
+  `id-${Date.now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+function replaceOrAppend<T extends { id: string; voided?: boolean }>(list: T[], entry: T, editingId?: string) {
+  if (!editingId) {
+    list.push(entry);
+    return;
+  }
+  const index = list.findIndex((item) => item.id === editingId);
+  if (index < 0) throw new Error('That entry no longer exists. Reload and try again.');
+  list[index].voided = true;
+  list.splice(index + 1, 0, entry);
+}
+
+export function recordTrade(p: Portfolio, trade: Omit<Trade, 'id'>, editingId?: string): Portfolio {
+  const next = clonePortfolio(p);
+  if (!next.companies.some((c) => c.ticker === trade.ticker)) throw new Error('Choose a company you own.');
+  replaceOrAppend(next.trades, { ...trade, id: newId() }, editingId);
+  return next;
+}
+
+export function recordDividend(
+  p: Portfolio,
+  dividend: Omit<Dividend, 'id' | 'grossAmount' | 'source'>,
+  editingId?: string,
+  now: string = new Date().toISOString(),
+): Portfolio {
+  const next = clonePortfolio(p);
+  if (!next.companies.some((c) => c.ticker === dividend.ticker)) throw new Error('Choose a company you own.');
+  next.dividends ??= [];
+  const entry: Dividend = {
+    ...dividend,
+    id: newId(),
+    source: 'manual',
+    grossAmount: round((dividend.perShare ?? 0) * sharesHeldOn(next, dividend.ticker, dividend.date)),
+  };
+  replaceOrAppend(next.dividends, entry, editingId);
+  addNotifications(next, dividendNotifications([entry], now));
+  return next;
+}
+
+export function recordSplit(p: Portfolio, split: Omit<StockSplit, 'id'>, editingId?: string): Portfolio {
+  const next = clonePortfolio(p);
+  if (!next.companies.some((c) => c.ticker === split.ticker)) throw new Error('Choose a company you own.');
+  next.stockSplits ??= [];
+  replaceOrAppend(next.stockSplits, { ...split, id: newId() }, editingId);
+  return next;
+}
+
+export type EntryKind = 'trade' | 'dividend' | 'split';
+
+/** Marks an entry voided; it stays in the ledger but no longer counts. */
+export function voidEntry(p: Portfolio, kind: EntryKind, id: string): Portfolio {
+  const next = clonePortfolio(p);
+  const list = kind === 'trade' ? next.trades : kind === 'dividend' ? (next.dividends ?? []) : (next.stockSplits ?? []);
+  const entry = (list as { id: string; voided?: boolean }[]).find((e) => e.id === id);
+  if (!entry) throw new Error('That entry no longer exists. Reload and try again.');
+  entry.voided = true;
+  return next;
+}
+
+/** Parses a user-typed number; empty or invalid gives null. */
+export function parseNumber(text: string): number | null {
+  const cleaned = text.replace(/,/g, '').trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function isIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}

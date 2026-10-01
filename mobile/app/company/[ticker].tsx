@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import type { PriceHistoryResponse } from '@shared/api-types.ts';
 import { money, moneyShort } from '@shared/portfolio.ts';
@@ -103,13 +103,26 @@ export default function Company() {
             </View>
           </Card>
 
+          <Pressable
+            style={styles.button}
+            onPress={() => router.push({ pathname: '/transaction', params: { ticker } })}
+          >
+            <Text style={styles.buttonText}>Add transaction</Text>
+          </Pressable>
           <Title>History</Title>
           {entries.length === 0 ? <Muted>No trades or dividends recorded for {ticker}.</Muted> : null}
+          {entries.some((e) => e.editable) ? <Muted>Tap an entry to correct or void it.</Muted> : null}
           <Card style={{ paddingVertical: 4 }}>
             {entries.map((e, i) => (
-              <View key={e.id} style={i ? { borderTopWidth: 1, borderTopColor: colors.border } : undefined}>
-                <ActivityRow entry={e} showTicker={false} />
-              </View>
+              <Pressable
+                key={e.id}
+                disabled={!e.editable}
+                onPress={() => router.push({ pathname: '/transaction', params: { id: e.id } })}
+              >
+                <View style={i ? { borderTopWidth: 1, borderTopColor: colors.border } : undefined}>
+                  <ActivityRow entry={e} showTicker={false} />
+                </View>
+              </Pressable>
             ))}
           </Card>
         </>
