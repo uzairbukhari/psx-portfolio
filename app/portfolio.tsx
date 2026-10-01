@@ -98,13 +98,13 @@ const TAB_PATHS: Record<string, string> = {
   holdings: '/',
   reports: '/reports',
   sip: '/sip',
-  history: '/history',
+  history: '/activity',
   'research-desk': '/research-desk',
   settings: '/settings',
   notifications: '/notifications',
 };
 const PATH_TABS: Record<string, string> = Object.fromEntries(
-  Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
+  [...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]), ['/history', 'history']],
 );
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
 function companyFromPathname(pathname: string): string {
@@ -706,7 +706,7 @@ export default function Dashboard({
     );
     if (ambiguous.length)
       throw Error(
-        `Nothing was imported: ${ambiguous.map((d) => `${d.ticker} ${d.date}`).join(', ')} could belong to more than one expected PSX dividend. Void the expected record that does not apply (Purchase log), then import again.`,
+        `Nothing was imported: ${ambiguous.map((d) => `${d.ticker} ${d.date}`).join(', ')} could belong to more than one expected PSX dividend. Void the expected record that does not apply (Activity), then import again.`,
       );
     const superseded = replaced.length;
     const at = new Date().toISOString();
@@ -1368,8 +1368,8 @@ export default function Dashboard({
             </TabsTrigger>
             <TabsTrigger value="history">
               <ScrollText className="tab-icon" aria-hidden="true" />
-              <span className="tab-long">Purchase log</span>
-              <span className="tab-short">Log</span>
+              <span className="tab-long">Activity</span>
+              <span className="tab-short">Activity</span>
             </TabsTrigger>
             <TabsTrigger value="sip">
               <Sparkles className="tab-icon" aria-hidden="true" />
@@ -1637,17 +1637,14 @@ export default function Dashboard({
         <TabsContent value="history">
           <div className="section-top">
             <div>
-              <h2>Purchase log</h2>
-              <p>
-                Every purchase, sale, dividend and split in one dated timeline.
-                Open a company for its own page.
-              </p>
+              <h2>Activity</h2>
+              <p>Every buy, sale, dividend and split, newest first.</p>
             </div>
             <button
               disabled={busy}
               onClick={() => openTx('buy')}
             >
-              <Plus size={16} /> Add purchase
+              <Plus size={16} /> Add transaction
             </button>
           </div>
           <LedgerTimeline
