@@ -1,4 +1,5 @@
 'use client';
+import { useConfirm } from '@/components/confirm-dialog';
 import { useState } from 'react';
 import { ArrowLeft, ExternalLink, Plus, Save } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -63,6 +64,7 @@ export function Dossier({
   onBack: () => void;
 }) {
   const [c, setC] = useState<Company>(() => structuredClone(company));
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [docTitle, setDocTitle] = useState('');
@@ -99,12 +101,18 @@ export function Dossier({
     : rubric;
   return (
     <>
+      {confirmDialog}
       <button
         className="back"
-        onClick={() => {
+        onClick={async () => {
           if (
             !dirty ||
-            window.confirm('Leave without saving your dossier changes?')
+            (await confirm({
+              title: 'Leave without saving?',
+              description: 'Your dossier changes have not been saved.',
+              confirmLabel: 'Leave',
+              destructive: true,
+            }))
           )
             onBack();
         }}

@@ -19,6 +19,7 @@ type Props = {
   onSave: (next: Portfolio, message?: string) => Promise<void>;
   onRefreshPrices: () => Promise<void>;
   onManualPrice: (ticker: string) => void;
+  onRecordBuys?: (picks: { ticker: string; shares: number; price: number | null }[], month: string) => void;
   onOpenCompany: (ticker: string) => void;
 };
 
@@ -28,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function MonthlyPicks({
-  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany,
+  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys,
 }: Props) {
   const initial = portfolio.monthlyPicksShortlist?.length
     ? portfolio.monthlyPicksShortlist
@@ -149,7 +150,7 @@ export default function MonthlyPicks({
       )}
 
       {current?.result && !active && (
-        <PicksResults run={current} portfolio={portfolio} onRefreshPrices={() => void onRefreshPrices()} onManualPrice={onManualPrice} onOpenCompany={onOpenCompany} />
+        <PicksResults run={current} portfolio={portfolio} onRefreshPrices={() => void onRefreshPrices()} onManualPrice={onManualPrice} onOpenCompany={onOpenCompany} onRecordBuys={onRecordBuys} />
       )}
 
       {!current && !recs.error && (

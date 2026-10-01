@@ -1,4 +1,5 @@
 'use client';
+import { useConfirm } from '@/components/confirm-dialog';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -50,6 +51,7 @@ import {
   holdings,
   plan,
   money,
+  moneyShort,
   today,
   round,
   validate,
@@ -181,6 +183,8 @@ const blankTrade = (
   month: kind === 'buy' ? today().slice(0, 7) : '',
   note: '',
 });
+type PickBuy = { ticker: string; shares: number; price: number | null };
+type PickQueue = { picks: PickBuy[]; month: string; index: number };
 const blankDividend = (ticker: string): Dividend => ({
   id: crypto.randomUUID(),
   ticker,
@@ -406,6 +410,8 @@ export default function Dashboard({
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, [isAdmin]);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [pickQueue, setPickQueue] = useState<PickQueue | null>(null);
   const [p, setP] = useState<Portfolio | null>(null),
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
@@ -1001,6 +1007,22 @@ export default function Dashboard({
     setDividend(blankDividend(ticker));
     setStockSplit(blankStockSplit(ticker));
   }
+  /** Monthly Picks "Record these buys": walks the dialog through each priced pick in turn. */
+  function openPick(queue: PickQueue, index: number) {
+    const pick = queue.picks[index];
+    if (!pick) {
+      setPickQueue(null);
+      closeTx();
+      return;
+    }
+    setPickQueue({ ...queue, index });
+    openTx('buy', pick.ticker, pick.price);
+    setTrade((t) => t && { ...t, shares: pick.shares, month: queue.month });
+  }
+  function recordPicks(picks: PickBuy[], pickMonth: string) {
+    const valid = picks.filter((x) => x.price !== null && x.price > 0 && x.shares > 0);
+    if (valid.length) openPick({ picks: valid, month: pickMonth, index: 0 }, 0);
+  }
   function closeTx() {
     setTrade(null);
     setDividend(null);
@@ -1169,6 +1191,7 @@ export default function Dashboard({
         : `${isNew ? `${trade.ticker} confirmed on PSX and added to your companies. ` : ''}Transaction saved as a new line item. Holdings and average cost updated.`,
     );
     closeTx();
+    if (pickQueue && !editing) openPick(pickQueue, pickQueue.index + 1);
   }
   async function recordStockSplit(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -1452,6 +1475,16 @@ export default function Dashboard({
         )}
       </header>
         <TabsContent value="holdings">
+          {p.companies.length === 0 ? (
+            <div className="panel empty-holdings">
+              <h2>No holdings yet</h2>
+              <p>Record your first purchase to start tracking your portfolio.</p>
+              <button disabled={busy} onClick={() => openTx('buy')}>
+                <Plus size={16} /> Add your first transaction
+              </button>
+            </div>
+          ) : (
+          <>
           <PortfolioValueCard
             p={p}
             value={value}
@@ -1580,13 +1613,13 @@ export default function Dashboard({
                   <div>
                     <dt>Value</dt>
                     <dd className="amount">
-                      {h.value === null ? '—' : money(h.value)}
+                      {h.value === null ? '—' : moneyShort(h.value)}
                     </dd>
                   </div>
                   <div>
                     <dt>Gain</dt>
                     <dd className={gainClass(h)}>
-                      {h.gain === null ? '—' : money(h.gain)}
+                      {h.gain === null ? '—' : moneyShort(h.gain)}
                       {gainPct(h) !== null && <small>{gainText(h)}</small>}
                     </dd>
                   </div>
@@ -1706,10 +1739,10 @@ export default function Dashboard({
                       )}
                     </TableCell>
                     <TableCell>
-                      {h.value === null ? '—' : money(h.value)}
+                      {h.value === null ? '—' : moneyShort(h.value)}
                     </TableCell>
                     <TableCell className={gainClass(h)}>
-                      {h.gain === null ? '—' : money(h.gain)}
+                      {h.gain === null ? '—' : moneyShort(h.gain)}
                       {gainPct(h) !== null && <small>{gainText(h)}</small>}
                     </TableCell>
                     <TableCell>
@@ -1743,6 +1776,8 @@ export default function Dashboard({
             </p>
           </section>
           <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
+          </>
+          )}
         </TabsContent>
         <TabsContent value="reports">
           <PortfolioReports portfolio={p} />
@@ -1756,6 +1791,7 @@ export default function Dashboard({
             setFeePct={setFees}
             busy={busy}
             onSave={save}
+            onRecordBuys={recordPicks}
             onRefreshPrices={refresh}
             onOpenCompany={openCompany}
             onManualPrice={(ticker) => {
@@ -1859,15 +1895,15 @@ export default function Dashboard({
         <div className="row">
           <span>All amounts in PKR · Private saved ledger</span>
         </div>
-        <p>
-          Plans are estimates. Actual execution prices, fees, taxes and
-          corporate actions may differ. No orders are placed by this dashboard.
-        </p>
       </footer>
+      {confirmDialog}
       <Dialog
         open={!!(trade || dividend || stockSplit)}
         onOpenChange={(open) => {
-          if (!open) closeTx();
+          if (!open) {
+            setPickQueue(null);
+            closeTx();
+          }
         }}
       >
         <DialogContent className="form-dialog tx-dialog">
@@ -1902,9 +1938,16 @@ export default function Dashboard({
               split:
                 'A split or bonus issue changes the number of shares held before its effective date. Total purchase cost stays unchanged. A 1 for 4 bonus is 4 old shares becoming 5 new.',
             }[txType];
-            const voidEntry = () => {
+            const voidEntry = async () => {
+              const ok = () =>
+                confirm({
+                  title: `Void this ${editing ? 'entry' : editingDividend ? 'dividend record' : 'stock split'}?`,
+                  description: 'Its audit record will remain.',
+                  confirmLabel: 'Void',
+                  destructive: true,
+                });
               if (editing) {
-                if (!window.confirm('Void this entry? Its audit record will remain.')) return;
+                if (!(await ok())) return;
                 attempt(async () => {
                   const next = clone(p);
                   next.trades.find((x) => x.id === editing)!.voided = true;
@@ -1912,7 +1955,7 @@ export default function Dashboard({
                   closeTx();
                 });
               } else if (editingDividend) {
-                if (!window.confirm('Void this dividend record? Its audit record will remain.')) return;
+                if (!(await ok())) return;
                 attempt(async () => {
                   const next = clone(p);
                   next.dividends!.find((x) => x.id === editingDividend)!.voided = true;
@@ -1920,7 +1963,7 @@ export default function Dashboard({
                   closeTx();
                 });
               } else if (editingStockSplit) {
-                if (!window.confirm('Void this stock split? Its audit record will remain.')) return;
+                if (!(await ok())) return;
                 attempt(async () => {
                   const next = clone(p);
                   next.stockSplits!.find((x) => x.id === editingStockSplit)!.voided = true;
@@ -1931,7 +1974,7 @@ export default function Dashboard({
             };
             return (
               <>
-                <DialogTitle>{title}</DialogTitle>
+                <DialogTitle>{pickQueue ? `Pick ${pickQueue.index + 1} of ${pickQueue.picks.length} · ${title}` : title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
                 <form
                   onSubmit={(e) =>
@@ -2228,6 +2271,16 @@ export default function Dashboard({
                             ? 'Save stock split'
                             : 'Save entry'}
                     </button>
+                    {pickQueue && (
+                      <button
+                        className="secondary"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => openPick(pickQueue, pickQueue.index + 1)}
+                      >
+                        Skip
+                      </button>
+                    )}
                     {correcting && (
                       <button
                         className="secondary"
