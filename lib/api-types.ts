@@ -19,6 +19,10 @@ export type MeResponse = {
   role: Role;
 };
 
+/** DELETE /api/me body: the signed-in email, typed by the user, confirms the permanent deletion. */
+export type DeleteAccountRequest = { confirm: string };
+export type DeleteAccountResponse = { deleted: true };
+
 export type MobileSignInRequest = {
   /** Google ID token from the native Google Sign-In SDK. */
   idToken: string;
