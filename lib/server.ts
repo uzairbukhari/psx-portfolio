@@ -5,7 +5,8 @@ import { UserError, publicError } from '@/lib/user-error';
 export async function identity(req: Request, write = false) {
   const user = await getCurrentUser();
   if (!user) throw new UserError('Sign in to access your portfolio.', 401);
-  if (write && req.headers.get('origin') !== new URL(req.url).origin)
+  // CSRF only applies to ambient cookies; a bearer token is never sent by a browser on its own.
+  if (write && user.via !== 'bearer' && req.headers.get('origin') !== new URL(req.url).origin)
     throw new UserError('Invalid request origin.', 403);
   return user.email;
 }

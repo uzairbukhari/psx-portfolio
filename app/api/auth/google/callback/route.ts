@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { safeRelativeReturnPath } from '@/lib/auth';
+import { emailAllowed, safeGooglePicture } from '@/lib/google-id-token';
 import {
   readCookieValue,
   serializeCookie,
@@ -47,19 +48,15 @@ export async function GET(req: Request) {
     picture?: string;
   };
 
-  const allowed = (env.ALLOWED_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
   const email = userInfo.email?.toLowerCase();
   if (!userInfo.email_verified || !email)
     return redirectWithError(url.origin, 'oauth_email');
-  if (allowed.length && !allowed.includes(email))
+  if (!emailAllowed(email, env.ALLOWED_EMAILS))
     return redirectWithError(url.origin, 'oauth_email');
 
   if (!env.SESSION_SECRET) return redirectWithError(url.origin, 'oauth_config');
   const name = typeof userInfo.name === 'string' ? userInfo.name : null;
-  const picture = safePicture(userInfo.picture);
+  const picture = safeGooglePicture(userInfo.picture);
   const sessionToken = await signSession(
     email,
     name,
@@ -82,16 +79,4 @@ export async function GET(req: Request) {
 
 function redirectWithError(origin: string, code: string): Response {
   return Response.redirect(new URL(`/?error=${code}`, origin).toString(), 302);
-}
-
-function safePicture(value: unknown): string | null {
-  if (typeof value !== 'string' || value.length > 500) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname.endsWith('.googleusercontent.com')
-      ? url.toString()
-      : null;
-  } catch {
-    return null;
-  }
 }

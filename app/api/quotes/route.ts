@@ -1,3 +1,4 @@
+import type { QuotesResponse } from '@/lib/api-types';
 import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
 import { refreshQuotes } from '@/lib/quote-cache';
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     if (!Object.keys(quotes).length && errors.length)
       throw new UserError('Every PSX quote request failed.');
     return Response.json(
-      { quotes, errors, reasons: failed, stale },
+      { quotes, errors, reasons: failed, stale } satisfies QuotesResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

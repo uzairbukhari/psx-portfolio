@@ -16,6 +16,9 @@
     "ALLOWED_EMAILS": "",
     // Public OAuth client ID from Google Cloud Console (not a secret).
     "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+    // Comma-separated iOS + Android OAuth client IDs (public, not secrets) whose Google
+    // ID tokens the native apps may exchange at /api/auth/mobile/google. Empty = off.
+    "GOOGLE_MOBILE_CLIENT_IDS": "",
     // Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
     // data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
     "GITHUB_REPO": "uzairbukhari/psx-portfolio",
@@ -45,6 +48,7 @@
       "vars": {
         "ALLOWED_EMAILS": "suzairbukhari@gmail.com",
         "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+        "GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
         "GITHUB_REPO": "uzairbukhari/psx-portfolio",
         "AI_MONTHLY_CAP_USD": "0.25",
         "APP_ENV": "staging"
