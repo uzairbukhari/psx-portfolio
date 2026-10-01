@@ -82,6 +82,8 @@ jobs:
       - name: Deploy staging Worker
         id: deploy
         if: steps.configured.outputs.ready == 'true'
+        # `shell: bash` adds pipefail, so a failed deploy isn't hidden by `tee`.
+        shell: bash
         run: |
           npx wrangler deploy --config dist/server/wrangler.json 2>&1 | tee deploy.log
           url=$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' deploy.log | head -n 1 || true)
