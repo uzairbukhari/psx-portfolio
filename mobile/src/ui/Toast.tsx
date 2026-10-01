@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii } from '@/theme/tokens';
+import { makeStyles } from '@/theme/ThemeProvider';
+import { radii } from '@/theme/tokens';
 
 type ToastInput = { message: string; actionLabel?: string; onAction?: () => void | Promise<void>; durationMs?: number };
 type ToastState = ToastInput & { id: number };
@@ -15,6 +16,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [acting, setActing] = useState(false);
   const idRef = useRef(0);
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
 
   const show = useCallback((t: ToastInput) => {
     setActing(false);
@@ -33,7 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {toast ? (
-        <View pointerEvents="box-none" style={[styles.host, { bottom: Math.max(insets.bottom, 8) + 64 }]}>
+        <View pointerEvents="box-none" style={[styles.host, { bottom: Math.max(insets.bottom, 8) + 72 }]}>
           <View style={styles.toast} accessibilityLiveRegion="polite">
             <Text style={styles.message}>{toast.message}</Text>
             {toast.actionLabel && toast.onAction ? (
@@ -69,22 +71,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+// The toast is inverted (ink on a dark chip in light, light chip in dark) so it stands out from the screen under it.
+const useStyles = makeStyles((c) => ({
   host: { position: 'absolute', left: 16, right: 16 },
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.cardRaised,
-    borderColor: colors.borderStrong,
-    borderWidth: 1,
-    borderRadius: radii.md,
+    backgroundColor: c.ink,
+    borderRadius: radii.control,
     paddingLeft: 16,
     paddingRight: 8,
     minHeight: 52,
     elevation: 6,
   },
-  message: { flex: 1, color: colors.foreground, fontSize: 14, paddingVertical: 12 },
+  message: { flex: 1, color: c.bg, fontSize: 14, lineHeight: 20, fontWeight: '600', paddingVertical: 12 },
   action: { minHeight: 48, minWidth: 48, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
-  actionText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
-});
+  actionText: { color: c.bg, fontWeight: '700', fontSize: 14, textDecorationLine: 'underline' },
+}));

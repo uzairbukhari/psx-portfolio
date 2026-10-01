@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { chartSummary } from '@/data/a11y';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeProvider';
 
 /** Minimal price line with a soft fill. `points` are chronological [time, value] pairs. */
 export function LineChart({ points, height = 150, label = 'Price chart' }: { points: [number, number][]; height?: number; label?: string }) {
+  const { colors } = useTheme();
   const [width, setWidth] = useState(0);
   const pad = 6;
   let line = '';
@@ -22,7 +23,7 @@ export function LineChart({ points, height = 150, label = 'Price chart' }: { poi
     area = `${line} L${sx(x1).toFixed(1)} ${height} L${sx(x0).toFixed(1)} ${height} Z`;
     up = ys[ys.length - 1] >= ys[0];
   }
-  const color = up ? colors.success : colors.danger;
+  const color = up ? colors.gain : colors.loss;
   return (
     <View
       style={{ height }}

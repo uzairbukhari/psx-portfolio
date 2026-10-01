@@ -178,3 +178,25 @@ export function setFilerStatus(p: Portfolio, filerStatus: FilerStatus): Portfoli
   next.taxProfile = { filerStatus };
   return next;
 }
+
+export type BuyDraft = { ticker: string; shares: number; price: number; fees?: number };
+
+/**
+ * Records several planned buys as one change (one save, one revision). Each buy is a normal manual trade
+ * tagged to the SIP month, so Activity, Reports and the plan treat it like a buy entered one at a time.
+ */
+export function recordBuys(p: Portfolio, buys: BuyDraft[], month: string, date: string = today(), note = ''): Portfolio {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Invalid month.');
+  if (!buys.length) throw new Error('There are no buys to record.');
+  if (!isIsoDate(date)) throw new Error('Enter the date as YYYY-MM-DD.');
+  const next = clonePortfolio(p);
+  for (const b of buys) {
+    if (!next.companies.some((c) => c.ticker === b.ticker)) throw new Error(`${b.ticker} is not in your portfolio.`);
+    if (!Number.isInteger(b.shares) || b.shares <= 0) throw new Error(`${b.ticker}: enter a whole number of shares.`);
+    if (!(b.price > 0)) throw new Error(`${b.ticker}: enter a price above zero.`);
+    const fees = b.fees ?? 0;
+    if (!(fees >= 0)) throw new Error(`${b.ticker}: fees cannot be negative.`);
+    next.trades.push({ id: newId(), ticker: b.ticker, kind: 'buy', date, shares: b.shares, price: b.price, fees, month, note });
+  }
+  return next;
+}

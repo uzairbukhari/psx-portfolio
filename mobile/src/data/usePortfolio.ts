@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PortfolioResponse, QuotesResponse, SavePortfolioRequest, SavePortfolioResponse } from '@shared/api-types.ts';
+import { notificationCounts } from '@shared/notification-actions.ts';
 import { validate, type Portfolio } from '@shared/portfolio.ts';
 import { ApiRequestError } from '@/api/client';
 import { useAuth } from '@/auth/AuthProvider';
 import { syncAnnouncementsOnLoad } from './auto-dividends';
 import { openPositions, priceTickers, safeHoldings, totals } from './derive';
-import { useCachedPortfolio } from './PortfolioCacheProvider';
+import { useCachedPortfolio, useCachedSavedAt } from './PortfolioCacheProvider';
 import { writePortfolioCache } from './portfolio-cache';
 
 export function usePortfolio() {
@@ -14,6 +15,7 @@ export function usePortfolio() {
   const queryClient = useQueryClient();
   const email = state.status === 'signedIn' ? state.user.email : '';
   const cached = useCachedPortfolio();
+  const cachedSavedAt = useCachedSavedAt();
 
   const query = useQuery({
     queryKey: ['portfolio', email],
@@ -83,7 +85,26 @@ export function usePortfolio() {
     isRefetching: query.isRefetching,
     error: query.error,
     offline: Boolean(query.error) && Boolean(data),
+    /** When the data on screen was last fetched or saved (ms since epoch); null if unknown. */
+    savedAt: query.dataUpdatedAt || cachedSavedAt,
     refetch: query.refetch,
     refreshPrices,
   };
+}
+
+/**
+ * Unread alert count for the bell badge. It watches the shared portfolio query's cache without being an
+ * observer of it, so it can never fetch the query or change how the real observers fetch it.
+ */
+export function useUnreadAlerts(): number {
+  const { state } = useAuth();
+  const email = state.status === 'signedIn' ? state.user.email : '';
+  const queryClient = useQueryClient();
+  const cached = useCachedPortfolio();
+  const live = useSyncExternalStore(
+    (notify) => queryClient.getQueryCache().subscribe(notify),
+    () => queryClient.getQueryData<PortfolioResponse>(['portfolio', email]),
+  );
+  const data = live ?? cached;
+  return useMemo(() => (data ? notificationCounts(data.portfolio.notifications ?? []).unread : 0), [data]);
 }

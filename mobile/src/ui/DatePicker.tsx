@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, Text, View } from 'react-native';
 import { today } from '@shared/portfolio.ts';
 import { WEEKDAYS, addDays, monthGrid, monthTitle, shiftYearMonth, spokenDate } from '@/data/calendar';
 import { isIsoDate } from '@/data/mutations';
-import { colors, radii } from '@/theme/tokens';
-import { Button } from './kit';
+import { makeStyles, useTheme } from '@/theme/ThemeProvider';
+import { layout, radii } from '@/theme/tokens';
+import { Button, Sheet } from './kit';
 import { Icon } from './Icon';
 
 const parts = (date: string) => ({ year: Number(date.slice(0, 4)), month: Number(date.slice(5, 7)) });
 
 /** Date field built from JS only: step a day at a time, or open a month grid. Value is 'YYYY-MM-DD'. */
 export function DatePicker({ label, value, onChange, disabled }: { label: string; value: string; onChange: (date: string) => void; disabled?: boolean }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const valid = isIsoDate(value);
   const [view, setView] = useState(() => parts(valid ? value : today()));
@@ -32,7 +34,7 @@ export function DatePicker({ label, value, onChange, disabled }: { label: string
       <View style={styles.field}>
         <Pressable accessibilityRole="button" accessibilityLabel={`${label}: previous day`} disabled={disabled} onPress={() => step(-1)} style={styles.step}>
           <View style={{ transform: [{ rotate: '180deg' }] }}>
-            <Icon name="chevronRight" size={18} color={colors.foreground} />
+            <Icon name="chevronRight" size={18} color={colors.ink} />
           </View>
         </Pressable>
         <Pressable
@@ -46,24 +48,22 @@ export function DatePicker({ label, value, onChange, disabled }: { label: string
           {valid ? <Text style={styles.sub}>{spokenDate(value)}{value === todayIso ? ' · today' : ''}</Text> : null}
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={`${label}: next day`} disabled={disabled} onPress={() => step(1)} style={styles.step}>
-          <Icon name="chevronRight" size={18} color={colors.foreground} />
+          <Icon name="chevronRight" size={18} color={colors.ink} />
         </Pressable>
       </View>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View style={styles.backdrop}>
-          <SafeAreaView edges={['bottom']} style={styles.sheet} accessibilityViewIsModal>
+      <Sheet visible={open} onClose={() => setOpen(false)}>
             <View style={styles.monthRow}>
               <Pressable accessibilityRole="button" accessibilityLabel="Previous month" onPress={() => setView((v) => shiftYearMonth(v, -1))} style={styles.step}>
                 <View style={{ transform: [{ rotate: '180deg' }] }}>
-                  <Icon name="chevronRight" size={18} color={colors.foreground} />
+                  <Icon name="chevronRight" size={18} color={colors.ink} />
                 </View>
               </Pressable>
               <Text style={styles.monthTitle} accessibilityRole="header" accessibilityLiveRegion="polite">
                 {monthTitle(view)}
               </Text>
               <Pressable accessibilityRole="button" accessibilityLabel="Next month" onPress={() => setView((v) => shiftYearMonth(v, 1))} style={styles.step}>
-                <Icon name="chevronRight" size={18} color={colors.foreground} />
+                <Icon name="chevronRight" size={18} color={colors.ink} />
               </Pressable>
             </View>
             <View style={styles.week} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -85,7 +85,7 @@ export function DatePicker({ label, value, onChange, disabled }: { label: string
                       onPress={() => setDraft(day)}
                       style={[styles.day, day === draft && styles.daySelected, day === todayIso && day !== draft && styles.dayToday]}
                     >
-                      <Text style={[styles.dayText, day === draft && { color: colors.primaryForeground, fontWeight: '700' }]}>{Number(day.slice(8))}</Text>
+                      <Text style={[styles.dayText, day === draft && { color: colors.onPrimary, fontWeight: '700' }]}>{Number(day.slice(8))}</Text>
                     </Pressable>
                   ) : (
                     <View key={`pad-${j}`} style={styles.day} />
@@ -96,7 +96,7 @@ export function DatePicker({ label, value, onChange, disabled }: { label: string
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
               <Button
                 label="Today"
-                variant="secondary"
+                variant="outline"
                 style={{ flex: 1 }}
                 onPress={() => {
                   setDraft(todayIso);
@@ -113,29 +113,25 @@ export function DatePicker({ label, value, onChange, disabled }: { label: string
                 }}
               />
             </View>
-            <Button label="Cancel" variant="ghost" onPress={() => setOpen(false)} />
-          </SafeAreaView>
-        </View>
-      </Modal>
+            <Button label="Cancel" variant="text" onPress={() => setOpen(false)} />
+      </Sheet>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  label: { color: colors.muted, fontSize: 12, fontWeight: '500' },
-  field: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: radii.sm, overflow: 'hidden' },
-  step: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  value: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, minHeight: 48 },
-  valueText: { color: colors.foreground, fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  sub: { color: colors.muted, fontSize: 12 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.card, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, padding: 16, gap: 4 },
+const useStyles = makeStyles((c) => ({
+  label: { color: c.muted, fontSize: 12, fontWeight: '600' },
+  field: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: c.surface, borderColor: c.outline, borderWidth: 1, borderRadius: radii.control, overflow: 'hidden' },
+  step: { width: layout.minTarget, minHeight: layout.minTarget, alignItems: 'center', justifyContent: 'center' },
+  value: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, minHeight: layout.minTarget },
+  valueText: { color: c.ink, fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  sub: { color: c.muted, fontSize: 12 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  monthTitle: { color: colors.foreground, fontSize: 17, fontWeight: '600' },
+  monthTitle: { color: c.ink, fontSize: 17, fontWeight: '600' },
   week: { flexDirection: 'row' },
-  weekday: { flex: 1, textAlign: 'center', color: colors.muted, fontSize: 12, paddingVertical: 6 },
-  day: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radii.sm },
-  daySelected: { backgroundColor: colors.primary },
-  dayToday: { borderWidth: 1, borderColor: colors.primary },
-  dayText: { color: colors.foreground, fontSize: 15, fontVariant: ['tabular-nums'] },
-});
+  weekday: { flex: 1, textAlign: 'center', color: c.muted, fontSize: 12, paddingVertical: 6 },
+  day: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radii.control },
+  daySelected: { backgroundColor: c.primary },
+  dayToday: { borderWidth: 1, borderColor: c.primary },
+  dayText: { color: c.ink, fontSize: 15, fontVariant: ['tabular-nums'] },
+}));

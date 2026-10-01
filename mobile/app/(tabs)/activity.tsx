@@ -5,12 +5,15 @@ import { router } from 'expo-router';
 import { ACTIVITY_FILTERS, filterActivity, groupByMonth, type ActivityFilter } from '@/data/activity-view';
 import { activityEntries } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeProvider';
 import { ActivityRow } from '@/ui/ActivityRow';
-import { Chip, EmptyState, Header, Input, Loading, Notice, styles } from '@/ui/kit';
+import { AppBar } from '@/ui/AppBar';
+import { Button, Chip, EmptyState, Input, Loading, Notice, useKitStyles } from '@/ui/kit';
 
 export default function Activity() {
   const p = usePortfolio();
+  const styles = useKitStyles();
+  const { colors } = useTheme();
   const [filter, setFilter] = useState<ActivityFilter>('all');
   const [query, setQuery] = useState('');
   const entries = useMemo(() => (p.portfolio ? activityEntries(p.portfolio) : []), [p.portfolio]);
@@ -21,7 +24,10 @@ export default function Activity() {
   if (p.isLoading)
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
-        <Loading />
+        <View style={{ padding: 16, gap: 12 }}>
+          <AppBar title="Activity" />
+          <Loading />
+        </View>
       </SafeAreaView>
     );
   return (
@@ -34,11 +40,11 @@ export default function Activity() {
         keyboardShouldPersistTaps="handled"
         initialNumToRender={16}
         windowSize={7}
-        contentContainerStyle={{ paddingBottom: 48 }}
-        refreshControl={<RefreshControl refreshing={p.isRefetching} onRefresh={() => void p.refetch()} tintColor={colors.primary} />}
+        contentContainerStyle={{ paddingBottom: 112 }}
+        refreshControl={<RefreshControl refreshing={p.isRefetching} onRefresh={() => void p.refetch()} tintColor={colors.primary} colors={[colors.primary]} />}
         ListHeaderComponent={
           <View style={{ padding: 16, gap: 12 }}>
-            <Header
+            <AppBar
               title="Activity"
               subtitle={
                 entries.length
@@ -48,6 +54,7 @@ export default function Activity() {
                   : undefined
               }
             />
+            {p.offline ? <Notice tone="offline">Offline · showing your saved copy.</Notice> : null}
             {p.error && !p.portfolio ? <Notice tone="error">{p.error.message}</Notice> : null}
             {entries.length ? (
               <>
@@ -65,19 +72,20 @@ export default function Activity() {
                     <Chip key={f.key} role="radio" label={f.label} accessibilityLabel={`Show ${f.label.toLowerCase()}`} selected={filter === f.key} onPress={() => setFilter(f.key)} />
                   ))}
                 </View>
+                <Button label="Import history" variant="text" icon="upload" onPress={() => router.push('/import')} style={{ alignSelf: 'flex-start' }} />
               </>
             ) : null}
           </View>
         }
         renderSectionHeader={({ section }) => (
-          <View style={{ backgroundColor: colors.background, paddingHorizontal: 16, paddingVertical: 8 }}>
+          <View style={{ backgroundColor: colors.bg, paddingHorizontal: 16, paddingVertical: 8 }}>
             <Text style={styles.sectionLabel} accessibilityRole="header">
               {section.title} · {section.data.length}
             </Text>
           </View>
         )}
         renderItem={({ item, index, section }) => (
-          <View style={{ marginHorizontal: 16, backgroundColor: colors.card, borderColor: colors.border, borderLeftWidth: 1, borderRightWidth: 1, borderTopWidth: index === 0 ? 1 : 0, borderBottomWidth: index === section.data.length - 1 ? 1 : 0, borderTopLeftRadius: index === 0 ? 14 : 0, borderTopRightRadius: index === 0 ? 14 : 0, borderBottomLeftRadius: index === section.data.length - 1 ? 14 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 14 : 0, overflow: 'hidden' }}>
+          <View style={{ marginHorizontal: 16, backgroundColor: colors.surface, borderColor: colors.line, borderLeftWidth: 1, borderRightWidth: 1, borderTopWidth: index === 0 ? 1 : 0, borderBottomWidth: index === section.data.length - 1 ? 1 : 0, borderTopLeftRadius: index === 0 ? 16 : 0, borderTopRightRadius: index === 0 ? 16 : 0, borderBottomLeftRadius: index === section.data.length - 1 ? 16 : 0, borderBottomRightRadius: index === section.data.length - 1 ? 16 : 0, overflow: 'hidden' }}>
             <ActivityRow
               entry={item}
               last={index === section.data.length - 1}
@@ -87,7 +95,12 @@ export default function Activity() {
         )}
         ListEmptyComponent={
           entries.length === 0 ? (
-            <EmptyState icon="activity" title="Nothing recorded yet" body="Trades and dividends you add or import will appear here." />
+            <EmptyState
+              icon="activity"
+              title="Nothing recorded yet"
+              body="Buys, sales, dividends and splits appear here, newest first."
+              action={<Button label="Import history" icon="upload" onPress={() => router.push('/import')} />}
+            />
           ) : (
             <EmptyState icon="activity" title="No entries match" body="Try a different search or filter." />
           )

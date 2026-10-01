@@ -6,11 +6,13 @@ import { money, today } from '@shared/portfolio.ts';
 import { companyDividends } from '@/data/derive';
 import { isIsoDate, markDividendReceived, parseNumber } from '@/data/mutations';
 import { usePortfolio } from '@/data/usePortfolio';
-import { colors } from '@/theme/tokens';
-import { Button, Card, Input, Loading, Muted, Notice, styles } from '@/ui/kit';
+import { useTheme } from '@/theme/ThemeProvider';
+import { Button, Card, Input, Loading, Muted, Notice, useKitStyles } from '@/ui/kit';
 
 /** Confirms that an expected PSX dividend arrived, with the actual gross amount and tax withheld if they differ. */
 export default function Received() {
+  const styles = useKitStyles();
+  const { colors } = useTheme();
   const { id: raw } = useLocalSearchParams<{ id: string }>();
   const id = String(raw ?? '');
   const p = usePortfolio();
@@ -43,7 +45,7 @@ export default function Received() {
 
   const waiting = row?.status === 'expected';
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
       <Stack.Screen options={{ title: dividend ? `${dividend.ticker} dividend` : 'Dividend' }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">

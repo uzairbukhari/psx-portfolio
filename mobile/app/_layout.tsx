@@ -1,6 +1,5 @@
 import { ActivityIndicator, AppState, Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
@@ -8,14 +7,15 @@ import { BiometricLockProvider } from '@/auth/BiometricLock';
 import { PortfolioCacheProvider } from '@/data/PortfolioCacheProvider';
 import { PushBridge } from '@/push/PushBridge';
 import { SignIn } from '@/screens/SignIn';
-import { colors } from '@/theme/tokens';
+import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { ToastProvider } from '@/ui/Toast';
 
 function Root() {
   const { state } = useAuth();
+  const { colors } = useTheme();
   if (state.status === 'loading')
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center' }}>
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -26,20 +26,23 @@ function Root() {
         <PushBridge />
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: colors.background },
+            headerStyle: { backgroundColor: colors.bg },
             headerTintColor: colors.primary,
-            headerTitleStyle: { color: colors.foreground, fontWeight: '700' },
+            headerTitleStyle: { color: colors.ink, fontWeight: '700' },
             headerShadowVisible: false,
             headerBackButtonDisplayMode: 'minimal',
             animation: 'slide_from_right',
-            contentStyle: { backgroundColor: colors.background },
+            contentStyle: { backgroundColor: colors.bg },
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="company/[ticker]" options={{ title: '' }} />
+          <Stack.Screen name="inbox" options={{ title: 'Inbox' }} />
+          <Stack.Screen name="more" options={{ title: 'More' }} />
           <Stack.Screen name="import" options={{ title: 'Import' }} />
-          <Stack.Screen name="reports" options={{ title: 'Reports' }} />
-          <Stack.Screen name="picks" options={{ title: 'Monthly Picks' }} />
+          {/* Old paths that now live inside Portfolio and Plan; they redirect, so they have no header. */}
+          <Stack.Screen name="reports" options={{ headerShown: false }} />
+          <Stack.Screen name="picks" options={{ headerShown: false }} />
           <Stack.Screen name="targets" options={{ presentation: 'modal', title: 'Targets' }} />
           <Stack.Screen name="received" options={{ presentation: 'modal', title: 'Dividend' }} />
           <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
@@ -60,13 +63,14 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <StatusBar style="light" />
-        <BiometricLockProvider>
-          <Root />
-        </BiometricLockProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BiometricLockProvider>
+            <Root />
+          </BiometricLockProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

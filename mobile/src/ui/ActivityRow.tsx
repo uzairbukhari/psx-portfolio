@@ -1,18 +1,16 @@
 import { Text } from 'react-native';
 import { money } from '@shared/portfolio.ts';
 import type { ActivityEntry } from '@/data/derive';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeProvider';
+import { type } from '@/theme/tokens';
 import { Avatar, ListRow } from '@/ui/kit';
 
-const tone: Record<ActivityEntry['kind'], string> = {
-  buy: colors.foreground,
-  opening: colors.foreground,
-  sell: colors.danger,
-  dividend: colors.success,
-  split: colors.muted,
-};
+const SIGN: Record<ActivityEntry['kind'], string> = { buy: '−', opening: '', sell: '+', dividend: '+', split: '' };
 
-/** One ledger line. Put several inside a padding-less Card; `last` drops the final divider. */
+/**
+ * One ledger line. Put several inside a padding-less Card; `last` drops the final divider. The amount is the
+ * cash effect: money out for buys (−), money in for sales and dividends (+), so colour is not the only cue.
+ */
 export function ActivityRow({
   entry,
   showTicker = true,
@@ -24,14 +22,26 @@ export function ActivityRow({
   onPress?: () => void;
   last?: boolean;
 }) {
+  const { colors } = useTheme();
+  const tone: Record<ActivityEntry['kind'], string> = {
+    buy: colors.ink,
+    opening: colors.ink,
+    sell: colors.gain,
+    dividend: colors.gain,
+    split: colors.muted,
+  };
   return (
     <ListRow
-      left={showTicker ? <Avatar ticker={entry.ticker} size={36} /> : undefined}
+      left={showTicker ? <Avatar ticker={entry.ticker} size={40} /> : undefined}
       title={`${showTicker ? `${entry.ticker} · ` : ''}${entry.title}`}
       subtitle={`${entry.date}${entry.detail ? ` · ${entry.detail}` : ''}`}
+      wrapTitle
       right={
         entry.amount !== null ? (
-          <Text style={{ color: tone[entry.kind], fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{money(entry.amount)}</Text>
+          <Text style={{ color: tone[entry.kind], ...type.number }}>
+            {SIGN[entry.kind]}
+            {money(entry.amount)}
+          </Text>
         ) : undefined
       }
       accessibilityLabel={[
@@ -39,7 +49,7 @@ export function ActivityRow({
         entry.title,
         entry.date,
         entry.detail,
-        entry.amount !== null ? `amount ${money(entry.amount)}` : '',
+        entry.amount !== null ? `${entry.kind === 'buy' ? 'paid' : entry.kind === 'sell' || entry.kind === 'dividend' ? 'received' : 'amount'} ${money(entry.amount)}` : '',
       ]
         .filter(Boolean)
         .join(', ')}

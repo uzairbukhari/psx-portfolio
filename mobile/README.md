@@ -15,6 +15,12 @@ APP_VARIANT=staging API_BASE_URL=https://<staging worker> npx expo start --dev-c
 
 Native Google Sign-In does not work in Expo Go; use a development build (`eas build --profile development`).
 
+## Look and feel
+
+The Steady Steps design lives in `src/theme` (tokens, light and dark palettes, Appearance setting) and `src/ui/kit.tsx`. Colours come from `useTheme()` / `makeStyles()`, never from fixed constants; `palette.test.ts` checks the contrast of every text pair. The Appearance choice (System / Light / Dark) is stored in SecureStore (`sipwise.appearance`) and "System" follows the phone. `userInterfaceStyle: 'automatic'` in `app.config.ts` only takes effect in the next native build; until then the JS theme still switches, but the OS dialog theme follows the old fixed setting.
+
+Navigation: tabs Today, Portfolio, Plan, Activity; the header bell opens the Inbox (`/inbox`) and the avatar opens More (`/more`). Old paths still work and redirect: `/sip` → `/plan`, `/alerts` → `/inbox`, `/account` → `/more`, `/reports` → `/portfolio?segment=insights`, `/picks` → `/plan?mode=picks` (guarded by `src/routes.test.ts`).
+
 ## Variants
 
 `APP_VARIANT` = `development` | `staging` | `production` (see `app.config.ts`). Each has its own bundle id (`com.uzairbukhari.sipwise[.dev|.staging]`) so they install side by side. Staging points at the staging Worker.

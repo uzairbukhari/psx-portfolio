@@ -33,7 +33,7 @@ const config: ExpoConfig = {
   scheme: `sipwise${v.suffix.replace('.', '-')}`,
   orientation: 'portrait',
   icon: './assets/icon.png',
-  userInterfaceStyle: 'dark',
+  userInterfaceStyle: 'automatic',
   backgroundColor: '#05070d',
   ios: { bundleIdentifier: bundleId, supportsTablet: false },
   android: {

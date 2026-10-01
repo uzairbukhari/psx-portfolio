@@ -8,12 +8,12 @@ import { useAuth } from '@/auth/AuthProvider';
 import { addCompany, isIsoDate, isValidSymbol, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry, type EntryKind } from '@/data/mutations';
 import { readOnlyReason } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
-import { colors } from '@/theme/tokens';
+import { useTheme } from '@/theme/ThemeProvider';
 import { splitPreview, tradeTotals } from '@/data/entry-form';
 import { CompanyPicker, NEW_COMPANY } from '@/ui/CompanyPicker';
 import { DatePicker } from '@/ui/DatePicker';
 import { useToast } from '@/ui/Toast';
-import { Button, Card, Chip, Input, Muted, Notice, SectionLabel, styles as kit } from '@/ui/kit';
+import { Button, Card, Chip, Input, Muted, Notice, SectionLabel, useKitStyles } from '@/ui/kit';
 
 type Kind = 'buy' | 'sell' | 'dividend' | 'split' | 'opening';
 const KINDS: { key: Kind; label: string }[] = [
@@ -58,6 +58,8 @@ function Chips<T extends string>({ items, value, onChange, disabled }: { items: 
 }
 
 export default function Transaction() {
+  const kit = useKitStyles();
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string; shares?: string; price?: string; month?: string }>();
   const p = usePortfolio();
   const { api } = useAuth();
@@ -243,17 +245,17 @@ export default function Transaction() {
 
   if (locked)
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
         <Stack.Screen options={{ title: 'Edit entry' }} />
         <View style={{ padding: 16, gap: 14 }}>
           <Notice>{locked}</Notice>
-          <Button label="Back" variant="secondary" onPress={() => router.back()} />
+          <Button label="Back" variant="outline" onPress={() => router.back()} />
         </View>
       </SafeAreaView>
     );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
       <Stack.Screen options={{ title: editing ? 'Edit entry' : 'Add transaction' }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
@@ -305,7 +307,7 @@ export default function Transaction() {
           {totals ? (
             <Card accessibilityLabel={`${totals.label}: ${money(totals.total)}. Shares times price ${money(totals.gross)}, fees ${money(totals.fees)}.`}>
               <Text style={kit.statLabel}>{totals.label}</Text>
-              <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{money(totals.total)}</Text>
+              <Text style={{ color: colors.ink, fontSize: 24, lineHeight: 30, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{money(totals.total)}</Text>
               <Muted>
                 {money(totals.gross)} {kind === 'sell' ? 'less' : 'plus'} {money(totals.fees)} fees
               </Muted>
@@ -317,7 +319,7 @@ export default function Transaction() {
             ) : (
               <Card accessibilityLabel={`Split preview: you hold ${split.before} shares on that date and will hold ${split.after} after the split.`}>
                 <Text style={kit.statLabel}>Split preview</Text>
-                <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: '700' }}>
+                <Text style={{ color: colors.ink, fontSize: 18, lineHeight: 24, fontWeight: '700' }}>
                   {split.before.toLocaleString('en-PK')} → {split.after.toLocaleString('en-PK')} shares
                 </Text>
                 <Muted>Held on {date}, before and after the split. Cost stays the same, so the average cost per share falls.</Muted>
@@ -334,7 +336,7 @@ export default function Transaction() {
             disabled={editing && !existing}
             onPress={() => void submit()}
           />
-          {editing && existing ? <Button label="Void this entry" variant="danger" disabled={busy} onPress={confirmVoid} /> : null}
+          {editing && existing ? <Button label="Void this entry" variant="destructive" disabled={busy} onPress={confirmVoid} /> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
