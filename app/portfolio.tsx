@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { Toaster, toast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Popover,
@@ -33,13 +34,16 @@ import {
 import {
   RefreshCw,
   Plus,
-  X,
   Wallet,
   LogOut,
   Settings,
   ChevronDown,
   MoreHorizontal,
   Bell,
+  BarChart3,
+  ScrollText,
+  Sparkles,
+  FlaskConical,
 } from 'lucide-react';
 import {
   holdings,
@@ -320,7 +324,7 @@ export default function Dashboard({
   const [p, setP] = useState<Portfolio | null>(null),
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState(''),
+    [message, setMessageState] = useState(''),
     [failed, setFailed] = useState(false),
     [month, setMonth] = useState(today().slice(0, 7)),
     [fees, setFees] = useState(0),
@@ -353,9 +357,26 @@ export default function Dashboard({
     } | null>(null),
     [sectorFilter, setSectorFilter] = useState<string>(''),
     [showSoldOut, setShowSoldOut] = useState(false);
+  // Status messages surface as toasts instead of an inline banner: errors
+  // persist until dismissed, successes auto-dismiss. Before the first
+  // portfolio load, the full-page LoadError screen shows `message` itself.
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    loadedRef.current = !!p;
+  }, [p]);
+  function showToast(s: string, error: boolean) {
+    if (!s || !loadedRef.current) return;
+    toast.add({
+      description: s,
+      type: error ? 'error' : 'success',
+      priority: error ? 'high' : 'low',
+      timeout: error ? 0 : 5000,
+    });
+  }
   function notify(s: string, error = false) {
-    setMessage(s);
+    setMessageState(s);
     setFailed(error);
+    showToast(s, error);
   }
   async function load() {
     setBusy(true);
@@ -1017,15 +1038,17 @@ export default function Dashboard({
   return (
     <CompanyNavProvider value={openCompany}>
     <main className="desk">
-      <header>
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+      <header className={'app-header' + (chromeless ? ' no-tabs' : '')}>
         <button
           type="button"
           data-slot="brand"
           className="brand"
           onClick={() => setTab('holdings')}
         >
-          <Wallet size={29} />
-          <span>PSX / PERSONAL INVESTING</span>
+          <Wallet size={22} />
+          <span className="brand-long">PSX / PERSONAL INVESTING</span>
+          <span className="brand-short">PSX</span>
         </button>
         <div className="header-right">
           <button
@@ -1179,48 +1202,38 @@ export default function Dashboard({
             </DropdownMenu>
           )}
         </div>
-      </header>
-      {!chromeless && (
-        <section className="heading">
-          <div>
-            <p className="eyebrow">YOUR LONG-TERM PICTURE</p>
-            <h1>Portfolio & SIP desk</h1>
-            <p>
-              A clear record of what you own. A considered plan for what comes
-              next.
-            </p>
-          </div>
-        </section>
-      )}
-      {message && (
-        <div
-          role={failed ? 'alert' : 'status'}
-          className={'notice ' + (failed ? 'error' : 'success')}
-        >
-          <span>{message}</span>
-          <button
-            type="button"
-            data-slot="notice-close"
-            className="notice-close"
-            aria-label="Dismiss message"
-            onClick={() => setMessage('')}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         {!chromeless && (
-          <TabsList>
-            <TabsTrigger value="holdings">Holdings</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="history">Purchase log</TabsTrigger>
-            <TabsTrigger value="sip">Monthly Picks</TabsTrigger>
+          <TabsList variant="line">
+            <TabsTrigger value="holdings">
+              <Wallet className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Holdings</span>
+              <span className="tab-short">Holdings</span>
+            </TabsTrigger>
+            <TabsTrigger value="reports">
+              <BarChart3 className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Reports</span>
+              <span className="tab-short">Reports</span>
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <ScrollText className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Purchase log</span>
+              <span className="tab-short">Log</span>
+            </TabsTrigger>
+            <TabsTrigger value="sip">
+              <Sparkles className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Monthly Picks</span>
+              <span className="tab-short">Picks</span>
+            </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="research-desk">Research desk</TabsTrigger>
+              <TabsTrigger value="research-desk">
+                <FlaskConical className="tab-icon" aria-hidden="true" />
+                <span className="tab-long">Research desk</span>
+                <span className="tab-short">Research</span>
+              </TabsTrigger>
             )}
           </TabsList>
         )}
+      </header>
         <TabsContent value="holdings">
           <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
           <PortfolioValueCard
@@ -2340,6 +2353,7 @@ export default function Dashboard({
         </DialogContent>
       </Dialog>
     </main>
+    <Toaster />
     </CompanyNavProvider>
   );
 }
