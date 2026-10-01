@@ -109,6 +109,12 @@ export default function Company() {
           >
             <Text style={styles.buttonText}>Add transaction</Text>
           </Pressable>
+          <Pressable
+            style={styles.secondary}
+            onPress={() => router.push({ pathname: '/quote', params: { ticker } })}
+          >
+            <Text style={styles.secondaryText}>Enter price manually</Text>
+          </Pressable>
           <Title>History</Title>
           {entries.length === 0 ? <Muted>No trades or dividends recorded for {ticker}.</Muted> : null}
           {entries.some((e) => e.editable) ? <Muted>Tap an entry to correct or void it.</Muted> : null}

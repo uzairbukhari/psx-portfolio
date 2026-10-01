@@ -3,9 +3,11 @@
 // Callers run validate() on the result before saving.
 import {
   round,
+  today,
   sharesHeldOn,
   type Dividend,
   type Portfolio,
+  type Quote,
   type StockSplit,
   type Trade,
 } from '../../../lib/portfolio.ts';
@@ -88,4 +90,51 @@ export function isIsoDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+/** Saves a price you typed in; it holds until PSX publishes a later trading day. */
+export function setManualQuote(
+  p: Portfolio,
+  ticker: string,
+  price: number,
+  date: string,
+  now: string = new Date().toISOString(),
+): Portfolio {
+  if (!p.companies.some((c) => c.ticker === ticker)) throw new Error('Choose a company you own.');
+  if (!(price > 0)) throw new Error('Enter a price above zero.');
+  if (date > today()) throw new Error('The price date cannot be in the future.');
+  const next = clonePortfolio(p);
+  next.quotes[ticker] = {
+    price,
+    date,
+    asOf: `${date} · manually entered`,
+    manual: true,
+    source: `https://dps.psx.com.pk/company/${ticker}`,
+    fetchedAt: now,
+  };
+  return next;
+}
+
+export const isValidSymbol = (ticker: string) => /^[A-Z0-9]{2,12}$/.test(ticker);
+
+/** Adds a company the ledger has not seen, with the PSX-confirmed quote that proved the symbol exists. */
+export function addCompany(
+  p: Portfolio,
+  company: { ticker: string; name: string; sector: string },
+  quote: Quote,
+): Portfolio {
+  if (!isValidSymbol(company.ticker)) throw new Error('Enter a valid PSX symbol (2-12 letters or digits).');
+  if (p.companies.some((c) => c.ticker === company.ticker)) throw new Error(`${company.ticker} is already in your portfolio.`);
+  const next = clonePortfolio(p);
+  next.quotes[company.ticker] = quote;
+  next.companies.push({
+    ticker: company.ticker,
+    name: company.name.trim() || company.ticker,
+    sector: company.sector,
+    target: 0,
+    approved: false,
+    screenDate: '',
+    note: '',
+  });
+  return next;
 }

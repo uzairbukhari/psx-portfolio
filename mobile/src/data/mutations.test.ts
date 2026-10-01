@@ -76,3 +76,29 @@ test('parseNumber and isIsoDate', () => {
   assert.equal(isIsoDate('2026-02-28'), true);
   assert.equal(isIsoDate('28/02/2026'), false);
 });
+
+import { addCompany, isValidSymbol, setManualQuote } from './mutations.ts';
+
+test('a manual quote is flagged manual and stored on the company', () => {
+  const next = setManualQuote(base(), 'AAA', 123.4, '2026-05-01', '2026-05-01T10:00:00Z');
+  assert.equal(next.quotes.AAA.price, 123.4);
+  assert.equal(next.quotes.AAA.manual, true);
+  assert.throws(() => setManualQuote(base(), 'ZZZ', 1, '2026-05-01'), /Choose a company/);
+  assert.throws(() => setManualQuote(base(), 'AAA', 0, '2026-05-01'), /above zero/);
+  assert.throws(() => setManualQuote(base(), 'AAA', 5, '2999-01-01'), /future/);
+});
+
+test('adding a company stores the confirmed quote and starts unapproved with no target', () => {
+  const quote = { price: 10, asOf: 'x', date: '2026-05-01', source: 'https://dps.psx.com.pk/company/BBB', fetchedAt: 'f' };
+  const next = addCompany(base(), { ticker: 'BBB', name: ' Beta Ltd ', sector: 'Bank' }, quote);
+  validate(next);
+  const c = next.companies.find((x) => x.ticker === 'BBB');
+  assert.equal(c?.name, 'Beta Ltd');
+  assert.equal(c?.approved, false);
+  assert.equal(c?.target, 0);
+  assert.equal(next.quotes.BBB.price, 10);
+  assert.throws(() => addCompany(base(), { ticker: 'AAA', name: '', sector: 'Bank' }, quote), /already in your portfolio/);
+  assert.throws(() => addCompany(base(), { ticker: 'a b', name: '', sector: 'Bank' }, quote), /valid PSX symbol/);
+  assert.equal(isValidSymbol('MEBL'), true);
+  assert.equal(isValidSymbol('x'), false);
+});

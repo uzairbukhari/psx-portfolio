@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { today, type Dividend, type StockSplit, type Trade } from '@shared/portfolio.ts';
-import { isIsoDate, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry, type EntryKind } from '@/data/mutations';
+import type { QuotesResponse } from '@shared/api-types.ts';
+import { SECTORS, today, type Dividend, type StockSplit, type Trade } from '@shared/portfolio.ts';
+import { useAuth } from '@/auth/AuthProvider';
+import { addCompany, isIsoDate, isValidSymbol, parseNumber, recordDividend, recordSplit, recordTrade, voidEntry, type EntryKind } from '@/data/mutations';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
 import { Muted, Notice, styles as kit } from '@/ui/kit';
@@ -63,6 +65,7 @@ function Chips<T extends string>({ items, value, onChange, disabled }: { items: 
 export default function Transaction() {
   const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string }>();
   const p = usePortfolio();
+  const { api } = useAuth();
   const editingId = params.id || undefined;
 
   // Editing: find the existing entry and lock its kind and company.
@@ -78,7 +81,7 @@ export default function Transaction() {
   }, [editingId, p.portfolio]);
 
   const [kind, setKind] = useState<Kind>((params.kind as Kind) || 'buy');
-  const [ticker, setTicker] = useState((params.ticker ?? '').toUpperCase());
+  const [tickerChoice, setTicker] = useState((params.ticker ?? '').toUpperCase());
   const [date, setDate] = useState(today());
   const [shares, setShares] = useState('');
   const [price, setPrice] = useState('');
@@ -88,6 +91,10 @@ export default function Transaction() {
   const [oldShares, setOldShares] = useState('');
   const [newShares, setNewShares] = useState('');
   const [note, setNote] = useState('');
+  const [newCompany, setNewCompany] = useState(false);
+  const [symbol, setSymbol] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [sector, setSector] = useState<string>('Others');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedFrom, setLoadedFrom] = useState<string | null>(null);
@@ -133,18 +140,34 @@ export default function Transaction() {
     setError(null);
     if (!p.portfolio) return;
     try {
+      let working = p.portfolio;
+      let ticker = tickerChoice;
+      if (newCompany) {
+        ticker = symbol.trim().toUpperCase();
+        if (!isValidSymbol(ticker)) throw new Error('Enter a valid PSX symbol (2-12 letters or digits).');
+        if (working.companies.some((c) => c.ticker === ticker)) throw new Error(`${ticker} is already in your portfolio. Pick it from the list.`);
+        setBusy(true);
+        let confirmed;
+        try {
+          confirmed = (await api.post<QuotesResponse>('/api/quotes', { tickers: [ticker] })).quotes[ticker];
+        } catch (e) {
+          throw new Error(`${ticker} could not be confirmed on PSX: ${e instanceof Error ? e.message : 'try again'}`);
+        }
+        if (!confirmed) throw new Error(`${ticker} is not available as a current PSX symbol.`);
+        working = addCompany(working, { ticker, name: companyName, sector }, confirmed);
+      }
       if (!ticker) throw new Error('Choose a company.');
       if (!isIsoDate(date)) throw new Error('Enter the date as YYYY-MM-DD.');
       let next;
       if (kind === 'dividend') {
         const per = parseNumber(perShare);
         if (per === null || per <= 0) throw new Error('Enter the dividend per share.');
-        next = recordDividend(p.portfolio, { ticker, date, perShare: per, note: note.trim() }, editingId);
+        next = recordDividend(working, { ticker, date, perShare: per, note: note.trim() }, editingId);
       } else if (kind === 'split') {
         const o = parseNumber(oldShares);
         const n = parseNumber(newShares);
         if (!o || !n || o <= 0 || n <= o) throw new Error('Enter the old and new share counts (new must be larger).');
-        next = recordSplit(p.portfolio, { ticker, date, oldShares: o, newShares: n, note: note.trim() }, editingId);
+        next = recordSplit(working, { ticker, date, oldShares: o, newShares: n, note: note.trim() }, editingId);
       } else {
         const sh = parseNumber(shares);
         if (!sh || sh <= 0 || !Number.isInteger(sh)) throw new Error('Enter a whole number of shares.');
@@ -154,7 +177,7 @@ export default function Transaction() {
         if (fee < 0) throw new Error('Fees cannot be negative.');
         if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('SIP month must look like 2026-10.');
         next = recordTrade(
-          p.portfolio,
+          working,
           { ticker, kind, date, shares: sh, price: pr, fees: fee, month: kind === 'buy' ? month : '', note: note.trim() },
           editingId,
         );
@@ -200,7 +223,24 @@ export default function Transaction() {
           <Text style={kit.statLabel}>Type</Text>
           <Chips items={KINDS} value={kind} onChange={setKind} disabled={editing} />
           <Text style={kit.statLabel}>Company</Text>
-          <Chips items={companies} value={ticker} onChange={setTicker} disabled={editing} />
+          <Chips
+            items={[...companies, ...(editing ? [] : [{ key: '__new', label: '+ New company' }])]}
+            value={newCompany ? '__new' : tickerChoice}
+            onChange={(k) => {
+              setNewCompany(k === '__new');
+              if (k !== '__new') setTicker(k);
+            }}
+            disabled={editing}
+          />
+          {newCompany ? (
+            <>
+              <Field label="PSX symbol" value={symbol} onChangeText={(v) => setSymbol(v.toUpperCase())} placeholder="e.g. MEBL" />
+              <Field label="Company name" value={companyName} onChangeText={setCompanyName} />
+              <Text style={kit.statLabel}>Sector</Text>
+              <Chips items={SECTORS.map((x) => ({ key: x, label: x }))} value={sector} onChange={setSector} />
+              <Muted>The symbol is confirmed against PSX when you save.</Muted>
+            </>
+          ) : null}
           <Field label="Date (YYYY-MM-DD)" value={date} onChangeText={setDate} />
           {kind === 'dividend' ? (
             <Field label="Dividend per share (PKR)" value={perShare} onChangeText={setPerShare} keyboard="decimal-pad" />
