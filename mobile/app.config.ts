@@ -13,6 +13,8 @@ const bundleId = `com.uzairbukhari.sipwise${v.suffix}`;
 // Reversed iOS OAuth client id, e.g. com.googleusercontent.apps.123-abc
 const iosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
 
+const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID ?? '0e6be082-0810-45d2-9036-d8a93e53fdff';
+
 const config: ExpoConfig = {
   name: v.label,
   slug: 'sipwise',
@@ -22,8 +24,12 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   ios: { bundleIdentifier: bundleId, supportsTablet: false },
   android: { package: bundleId },
+  // Lets JS-only changes ship over the air (eas update) without using a build.
+  runtimeVersion: { policy: 'appVersion' },
+  updates: { url: `https://u.expo.dev/${EAS_PROJECT_ID}`, checkAutomatically: 'ON_LOAD' },
   plugins: [
     'expo-router',
+    'expo-local-authentication',
     'expo-secure-store',
     ...(iosUrlScheme ? [['@react-native-google-signin/google-signin', { iosUrlScheme }] as [string, object]] : []),
   ],
@@ -34,7 +40,7 @@ const config: ExpoConfig = {
     googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID ?? '',
     googleIosClientId: process.env.GOOGLE_IOS_CLIENT_ID ?? '',
     // Public identifier (not a secret); EAS cloud builds don't see the local .env.
-    eas: { projectId: process.env.EAS_PROJECT_ID ?? '0e6be082-0810-45d2-9036-d8a93e53fdff' },
+    eas: { projectId: EAS_PROJECT_ID },
   },
 };
 
