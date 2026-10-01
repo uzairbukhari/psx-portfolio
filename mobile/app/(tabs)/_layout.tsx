@@ -18,6 +18,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Holdings', tabBarIcon: icon('▤') }} />
+      <Tabs.Screen name="sip" options={{ title: 'SIP', tabBarIcon: icon('◔') }} />
       <Tabs.Screen name="activity" options={{ title: 'Activity', tabBarIcon: icon('≡') }} />
       <Tabs.Screen name="alerts" options={{ title: 'Alerts', tabBarIcon: icon('●') }} />
       <Tabs.Screen name="account" options={{ title: 'Account', tabBarIcon: icon('☺') }} />
