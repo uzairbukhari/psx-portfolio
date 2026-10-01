@@ -40,7 +40,7 @@ export function SignIn() {
           </Muted>
           <Muted>
             Debug: package {Constants.expoConfig?.android?.package ?? '?'} · web client{' '}
-            {config.googleWebClientId ? `${config.googleWebClientId.slice(0, 12)}…${config.googleWebClientId.slice(-26)}` : 'NOT SET'} ·{' '}
+            {config.googleWebClientId ? `${config.googleWebClientId.split('-')[1]?.slice(0, 12) ?? '?'}… (${config.googleWebClientId.length} chars)` : 'NOT SET'} ·{' '}
             {Updates.isEmbeddedLaunch ? 'built-in code (no update applied)' : `update ${Updates.updateId?.slice(0, 8) ?? '?'}`}
           </Muted>
         </>
