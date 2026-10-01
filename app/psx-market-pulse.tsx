@@ -1,6 +1,6 @@
 'use client';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import type {
   IndexPoint,
   IndexSummary,
@@ -86,6 +86,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   const [liveConnected, setLiveConnected] = useState(false);
   const [liveReceivedAt, setLiveReceivedAt] = useState<string | null>(null);
   const [stale, setStale] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const liveActive = useRef(false);
 
   const request = useCallback(async (refresh = false, force = false) => {
@@ -239,7 +240,30 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   }, [displayedAt]);
 
   return (
-    <section className="pulse">
+    <section className="pulse" data-expanded={expanded || undefined}>
+      <button
+        type="button"
+        className="pulse-summary secondary"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className={`pulse-dot${summary?.market.isOpen ? '' : ' pulse-dot--closed'}`} aria-hidden="true" />
+        <span className="pulse-summary__text">
+          {index ? (
+            <>
+              KSE100 {index.close.toLocaleString()}{' '}
+              <b className={indexUp ? 'pos' : 'neg'}>
+                {indexUp ? '▲' : '▼'}
+                {Math.abs(index.changePercent).toFixed(2)}%
+              </b>
+            </>
+          ) : (
+            'Market pulse'
+          )}
+          {summary ? ` · ${summary.market.label}` : ''}
+        </span>
+        {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
       <div className="pulse-head">
         <div>
           <p className="eyebrow">
@@ -265,27 +289,23 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
         </div>
       </div>
       {error && <p role="alert" className="notice error pulse-error">{error}</p>}
-      <div className="pulse-grid pulse-grid--shortlist">
-        <div className="pulse-index">
-          <span className="muted pulse-label">KSE100 Index</span>
-          {index ? (
-            <>
-              <div className="pulse-index__value">{index.close.toLocaleString()}</div>
-              <span className={`pulse-index__change ${indexUp ? 'pos' : 'neg'}`}>
-                {indexUp ? '▲' : '▼'} {Math.abs(index.change).toLocaleString()} ({index.changePercent.toFixed(2)}%)
-              </span>
-              <Sparkline points={summary?.series ?? []} up={indexUp} />
-              <div className="pulse-stats">
-                <div>High<b>{index.high.toLocaleString()}</b></div>
-                <div>Low<b>{index.low.toLocaleString()}</b></div>
-                <div>YTD<b>{index.ytdChangePercent.toFixed(2)}%</b></div>
-              </div>
-              <small className="pulse-index-source">PSX index time: {index.asOf || 'Unavailable'}</small>
-            </>
-          ) : (
-            <p className="pulse-empty">KSE100 data is unavailable.</p>
-          )}
-        </div>
+      <div className={`pulse-grid pulse-grid--shortlist${index ? '' : ' pulse-grid--solo'}`}>
+        {index && (
+          <div className="pulse-index">
+            <span className="muted pulse-label">KSE100 Index</span>
+            <div className="pulse-index__value">{index.close.toLocaleString()}</div>
+            <span className={`pulse-index__change ${indexUp ? 'pos' : 'neg'}`}>
+              {indexUp ? '▲' : '▼'} {Math.abs(index.change).toLocaleString()} ({index.changePercent.toFixed(2)}%)
+            </span>
+            <Sparkline points={summary?.series ?? []} up={indexUp} />
+            <div className="pulse-stats">
+              <div>High<b>{index.high.toLocaleString()}</b></div>
+              <div>Low<b>{index.low.toLocaleString()}</b></div>
+              <div>YTD<b>{index.ytdChangePercent.toFixed(2)}%</b></div>
+            </div>
+            <small className="pulse-index-source">PSX index time: {index.asOf || 'Unavailable'}</small>
+          </div>
+        )}
         <div className="pulse-shortlist">
           <div className="pulse-shortlist__head">
             <div>
