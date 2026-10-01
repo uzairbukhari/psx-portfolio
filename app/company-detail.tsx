@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { TabLoader } from './tab-loader';
 import {
   Area,
@@ -338,11 +344,22 @@ export default function CompanyDetail({
       Math.round(received.slice(0, i + 1).reduce((a, x) => a + x.net, 0) * 100) / 100,
   }));
   const known = holding !== undefined;
+  const goBack = () => {
+    if (window.history.length > 1) {
+      const from = window.location.pathname;
+      window.history.back();
+      // Nothing to go back to inside the app (e.g. direct link): fall back to the parent tab.
+      window.setTimeout(() => {
+        if (window.location.pathname === from) onBack();
+      }, 300);
+    } else onBack();
+  };
+  const held = (holding?.shares ?? 0) > 0;
 
   return (
     <div className="company-page">
-      <button type="button" className="secondary compact company-back" onClick={onBack}>
-        <ArrowLeft size={15} /> Back to holdings
+      <button type="button" className="secondary compact company-back" onClick={goBack}>
+        <ArrowLeft size={15} /> Back
       </button>
       <div className="company-head">
         <div>
@@ -360,26 +377,33 @@ export default function CompanyDetail({
               : 'No quote yet'}
           </small>
         </div>
-        <div className="row">
-          <button className="secondary" disabled={busy || !known} onClick={onEdit}>
-            Edit
-          </button>
-          <button className="secondary" disabled={busy} onClick={onSplit}>
-            Record split
-          </button>
-          {(holding?.shares ?? 0) > 0 && (
-            <button className="secondary" disabled={busy} onClick={onSell}>
-              Sell
-            </button>
-          )}
-          {(holding?.shares ?? 0) > 0 && (
-            <button className="secondary" disabled={busy} onClick={onDividend}>
-              Dividend
-            </button>
-          )}
+        <div className="company-actions">
           <button disabled={busy} onClick={onAddPurchase}>
-            <Plus size={16} /> Add purchase
+            <Plus size={16} /> Add transaction
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="secondary company-more" aria-label="More actions">
+              <MoreHorizontal size={18} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {held && (
+                <DropdownMenuItem disabled={busy} onClick={onSell}>
+                  Sell
+                </DropdownMenuItem>
+              )}
+              {held && (
+                <DropdownMenuItem disabled={busy} onClick={onDividend}>
+                  Dividend
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem disabled={busy} onClick={onSplit}>
+                Bonus / split
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={busy || !known} onClick={onEdit}>
+                Edit company
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -392,9 +416,9 @@ export default function CompanyDetail({
           </small>
         </article>
         <article>
-          <span>Invested → current</span>
+          <span>Market value</span>
           <strong>{summary.value === null ? '—' : money(summary.value)}</strong>
-          <small>Invested {summary.cost === null ? '—' : money(summary.cost)}</small>
+          <small>Cost {summary.cost === null ? '—' : money(summary.cost)}</small>
         </article>
         <article>
           <span>Profit / loss</span>
@@ -411,9 +435,7 @@ export default function CompanyDetail({
             {money(summary.dividendNet === null ? summary.dividendGross : summary.dividendNet)}
           </strong>
           <small>
-            {summary.dividendNet === null
-              ? 'Gross · set filer status in Settings for net'
-              : `Net of tax (estimated unless recorded) · ${money(summary.dividendGross)} gross`}
+            {summary.dividendNet === null ? 'Gross · set filer status for net' : 'Net of tax'}
           </small>
         </article>
       </div>
@@ -421,11 +443,11 @@ export default function CompanyDetail({
       <PriceChart key={ticker} ticker={ticker} holding={holding} trades={trades} />
 
       <section className="company-section">
-        <h2>Purchase log</h2>
+        <h2>Activity</h2>
         {entries.length === 0 ? (
           <p className="muted">No transactions recorded for {ticker} yet.</p>
         ) : (
-          <LedgerTimeline portfolio={portfolio} entries={entries} ticker={ticker} />
+          <LedgerTimeline portfolio={portfolio} entries={entries} ticker={ticker} hideKpis />
         )}
       </section>
 
