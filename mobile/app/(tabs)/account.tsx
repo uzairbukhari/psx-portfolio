@@ -52,6 +52,9 @@ export default function Account() {
       <Pressable style={styles.button} onPress={() => router.push('/reports')}>
         <Text style={styles.buttonText}>Reports</Text>
       </Pressable>
+      <Pressable style={styles.secondary} onPress={() => router.push('/import')}>
+        <Text style={styles.secondaryText}>Import broker / CDC file</Text>
+      </Pressable>
       {usage.data ? (
         <Card>
           <Text style={styles.strong}>AI usage</Text>

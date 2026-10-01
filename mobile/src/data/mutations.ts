@@ -16,7 +16,7 @@ import { addNotifications, dividendNotifications } from '../../../lib/notificati
 export const clonePortfolio = (p: Portfolio): Portfolio => JSON.parse(JSON.stringify(p)) as Portfolio;
 
 let counter = 0;
-const newId = () =>
+export const newId = () =>
   (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.() ??
   `id-${Date.now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
