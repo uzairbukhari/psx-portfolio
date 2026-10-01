@@ -5,6 +5,7 @@ import { money, moneyShort } from '@shared/portfolio.ts';
 import { formatPercent } from '@/data/derive';
 import { usePortfolio } from '@/data/usePortfolio';
 import { colors } from '@/theme/tokens';
+import { MarketPulse } from '@/ui/MarketPulse';
 import { Amount, Card, Muted, Notice, Screen, Stat, Title, styles } from '@/ui/kit';
 
 export default function Holdings() {
@@ -54,6 +55,7 @@ export default function Holdings() {
           <Muted>{totals.unpriced} position(s) without a price or known cost are left out of these totals.</Muted>
         ) : null}
       </Card>
+      <MarketPulse />
       <Pressable
         style={[styles.secondary, pricing && { opacity: 0.5 }]}
         disabled={pricing}
