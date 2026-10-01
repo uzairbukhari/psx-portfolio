@@ -382,3 +382,6 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 }
 @media(min-width:1100px){.app-header [data-slot=tabs-list]{justify-self:center}}
 .app-header ~ [data-slot=tabs-content]{padding-top:20px}@media(max-width:760px){.app-header ~ [data-slot=tabs-content]{padding-top:12px}}
+
+/* Staging deployments (APP_ENV=staging) mark the app bar brand so they can't be mistaken for production. */
+html[data-app-env=staging] .app-header>.brand::after{content:'STAGING';margin-left:2px;padding:2px 7px;border-radius:999px;border:1px solid rgba(211,154,41,.45);background:rgba(211,154,41,.14);color:#e8c27a;font-size:10px;font-weight:700;letter-spacing:1.2px;line-height:1.4}
