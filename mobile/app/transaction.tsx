@@ -63,7 +63,7 @@ function Chips<T extends string>({ items, value, onChange, disabled }: { items: 
 }
 
 export default function Transaction() {
-  const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string }>();
+  const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string; shares?: string; price?: string; month?: string }>();
   const p = usePortfolio();
   const { api } = useAuth();
   const editingId = params.id || undefined;
@@ -83,10 +83,10 @@ export default function Transaction() {
   const [kind, setKind] = useState<Kind>((params.kind as Kind) || 'buy');
   const [tickerChoice, setTicker] = useState((params.ticker ?? '').toUpperCase());
   const [date, setDate] = useState(today());
-  const [shares, setShares] = useState('');
-  const [price, setPrice] = useState('');
+  const [shares, setShares] = useState(params.shares ?? '');
+  const [price, setPrice] = useState(params.price ?? '');
   const [fees, setFees] = useState('');
-  const [month, setMonth] = useState('');
+  const [month, setMonth] = useState(params.month ?? '');
   const [perShare, setPerShare] = useState('');
   const [oldShares, setOldShares] = useState('');
   const [newShares, setNewShares] = useState('');
