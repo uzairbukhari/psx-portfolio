@@ -9,8 +9,8 @@
     "ios": "APP_VARIANT=development expo start --ios",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types 'src/**/*.test.ts'",
-    "update:staging": "APP_VARIANT=staging npx eas-cli update --channel staging --environment preview",
-    "update:production": "APP_VARIANT=production npx eas-cli update --channel production --environment production"
+    "update:staging": "APP_VARIANT=staging npx eas-cli update --platform android --channel staging --environment preview",
+    "update:production": "APP_VARIANT=production npx eas-cli update --platform android --channel production --environment production"
   },
   "dependencies": {
     "@react-native-google-signin/google-signin": "16.1.5",
