@@ -1,3 +1,4 @@
+import type { MobileSessionsResponse } from '@/lib/api-types';
 import { identity, failure } from '@/lib/server';
 import { listMobileSessions, revokeMobileSession } from '@/lib/mobile-sessions';
 import { UserError } from '@/lib/user-error';
@@ -6,7 +7,7 @@ export async function GET(req: Request) {
   try {
     const email = await identity(req);
     return Response.json(
-      { sessions: await listMobileSessions(email) },
+      { sessions: await listMobileSessions(email) } satisfies MobileSessionsResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

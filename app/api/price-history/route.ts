@@ -1,3 +1,4 @@
+import type { PriceHistoryBatchResponse, PriceHistoryResponse } from '@/lib/api-types';
 import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
 import { UserError } from '@/lib/user-error';
@@ -22,7 +23,9 @@ export async function GET(req: Request) {
           ).results
         : [];
       return Response.json(
-        { histories: Object.fromEntries(rows.map((r) => [r.ticker, { eod: JSON.parse(r.eod) }])) },
+        {
+          histories: Object.fromEntries(rows.map((r) => [r.ticker, { eod: JSON.parse(r.eod) }])),
+        } satisfies PriceHistoryBatchResponse,
         { headers: { 'Cache-Control': 'no-store' } },
       );
     }
@@ -48,7 +51,7 @@ export async function GET(req: Request) {
         intraday: row ? JSON.parse(row.intraday) : [],
         eodFetchedAt: row?.eod_fetched_at ?? null,
         intradayFetchedAt: row?.intraday_fetched_at ?? null,
-      },
+      } satisfies PriceHistoryResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

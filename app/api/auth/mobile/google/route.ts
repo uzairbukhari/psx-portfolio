@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import type { MobileSignInRequest, MobileSignInResponse } from '@/lib/api-types';
 import { emailAllowed, parseList, verifyGoogleIdToken } from '@/lib/google-id-token';
 import { signMobileToken } from '@/lib/mobile-token';
 import { createMobileSession } from '@/lib/mobile-sessions';
@@ -15,11 +16,7 @@ export async function POST(req: Request) {
     if (!audiences.length || !env.SESSION_SECRET)
       throw new UserError('Mobile sign-in is not configured.', 503);
     const bytes = await readLimited(req, 16_000, 'Request is too large.');
-    const body = JSON.parse(new TextDecoder().decode(bytes)) as {
-      idToken?: unknown;
-      deviceName?: unknown;
-      platform?: unknown;
-    };
+    const body = JSON.parse(new TextDecoder().decode(bytes)) as Partial<MobileSignInRequest>;
     if (typeof body.idToken !== 'string' || !body.idToken)
       throw new UserError('Missing Google ID token.');
     const identity = await verifyGoogleIdToken(body.idToken, audiences);
@@ -31,7 +28,7 @@ export async function POST(req: Request) {
       {
         token,
         user: { ...identity, role: await getUserRole(identity.email) },
-      },
+      } satisfies MobileSignInResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

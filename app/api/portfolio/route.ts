@@ -1,3 +1,4 @@
+import type { PortfolioResponse, SavePortfolioResponse } from '@/lib/api-types';
 import { db, identity, failure } from '@/lib/server';
 import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
 import { applyFacts, newTickers } from '@/lib/company-enrichment';
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
       portfolio.companies.map((company) => company.ticker),
     ).catch(() => []);
     return Response.json(
-      { portfolio, revision: row?.revision ?? 0, announcements },
+      { portfolio, revision: row?.revision ?? 0, announcements } satisfies PortfolioResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
@@ -83,7 +84,7 @@ export async function PUT(req: Request) {
         409,
       );
     return Response.json(
-      { revision: revision + 1 },
+      { revision: revision + 1 } satisfies SavePortfolioResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
