@@ -3,6 +3,7 @@
 // directly. Routes use `satisfies` against these so the two cannot drift.
 // Not yet covered: market-summary and research/* (added with the screens that use them).
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import type { FaceValueEvidence } from './face-values.ts';
 import type { Portfolio, Quote } from './portfolio.ts';
 import type { PricePoint } from './price-history.ts';
 import type { IpoLookup } from './ipo-offers.ts';
@@ -53,6 +54,8 @@ export type PortfolioResponse = {
   announcements: PayoutAnnouncement[];
   /** Companies whose name or sector the shared directory has not resolved yet (additive; old clients ignore it). */
   pendingCompanies?: string[];
+  /** Verified, dated face-value evidence for the held companies (additive). Empty = none verified. */
+  faceValues?: Record<string, FaceValueEvidence[]>;
 };
 /**
  * PUT /api/portfolio body. A stale `revision` is answered with 409. `createCompanies` is the strict
@@ -257,6 +260,18 @@ export type CompaniesResponse = {
   companies: CompanyLookup[];
   dispatchEnabled: boolean;
   /** POST only. */
+  queued?: string[];
+  message?: string;
+};
+
+/** GET/POST /api/face-values: verified face-value evidence for the signed-in ledger's companies. */
+export type FaceValuesResponse = {
+  tickers: string[];
+  evidence: Record<string, FaceValueEvidence[]>;
+  states: RefreshTickerState[];
+  overall: RefreshOverall;
+  dispatchEnabled: boolean;
+  disabledReason: string | null;
   queued?: string[];
   message?: string;
 };

@@ -9,9 +9,9 @@
 //  - the production-writing workflows are never dispatched from staging (see dispatchBlockedReason).
 import { dispatchBlockedReason, type DispatchConfig } from './github-dispatch.ts';
 
-export type RequestKind = 'payouts' | 'ipo' | 'company' | 'quotes';
+export type RequestKind = 'payouts' | 'ipo' | 'company' | 'quotes' | 'facevalue';
 export const WORKFLOWS: Record<RequestKind, string> = {
-  payouts: 'psx-payouts.yml', ipo: 'psx-ipo.yml', company: 'psx-directory.yml', quotes: 'psx-quotes.yml',
+  payouts: 'psx-payouts.yml', ipo: 'psx-ipo.yml', company: 'psx-directory.yml', quotes: 'psx-quotes.yml', facevalue: 'psx-face-values.yml',
 };
 /**
  * The `inputs` each workflow declares (GitHub rejects an undeclared input). The quote scraper declares none:

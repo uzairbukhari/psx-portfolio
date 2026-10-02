@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8e373ec6-9738-40ff-8d7c-816522c52e1c",
+  "id": "273cff8c-ccc6-4055-b3d5-1eb21aa097f2",
   "prevId": "47162394-7147-4e8d-b925-a9e1f618abae",
   "tables": {
     "ai_usage": {
@@ -1654,6 +1654,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'verified'"
         }
       },
       "indexes": {},

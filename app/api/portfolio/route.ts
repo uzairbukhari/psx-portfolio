@@ -2,6 +2,7 @@ import type { PortfolioResponse, SavePortfolioResponse } from '@/lib/api-types';
 import { db, identity, failure } from '@/lib/server';
 import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
 import { enrichForSave, overlayForRead } from '@/lib/company-save';
+import { readFaceValues } from '@/lib/face-values';
 import { dispatchConfig } from '@/lib/dispatch-config';
 import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';
 import { readAnnouncements } from '@/lib/dividend-announcements';
@@ -27,12 +28,13 @@ export async function GET(req: Request) {
     // Resolved company details fill placeholder names/sectors in the response only; nothing is written here,
     // so background lookups never change the revision under an open editor.
     const pendingCompanies = await overlayForRead(db(), portfolio);
+    const faceValues = await readFaceValues(db(), portfolio.companies.map((company) => company.ticker)).catch(() => ({}));
     const announcements = await readAnnouncements(
       db(),
       portfolio.companies.map((company) => company.ticker),
     ).catch(() => []);
     return Response.json(
-      { portfolio, revision: row?.revision ?? 0, announcements, pendingCompanies } satisfies PortfolioResponse,
+      { portfolio, revision: row?.revision ?? 0, announcements, pendingCompanies, faceValues } satisfies PortfolioResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

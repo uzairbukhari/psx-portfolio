@@ -19,10 +19,12 @@ import {
   type Trade,
 } from './portfolio.ts';
 import { historicalEntitlement } from './psx-calendar.ts';
+import { resolveFaceValue, type FaceValueEvidence } from './face-values.ts';
 import type { PayoutAnnouncement } from './psx-payouts.ts';
 
 export type IssueKind =
   | 'face-value' // percent-of-face-value rate with no confirmed face value
+  | 'face-value-conflict' // the account's own face value disagrees with verified evidence for that date
   | 'ambiguous-match' // a recorded dividend could belong to this or another announcement
   | 'calendar' // cutoff depends on holidays that are not officially confirmed
   | 'trade-date' // a trade near the cutoff has an unconfirmed execution date
@@ -55,6 +57,13 @@ export type DividendCandidate = {
   perShare: number | null;
   rateSource: 'rupees' | 'percent-of-face-value';
   faceValue: number | null;
+  /**
+   * Where `faceValue` came from: `review` (typed or assumed in this review), `account` (the company's own
+   * value), `verified` (dated evidence). Null when none could be stated.
+   */
+  faceValueSource: 'review' | 'account' | 'verified' | null;
+  /** Why no face value could be stated (only when `faceValue` is null and the rate is a percentage). */
+  faceValueGap: 'none' | 'before-coverage' | 'conflict' | null;
   gross: number | null;
   state: CandidateState;
   /** Existing dividend ids this row converts or is covered by. */
@@ -67,6 +76,8 @@ export type HistoryOptions = {
   to?: string;
   /** Face values the user confirmed in the review, by ticker (persisted on approval). */
   faceValues?: Record<string, number>;
+  /** Verified, dated face-value evidence from the shared company directory, by ticker. */
+  faceValueEvidence?: Record<string, FaceValueEvidence[]>;
 };
 
 export type HistoryPlan = {
@@ -161,8 +172,14 @@ export function planHistoricalDividends(
     const company = companies.get(a.ticker)!;
     const id = autoDividendId(a);
     const entitlement = historicalEntitlement(a.bookClosureStart);
-    const faceValue = options.faceValues?.[a.ticker] ?? company.faceValue ?? null;
     const rateSource = a.perShareRs !== null ? 'rupees' : 'percent-of-face-value';
+    // Precedence: a value chosen in this review, then the account's own value, then verified dated evidence.
+    const reviewed = options.faceValues?.[a.ticker];
+    const verified = rateSource === 'percent-of-face-value' ? resolveFaceValue(options.faceValueEvidence?.[a.ticker], entitlement.date) : null;
+    const faceValue = reviewed ?? company.faceValue ?? (verified?.status === 'verified' ? verified.faceValue : null);
+    const faceValueSource: DividendCandidate['faceValueSource'] =
+      reviewed !== undefined ? 'review' : company.faceValue !== undefined ? 'account' : verified?.status === 'verified' ? 'verified' : null;
+    const faceValueGap: DividendCandidate['faceValueGap'] = faceValue === null && verified?.status === 'unresolved' ? verified.reason : null;
     const perShare = perShareOf(a, faceValue);
     let shares = 0;
     try {
@@ -207,7 +224,18 @@ export function planHistoricalDividends(
     }
 
     if (percentNeedsFace(a, faceValue))
-      issues.push({ kind: 'face-value', severity: 'confirm', message: `PSX quotes ${a.percent}% of face value and no face value is on file for ${a.ticker}. Confirm it (most PSX companies use Rs 10).` });
+      issues.push({
+        kind: 'face-value', severity: 'confirm',
+        message:
+          faceValueGap === 'conflict'
+            ? `PSX quotes ${a.percent}% of face value, but sources disagree about the face value of ${a.ticker}. Enter the correct one.`
+            : faceValueGap === 'before-coverage'
+              ? `PSX quotes ${a.percent}% of face value. The verified face value of ${a.ticker} only covers later dates, so it is not applied to this earlier payout. Confirm the face value that applied then.`
+              : `PSX quotes ${a.percent}% of face value and no verified face value is on file for ${a.ticker}. Enter it, or use Rs 10 if that is what you assume.`,
+      });
+    // The account's own value is kept, but a disagreement with verified evidence is surfaced, never silently resolved.
+    if (reviewed === undefined && company.faceValue !== undefined && verified?.status === 'verified' && verified.faceValue !== company.faceValue && rateSource === 'percent-of-face-value')
+      issues.push({ kind: 'face-value-conflict', severity: 'confirm', message: `Your face value for ${a.ticker} is Rs ${company.faceValue}, but ${verified.evidence.sourceUrl} shows Rs ${verified.faceValue} for this date. Your value is used; confirm to keep it.` });
     if (!entitlement.certain)
       issues.push({ kind: 'calendar', severity: 'confirm', message: `The cutoff (${entitlement.date}, ${entitlement.settlement}) depends on market holidays that are not officially confirmed.` });
     if (shares > 0) {
@@ -228,7 +256,7 @@ export function planHistoricalDividends(
     }
     candidates.push({
       id, announcement: a, entitlementDate: entitlement.date, settlement: entitlement.settlement, calendarCertain: entitlement.certain,
-      shares, perShare, rateSource, faceValue, gross: perShare === null ? null : round(perShare * shares), state, existingIds, issues,
+      shares, perShare, rateSource, faceValue, faceValueSource, faceValueGap, gross: perShare === null ? null : round(perShare * shares), state, existingIds, issues,
     });
   }
   candidates.sort((x, y) => y.announcement.bookClosureStart.localeCompare(x.announcement.bookClosureStart) || x.announcement.ticker.localeCompare(y.announcement.ticker));
@@ -247,10 +275,31 @@ export function isSelectable(c: DividendCandidate, confirmed: ReadonlySet<string
 /** Rows that need nothing more from the user: what "select all resolved" ticks. */
 export const isResolved = (c: DividendCandidate) => (c.state === 'eligible' || c.state === 'convert') && c.issues.length === 0 && c.perShare !== null && c.gross !== null;
 
+/** Companies in the plan whose percentage payouts still lack a usable face value (rows the user could still act on). */
+export function unresolvedFaceValueTickers(plan: HistoryPlan): string[] {
+  const tickers = new Set<string>();
+  for (const c of plan.candidates)
+    if ((c.state === 'eligible' || c.state === 'convert') && c.shares > 0 && c.issues.some((i) => i.kind === 'face-value')) tickers.add(c.announcement.ticker);
+  return [...tickers].sort();
+}
+
+/**
+ * "Use Rs 10 for all unresolved companies": the review's face-value choices plus `value` for exactly the
+ * companies still unresolved in this plan. Existing choices and every resolved company are left alone.
+ */
+export function assumeFaceValueForUnresolved(plan: HistoryPlan, current: Record<string, number>, value = 10) {
+  const tickers = unresolvedFaceValueTickers(plan).filter((t) => current[t] === undefined);
+  return { faceValues: { ...current, ...Object.fromEntries(tickers.map((t) => [t, value])) }, assumed: tickers };
+}
+
 export type ApprovalRequest = {
   /** Candidates exactly as the user saw them. */
   reviewed: { id: string; shares: number; perShare: number; gross: number }[];
   faceValues?: Record<string, number>;
+  /** Tickers whose face value in `faceValues` is the review's "assume Rs 10" choice, not an entered or verified value. */
+  assumedFaceValues?: readonly string[];
+  /** Verified face-value evidence the review was prepared with. */
+  faceValueEvidence?: Record<string, FaceValueEvidence[]>;
   confirmed?: ReadonlySet<string>;
   from?: string;
   to?: string;
@@ -271,7 +320,7 @@ export function approveSelectedAsReceived(
   request: ApprovalRequest,
 ): ApprovalResult {
   if (!request.reviewed.length) return { ok: false, reason: 'empty', ids: [], message: 'Select at least one dividend.' };
-  const plan = planHistoricalDividends(p, announcements, { from: request.from, to: request.to, faceValues: request.faceValues });
+  const plan = planHistoricalDividends(p, announcements, { from: request.from, to: request.to, faceValues: request.faceValues, faceValueEvidence: request.faceValueEvidence });
   const byId = new Map(plan.candidates.map((c) => [c.id, c]));
   const stale: string[] = [], unresolved: string[] = [];
   for (const seen of request.reviewed) {
@@ -293,7 +342,12 @@ export function approveSelectedAsReceived(
     const c = byId.get(seen.id)!;
     const a = c.announcement;
     const company = next.companies.find((x) => x.ticker === a.ticker)!;
-    if (c.rateSource === 'percent-of-face-value' && company.faceValue === undefined && c.faceValue !== null) company.faceValue = c.faceValue;
+    // Only a value the user supplied or assumed in this review is kept on the account; verified evidence stays
+    // in the shared directory and an existing account value is never replaced.
+    if (c.rateSource === 'percent-of-face-value' && company.faceValue === undefined && c.faceValueSource === 'review' && c.faceValue !== null) {
+      company.faceValue = c.faceValue;
+      if (request.assumedFaceValues?.includes(a.ticker)) company.faceValueAssumed = true;
+    }
     const entitlement: DividendEntitlementBasis = {
       shares: c.shares, perShare: c.perShare!, bookClosureEnd: a.bookClosureEnd, details: a.details.slice(0, 200), announcedOn: a.announcedOn,
       faceValue: c.rateSource === 'percent-of-face-value' ? c.faceValue : null, rateSource: c.rateSource, certain: c.calendarCertain && c.issues.length === 0,

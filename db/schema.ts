@@ -181,6 +181,9 @@ export const securityFaceValues = sqliteTable(
     sourceLabel: text('source_label'),
     evidence: text('evidence'),
     verifiedAt: text('verified_at').notNull(),
+    // 'verified', or 'conflict' when a second source disagreed for the same start date: a conflicting row is
+    // never used to calculate anything (the value stays unresolved) and the disagreement is kept in `evidence`.
+    status: text('status').notNull().default('verified'),
   },
   (t) => [primaryKey({ columns: [t.ticker, t.effectiveFrom] })],
 );

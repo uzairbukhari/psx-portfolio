@@ -6,6 +6,7 @@ CREATE TABLE `security_face_values` (
 	`source_label` text,
 	`evidence` text,
 	`verified_at` text NOT NULL,
+	`status` text DEFAULT 'verified' NOT NULL,
 	PRIMARY KEY(`ticker`, `effective_from`)
 );
 --> statement-breakpoint

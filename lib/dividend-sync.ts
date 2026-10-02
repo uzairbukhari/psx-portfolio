@@ -12,6 +12,9 @@ import {
 } from './portfolio.ts';
 import { addNotifications, announcementNotifications, dividendNotifications } from './notifications.ts';
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import type { FaceValueEvidence } from './face-values.ts';
+
+export type FaceValueEvidenceMap = Record<string, FaceValueEvidence[]>;
 
 /** Tries (initial save plus conflict retries) before giving up; a later load simply tries again. */
 export const MAX_SYNC_ATTEMPTS = 3;
@@ -38,15 +41,16 @@ export function planAutoDividendUpdate(
   announcements: PayoutAnnouncement[],
   now: string = new Date().toISOString(),
   asOf: string = today(),
+  faceValueEvidence: FaceValueEvidenceMap = {},
 ): AutoDividendUpdate | null {
   const next = clone(portfolio);
   const tracking = startDividendTracking(next, asOf);
   let pending: Dividend[], notifications: AppNotification[];
   try {
-    pending = pendingAutoDividends(next, announcements, asOf);
+    pending = pendingAutoDividends(next, announcements, asOf, faceValueEvidence);
     notifications = [
       ...dividendNotifications(pending, now),
-      ...announcementNotifications(next, announcements, asOf, now),
+      ...announcementNotifications(next, announcements, asOf, now, faceValueEvidence),
     ];
   } catch {
     return null;
@@ -78,13 +82,13 @@ export async function syncAutoDividends(
   loaded: { portfolio: Portfolio; revision: number },
   announcements: PayoutAnnouncement[],
   io: { save: SyncSave; reload: SyncReload },
-  options: { maxAttempts?: number; now?: () => string; asOf?: string } = {},
+  options: { maxAttempts?: number; now?: () => string; asOf?: string; faceValues?: FaceValueEvidenceMap } = {},
 ): Promise<AutoDividendSyncResult> {
   const maxAttempts = options.maxAttempts ?? MAX_SYNC_ATTEMPTS;
   let current = loaded.portfolio,
     revision = loaded.revision;
   for (let tries = 0; tries < maxAttempts; tries++) {
-    const update = planAutoDividendUpdate(current, announcements, (options.now ?? (() => new Date().toISOString()))(), options.asOf);
+    const update = planAutoDividendUpdate(current, announcements, (options.now ?? (() => new Date().toISOString()))(), options.asOf, options.faceValues);
     if (!update) return { status: 'nothing', portfolio: current, revision };
     try {
       validate(update.next);

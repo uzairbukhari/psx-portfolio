@@ -1,6 +1,7 @@
 import type { PayoutAnnouncement } from './psx-payouts.ts';
 import { dividendEntitlement, lastTradingDay } from './psx-calendar.ts';
 import { UserError } from './user-error.ts';
+import { faceValueFor, type FaceValueEvidence } from './face-values.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -23,8 +24,13 @@ export type Company = {
   approved: boolean;
   screenDate: string;
   note: string;
-  /** Face value in PKR; PSX quotes cash dividends as a percentage of it. Defaults to 10. */
+  /**
+   * Face value in PKR that this account uses; PSX quotes many cash dividends as a percentage of it. Never
+   * defaulted: with no value here and no verified evidence, a percentage payout has no calculated amount.
+   */
   faceValue?: number;
+  /** True when `faceValue` is the account's own "assume Rs 10" choice rather than a verified or entered value. */
+  faceValueAssumed?: boolean;
 };
 export type Trade = {
   id: string;
@@ -515,6 +521,7 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
   }
   return out;
 }
+/** The common PSX face value, offered only as an explicit, account-level assumption (never applied silently). */
 export const DEFAULT_FACE_VALUE = 10;
 /** Last qualifying trade date for a book closure start (PSX calendar and settlement rules; see `dividendEntitlement`). */
 export const entitlementDate = (bookClosureStart: string) =>
@@ -580,6 +587,7 @@ export function pendingAutoDividends(
   p: Portfolio,
   announcements: PayoutAnnouncement[],
   asOf: string = today(),
+  faceValueEvidence: Record<string, FaceValueEvidence[]> = {},
 ): Dividend[] {
   const tickers = new Map(p.companies.map((c) => [c.ticker, c]));
   const all = p.dividends ?? [];
@@ -592,13 +600,13 @@ export function pendingAutoDividends(
     if (p.dividendTrackingFrom && a.bookClosureStart < p.dividendTrackingFrom) continue;
     const externalId = autoDividendId(a);
     if (seen.has(externalId)) continue;
-    const perShare =
-      a.perShareRs ??
-      (a.percent === null
-        ? null
-        : round((a.percent / 100) * (company.faceValue ?? DEFAULT_FACE_VALUE)));
-    if (perShare === null || !(perShare > 0)) continue;
     const entitlement = dividendEntitlement(a.bookClosureStart);
+    // A percentage of face value needs a face value that applied on the entitlement date (the account's own
+    // value or verified evidence). Without one no amount is invented: the payout waits for it.
+    const faceValue = a.perShareRs === null && a.percent !== null ? faceValueFor(company, faceValueEvidence[a.ticker], entitlement.date) : null;
+    const perShare =
+      a.perShareRs ?? (a.percent === null || faceValue === null ? null : round((a.percent / 100) * faceValue));
+    if (perShare === null || !(perShare > 0)) continue;
     const shares = sharesHeldOn(p, a.ticker, entitlement.date);
     if (shares <= 0) continue;
     seen.add(externalId);

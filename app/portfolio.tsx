@@ -100,6 +100,7 @@ import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
 import { importAhlTrades, parseAhlHistory } from './ahl-import';
 import { importCdcDividends } from '@/lib/cdc-import';
+import type { PortfolioResponse } from '@/lib/api-types';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
 import { canSaveCompany } from '@/lib/company-lookup-client';
 
@@ -138,6 +139,7 @@ type ApiResponse = {
   revision: number;
   details?: { ticker: string; name: string; sector: string }[];
   pendingCompanies?: string[];
+  faceValues?: PortfolioResponse['faceValues'];
   announcements?: PayoutAnnouncement[];
   available?: boolean;
   cached?: boolean;
@@ -459,7 +461,7 @@ export default function Dashboard({
       setP(d.portfolio);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
-      await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? []);
+      await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
     } catch (e) {
       notify(String(e), true);
     } finally {
@@ -476,6 +478,7 @@ export default function Dashboard({
     loaded: Portfolio,
     loadedRevision: number,
     announcements: PayoutAnnouncement[],
+    faceValues: NonNullable<PortfolioResponse['faceValues']>,
   ) {
     const result = await syncAutoDividends(
       { portfolio: loaded, revision: loadedRevision },
@@ -499,6 +502,7 @@ export default function Dashboard({
           return d.portfolio ? { portfolio: d.portfolio, revision: d.revision } : null;
         },
       },
+      { faceValues },
     );
     if (result.portfolio !== loaded) {
       setP(result.portfolio);
@@ -2474,6 +2478,8 @@ export default function Dashboard({
                         faceValue: e.target.value
                           ? Number(e.target.value)
                           : undefined,
+                        // A value typed here is the account's own, no longer an assumption.
+                        faceValueAssumed: undefined,
                       })
                     }
                   />

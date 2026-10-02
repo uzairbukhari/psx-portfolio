@@ -6,7 +6,7 @@ const NOW = '2025-08-30T10:00:00Z';
 const AS_OF = '2025-08-30';
 const buy = { id: 'b1', ticker: 'MEBL', kind: 'buy', date: '2025-01-02', shares: 100, price: 100, fees: 0, month: '2025-01', note: '' };
 const pf = (extra = {}) => ({
-  companies: [{ ticker: 'MEBL', name: 'Meezan', sector: 'Banks', target: 0, approved: true, screenDate: '', note: '' }],
+  companies: [{ ticker: 'MEBL', name: 'Meezan', sector: 'Banks', target: 0, approved: true, screenDate: '', note: '', faceValue: 10 }],
   trades: [buy], quotes: {}, budgets: {}, dividendTrackingFrom: '2025-01-01', ...extra,
 });
 const ann = (extra = {}) => ({
