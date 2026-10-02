@@ -169,6 +169,13 @@
       "when": 1790942463405,
       "tag": "0023_special_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1790957567568,
+      "tag": "0024_wandering_warlock",
+      "breakpoints": true
     }
   ]
 }

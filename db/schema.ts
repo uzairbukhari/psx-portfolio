@@ -147,7 +147,43 @@ export const securityCatalog = sqliteTable('security_catalog', {
   source: text('source').notNull(),
   firstSeenAt: text('first_seen_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
+  // Company directory (scripts/psx-directory-scrape.mjs). Provenance is kept per field: the name and sector
+  // can come from different sources, and nothing here is ever promoted from a user's own portfolio data.
+  sectorCode: text('sector_code'),
+  sectorName: text('sector_name'),
+  nameSource: text('name_source'),
+  sectorSource: text('sector_source'),
+  sourceUrls: text('source_urls'),
+  // 'resolved' = name and sector both verified from PSX/issuer data; 'incomplete' = something missing;
+  // 'unresolved' = a lookup was tried and the evidence was insufficient.
+  resolutionStatus: text('resolution_status').notNull().default('incomplete'),
+  listingStatus: text('listing_status'),
+  verifiedAt: text('verified_at'),
+  profileFetchedAt: text('profile_fetched_at'),
+  // Hash of the observed fields, so an incremental run can tell a changed listing from an unchanged one.
+  fingerprint: text('fingerprint'),
+  // Current verified face value (Rs); the dated evidence lives in security_face_values.
+  faceValue: real('face_value'),
+  faceValueSource: text('face_value_source'),
+  faceValueVerifiedAt: text('face_value_verified_at'),
 });
+
+// Dated face-value evidence per ticker. A capital change (split / consolidation) adds a row with a later
+// `effective_from` instead of overwriting the old one, so a past dividend keeps the face value that applied then.
+export const securityFaceValues = sqliteTable(
+  'security_face_values',
+  {
+    ticker: text('ticker').notNull(),
+    // First date this face value applied; '' = from the earliest date the evidence covers.
+    effectiveFrom: text('effective_from').notNull().default(''),
+    faceValue: real('face_value').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    sourceLabel: text('source_label'),
+    evidence: text('evidence'),
+    verifiedAt: text('verified_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ticker, t.effectiveFrom] })],
+);
 
 export const aiUsage = sqliteTable(
   'ai_usage',
@@ -294,6 +330,8 @@ export const refreshRequests = sqliteTable(
     rowsFound: integer('rows_found'),
     coverageFrom: text('coverage_from'),
     error: text('error'),
+    // Quote refreshes: 'updated' | 'already_current' | 'fallback_used' | 'failed'.
+    outcome: text('outcome'),
   },
   (t) => [primaryKey({ columns: [t.kind, t.ticker] })],
 );
