@@ -2,16 +2,16 @@
 
 Updated 2 October 2026. Plan: `docs/claude-implementation-plan.md`. A stage counts as complete only when its gate passes.
 
-## Overall: `███████░░░░░░░░░░░░░ 36%`
+## Overall: `██████████░░░░░░░░░░ 52%`
 
 | Stage | Weight | Progress | Gate |
 |---|---|---|---|
-| 1 Contracts and regression coverage | 10% | `████████░░ 80%` | Partly met |
+| 1 Contracts and regression coverage | 10% | `█████████░ 90%` | Mostly met |
 | 2 Ingestion and cache correctness | 20% | `█████░░░░░ 50%` | Not met |
-| 3 Counts, indices, statistics | 15% | `██░░░░░░░░ 20%` | Not met |
-| 4 Picks evidence and allocation | 20% | `█████████░ 90%` | Met except price-freshness and cache keys |
+| 3 Counts, indices, statistics | 15% | `██████░░░░ 60%` | Partly met |
+| 4 Picks evidence and allocation | 20% | `█████████░ 92%` | Met except price-freshness, full snapshot, evidence refs |
 | 5 Durable execution, truthful progress | 15% | `████████░░ 85%` | Met locally; not run against Cloudflare |
-| 6 Web/mobile integration, release | 20% | `███░░░░░░░ 30%` | Not met |
+| 6 Web/mobile integration, release | 20% | `██████░░░░ 55%` | Not met |
 
 Percentages are my estimate of completed checklist items per stage. Overall = weighted sum of stages (stage 1 counted at 80%, no stage credited 100%).
 
@@ -39,8 +39,10 @@ Percentages are my estimate of completed checklist items per stage. Overall = we
 ### Stage 3
 - [x] `pakistanMarketState` respects the holiday calendar; year boundary tested.
 - [x] Session-aware freshness classifier (`lib/market-freshness.ts`, 10 tests).
-- [ ] Security catalog, count definitions, advance/decline from one coherent dataset.
-- [ ] KSE-30, KMI-30, All-Share ingestion and cards.
+- [x] Advance/decline/unchanged/volume from one All-Share table, invalid rows excluded and counted (`lib/market-breadth.ts`), labelled as securities in the source table, not listed companies. Shown on web and mobile.
+- [ ] Security catalog and the other count definitions (saved companies, holdings, shortlisted, assessed) in one place.
+- [x] KSE-100, KSE-30, KMI-30 and All-Share parsed from one homepage fetch, merged per index (partial failure and older observations keep the stored value and its timestamps): `lib/index-snapshot.ts`, scraper, `/api/market-summary` `summary.indices` with `DataMeta`. Verified against the live PSX homepage. Index cards on web and mobile.
+- [ ] Intraday charts for KSE-30, KMI-30, All-Share (only KSE-100 has a series).
 - [ ] Chart/headline session pairing; sampled index series.
 - [ ] Market-summary reads still call pyPSX when the 30 s cache expires (see deviations).
 
@@ -56,7 +58,8 @@ Percentages are my estimate of completed checklist items per stage. Overall = we
 - [ ] Immutable full snapshot (holdings, quotes, index context) stored with the run. Only the existing facts snapshot is stored; holdings are fingerprinted in `sizing`.
 - [ ] Structured evidence references for AI claims; announcements treated as untrusted text in the prompt.
 - [ ] Session-aware price freshness for estimates (client estimate still uses 7 days).
-- [ ] Cache reuse keyed on holdings fingerprint and data versions (reuse is still by inputs and day).
+- [x] Saved run reused only when the holdings fingerprint matches (older runs without `sizing` are re-run once).
+- [ ] Reuse keyed on data and model versions beyond workflow version.
 - [ ] Versioned model/pricing configuration.
 
 ### Stage 5
@@ -77,11 +80,13 @@ Percentages are my estimate of completed checklist items per stage. Overall = we
 - [x] Web and mobile progress display from persisted fields; 5 s then 15 s polling; mobile stops when backgrounded.
 - [x] Fallback reason and allocation-limit explanations shown on both clients.
 - [x] pyPSX: 30 s cache, in-flight dedupe, 6 s timeout, out-of-order rejection.
-- [ ] Four index cards, counts, evidence-coverage UI.
+- [x] Four index cards and breadth counts on web and mobile.
+- [ ] Evidence-coverage UI beyond the existing coverage list.
 - [ ] Web polling stops on hidden tab (existing behaviour: pauses and rechecks every 3 s; unchanged).
 - [ ] Minute-level market summary refresh and cached closing data off-session.
 - [ ] pyPSX reconnect/cleanup for the streaming route (`app/api/market-stream`) not reviewed.
-- [ ] Documentation update (README/CLAUDE.md) for the new architecture.
+- [x] CLAUDE.md note on run execution. README not updated.
+- [x] Users can delete their own holdings data from Settings (`DELETE /api/me/data`, confirmation dialog).
 - [ ] Staging evidence on two sessions.
 
 ## Confirmed findings (against current code)
@@ -96,7 +101,7 @@ Not verified: that pyPSX or All-Share behave as the plan describes (no network c
 - Client share estimates still derive money from `allocationPct`, so figures can differ from `sizing.allocationPkr` by under one paisa-rounding step.
 
 ## Tests run (actual)
-- Root: `node --test --test-isolation=none tests/*.test.mjs`: 447 pass, 0 fail.
+- Root: `node --test --test-isolation=none tests/*.test.mjs`: 459 pass, 0 fail.
 - Mobile: `node --test --experimental-strip-types "src/**/*.test.ts"` in `mobile/`: 135 pass, 0 fail.
 - `npx tsc --noEmit` in root and `mobile/`: no errors.
 - `npm run build`: succeeds.

@@ -23,7 +23,7 @@ import {
   type ProviderResponse, type SnapshotV8,
 } from './monthly-picks-ai.ts';
 import type { MonthlyPicksResearch } from './monthly-picks.ts';
-import { applySizing, type HoldingValue } from './monthly-picks-allocation.ts';
+import { applySizing, holdingsFingerprint, type HoldingValue } from './monthly-picks-allocation.ts';
 import { newProgress, parseProgress, progressPercent, withStep, isIndeterminate, type RunProgress } from './monthly-picks-progress.ts';
 import { UserError } from './user-error.ts';
 
@@ -477,10 +477,15 @@ export async function startRun(env: RunEnv, owner: string, body: StartInput) {
   // Reuse only a completed run with identical inputs and same-day data; failed/old runs always start fresh.
   const day = today();
   const previous = (await env.db.prepare('SELECT * FROM monthly_recommendations WHERE user_id=? AND month=? AND amount=? AND fee_pct=? ORDER BY created_at DESC').bind(owner, month, amount, fee).all<Row>()).results;
-  const existing = previous.find((row) => canReuseRun({
-    status: row.status, workflowVersion: row.workflow_version, shortlist: parseList(row.shortlist),
-    dataAsOf: row.result ? (JSON.parse(row.result) as MonthlyPicksResearch).dataAsOf : null,
-  }, shortlist, day, WORKFLOW_VERSION));
+  // A saved result is only reused when the holdings it was sized against are unchanged.
+  const currentFingerprint = holdingsFingerprint(await heldValues(env, owner));
+  const existing = previous.find((row) => {
+    const saved = row.result ? (JSON.parse(row.result) as MonthlyPicksResearch) : null;
+    return canReuseRun({
+      status: row.status, workflowVersion: row.workflow_version, shortlist: parseList(row.shortlist),
+      dataAsOf: saved?.dataAsOf ?? null,
+    }, shortlist, day, WORKFLOW_VERSION) && saved?.sizing?.holdingsFingerprint === currentFingerprint;
+  });
   if (existing && body.rerun !== true) return viewOne(env, existing);
 
   // One active run per account. A stalled one is advanced (it times itself out) rather than blocking forever.

@@ -8,6 +8,7 @@ import type {
   ShortlistPerformance,
 } from '@/lib/psx-market';
 import type { PypsxLiveQuote } from '@/lib/pypsx-market';
+import type { MarketBreadthView, MarketIndexView } from '@/lib/api-types';
 import { TabLoader } from './tab-loader';
 import { TickerLink } from './ticker-link';
 
@@ -17,6 +18,8 @@ export interface PsxMarketPulseHandle {
 
 interface MarketSummary {
   index: IndexSummary | null;
+  indices?: MarketIndexView[];
+  breadth?: MarketBreadthView | null;
   series: IndexPoint[];
   companies: ShortlistPerformance[];
   market: MarketState;
@@ -289,6 +292,30 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
         </div>
       </div>
       {error && <p role="alert" className="notice error pulse-error">{error}</p>}
+      {!!summary?.indices?.length && (
+        <ul className="pulse-indices" aria-label="Market indices">
+          {summary.indices.map((entry) => (
+            <li key={entry.code} className="pulse-indices__item">
+              <span className="muted pulse-label">{entry.label}</span>
+              <b>{entry.close.toLocaleString()}</b>
+              <span className={entry.change >= 0 ? 'pos' : 'neg'}>
+                {entry.change >= 0 ? '▲' : '▼'} {Math.abs(entry.change).toLocaleString()} ({entry.changePercent.toFixed(2)}%)
+              </span>
+              <small className={`pulse-fresh pulse-fresh--${entry.meta.freshness}`} title={entry.meta.reason}>
+                {entry.meta.freshness === 'fresh' ? 'Fresh' : entry.meta.freshness === 'delayed' ? 'Delayed' : 'Stale'} · {entry.asOf}
+              </small>
+              {entry.meta.lastFailure && <small className="muted">Last refresh failed; showing earlier value</small>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {summary?.breadth && summary.breadth.covered > 0 && (
+        <p className="muted pulse-breadth">
+          {summary.breadth.advances.toLocaleString()} up · {summary.breadth.declines.toLocaleString()} down · {summary.breadth.unchanged.toLocaleString()} unchanged
+          {' '}across {summary.breadth.covered.toLocaleString()} securities in the {summary.breadth.source}
+          {summary.breadth.excluded > 0 ? ` (${summary.breadth.excluded.toLocaleString()} without valid prices left out)` : ''}.
+        </p>
+      )}
       <div className={`pulse-grid pulse-grid--shortlist${index ? '' : ' pulse-grid--solo'}`}>
         {index && (
           <div className="pulse-index">

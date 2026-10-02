@@ -141,3 +141,28 @@ export type PicksHealthResponse = {
   recentFactsErrors: { ticker: string; error: string; attemptedAt: string | null }[];
   providerRequests24h: number; warnings: string[]; backgroundProcessing: boolean;
 };
+
+/** One of the four supported indices in GET /api/market-summary `summary.indices`. */
+export type MarketIndexView = {
+  code: 'KSE100' | 'KSE30' | 'KMI30' | 'ALLSHR';
+  label: string;
+  name: string;
+  close: number;
+  change: number;
+  changePercent: number;
+  previousClose: number;
+  asOf: string;
+  date: string;
+  high: number;
+  low: number;
+  ytdChangePercent: number;
+  retrievedAt: string;
+  meta: import('./market-meta.ts').DataMeta;
+};
+
+/** `summary.breadth` in GET /api/market-summary. Counts securities in the source table, not listed companies. */
+export type MarketBreadthView = {
+  advances: number; declines: number; unchanged: number; volume: number;
+  covered: number; sourceRows: number; excluded: number; volumeMissing: number;
+  source: string; asOf: string | null; retrievedAt: string | null;
+};

@@ -19,6 +19,9 @@ import {
   refreshQuotes,
 } from '@/lib/quote-cache';
 import { db, failure, identity } from '@/lib/server';
+import { INDEX_LABELS, SUPPORTED_INDICES, type IndexSnapshot } from '@/lib/index-snapshot';
+import { dataMeta } from '@/lib/market-freshness';
+import { marketBreadth } from '@/lib/market-breadth';
 import { fetchPypsxIntradayFor, pypsxCredentialsFor } from '@/lib/pypsx-server';
 
 /**
@@ -34,8 +37,16 @@ const PSX_BUDGET = 35;
 const MAX_SHORTLIST_REFRESH = 30;
 const MAX_INTRADAY = 10;
 
+/** PSX prints "2026-10-02 15:11:00" in Pakistan time (UTC+5). */
+const pktStampToIso = (stamp: string) => {
+  const parsed = Date.parse(`${stamp.replace(' ', 'T')}+05:00`);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+};
+
 interface MarketSummaryCache {
   index?: IndexSummary;
+  /** KSE-100, KSE-30, KMI-30 and All-Share, each with its own source time and failure state. */
+  indices?: IndexSnapshot;
   series?: IndexPoint[];
   quotes?: MarketWatchQuote[];
 }
@@ -154,6 +165,34 @@ async function personalized(
   return {
     summary: {
       index: cache.index ?? null,
+      indices: SUPPORTED_INDICES.flatMap((code) => {
+        const stored = cache.indices?.[code];
+        if (!stored) return [];
+        const { summary } = stored;
+        return [{
+          code,
+          label: INDEX_LABELS[code],
+          ...summary,
+          retrievedAt: stored.retrievedAt,
+          // Source time and fetch time stay separate; a failed refresh never freshens old data.
+          meta: dataMeta({
+            provider: 'PSX Data Portal',
+            sourceUrl: 'https://dps.psx.com.pk/',
+            sourceTimestamp: pktStampToIso(summary.asOf),
+            fetchedAt: stored.retrievedAt,
+            lastFailure: stored.lastFailure,
+          }),
+        }];
+      }),
+      // Counts come from one scrape's All-Share table. `coverage` is that table's size, not the number of PSX companies.
+      breadth: cache.quotes?.length
+        ? {
+            ...marketBreadth(cache.quotes),
+            source: 'All-Share constituents table',
+            asOf: cache.index?.asOf ?? null,
+            retrievedAt: fetchedAt,
+          }
+        : null,
       series,
       companies,
       market: pakistanMarketState(),
@@ -212,6 +251,8 @@ export async function POST(req: Request) {
       fetchPsxMarketWatch(budget),
     ]);
     const cache: MarketSummaryCache = {
+      // The Worker only refreshes KSE-100 itself; the scraper owns the other indices, so keep them.
+      indices: previous.cache.indices,
       index:
         indexResult.status === 'fulfilled' ? indexResult.value : previous.cache.index,
       series:

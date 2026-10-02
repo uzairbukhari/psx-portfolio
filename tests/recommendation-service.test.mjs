@@ -207,3 +207,16 @@ test('holdings are honoured: an overweight existing position receives no new all
   assert.equal(result.sizing.picks.find((p) => p.ticker === 'MEBL').constrainedBy, 'overweight');
   assert.equal(result.unallocatedPct, 100);
 });
+
+test('a completed run is reused only while holdings are unchanged', async () => {
+  const day = today();
+  const { env, db } = world();
+  const first = await drive(env, (await startRun(env, OWNER, body())).id);
+  const again = await startRun(env, OWNER, body());
+  assert.equal(again.id, first.id, 'same inputs and holdings reuse the saved run');
+  const trade = { id: 't1', ticker: 'LUCK', kind: 'buy', date: '2026-01-05', shares: 10, price: 400, fees: 0, note: '' };
+  const quote = { price: 400, asOf: 'x', date: day, source: 'https://dps.psx.com.pk/company/LUCK', fetchedAt: `${day}T05:00:00Z` };
+  db.sqlite.prepare("UPDATE portfolios SET payload=json_set(json_set(payload,'$.trades',json(?)),'$.quotes',json(?))").run(JSON.stringify([trade]), JSON.stringify({ LUCK: quote }));
+  const fresh = await startRun(env, OWNER, body());
+  assert.notEqual(fresh.id, first.id, 'new holdings start a new run');
+});

@@ -16,7 +16,8 @@ import { pathToFileURL } from 'node:url';
 import { d1, heldTickers as sharedHeldTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
-import { parseIndexConstituents, parseIndexSummary } from '../lib/psx-market.ts';
+import { parseIndexConstituents } from '../lib/psx-market.ts';
+import { mergeIndexSnapshot, parseSupportedIndices } from '../lib/index-snapshot.ts';
 import { fetchPsxQuote } from '../lib/psx-quotes.ts';
 import { quoteUpsertSql } from '../lib/quote-write.ts';
 
@@ -57,7 +58,7 @@ function pktSeconds(stamp) {
  * per scrape and reset each trading day; `quotes` is the full ALLSHR table so
  * shortlisted companies get price and day change even when nobody holds them.
  */
-export function buildMarketSummary(previous, index, constituents, retrievedAt) {
+export function buildMarketSummary(previous, index, constituents, retrievedAt, parsedIndices) {
   const dayStart = pktSeconds(`${index.date} 00:00:00`);
   const time = pktSeconds(index.asOf);
   const series = (Array.isArray(previous?.series) ? previous.series : []).filter(
@@ -66,6 +67,8 @@ export function buildMarketSummary(previous, index, constituents, retrievedAt) {
   series.push({ time, value: index.close });
   return {
     index,
+    // All four supported indices, merged per index so one failed panel keeps its last good value.
+    indices: parsedIndices ? mergeIndexSnapshot(previous?.indices, parsedIndices, retrievedAt) : previous?.indices,
     series: series.slice(-MAX_SERIES_POINTS),
     quotes: constituents.map((row) => ({
       symbol: row.symbol,
@@ -82,7 +85,7 @@ export function buildMarketSummary(previous, index, constituents, retrievedAt) {
   };
 }
 
-async function writeMarketSummary(index, constituents, retrievedAt) {
+async function writeMarketSummary(index, constituents, retrievedAt, parsedIndices) {
   const [row] = await d1("SELECT payload FROM market_summary_refreshes WHERE id='latest'");
   let previous = null;
   try {
@@ -90,7 +93,7 @@ async function writeMarketSummary(index, constituents, retrievedAt) {
   } catch {
     previous = null;
   }
-  const payload = buildMarketSummary(previous, index, constituents, retrievedAt);
+  const payload = buildMarketSummary(previous, index, constituents, retrievedAt, parsedIndices);
   await d1(
     `INSERT INTO market_summary_refreshes (id,payload,fetched_at,updated_at)
      VALUES ('latest',?,?,?)
@@ -106,7 +109,10 @@ async function main() {
     fetchPsx('https://dps.psx.com.pk/').then((response) => response.text()),
     fetchPsx(SOURCE).then((response) => response.text()),
   ]);
-  const index = parseIndexSummary(home, 'KSE100');
+  const parsedIndices = parseSupportedIndices(home);
+  const index = parsedIndices.indices.KSE100;
+  if (!index) throw Error(parsedIndices.failures.KSE100 ?? 'KSE100 missing from the PSX homepage');
+  for (const [code, message] of Object.entries(parsedIndices.failures)) console.warn(`Index ${code} not refreshed: ${message}`);
   const stamp = index.asOf;
   const asOf = psxAsOf(stamp);
   const date = stamp.slice(0, 10);
@@ -157,7 +163,7 @@ async function main() {
       ]),
     );
   }
-  const points = await writeMarketSummary(index, constituents, fetchedAt);
+  const points = await writeMarketSummary(index, constituents, fetchedAt, parsedIndices);
   console.log(`Market summary: KSE100 ${index.close} (${points} chart points), ${constituents.length} ALLSHR quotes.`);
   process.exitCode = scrapeExitCode(tickers.length, tickers.length - entries.length);
 }
