@@ -32,7 +32,7 @@ Branch `claude/project-thread-t4dk16` (local commits; nothing pushed, nothing de
 
 ## Not verified (blockers)
 
-- Mobile typecheck: `mobile/` dependencies are not installed here (`expo/tsconfig.base` missing). Only `mobile/src/data/auto-dividends.ts` changed (passes `faceValues`); root `shared-lib` tests pass.
+- Mobile: `npm ci && npm run typecheck && npm test` in `mobile/` pass (typecheck and 136 tests). The first PR run caught shared `lib/` modules pulling in Workers types; fixed by moving the quote job types to the import-free `lib/quote-job-types.ts` and a structural DB type in `lib/face-values.ts`. Only `mobile/src/data/auto-dividends.ts` and its test fixture changed; no screens.
 - Live PSX scraping (directory, face-value evidence, quotes) and PDF extraction: PSX is not reachable from this environment and the test fixtures are synthetic, not live captures. Run the workflows with `dry_run` on a real runner first.
 - GitHub dispatch end to end (queued → running → completed in the browser) needs `GITHUB_DISPATCH_TOKEN` / `GITHUB_REPO` on the Worker; not available here. Staging never dispatches by design (`unavailable`).
 - Browser walkthrough (Add Company, import preview, dividend review, polling UI) was not performed: only API-level local checks. PDF import must be checked on `npm run build` + `npm run start`.
