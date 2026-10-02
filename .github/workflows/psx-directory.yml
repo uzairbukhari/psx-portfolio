@@ -1,0 +1,72 @@
+name: PSX company directory
+
+# PSX drops requests from Cloudflare's network, so the shared company directory (security_catalog: name,
+# sector, security type, listing status) is built from a GitHub runner. Modes:
+#   bootstrap    first load of every discovered symbol (resumable: reruns skip symbols already profiled)
+#   incremental  the daily check for new, changed or still-incomplete listings (default for the schedule)
+#   full         explicit full refresh of every company profile
+# The Worker also dispatches this with `tickers` when someone looks up a symbol the directory lacks.
+on:
+  schedule:
+    # Daily 12:30 UTC Monday-Friday = 17:30 PKT, after the close. GitHub may delay runs.
+    - cron: '30 12 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'bootstrap | incremental | full'
+        required: false
+        default: 'incremental'
+      tickers:
+        description: 'Comma-separated tickers for an on-demand lookup (blank = the whole directory)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Read and parse only; write nothing (true/false)'
+        required: false
+        default: 'false'
+
+# One directory run at a time (a bootstrap must not race the daily check); on-demand lookups are short and
+# get their own group so a queued dispatch is never blocked behind a long bootstrap.
+concurrency:
+  group: psx-directory-${{ inputs.tickers != '' && github.run_id || 'bulk' }}
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    environment: prod
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh the company directory from PSX
+        # Dispatch inputs are untrusted text: pass them through the environment, never into the script.
+        run: |
+          args=("--mode=${MODE:-incremental}")
+          if [ -n "$TICKERS" ]; then args+=("--tickers=$TICKERS"); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
+          node scripts/psx-directory-scrape.mjs "${args[@]}"
+        env:
+          MODE: ${{ inputs.mode }}
+          TICKERS: ${{ inputs.tickers }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Open or update a failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Scraper failing: $GITHUB_WORKFLOW"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "Scheduled scraper run failed: $RUN_URL"
+          fi

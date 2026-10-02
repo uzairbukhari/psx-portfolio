@@ -169,6 +169,13 @@
       "when": 1790942463405,
       "tag": "0023_special_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1790958183911,
+      "tag": "0024_company_directory",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DividendRefreshResponse } from '@/lib/api-types';
+import type { DividendRefreshResponse, FaceValuesResponse } from '@/lib/api-types';
 import {
   approveSelectedAsReceived,
+  assumeFaceValueForUnresolved,
   earliestHoldingDate,
   isSelectable,
   planHistoricalDividends,
+  unresolvedFaceValueTickers,
   type DividendCandidate,
 } from '@/lib/dividend-history';
 import { money, today, type Portfolio } from '@/lib/portfolio';
@@ -42,7 +44,11 @@ export function DividendSyncView({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const [faceValues, setFaceValues] = useState<Record<string, number>>({});
+  // Tickers whose face value in `faceValues` is the "assume Rs 10" choice (saved per account on approval, never as verified data).
+  const [assumed, setAssumed] = useState<string[]>([]);
+  const [fv, setFv] = useState<FaceValuesResponse | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const fvRequested = useRef(false);
   const poll = useRef(0);
   const loading = data === null && !error;
 
@@ -101,10 +107,49 @@ export function DividendSyncView({
     }
   }
 
+  const unresolvedFaceRef = useRef<string[]>([]);
+  const evidence = fv?.evidence;
+  // Verified face values that arrive later (the background lookup finishing) recalculate every affected row.
   const plan = useMemo(
-    () => (data ? planHistoricalDividends(portfolio, data.announcements, { from, to, faceValues }) : null),
-    [portfolio, data, from, to, faceValues],
+    () => (data ? planHistoricalDividends(portfolio, data.announcements, { from, to, faceValues, faceValueEvidence: evidence }) : null),
+    [portfolio, data, from, to, faceValues, evidence],
   );
+  const unresolvedFace = useMemo(() => (plan ? unresolvedFaceValueTickers(plan) : []), [plan]);
+
+  // Verified face values: read what is on file, ask once for a background lookup when payouts need one, and
+  // poll while it runs. Stops by itself; never cancels the server-side work.
+  useEffect(() => {
+    let live = true;
+    let timer: number | undefined;
+    const started = Date.now();
+    async function step() {
+      try {
+        const get = async () => {
+          const response = await fetch('/api/face-values');
+          const body = (await response.json()) as FaceValuesResponse & { error?: string };
+          if (!response.ok) throw new Error(body.error);
+          return body;
+        };
+        let body = await get();
+        if (!live) return;
+        setFv(body);
+        const missing = body.tickers.some((t) => !body.evidence[t]?.length);
+        if (missing && unresolvedFaceRef.current.length && !fvRequested.current && body.dispatchEnabled && body.overall !== 'queued' && body.overall !== 'running') {
+          fvRequested.current = true;
+          const response = await fetch('/api/face-values', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: unresolvedFaceRef.current }) });
+          if (response.ok) body = (await response.json()) as FaceValuesResponse;
+          if (!live) return;
+          setFv(body);
+        }
+        if ((body.overall === 'queued' || body.overall === 'running') && Date.now() - started < 10 * 60_000) timer = window.setTimeout(() => void step(), 6000);
+      } catch {
+        /* face values are an aid: the review works without them */
+      }
+    }
+    void step();
+    return () => { live = false; if (timer) window.clearTimeout(timer); };
+  }, [revision, data?.tickers.length]);
+  useEffect(() => { unresolvedFaceRef.current = unresolvedFace; }, [unresolvedFace]);
   const rows = plan?.candidates.filter((c) => showAll || c.state === 'eligible' || c.state === 'convert') ?? [];
   const selectable = rows.filter((c) => isSelectable(c, confirmed));
   const picked = (plan?.candidates ?? []).filter((c) => selected.has(c.id) && isSelectable(c, confirmed));
@@ -123,7 +168,7 @@ export function DividendSyncView({
     if (!ok) return;
     const result = approveSelectedAsReceived(portfolio, data.announcements, {
       reviewed: picked.map((c) => ({ id: c.id, shares: c.shares, perShare: c.perShare!, gross: c.gross! })),
-      faceValues, confirmed, from, to,
+      faceValues, assumedFaceValues: assumed, faceValueEvidence: evidence, confirmed, from, to,
     });
     if (!result.ok) {
       setError(result.message);
@@ -192,6 +237,31 @@ export function DividendSyncView({
         </div>
       ) : null}
 
+      {unresolvedFace.length > 0 && (
+        <div className="ir-banner ir-warn" aria-live="polite">
+          <b>{unresolvedFace.length} compan{unresolvedFace.length === 1 ? 'y has' : 'ies have'} no verified face value</b> ({unresolvedFace.join(', ')}), so their percentage payouts have no amount yet.
+          {fv && (fv.overall === 'queued' || fv.overall === 'running') ? ' Looking for verified face values now; amounts update automatically if any are found.' : ''}
+          <div className="ir-inline">
+            <button
+              type="button"
+              className="secondary compact"
+              disabled={busy}
+              onClick={() => {
+                if (!plan) return;
+                const next = assumeFaceValueForUnresolved(plan, faceValues, 10);
+                setFaceValues(next.faceValues);
+                setAssumed((a) => [...new Set([...a, ...next.assumed])]);
+              }}
+            >
+              Use Rs 10 for all unresolved companies ({unresolvedFace.filter((t) => faceValues[t] === undefined).length})
+            </button>
+            <small>
+              This assumes a Rs 10 face value for the {unresolvedFace.length} company{unresolvedFace.length === 1 ? '' : 'ies'} listed. It applies only to companies still unresolved here, is kept on your account
+              only when you approve, and is not treated as verified. You can correct any company below.
+            </small>
+          </div>
+        </div>
+      )}
       <label className="ir-toggle"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Also show rows already recorded, voided or not held</label>
       <div className="ir-table-wrap">
         <table className="ir-table" aria-label="Historical cash dividends">
@@ -213,7 +283,15 @@ export function DividendSyncView({
                   <td>{c.announcement.bookClosureStart}<small>to {c.announcement.bookClosureEnd}</small></td>
                   <td>{c.entitlementDate}<small>{c.settlement}{c.calendarCertain ? '' : ' · holidays unconfirmed'}</small></td>
                   <td className="num">{c.shares}</td>
-                  <td className="num">{c.perShare === null ? '—' : c.perShare.toFixed(2)}</td>
+                  <td className="num">
+                    {c.perShare === null ? '—' : c.perShare.toFixed(2)}
+                    {c.rateSource === 'percent-of-face-value' && c.faceValue !== null && (
+                      <small>
+                        face value Rs {c.faceValue} ·{' '}
+                        {c.faceValueSource === 'verified' ? 'verified' : c.faceValueSource === 'account' ? 'your value' : assumed.includes(c.announcement.ticker) ? 'assumed' : 'entered'}
+                      </small>
+                    )}
+                  </td>
                   <td className="num">{c.gross === null ? '—' : money(c.gross)}</td>
                   <td>
                     {STATE_LABEL[c.state]}
@@ -222,8 +300,8 @@ export function DividendSyncView({
                         {issue.message}
                         {issue.kind === 'face-value' ? (
                           <span className="ir-inline">
-                            <input type="number" min="0.01" step="any" aria-label={`Face value for ${c.announcement.ticker}`} placeholder="Face value" onChange={(e) => { const v = Number(e.target.value); setFaceValues((f) => { const n = { ...f }; if (v > 0) n[c.announcement.ticker] = v; else delete n[c.announcement.ticker]; return n; }); }} />
-                            <button type="button" className="secondary compact" onClick={() => setFaceValues((f) => ({ ...f, [c.announcement.ticker]: 10 }))}>Use Rs 10</button>
+                            <input type="number" min="0.01" step="any" aria-label={`Face value for ${c.announcement.ticker}`} placeholder="Face value" onChange={(e) => { const v = Number(e.target.value); setAssumed((a) => a.filter((t) => t !== c.announcement.ticker)); setFaceValues((f) => { const n = { ...f }; if (v > 0) n[c.announcement.ticker] = v; else delete n[c.announcement.ticker]; return n; }); }} />
+                            <button type="button" className="secondary compact" onClick={() => { setAssumed((a) => [...new Set([...a, c.announcement.ticker])]); setFaceValues((f) => ({ ...f, [c.announcement.ticker]: 10 })); }}>Use Rs 10</button>
                           </span>
                         ) : issue.severity === 'confirm' ? (
                           <label className="ir-toggle"><input type="checkbox" checked={confirmed.has(issue.kind === 'corporate-action' ? `${c.announcement.ticker}|${issue.kind}` : `${c.id}|${issue.kind}`)} onChange={(e) => acknowledge(issue.kind === 'corporate-action' ? `${c.announcement.ticker}|${issue.kind}` : `${c.id}|${issue.kind}`, e.target.checked)} /> I have checked this</label>

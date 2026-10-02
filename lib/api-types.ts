@@ -3,6 +3,7 @@
 // directly. Routes use `satisfies` against these so the two cannot drift.
 // Not yet covered: market-summary and research/* (added with the screens that use them).
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import type { FaceValueEvidence } from './face-values.ts';
 import type { Portfolio, Quote } from './portfolio.ts';
 import type { PricePoint } from './price-history.ts';
 import type { IpoLookup } from './ipo-offers.ts';
@@ -51,10 +52,25 @@ export type PortfolioResponse = {
   portfolio: Portfolio;
   revision: number;
   announcements: PayoutAnnouncement[];
+  /** Companies whose name or sector the shared directory has not resolved yet (additive; old clients ignore it). */
+  pendingCompanies?: string[];
+  /** Verified, dated face-value evidence for the held companies (additive). Empty = none verified. */
+  faceValues?: Record<string, FaceValueEvidence[]>;
 };
-/** PUT /api/portfolio body. A stale `revision` is answered with 409. */
-export type SavePortfolioRequest = { portfolio: Portfolio; revision: number };
-export type SavePortfolioResponse = { revision: number };
+/**
+ * PUT /api/portfolio body. A stale `revision` is answered with 409. `createCompanies` is the strict
+ * Add Company intent: those tickers must be new to the portfolio and fully resolved in the shared company
+ * directory, and their name and sector are taken from it. Omitted (imports, old clients), the save is tolerant:
+ * unresolved metadata is kept as entered and repaired by a later save.
+ */
+export type SavePortfolioRequest = { portfolio: Portfolio; revision: number; createCompanies?: string[] };
+export type SavePortfolioResponse = {
+  revision: number;
+  /** Name and sector the server filled in from the company directory (additive; old clients ignore it). */
+  details?: { ticker: string; name: string; sector: string }[];
+  /** Companies the directory could not resolve yet; a lookup is queued and a later save repairs them. */
+  pendingCompanies?: string[];
+};
 
 /** POST /api/quotes body: `{ tickers }` (optionally `?force=1`). */
 export type QuotesResponse = {
@@ -64,6 +80,8 @@ export type QuotesResponse = {
   stale: Record<string, string>;
   /** Additive: per-ticker provider, source/fetch times, session and session-aware freshness. */
   meta?: Record<string, import('./market-meta.ts').DataMeta>;
+  /** Additive: the manual-refresh job (state, verified per-ticker outcomes, the one user-facing message). */
+  job?: import('./quote-job-types.ts').QuoteJob;
 };
 
 export type UsageResponse = { inputTokens: number; outputTokens: number; costUsd: number };
@@ -211,6 +229,47 @@ export type DividendRefreshResponse = {
 /** GET/POST /api/ipo-offers: official offer evidence for symbols that need an assumed acquisition. */
 export type IpoOffersResponse = {
   lookups: IpoLookup[];
+  states: RefreshTickerState[];
+  overall: RefreshOverall;
+  dispatchEnabled: boolean;
+  disabledReason: string | null;
+  queued?: string[];
+  message?: string;
+};
+
+/** What the shared company directory knows about one symbol. */
+export type CompanyLookup = {
+  ticker: string;
+  /** `resolved`: name and sector are verified; `pending`: a lookup is under way; `unresolved`: no usable evidence yet. */
+  state: 'resolved' | 'pending' | 'unresolved';
+  company: {
+    name: string;
+    sector: string;
+    sectorCode: string | null;
+    securityType: 'equity' | 'etf' | 'debt' | null;
+    listingStatus: 'listed' | 'delisted' | null;
+    /** Verified current face value (Rs), or null when none is on file. */
+    faceValue: number | null;
+  } | null;
+  source: 'directory' | 'facts' | null;
+  /** Safe, user-facing explanation (never a provider error). */
+  message: string | null;
+  /** True when POST /api/companies can start a lookup for this symbol. */
+  canRequest: boolean;
+};
+/** GET /api/companies?tickers=A,B (cached, read-only) and POST /api/companies (queues missing lookups). */
+export type CompaniesResponse = {
+  companies: CompanyLookup[];
+  dispatchEnabled: boolean;
+  /** POST only. */
+  queued?: string[];
+  message?: string;
+};
+
+/** GET/POST /api/face-values: verified face-value evidence for the signed-in ledger's companies. */
+export type FaceValuesResponse = {
+  tickers: string[];
+  evidence: Record<string, FaceValueEvidence[]>;
   states: RefreshTickerState[];
   overall: RefreshOverall;
   dispatchEnabled: boolean;

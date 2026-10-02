@@ -22,11 +22,11 @@ export function createD1() {
   return {
     sqlite,
     prepare: (sql) => statement(sql),
+    // Like D1, a batch is atomic and never interleaves with another one: run it without yielding.
     batch: async (statements) => {
       sqlite.exec('BEGIN');
       try {
-        const out = [];
-        for (const s of statements) out.push(await s.run());
+        const out = statements.map((s) => ({ meta: { changes: Number(sqlite.prepare(s.sql).run(...s.args).changes) } }));
         sqlite.exec('COMMIT');
         return out;
       } catch (error) { sqlite.exec('ROLLBACK'); throw error; }

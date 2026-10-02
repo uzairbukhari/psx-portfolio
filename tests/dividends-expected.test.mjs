@@ -11,7 +11,7 @@ import {
 } from '../lib/portfolio.ts';
 
 const ASOF = '2026-09-30';
-const company = () => ({ ticker: 'MEBL', name: 'Meezan', target: 0, approved: true, screenDate: '', note: '' });
+const company = () => ({ ticker: 'MEBL', name: 'Meezan', target: 0, approved: true, screenDate: '', note: '', faceValue: 10 });
 const tr = (id, kind, date, shares, price = 100, extra = {}) => ({ id, ticker: 'MEBL', kind, date, shares, price, fees: 0, month: kind === 'buy' ? date.slice(0, 7) : '', note: '', ...extra });
 const portfolio = (trades, extra = {}) => ({ companies: [company()], trades, quotes: {}, budgets: {}, taxProfile: { filerStatus: 'filer' }, ...extra });
 const ann = (extra = {}) => ({

@@ -7,7 +7,7 @@ import { syncAnnouncementsOnLoad } from './auto-dividends.ts';
 const NOW = '2025-08-30T10:00:00Z';
 const OPTS = { now: () => NOW, asOf: '2025-08-30' };
 const base = (extra = {}): PortfolioResponse['portfolio'] => ({
-  companies: [{ ticker: 'MEBL', name: 'Meezan', sector: 'Banks', target: 0, approved: true, screenDate: '', note: '' }],
+  companies: [{ ticker: 'MEBL', name: 'Meezan', sector: 'Banks', target: 0, approved: true, screenDate: '', note: '', faceValue: 10 }],
   trades: [{ id: 'b1', ticker: 'MEBL', kind: 'buy', date: '2025-01-02', shares: 100, price: 100, fees: 0, month: '2025-01', note: '' }],
   quotes: {}, budgets: {}, dividendTrackingFrom: '2025-01-01', ...extra,
 });

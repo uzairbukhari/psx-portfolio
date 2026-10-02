@@ -1,9 +1,8 @@
 import type { PortfolioResponse, SavePortfolioResponse } from '@/lib/api-types';
 import { db, identity, failure } from '@/lib/server';
 import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
-import { applyFacts, newTickers } from '@/lib/company-enrichment';
-import { gatherFacts } from '@/lib/company-facts-store';
-import { applyCatalog, readCatalog } from '@/lib/security-catalog';
+import { enrichForSave, overlayForRead } from '@/lib/company-save';
+import { readFaceValues } from '@/lib/face-values';
 import { dispatchConfig } from '@/lib/dispatch-config';
 import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';
 import { readAnnouncements } from '@/lib/dividend-announcements';
@@ -26,12 +25,16 @@ export async function GET(req: Request) {
       await readQuoteRows(db()),
       portfolio.companies.map((company) => company.ticker),
     );
+    // Resolved company details fill placeholder names/sectors in the response only; nothing is written here,
+    // so background lookups never change the revision under an open editor.
+    const pendingCompanies = await overlayForRead(db(), portfolio);
+    const faceValues = await readFaceValues(db(), portfolio.companies.map((company) => company.ticker)).catch(() => ({}));
     const announcements = await readAnnouncements(
       db(),
       portfolio.companies.map((company) => company.ticker),
     ).catch(() => []);
     return Response.json(
-      { portfolio, revision: row?.revision ?? 0, announcements } satisfies PortfolioResponse,
+      { portfolio, revision: row?.revision ?? 0, announcements, pendingCompanies, faceValues } satisfies PortfolioResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
@@ -43,7 +46,7 @@ export async function PUT(req: Request) {
     const user = await identity(req, true);
     // Byte limit, checked against content-length first and enforced while streaming.
     const bytes = await readLimited(req, MAX_PAYLOAD_BYTES, 'Portfolio file is too large.');
-    const { portfolio, revision } = JSON.parse(new TextDecoder().decode(bytes));
+    const { portfolio, revision, createCompanies } = JSON.parse(new TextDecoder().decode(bytes));
     if (!portfolio || !Array.isArray(portfolio.companies))
       throw new UserError('Invalid portfolio format.');
     if (!Number.isInteger(revision) || revision < 0)
@@ -55,15 +58,14 @@ export async function PUT(req: Request) {
     const previous: Portfolio | null = previousRow
       ? JSON.parse(previousRow.payload)
       : null;
-    const justAdded = newTickers(previous, portfolio);
-    if (justAdded.length) {
-      // Best-effort: a PSX fetch/D1 cache hiccup here should never block the save.
-      await gatherFacts(db(), dispatchConfig(), justAdded)
-        .then((facts) => applyFacts(portfolio.companies, facts))
-        .catch(() => {});
-      // Tickers PSX facts could not name yet get the name PSX lists in the shared catalog.
-      await readCatalog(db(), justAdded).then((catalog) => applyCatalog(portfolio.companies, catalog)).catch(() => {});
-    }
+    if (createCompanies !== undefined && (!Array.isArray(createCompanies) || createCompanies.length > 25 || createCompanies.some((t) => typeof t !== 'string')))
+      throw new UserError('Invalid company list.');
+    // Best-effort for imports and old clients (a lookup hiccup never blocks the save); strict for the
+    // explicit Add Company intent, which refuses symbols the directory cannot resolve.
+    const enriched = await enrichForSave(db(), dispatchConfig(), previous, portfolio, createCompanies ?? []);
+    const details = portfolio.companies
+      .filter((company: { ticker: string }) => enriched.repaired.includes(company.ticker))
+      .map((company: { ticker: string; name: string; sector: string }) => ({ ticker: company.ticker, name: company.name, sector: company.sector }));
     // Validate what is actually stored: after enrichment has filled company facts.
     validate(portfolio);
     const body = JSON.stringify(portfolio),
@@ -88,7 +90,7 @@ export async function PUT(req: Request) {
         409,
       );
     return Response.json(
-      { revision: revision + 1 } satisfies SavePortfolioResponse,
+      { revision: revision + 1, details, pendingCompanies: enriched.pending } satisfies SavePortfolioResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

@@ -1,4 +1,4 @@
-import { blankPortfolio, type Portfolio } from '@/lib/portfolio';
+import { blankPortfolio, type Portfolio, type Quote } from '@/lib/portfolio';
 import {
   fetchPsxIndexSummary,
   pakistanMarketState,
@@ -14,7 +14,6 @@ import {
   OPEN_TTL_MS,
   readQuoteRows,
   rebaseWatchQuotes,
-  refreshQuotes,
 } from '@/lib/quote-cache';
 import { db, failure, identity } from '@/lib/server';
 import { takeRateLimit, waitText } from '@/lib/rate-limit';
@@ -34,7 +33,6 @@ const MIN_REFRESH_MS = OPEN_TTL_MS;
 /** PSX fetches allowed per POST — stays under the Workers subrequest cap with room for D1/pyPSX. */
 const PSX_BUDGET = 35;
 /** Shortlist tickers refreshed per POST and pyPSX intraday calls per request. */
-const MAX_SHORTLIST_REFRESH = 30;
 const MAX_INTRADAY = 10;
 const FORCE_COOLDOWN = { windowMs: 60_000, max: 1 };
 
@@ -73,7 +71,7 @@ async function personalized(
   user: string,
   cache: MarketSummaryCache,
   fetchedAt: string | null,
-  budget?: FetchBudget,
+  _budget?: FetchBudget,
 ) {
   const portfolioRow = await db()
     .prepare('SELECT payload FROM portfolios WHERE user_id=?')
@@ -87,16 +85,9 @@ async function personalized(
     : portfolio.companies
         .filter((company) => company.target > 0)
         .map((company) => company.ticker);
-  // PSX's market-watch table (one call for every symbol) is gone, so on a live
-  // refresh the shortlist is priced through the shared per-ticker quote cache.
-  const refreshed =
-    budget && !cache.quotes?.length
-      ? (
-          await refreshQuotes(db(), shortlist.slice(0, MAX_SHORTLIST_REFRESH), {
-            budget,
-          })
-        ).quotes
-      : {};
+  // The shortlist is priced from the shared per-ticker quote cache the scheduled scraper keeps
+  // current; Cloudflare never fetches company prices itself (PSX refuses its network).
+  const refreshed: Record<string, Quote> = {};
   const quotes = {
     ...mergeQuotes(portfolio.quotes, await readQuoteRows(db()), shortlist),
     ...refreshed,

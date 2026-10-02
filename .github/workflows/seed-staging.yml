@@ -63,3 +63,7 @@ jobs:
         run: node scripts/psx-history-scrape.mjs "--tickers=$TICKERS"
       - name: Scrape dividend announcements
         run: node scripts/psx-payout-scrape.mjs "--tickers=$TICKERS"
+      - name: Bootstrap company directory
+        # Staging cannot dispatch the production-writing directory workflow, so its directory is
+        # filled here, aimed at the staging database (D1_DATABASE_ID above).
+        run: node scripts/psx-directory-scrape.mjs --mode=bootstrap --limit=80

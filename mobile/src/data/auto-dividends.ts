@@ -1,5 +1,6 @@
 // Runs the shared PSX-announcement bookkeeping when the portfolio loads on the phone, so expected dividends
-// and payout alerts appear without the web app being opened. Best effort: any failure leaves the loaded data as is.
+// and payout alerts appear without the web app being opened. Verified face values come with the portfolio response
+// (percentage payouts without one get no calculated amount rather than an assumed Rs 10). Best effort: any failure leaves the loaded data as is.
 import type { PortfolioResponse, SavePortfolioRequest, SavePortfolioResponse } from '../../../lib/api-types.ts';
 import { syncAutoDividends } from '../../../lib/dividend-sync.ts';
 import { ApiRequestError } from '../api/client.ts';
@@ -31,7 +32,7 @@ export async function syncAnnouncementsOnLoad(
         const fresh = await api.get<PortfolioResponse>('/api/portfolio');
         return fresh?.portfolio ? { portfolio: fresh.portfolio, revision: fresh.revision } : null;
       },
-    }, options);
+    }, { ...options, faceValues: data.faceValues ?? {} });
     return result.portfolio === data.portfolio ? data : { ...data, portfolio: result.portfolio, revision: result.revision };
   } catch {
     return data;

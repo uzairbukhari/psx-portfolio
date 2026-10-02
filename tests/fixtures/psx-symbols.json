@@ -1,0 +1,9 @@
+[
+  {"symbol":"MEBL","name":"Meezan Bank Limited","sectorName":"COMMERCIAL BANKS","isETF":false,"isDebt":false},
+  {"symbol":"LUCK","name":"Lucky Cement Limited","sectorName":"CEMENT","isETF":false,"isDebt":false},
+  {"symbol":"ENGRO","name":"Engro Corporation Limited","sectorName":"FERTILIZER","isETF":false,"isDebt":false},
+  {"symbol":"MIIETF","name":"Meezan Pakistan ETF","sectorName":"EXCHANGE TRADED FUNDS","isETF":true,"isDebt":false},
+  {"symbol":"NEWCO","name":"","sectorName":"","isETF":false,"isDebt":false},
+  {"symbol":"OLDCO","name":"Old Company Limited","sectorName":"CEMENT"},
+  {"symbol":"??","name":"Not a symbol"}
+]

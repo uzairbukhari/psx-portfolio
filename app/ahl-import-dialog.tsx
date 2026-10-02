@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { IpoOffersResponse } from '@/lib/api-types';
+import { useCompanyStates } from './use-company-lookup';
 import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import { applyAhlLedgerPlan, planAhlLedgerImport, planIsNoop, type RowResolution } from '@/lib/ahl-reconcile';
 import type { IpoLookup } from '@/lib/ipo-offers';
@@ -40,6 +41,7 @@ export function AhlImportDialog({
     () => planAhlLedgerImport(portfolio, statement, { resolutions, inferredEdits: edits, acceptedIpo: accepted, ipo }),
     [portfolio, statement, resolutions, edits, accepted, ipo],
   );
+  const companyState = useCompanyStates(plan.newCompanies);
   const needIpo = useMemo(() => [...new Set(plan.inferred.map((i) => i.ticker))].sort().join(','), [plan.inferred]);
 
   async function loadIpo(tickers: string) {
@@ -251,7 +253,13 @@ export function AhlImportDialog({
                 <tbody>
                   {plan.holdingChanges.map((c) => (
                     <tr key={c.ticker}>
-                      <td><b>{c.ticker}</b>{plan.newCompanies.includes(c.ticker) ? <small>new, not approved, 0% target</small> : null}</td>
+                      <td>
+                        <b>{c.ticker}</b>
+                        {plan.newCompanies.includes(c.ticker) ? <small>new, not approved, 0% target</small> : null}
+                        {plan.newCompanies.includes(c.ticker) && companyState[c.ticker] !== 'resolved' ? (
+                          <small>{companyState[c.ticker] === 'pending' ? 'company details being looked up' : companyState[c.ticker] === 'unresolved' ? 'company details pending: trades are kept' : 'checking company details…'}</small>
+                        ) : null}
+                      </td>
                       <td className="num">{c.beforeShares}</td><td className="num">{c.afterShares}</td>
                       <td>{c.afterCostKnown ? 'known' : 'unknown (no cost for some shares)'}</td>
                     </tr>

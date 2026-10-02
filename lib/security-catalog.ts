@@ -1,3 +1,6 @@
+// The All-Share table feeds this catalog every few minutes, but only as the lowest-ranked source: once the
+// company directory (lib/company-directory.ts) has recorded where a name came from (`name_source`), this
+// upsert refreshes `last_seen_at` only and never overwrites that verified name.
 // Shared security catalog: every symbol PSX lists in a validated All-Share observation, with the name PSX
 // prints. It is NOT a count of listed companies and records no issuer identity or security type it was
 // not told. Used to give brand-new portfolio tickers a real name when no company facts exist yet.
@@ -8,7 +11,10 @@ export type CatalogEntry = { ticker: string; name: string };
 export function catalogUpsertSql(rows: number): string {
   return `INSERT INTO security_catalog (ticker,name,source,first_seen_at,last_seen_at)
           VALUES ${Array.from({ length: rows }, () => '(?,?,?,?,?)').join(',')}
-          ON CONFLICT(ticker) DO UPDATE SET name=excluded.name, source=excluded.source, last_seen_at=excluded.last_seen_at
+          ON CONFLICT(ticker) DO UPDATE SET
+            name=CASE WHEN security_catalog.name_source IS NULL THEN excluded.name ELSE security_catalog.name END,
+            source=CASE WHEN security_catalog.name_source IS NULL THEN excluded.source ELSE security_catalog.source END,
+            last_seen_at=excluded.last_seen_at
           WHERE excluded.last_seen_at >= security_catalog.last_seen_at`;
 }
 /** Bound values per row for `catalogUpsertSql` (first and last seen start equal). */
