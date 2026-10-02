@@ -5,8 +5,9 @@ name: Mobile OTA update
 # uses no build from the free tier's monthly allowance. A native change (new native module, app.config
 # plugins, permissions) still needs one manual `eas build`; installed apps only take updates whose
 # runtimeVersion (the app version) matches.
-# Needs the repository secret EXPO_TOKEN (an Expo access token for the `uzairbukhari` account). Without
-# it the job skips cleanly, like deploy-staging.yml does before its setup is done.
+# Needs the secret EXPO_TOKEN (an Expo access token for the `uzairbukhari` account) in the `prod` GitHub
+# environment, like the other workflows' secrets. Without it the job skips cleanly. Keep `prod` free of
+# required reviewers, or every merge will wait for approval.
 on:
   push:
     branches: [main]
@@ -27,6 +28,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: prod
     defaults:
       run:
         working-directory: mobile
