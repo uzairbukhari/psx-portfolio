@@ -239,8 +239,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
 
   const index = summary?.index ?? null;
   const indexUp = (index?.change ?? 0) >= 0;
-  // Only KSE-100 is presented as an index; the other indices stay in the API response for other consumers.
-  const kseMeta = summary?.indices?.find((entry) => entry.code === 'KSE100')?.meta ?? null;
+  const headlineMeta = summary?.indices?.find((entry) => entry.code === 'KSE100')?.meta ?? null;
   const newestQuote = summary?.companies.reduce<string | null>(
     (latest, company) =>
       company.retrievedAt && (!latest || company.retrievedAt > latest)
@@ -334,13 +333,14 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
               <div>Low<b>{index.low.toLocaleString()}</b></div>
               <div>YTD<b>{index.ytdChangePercent.toFixed(2)}%</b></div>
             </div>
-            <small className="pulse-index-source">PSX index time: {index.asOf || 'Unavailable'}</small>
-            {kseMeta && (
-              <small className={`pulse-fresh pulse-fresh--${kseMeta.freshness}`} title={kseMeta.reason}>
-                {kseMeta.freshness === 'fresh' ? 'Fresh' : kseMeta.freshness === 'delayed' ? 'Delayed' : 'Stale'}
-                {kseMeta.lastFailure ? ' · last refresh failed; showing earlier value' : ''}
-              </small>
-            )}
+            <small className="pulse-index-source">
+              PSX index time: {index.asOf || 'Unavailable'}
+              {headlineMeta && (
+                <span className={`pulse-fresh pulse-fresh--${headlineMeta.freshness}`} title={headlineMeta.reason}>
+                  {' · '}{headlineMeta.freshness === 'fresh' ? 'Fresh' : headlineMeta.freshness === 'delayed' ? 'Delayed' : 'Stale'}
+                </span>
+              )}
+            </small>
           </div>
         )}
         <div className="pulse-shortlist">

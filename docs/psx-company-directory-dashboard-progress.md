@@ -12,7 +12,7 @@ Branch `claude/project-thread-t4dk16` (local commits; nothing pushed, nothing de
 | 4 | KSE-100-only web Market Pulse | Done | `4653114` |
 | 5 | Reliable manual quote refresh and clean messaging | Done (end-to-end with GitHub dispatch unverified) | `4374aeb` |
 
-**Stage 4 overlap.** The coordinator note said another thread was doing Stage 4 on `feat/monthly-picks-reliability`. That branch is already merged into this branch's base (PR #41) and its merge did not include the Market Pulse change, so it was done here: the four-index strip and its CSS were removed from `app/psx-market-pulse.tsx` / `app/globals.css`, and the KSE-100 card now shows its own freshness. If any other open branch edits `app/psx-market-pulse.tsx`, resolve in favour of one KSE-100 card with no other index strip.
+**Stage 4 overlap.** Another thread shipped the same KSE-100-only Market Pulse to `main` (PR #42, `f0a1a8a`) while this branch was open. The merge conflict in `app/psx-market-pulse.tsx` was resolved by taking main's version; this branch's own Stage 4 commit is superseded.
 
 ## What was built
 
