@@ -332,12 +332,6 @@ export async function fetchPsxIndexConstituents(
   return parseIndexConstituents(await response.text());
 }
 
-export async function fetchPsxMarketWatch(budget?: FetchBudget): Promise<MarketWatchQuote[]> {
-  const response = await fetchPsx('https://dps.psx.com.pk/market-watch', budget);
-  const retrievedAt = new Date().toISOString();
-  return parseMarketWatch(await response.text(), retrievedAt);
-}
-
 /** Calendar date (YYYY-MM-DD) in Pakistan time. */
 export const pktDateOf = (at: Date) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
@@ -422,17 +416,4 @@ export function downsample(points: IndexPoint[], limit: number): IndexPoint[] {
   if (points.length <= limit) return points;
   const step = (points.length - 1) / (limit - 1);
   return Array.from({ length: limit }, (_, i) => points[Math.round(i * step)]);
-}
-
-export async function fetchPsxIndexSeries(
-  indexName = 'KSE100',
-  limit = 60,
-  budget?: FetchBudget,
-): Promise<IndexPoint[]> {
-  const response = await fetchPsx(`https://dps.psx.com.pk/timeseries/int/${indexName}`, budget);
-  const body = (await response.json()) as { status: number; data: [number, number, number][] };
-  if (body.status !== 1 || !Array.isArray(body.data))
-    throw Error('Unexpected PSX timeseries response');
-  const chronological = [...body.data].reverse().map(([time, value]) => ({ time, value }));
-  return downsample(chronological, limit);
 }

@@ -88,7 +88,11 @@ function availableCompanies(snapshot: SnapshotV8) {
 
 /** Scraped text is data, not instructions: flatten whitespace, drop control characters and quoting, cap length. */
 export function untrusted(text: string, max: number): string {
-  return text.replace(/[\u0000-\u001f\u007f`"<>{}[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  const flattened = Array.from(text, (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 32 || code === 127 || '`"<>{}[]'.includes(ch) ? ' ' : ch;
+  }).join('');
+  return flattened.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
 function companyLine(company: SnapshotCompany, score: CompanyScore | undefined) {

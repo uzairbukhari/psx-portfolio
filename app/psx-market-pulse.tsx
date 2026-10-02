@@ -91,6 +91,8 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   const [stale, setStale] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const liveActive = useRef(false);
+  // Outside a session the saved closing values are shown and no refresh is requested.
+  const sessionOpen = useRef(false);
 
   const request = useCallback(async (refresh = false, force = false) => {
     const res = await fetch(`/api/market-summary${force ? '?force=1' : ''}`, {
@@ -103,6 +105,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     };
     if (!res.ok || !body.summary) throw Error(body.error || 'Market update failed.');
     setSummary(body.summary);
+    sessionOpen.current = body.summary.market.isOpen;
     setFetchedAt(body.fetchedAt ?? null);
     setError('');
   }, []);
@@ -110,10 +113,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   useEffect(() => {
     const initial = window.setTimeout(() => void request().catch(() => {}), 0);
     const timer = window.setInterval(() => {
-      if (!document.hidden && !liveActive.current) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+      if (!document.hidden && !liveActive.current && sessionOpen.current) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
     }, 60_000);
     const visible = () => {
-      if (!document.hidden) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+      if (!document.hidden) void request(sessionOpen.current).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
     };
     document.addEventListener('visibilitychange', visible);
     return () => {
