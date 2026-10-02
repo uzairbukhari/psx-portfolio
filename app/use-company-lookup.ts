@@ -74,3 +74,54 @@ export function useCompanyLookup(rawTicker: string): LookupView & { retry: () =>
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { ...view, retry };
 }
+
+/**
+ * Batch status for an import preview: resolves the unique tickers 50 at a time, asks for one background
+ * lookup of the ones the directory lacks, and keeps polling while any are pending. Never blocks the import:
+ * valid trades are kept whatever the answer.
+ */
+export function useCompanyStates(tickers: string[]): Record<string, CompanyLookup['state']> {
+  const key = [...new Set(tickers)].filter((t) => /^[A-Z0-9]{2,12}$/.test(t)).sort().join(',');
+  const [states, setStates] = useState<Record<string, CompanyLookup['state']>>({});
+  useEffect(() => {
+    if (!key) return;
+    const list = key.split(',');
+    let live = true;
+    let timer: number | undefined;
+    const startedAt = Date.now();
+    let requested = false;
+    async function step() {
+      try {
+        const next: Record<string, CompanyLookup['state']> = {};
+        const missing: string[] = [];
+        for (let i = 0; i < list.length; i += 50) {
+          const part = list.slice(i, i + 50);
+          const body = await call(`/api/companies?tickers=${encodeURIComponent(part.join(','))}`);
+          for (const c of body.companies) {
+            next[c.ticker] = c.state;
+            if (c.state === 'unresolved' && c.canRequest) missing.push(c.ticker);
+          }
+        }
+        if (!live) return;
+        if (missing.length && !requested) {
+          requested = true;
+          for (let i = 0; i < missing.length; i += 25) {
+            const body = await call('/api/companies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: missing.slice(i, i + 25) }) });
+            for (const c of body.companies) next[c.ticker] = c.state;
+          }
+        }
+        if (!live) return;
+        setStates(next);
+        if (Object.values(next).includes('pending') && Date.now() - startedAt < POLL_LIMIT_MS) timer = window.setTimeout(() => void step(), POLL_INTERVAL_MS);
+      } catch {
+        /* the preview simply keeps showing "checking"; the import itself is unaffected */
+      }
+    }
+    void step();
+    return () => {
+      live = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [key]);
+  return states;
+}

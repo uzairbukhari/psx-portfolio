@@ -60,7 +60,10 @@ export async function PUT(req: Request) {
       throw new UserError('Invalid company list.');
     // Best-effort for imports and old clients (a lookup hiccup never blocks the save); strict for the
     // explicit Add Company intent, which refuses symbols the directory cannot resolve.
-    await enrichForSave(db(), dispatchConfig(), previous, portfolio, createCompanies ?? []);
+    const enriched = await enrichForSave(db(), dispatchConfig(), previous, portfolio, createCompanies ?? []);
+    const details = portfolio.companies
+      .filter((company: { ticker: string }) => enriched.repaired.includes(company.ticker))
+      .map((company: { ticker: string; name: string; sector: string }) => ({ ticker: company.ticker, name: company.name, sector: company.sector }));
     // Validate what is actually stored: after enrichment has filled company facts.
     validate(portfolio);
     const body = JSON.stringify(portfolio),
@@ -85,7 +88,7 @@ export async function PUT(req: Request) {
         409,
       );
     return Response.json(
-      { revision: revision + 1 } satisfies SavePortfolioResponse,
+      { revision: revision + 1, details, pendingCompanies: enriched.pending } satisfies SavePortfolioResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

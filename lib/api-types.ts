@@ -61,7 +61,13 @@ export type PortfolioResponse = {
  * unresolved metadata is kept as entered and repaired by a later save.
  */
 export type SavePortfolioRequest = { portfolio: Portfolio; revision: number; createCompanies?: string[] };
-export type SavePortfolioResponse = { revision: number };
+export type SavePortfolioResponse = {
+  revision: number;
+  /** Name and sector the server filled in from the company directory (additive; old clients ignore it). */
+  details?: { ticker: string; name: string; sector: string }[];
+  /** Companies the directory could not resolve yet; a lookup is queued and a later save repairs them. */
+  pendingCompanies?: string[];
+};
 
 /** POST /api/quotes body: `{ tickers }` (optionally `?force=1`). */
 export type QuotesResponse = {

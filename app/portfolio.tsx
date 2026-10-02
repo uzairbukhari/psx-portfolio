@@ -100,7 +100,8 @@ import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
 import { importAhlTrades, parseAhlHistory } from './ahl-import';
 import { importCdcDividends } from '@/lib/cdc-import';
-import { verifyPsxSymbol } from './psx-symbol';
+import { useCompanyLookup, type LookupView } from './use-company-lookup';
+import { canSaveCompany } from '@/lib/company-lookup-client';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -135,6 +136,8 @@ type ApiResponse = {
   error?: string;
   portfolio: Portfolio;
   revision: number;
+  details?: { ticker: string; name: string; sector: string }[];
+  pendingCompanies?: string[];
   announcements?: PayoutAnnouncement[];
   available?: boolean;
   cached?: boolean;
@@ -153,6 +156,38 @@ type QuoteRefreshResponse = {
   error?: string;
 };
 const SHORTLISTED = '__shortlisted';
+/** Add Company may save only once the directory answered for exactly this symbol. */
+const lookupReady = (lookup: LookupView, ticker: string) =>
+  lookup.ticker === ticker.trim().toUpperCase() && canSaveCompany({ state: lookup.status, company: lookup.company });
+/** Asks for a price for a company that has none yet; the scheduled scraper does the fetch. */
+async function queueQuoteRefresh(tickers: string[]) {
+  try {
+    await fetch('/api/quotes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickers }),
+    });
+  } catch {
+    /* the scheduled scraper prices held companies anyway */
+  }
+}
+/** Status line under the symbol field while the company directory is consulted. */
+function CompanyLookupNote({ lookup, ticker }: { lookup: LookupView & { retry: () => void }; ticker: string }) {
+  if (!ticker.trim()) return null;
+  const current = lookup.ticker === ticker.trim().toUpperCase();
+  if (!current || lookup.status === 'idle')
+    return /^[A-Z0-9]{2,12}$/.test(ticker.trim().toUpperCase()) ? <p className="muted" role="status">Checking company details…</p> : <p className="muted">Enter a PSX symbol (2-12 letters or digits).</p>;
+  if (lookup.status === 'loading') return <p className="muted" role="status">Checking company details…</p>;
+  if (lookup.status === 'pending')
+    return <p className="muted" role="status">{lookup.message ?? 'Looking up this company…'}</p>;
+  if (lookup.status === 'resolved') return null;
+  return (
+    <p className="notice error" role="alert">
+      {lookup.message ?? 'Company details could not be found.'}{' '}
+      <button type="button" className="secondary compact" onClick={lookup.retry}>Try again</button>
+    </p>
+  );
+}
 type HoldingsSortKey =
   | 'name'
   | 'shares'
@@ -366,7 +401,27 @@ export default function Dashboard({
       inputTokens: number;
       outputTokens: number;
       costUsd: number;
-    } | null>(null);
+    } | null>(null),
+    [pendingCompanies, setPendingCompanies] = useState<string[]>([]);
+  // Add Company: the ticker is the only typed identity field; name and sector come from the shared directory.
+  const txNewTicker =
+    !p || !trade || editing || editingDividend || editingStockSplit || txType === 'sell' || txType === 'dividend' || txType === 'split' ||
+    p.companies.some((c) => c.ticker === trade.ticker)
+      ? ''
+      : trade.ticker;
+  const txLookup = useCompanyLookup(txNewTicker);
+  const companyLookup = useCompanyLookup(creatingCompany && company ? company.ticker : '');
+  useEffect(() => {
+    if (!creatingCompany) return;
+    const name = companyLookup.company?.name ?? '';
+    const sector = companyLookup.company?.sector ?? '';
+    setCompany((c) => (c && (c.name !== name || c.sector !== sector) ? { ...c, name, sector } : c));
+  }, [creatingCompany, companyLookup.company]);
+  useEffect(() => {
+    const name = txLookup.company?.name ?? '';
+    const sector = txLookup.company?.sector ?? '';
+    setTxCompany((c) => (c.name === name && c.sector === sector ? c : { name, sector }));
+  }, [txLookup.company]);
   const [holdingsSort, setHoldingsSort] = useState<{
       key: HoldingsSortKey;
       dir: 'asc' | 'desc';
@@ -403,6 +458,7 @@ export default function Dashboard({
       if (!r.ok) throw Error(d.error);
       setP(d.portfolio);
       setRevision(d.revision);
+      setPendingCompanies(d.pendingCompanies ?? []);
       await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? []);
     } catch (e) {
       notify(String(e), true);
@@ -492,6 +548,7 @@ export default function Dashboard({
   async function save(
     next: Portfolio,
     success = 'Saved to your private portfolio.',
+    options: { createCompanies?: string[] } = {},
   ) {
     if (busy)
       throw Error('Wait for the current operation to finish.');
@@ -501,13 +558,26 @@ export default function Dashboard({
       const r = await fetch('/api/portfolio', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolio: next, revision }),
+        body: JSON.stringify({ portfolio: next, revision, ...(options.createCompanies ? { createCompanies: options.createCompanies } : {}) }),
       });
       const d = (await r.json()) as ApiResponse;
       if (!r.ok) throw Error(d.error);
+      // Show the name and sector the server filled in from the company directory.
+      for (const detail of d.details ?? []) {
+        const company = next.companies.find((c) => c.ticker === detail.ticker);
+        if (company) {
+          company.name = detail.name;
+          company.sector = detail.sector;
+        }
+      }
       setP(next);
       setRevision(d.revision);
-      notify(success);
+      setPendingCompanies(d.pendingCompanies ?? []);
+      notify(
+        d.pendingCompanies?.length
+          ? `${success} Company details for ${d.pendingCompanies.join(', ')} are still being looked up; your transactions are saved and the details will fill in on a later load.`
+          : success,
+      );
     } catch (e) {
       notify(String(e), true);
       throw e;
@@ -1075,11 +1145,12 @@ export default function Dashboard({
     if (isNew) {
       if (!/^[A-Z0-9]{2,12}$/.test(trade.ticker))
         throw Error('Enter a valid PSX symbol (2-12 letters or digits).');
-      next.quotes[trade.ticker] = await verifyPsxSymbol(trade.ticker);
+      if (!lookupReady(txLookup, trade.ticker))
+        throw Error('Wait for the company details to be found before saving a new company.');
       next.companies.push({
         ticker: trade.ticker,
-        name: txCompany.name.trim(),
-        sector: txCompany.sector,
+        name: txLookup.company!.name,
+        sector: txLookup.company!.sector,
         target: 0,
         approved: false,
         screenDate: '',
@@ -1099,8 +1170,10 @@ export default function Dashboard({
       next,
       editing
         ? 'Correction saved. Previous entry retained as voided.'
-        : `${isNew ? `${trade.ticker} confirmed on PSX and added to your companies. ` : ''}Transaction saved as a new line item. Holdings and average cost updated.`,
+        : `${isNew ? `${trade.ticker} added to your companies. ` : ''}Transaction saved as a new line item. Holdings and average cost updated.`,
+      isNew ? { createCompanies: [trade.ticker] } : {},
     );
+    if (isNew) void queueQuoteRefresh([trade.ticker]);
     closeTx();
     if (pickQueue && !editing) openPick(pickQueue, pickQueue.index + 1);
   }
@@ -1174,17 +1247,20 @@ export default function Dashboard({
     const at = next.companies.findIndex((c) => c.ticker === company.ticker);
     if (creatingCompany) {
       if (at >= 0) throw Error(`${company.ticker} is already in your portfolio.`);
-      const quote = await verifyPsxSymbol(company.ticker);
-      next.quotes[company.ticker] = quote;
+      if (!lookupReady(companyLookup, company.ticker))
+        throw Error('Wait for the company details to be found before saving.');
     }
-    if (at >= 0) next.companies[at] = company;
-    else next.companies.push(company);
+    const entry = creatingCompany
+      ? { ...company, name: companyLookup.company!.name, sector: companyLookup.company!.sector }
+      : company;
+    if (at >= 0) next.companies[at] = entry;
+    else next.companies.push(entry);
     await save(
       next,
-      creatingCompany
-        ? `${company.ticker} confirmed on PSX and added to your portfolio.`
-        : undefined,
+      creatingCompany ? `${company.ticker} added to your portfolio.` : undefined,
+      creatingCompany ? { createCompanies: [company.ticker] } : {},
     );
+    if (creatingCompany) void queueQuoteRefresh([company.ticker]);
     setCompany(null);
     setCreatingCompany(false);
   }
@@ -1409,6 +1485,15 @@ export default function Dashboard({
             </div>
           ) : (
           <>
+          {pendingCompanies.length > 0 && (
+            <p className="notice" role="status">
+              Company details for {pendingCompanies.join(', ')} are still being looked up. Your transactions are saved;
+              names and sectors fill in automatically once PSX details are found.{' '}
+              <button type="button" className="secondary compact" disabled={busy} onClick={() => void load()}>
+                Check again
+              </button>
+            </p>
+          )}
           <PortfolioValueCard
             p={p}
             value={value}
@@ -1863,7 +1948,6 @@ export default function Dashboard({
               !correcting && isTrade && txType !== 'sell' && !!ticker && !owned &&
               /^[A-Z0-9]{2,12}$/.test(ticker);
             const date = (isTrade ? t?.date : txType === 'dividend' ? d?.date : sp?.date) ?? '';
-            const sectors = Array.from(new Set([...SECTORS, ...sectorsInUse])).sort();
             const title = correcting
               ? txType === 'dividend'
                 ? 'Correct dividend'
@@ -1964,40 +2048,19 @@ export default function Dashboard({
                           <b>Add {ticker} to your companies</b>
                           <span>
                             {' '}
-                            It is not in your portfolio yet. The symbol is checked against PSX
-                            when you save, then the company and this entry are saved together.
+                            It is not in your portfolio yet. Its name and sector come from the shared
+                            PSX company directory; the company and this entry are saved together.
                           </span>
                         </p>
+                        <CompanyLookupNote lookup={txLookup} ticker={ticker ?? ''} />
                         <div className="form-grid">
                           <label>
                             Company name
-                            <input
-                              required
-                              maxLength={150}
-                              value={txCompany.name}
-                              onChange={(e) =>
-                                setTxCompany({ ...txCompany, name: e.target.value })
-                              }
-                            />
+                            <input readOnly value={lookupReady(txLookup, ticker ?? '') ? txCompany.name : ''} placeholder="Found from the PSX directory" />
                           </label>
                           <label>
                             Sector
-                            <select
-                              required
-                              value={txCompany.sector}
-                              onChange={(e) =>
-                                setTxCompany({ ...txCompany, sector: e.target.value })
-                              }
-                            >
-                              <option value="" disabled>
-                                Select sector
-                              </option>
-                              {sectors.map((sector) => (
-                                <option key={sector} value={sector}>
-                                  {sector}
-                                </option>
-                              ))}
-                            </select>
+                            <input readOnly value={lookupReady(txLookup, ticker ?? '') ? txCompany.sector : ''} placeholder="Found from the PSX directory" />
                           </label>
                         </div>
                       </div>
@@ -2205,7 +2268,7 @@ export default function Dashboard({
                     }
                   })()}
                   <div className="row tx-actions">
-                    <button disabled={busy} type="submit">
+                    <button disabled={busy || (addNew && !lookupReady(txLookup, ticker ?? ''))} type="submit">
                       {txType === 'sell'
                         ? 'Save sale'
                         : txType === 'dividend'
@@ -2336,39 +2399,52 @@ export default function Dashboard({
                 </label>
                 <label>
                   Company name
-                  <input
-                    required
-                    maxLength={150}
-                    value={company.name}
-                    onChange={(e) =>
-                      setCompany({ ...company, name: e.target.value })
-                    }
-                  />
+                  {creatingCompany ? (
+                    <input readOnly value={lookupReady(companyLookup, company.ticker) ? company.name : ''} placeholder="Found from the PSX directory" />
+                  ) : (
+                    <input
+                      required
+                      maxLength={150}
+                      value={company.name}
+                      onChange={(e) =>
+                        setCompany({ ...company, name: e.target.value })
+                      }
+                    />
+                  )}
                 </label>
                 <label>
                   Sector
-                  <select
-                    required
-                    value={company.sector ?? ''}
-                    onChange={(e) =>
-                      setCompany({
-                        ...company,
-                        sector: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="" disabled>
-                      Select sector
-                    </option>
-                    {Array.from(new Set([...SECTORS, ...sectorsInUse]))
-                      .sort()
-                      .map((sector) => (
-                        <option key={sector} value={sector}>
-                          {sector}
-                        </option>
-                      ))}
-                  </select>
+                  {creatingCompany ? (
+                    <input readOnly value={lookupReady(companyLookup, company.ticker) ? company.sector : ''} placeholder="Found from the PSX directory" />
+                  ) : (
+                    <select
+                      required
+                      value={company.sector ?? ''}
+                      onChange={(e) =>
+                        setCompany({
+                          ...company,
+                          sector: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="" disabled>
+                        Select sector
+                      </option>
+                      {Array.from(new Set([...SECTORS, ...sectorsInUse, ...(company.sector ? [company.sector] : [])]))
+                        .sort()
+                        .map((sector) => (
+                          <option key={sector} value={sector}>
+                            {sector}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </label>
+                {creatingCompany && (
+                  <div className="wide">
+                    <CompanyLookupNote lookup={companyLookup} ticker={company.ticker} />
+                  </div>
+                )}
                 <label>
                   Target weight (%)
                   <input
@@ -2435,13 +2511,13 @@ export default function Dashboard({
               </div>
               <p className="muted">
                 {creatingCompany
-                  ? 'The symbol is checked against PSX before this company is saved.'
+                  ? 'Enter the PSX symbol; the company name and sector come from the shared PSX company directory and cannot be edited.'
                   : 'This existing symbol has already been created in your portfolio.'}{' '}
                 Screens older than 183 days pause new allocations. Total targets
                 must equal 100%; calculator caps new exposure at 20% per
                 company.
               </p>
-              <button disabled={busy}>Save company</button>
+              <button disabled={busy || (creatingCompany && !lookupReady(companyLookup, company.ticker))}>Save company</button>
             </form>
           )}
         </DialogContent>
