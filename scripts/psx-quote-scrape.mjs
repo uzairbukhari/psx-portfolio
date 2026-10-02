@@ -19,11 +19,9 @@ import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents } from '../lib/psx-market.ts';
 import { mergeIndexSnapshot, parseSupportedIndices } from '../lib/index-snapshot.ts';
 import { fetchPsxQuote } from '../lib/psx-quotes.ts';
-import { quoteUpsertSql } from '../lib/quote-write.ts';
+import { QUOTE_ROWS_PER_STATEMENT, quoteRowParams, quoteUpsertSql, refreshStateSql } from '../lib/quote-write.ts';
 
 const MAX_FALLBACK = 20;
-// D1 allows 100 bound parameters per statement; 7 per row.
-const ROWS_PER_STATEMENT = 14;
 const SOURCE = 'https://dps.psx.com.pk/indices/ALLSHR';
 
 const dryRun = process.argv.includes('--dry-run');
@@ -148,20 +146,18 @@ async function main() {
     return;
   }
   const now = new Date().toISOString();
-  for (let index = 0; index < entries.length; index += ROWS_PER_STATEMENT) {
-    const chunk = entries.slice(index, index + ROWS_PER_STATEMENT);
+  for (let index = 0; index < entries.length; index += QUOTE_ROWS_PER_STATEMENT) {
+    const chunk = entries.slice(index, index + QUOTE_ROWS_PER_STATEMENT);
     await d1(
       quoteUpsertSql(chunk.length),
-      chunk.flatMap(([ticker, quote]) => [
-        ticker,
-        quote.price,
-        quote.asOf,
-        quote.date,
-        quote.source,
-        quote.fetchedAt,
-        now,
-      ]),
+      chunk.flatMap(([ticker, quote]) => quoteRowParams(ticker, quote, now)),
     );
+  }
+  // Attempts are recorded apart from observations: a failure leaves the stored price and its age untouched.
+  for (const [ticker] of entries) await d1(refreshStateSql(true), ['quote', ticker, now, now]);
+  for (const message of failed) {
+    const [ticker, ...rest] = message.split(': ');
+    await d1(refreshStateSql(false), ['quote', ticker, now, rest.join(': ').slice(0, 300)]);
   }
   const points = await writeMarketSummary(index, constituents, fetchedAt, parsedIndices);
   console.log(`Market summary: KSE100 ${index.close} (${points} chart points), ${constituents.length} ALLSHR quotes.`);

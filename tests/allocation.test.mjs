@@ -78,7 +78,7 @@ const snapshot = (tickers) => ({
   generatedOn: '2026-09-30', contributionMonth: '2026-10', freshMoneyPkr: 100000, shortlist: tickers, dataAsOf: '2026-09-30',
   companies: tickers.map(company), scores: tickers.map((t, i) => ({ ticker: t, score: 80 - i * 5, confidence: 'High', evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics() })),
 });
-const aiPick = (ticker, allocationPct) => ({ ticker, allocationPct, confidence: 'High', thesis: 't', catalysts: [], risks: [] });
+const aiPick = (ticker, allocationPct) => ({ ticker, allocationPct, confidence: 'High', thesis: 't', evidence: ['peTtm'], catalysts: [], risks: [] });
 const aiOut = (picks, unallocatedPct) => ({ marketOutlook: 'x', picks, coverage: [], unallocatedPct });
 
 test('AI output with one surviving company cannot reach 100%', () => {

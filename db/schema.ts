@@ -118,7 +118,24 @@ export const quoteRefreshes = sqliteTable('quote_refreshes', {
   source: text('source').notNull(),
   fetchedAt: text('fetched_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  // When PSX says the price was quoted (ISO, from the display time in `as_of`); null when unknown.
+  observedAt: text('observed_at'),
 });
+
+// Refresh attempts, kept apart from observations: a failed attempt never changes how old a stored
+// price looks, and the oldest-attempted ticker is serviced first so no symbol is starved.
+export const refreshState = sqliteTable(
+  'refresh_state',
+  {
+    kind: text('kind').notNull(),
+    key: text('key').notNull(),
+    lastAttemptAt: text('last_attempt_at'),
+    lastSuccessAt: text('last_success_at'),
+    lastError: text('last_error'),
+    failureCount: integer('failure_count').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.kind, table.key] })],
+);
 
 export const aiUsage = sqliteTable(
   'ai_usage',

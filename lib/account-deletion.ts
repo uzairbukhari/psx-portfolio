@@ -28,6 +28,7 @@ export const SHARED_TABLES: readonly string[] = [
   'market_summary_refreshes',
   'dividend_announcements',
   'price_history',
+  'refresh_state',
 ];
 
 /** SQL statements (child rows first) with the single bound email each one takes. */

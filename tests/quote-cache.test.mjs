@@ -147,8 +147,11 @@ test('refreshQuotes fetches only stale tickers and falls back to cache on failur
   assert.equal(result.stale.LUCK, '503 from PSX');
   assert.equal(result.failed.NEW, '503 from PSX');
   assert.equal(result.quotes.HUBC.price, 200);
-  assert.equal(db.writes.length, 1);
-  assert.equal(db.writes[0][0], 'HUBC');
+  const quoteRows = db.writes.filter((args) => args.length === 8);
+  assert.equal(quoteRows.length, 1);
+  assert.equal(quoteRows[0][0], 'HUBC');
+  const failedAttempts = db.writes.filter((args) => args[0] === 'quote' && typeof args[3] === 'string' && /503/.test(args[3])).map((args) => args[1]).sort();
+  assert.deepEqual(failedAttempts, ['LUCK', 'NEW'], 'failed attempts are recorded apart from observations');
 });
 
 test('refreshQuotes stops at the budget and serves the rest from cache', async () => {
