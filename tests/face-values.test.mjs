@@ -108,7 +108,7 @@ test('verified evidence resolves previews automatically, by date, without markin
   // a capital change between two payouts: each takes the value that applied
   const split = [ev(10, ''), ev(5, '2025-06-01')];
   const rows = plan(base({}, [buy('b1', 'AAAA', '2025-01-10', 100)]), [ann(), ann({ announcedOn: '2025-08-20', bookClosureStart: '2025-09-20', bookClosureEnd: '2025-09-21' })], { faceValueEvidence: { AAAA: split } }).candidates;
-  assert.deepEqual(rows.map((r) => r.perShare).sort(), [1, 2]);
+  assert.deepEqual(rows.map((r) => r.perShare).sort((a, b) => a - b), [1, 2]);
   const conflict = plan(p, [ann()], { faceValueEvidence: { AAAA: [ev(10, '', { status: 'conflict' })] } }).candidates[0];
   assert.deepEqual([conflict.perShare, conflict.faceValueGap], [null, 'conflict']);
   assert.match(conflict.issues[0].message, /disagree/);

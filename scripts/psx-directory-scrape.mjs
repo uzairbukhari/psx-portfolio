@@ -38,7 +38,7 @@ async function main() {
   try {
     allShareTickers = parseIndexConstituents(await (await fetchPsx('https://dps.psx.com.pk/indices/ALLSHR')).text()).map((r) => r.symbol);
   } catch (error) {
-    console.warn(`All-Share cross-check unavailable: ${error instanceof Error ? error.message : error}`);
+    console.warn(`All-Share cross-check unavailable: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (onDemand && !dryRun) await markRunning('company', asked);
   const report = await runDirectory(

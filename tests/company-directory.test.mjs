@@ -26,9 +26,9 @@ function fetcher({ failProfiles = [], failAfter = Infinity, dropSources = [] } =
   let profileCalls = 0;
   const fetchText = async (url) => {
     calls.push(url);
-    if (/\/screener$/.test(url)) return dropSources.includes('screener') ? Promise.reject(new Error('503 from PSX')) : fixture('psx-screener.html');
-    if (/\/symbols$/.test(url)) return dropSources.includes('symbols') ? Promise.reject(new Error('503 from PSX')) : fixture('psx-symbols.json');
-    if (/\/listings$/.test(url)) return dropSources.includes('listings') ? Promise.reject(new Error('503 from PSX')) : fixture('psx-listings.html');
+    if (url.endsWith('/screener')) return dropSources.includes('screener') ? Promise.reject(new Error('503 from PSX')) : fixture('psx-screener.html');
+    if (url.endsWith('/symbols')) return dropSources.includes('symbols') ? Promise.reject(new Error('503 from PSX')) : fixture('psx-symbols.json');
+    if (url.endsWith('/listings')) return dropSources.includes('listings') ? Promise.reject(new Error('503 from PSX')) : fixture('psx-listings.html');
     const ticker = url.split('/').pop();
     if (++profileCalls > failAfter) throw new Error('connection reset');
     if (failProfiles.includes(ticker) || !PROFILES[ticker]) throw new Error('520 from PSX');

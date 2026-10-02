@@ -80,6 +80,8 @@ export type QuotesResponse = {
   stale: Record<string, string>;
   /** Additive: per-ticker provider, source/fetch times, session and session-aware freshness. */
   meta?: Record<string, import('./market-meta.ts').DataMeta>;
+  /** Additive: the manual-refresh job (state, verified per-ticker outcomes, the one user-facing message). */
+  job?: import('./quote-jobs.ts').QuoteJob;
 };
 
 export type UsageResponse = { inputTokens: number; outputTokens: number; costUsd: number };

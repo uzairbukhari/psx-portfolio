@@ -11,7 +11,7 @@
 
 export const TICKER_PATTERN = /^[A-Z0-9]{2,12}$/;
 export const normalizeTicker = (raw: unknown): string | null => {
-  const ticker = String(raw ?? '').trim().toUpperCase();
+  const ticker = (typeof raw === 'string' || typeof raw === 'number' ? String(raw) : '').trim().toUpperCase();
   return TICKER_PATTERN.test(ticker) ? ticker : null;
 };
 
@@ -72,7 +72,7 @@ function stripTags(s: string) {
 
 /** A usable company name: real text, not just the ticker, bounded. */
 export function cleanName(raw: unknown, ticker: string): string | null {
-  const name = stripTags(String(raw ?? ''));
+  const name = stripTags(typeof raw === 'string' ? raw : '');
   if (name.length < 2 || name.length > 200) return null;
   if (name.toUpperCase() === ticker) return null;
   if (/^(n\/?a|unknown|-|—)$/i.test(name)) return null;
@@ -80,7 +80,7 @@ export function cleanName(raw: unknown, ticker: string): string | null {
 }
 /** A usable sector label (PSX prints these in capitals). */
 export function cleanSector(raw: unknown): string | null {
-  const sector = stripTags(String(raw ?? ''));
+  const sector = stripTags(typeof raw === 'string' ? raw : '');
   if (sector.length < 2 || sector.length > 100) return null;
   if (/^(n\/?a|unknown|-|—)$/i.test(sector)) return null;
   return sector;

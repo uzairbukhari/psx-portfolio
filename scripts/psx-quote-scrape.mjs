@@ -20,6 +20,7 @@ import { parseIndexConstituents } from '../lib/psx-market.ts';
 import { CATALOG_CHUNK, catalogRowParams, catalogUpsertSql } from '../lib/security-catalog.ts';
 import { growIndexSeries, mergeIndexSnapshot, parseSupportedIndices } from '../lib/index-snapshot.ts';
 import { fetchPsxQuote } from '../lib/psx-quotes.ts';
+import { completeRequests, computeOutcomes, failRequests, markRunning, readStoredFetchTimes, snapshotOpenRequests } from '../lib/quote-scrape-run.ts';
 import { QUOTE_ROWS_PER_STATEMENT, quoteRowParams, quoteUpsertSql, refreshStateSql } from '../lib/quote-write.ts';
 
 const MAX_FALLBACK = 20;
@@ -103,8 +104,24 @@ async function writeMarketSummary(index, constituents, retrievedAt, parsedIndice
   return payload.series.length;
 }
 
+// Serves every held ticker plus every ticker a user queued with "Refresh prices" (`quotes` requests in D1),
+// then completes those requests with a verified per-ticker result. A request queued while this run is
+// already going is left for the next run (see completeRequests).
 async function main() {
-  const tickers = await heldTickers();
+  const snapshot = dryRun ? new Map() : await snapshotOpenRequests(d1);
+  try {
+    await markRunning(d1, snapshot);
+    await scrape(snapshot);
+  } catch (error) {
+    // Technical detail stays in the log; the requests only learn that the refresh failed.
+    console.error(error instanceof Error ? error.message : String(error));
+    await failRequests(d1, snapshot).catch(() => {});
+    throw error;
+  }
+}
+
+async function scrape(snapshot) {
+  const tickers = [...new Set([...(await heldTickers()), ...snapshot.keys()])];
   const [home, allshr] = await Promise.all([
     fetchPsx('https://dps.psx.com.pk/').then((response) => response.text()),
     fetchPsx(SOURCE).then((response) => response.text()),
@@ -128,9 +145,13 @@ async function main() {
     else missing.push(ticker);
   }
   const failed = [];
+  const fallback = new Set();
+  // Requested tickers go first so a user's click is never starved by a long list of held ETFs.
+  missing.sort((a, b) => Number(snapshot.has(b)) - Number(snapshot.has(a)));
   for (const ticker of missing.slice(0, MAX_FALLBACK)) {
     try {
       quotes[ticker] = await fetchPsxQuote(ticker);
+      fallback.add(ticker);
     } catch (error) {
       failed.push(`${ticker}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -168,6 +189,13 @@ async function main() {
   }
   const points = await writeMarketSummary(index, constituents, fetchedAt, parsedIndices);
   console.log(`Market summary: KSE100 ${index.close} (${points} chart points), ${constituents.length} ALLSHR quotes.`);
+  if (snapshot.size) {
+    const stored = await readStoredFetchTimes(d1, [...snapshot.keys()]);
+    const outcomes = computeOutcomes({ targets: snapshot.keys(), quotes, fallback, stored });
+    await completeRequests(d1, snapshot, outcomes);
+    const tally = Object.values(outcomes).reduce((acc, o) => ({ ...acc, [o]: (acc[o] ?? 0) + 1 }), {});
+    console.log(`Quote requests completed: ${JSON.stringify(tally)}.`);
+  }
   process.exitCode = scrapeExitCode(tickers.length, tickers.length - entries.length);
 }
 

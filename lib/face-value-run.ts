@@ -47,7 +47,7 @@ export async function runFaceValues(io: FaceRunIo, options: FaceRunOptions): Pro
       }
       const [facts] = await io.d1('SELECT payload FROM company_facts WHERE ticker=?', [ticker]).catch(() => []);
       let announcements: Announcement[] = [];
-      try { announcements = (JSON.parse(String(facts?.payload ?? '{}')) as { announcements?: Announcement[] }).announcements ?? []; } catch { /* no facts */ }
+      try { announcements = (JSON.parse(typeof facts?.payload === 'string' ? facts.payload : '{}') as { announcements?: Announcement[] }).announcements ?? []; } catch { /* no facts */ }
       const documents = announcements
         .filter((a) => a.url && OFFICIAL_URL.test(a.url) && RELEVANT_DISCLOSURE.test(a.title ?? ''))
         .sort((x, y) => String(y.date ?? '').localeCompare(String(x.date ?? '')))

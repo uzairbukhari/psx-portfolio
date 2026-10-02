@@ -4,7 +4,7 @@ import { createD1 } from './helpers/d1.mjs';
 import { lookupCompanies, cleanLookupTickers } from '../lib/company-resolver.ts';
 import { companyStatus, requestCompanyLookup, COMPANY_LOOKUP_LIMIT } from '../lib/company-api.ts';
 import { enrichForSave, overlayForRead, queueBackgroundLookups, LOOKUP_RETRY_MS } from '../lib/company-save.ts';
-import { applyLookups, hasPlaceholderDetails } from '../lib/company-enrichment.ts';
+import { hasPlaceholderDetails } from '../lib/company-enrichment.ts';
 import { blankPortfolio } from '../lib/portfolio.ts';
 import { canSaveCompany, createLatest, nextLookupAction } from '../lib/company-lookup-client.ts';
 

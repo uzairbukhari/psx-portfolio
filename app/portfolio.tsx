@@ -103,6 +103,9 @@ import { importCdcDividends } from '@/lib/cdc-import';
 import type { PortfolioResponse } from '@/lib/api-types';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
 import { canSaveCompany } from '@/lib/company-lookup-client';
+import { followQuoteJob, isPending, isProblem, jobMessage } from '@/lib/quote-refresh-client';
+import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
+import type { QuotesResponse } from '@/lib/api-types';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -149,13 +152,6 @@ type ApiResponse = {
   reasons?: Record<string, string>;
   summary?: string;
   weights?: Record<string, number>;
-};
-type QuoteRefreshResponse = {
-  quotes: Portfolio['quotes'];
-  errors: string[];
-  reasons?: Record<string, string>;
-  stale?: Record<string, string>;
-  error?: string;
 };
 const SHORTLISTED = '__shortlisted';
 /** Add Company may save only once the directory answered for exactly this symbol. */
@@ -435,6 +431,14 @@ export default function Dashboard({
   // persist until dismissed, successes auto-dismiss. Before the first
   // portfolio load, the full-page LoadError screen shows `message` itself.
   const loadedRef = useRef(false);
+  const quoteAlive = useRef(true);
+  const quoteRunning = useRef(false);
+  useEffect(() => {
+    quoteAlive.current = true;
+    return () => {
+      quoteAlive.current = false;
+    };
+  }, []);
   useEffect(() => {
     loadedRef.current = !!p;
   }, [p]);
@@ -452,6 +456,77 @@ export default function Dashboard({
     setFailed(error);
     showToast(s, error);
   }
+  /** Applies refreshed prices locally. They are already in the shared cache the next load merges in, so no save is needed. */
+  function applyQuotes(quotes: Portfolio['quotes'], stale: Record<string, string> = {}) {
+    setP((current) => {
+      if (!current) return current;
+      const fresh = Object.fromEntries(
+        Object.entries(quotes).filter(
+          ([ticker, quote]) =>
+            isValidQuote(quote) && !(stale[ticker] && current.quotes[ticker]) && quoteSupersedes(quote, current.quotes[ticker]),
+        ),
+      );
+      return Object.keys(fresh).length ? { ...current, quotes: { ...current.quotes, ...fresh } } : current;
+    });
+  }
+  /** POST starts (or joins) a refresh; GET with `since` (even empty) only reads its state. */
+  async function quoteCall(tickers: string[], since?: string) {
+    if (!tickers.length) throw Error('No companies to price.');
+    const r =
+      since === undefined
+        ? await fetch('/api/quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tickers }),
+          })
+        : await fetch(`/api/quotes?tickers=${tickers.join(',')}${since ? `&since=${encodeURIComponent(since)}` : ''}`);
+    const d = (await r.json()) as QuotesResponse & { error?: string };
+    if (!r.ok) throw Error(d.error);
+    return d;
+  }
+  /** Follows a refresh job to its end and reports it with the single user-facing message for its state. */
+  async function followRefresh(tickers: string[], start: boolean) {
+    const final = await followQuoteJob({
+      start: start ? () => quoteCall(tickers) : undefined,
+      poll: (since) => quoteCall(tickers, since ?? ''),
+      cancelled: () => !quoteAlive.current,
+      onPending: (d) => applyQuotes(d.quotes, d.stale),
+    });
+    if (!quoteAlive.current) return;
+    applyQuotes(final.quotes, final.stale);
+    if (isPending(final.job)) return notify(QUOTE_MESSAGES.pending);
+    if (final.job) notify(jobMessage(final.job), isProblem(final.job));
+  }
+  async function refresh() {
+    if (!p || quoteRunning.current) return;
+    quoteRunning.current = true;
+    setBusy(true);
+    try {
+      notify(QUOTE_MESSAGES.pending);
+      void pulseRef.current?.refresh();
+      await followRefresh(p.companies.map((c) => c.ticker), true);
+    } catch (e) {
+      notify(e instanceof Error && e.message ? e.message : QUOTE_MESSAGES.failed, true);
+    } finally {
+      quoteRunning.current = false;
+      setBusy(false);
+    }
+  }
+  /** After a reload, picks up a refresh that is still queued or running instead of starting another. */
+  async function resumeRefresh(tickers: string[]) {
+    if (quoteRunning.current || !tickers.length) return;
+    try {
+      const d = await quoteCall(tickers, '');
+      if (!isPending(d.job)) return;
+      quoteRunning.current = true;
+      notify(QUOTE_MESSAGES.pending);
+      await followRefresh(tickers, false);
+    } catch {
+      /* nothing to resume */
+    } finally {
+      quoteRunning.current = false;
+    }
+  }
   async function load() {
     setBusy(true);
     try {
@@ -461,6 +536,7 @@ export default function Dashboard({
       setP(d.portfolio);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
+      void resumeRefresh(d.portfolio.companies.map((c) => c.ticker));
       await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
     } catch (e) {
       notify(String(e), true);
@@ -1095,50 +1171,6 @@ export default function Dashboard({
     setEditingStockSplit(entry.id);
     setTxType('split');
     setStockSplit({ ...entry });
-  }
-  async function refresh() {
-    setBusy(true);
-    try {
-      notify('Fetching PSX prices…');
-      void pulseRef.current?.refresh();
-      const r = await fetch('/api/quotes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers: p!.companies.map((c) => c.ticker) }),
-      });
-      const d = (await r.json()) as QuoteRefreshResponse;
-      if (!r.ok) throw Error(d.error);
-      // A stale cached quote must not replace one the ledger already holds, and
-      // an older or same-day PSX price never replaces a newer or manual quote.
-      const fresh = Object.fromEntries(
-        Object.entries(d.quotes).filter(
-          ([ticker, quote]) =>
-            isValidQuote(quote) &&
-            !(d.stale?.[ticker] && p!.quotes[ticker]) &&
-            quoteSupersedes(quote, p!.quotes[ticker]),
-        ),
-      );
-      const next = { ...p!, quotes: { ...p!.quotes, ...fresh } };
-      validate(next);
-      const s = await fetch('/api/portfolio', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolio: next, revision }),
-      });
-      const saved = (await s.json()) as ApiResponse;
-      if (!s.ok) throw Error(saved.error);
-      setP(next);
-      setRevision(saved.revision);
-      const stale = Object.keys(d.stale ?? {});
-      notify(
-        `${Object.keys(d.quotes).length - stale.length} PSX prices up to date.${stale.length ? ` Last saved price kept for ${stale.join(', ')} (${[...new Set(Object.values(d.stale ?? {}))].join(' | ')}).` : ''}${d.errors.length ? ' Unavailable: ' + d.errors.join(', ') + '. Previous quotes retained.' + (d.reasons ? ' Reason: ' + [...new Set(Object.values(d.reasons))].join(' | ') : '') : ''}`,
-        !!d.errors.length || !!stale.length,
-      );
-    } catch (e) {
-      notify(String(e), true);
-    } finally {
-      setBusy(false);
-    }
   }
   async function record(e: React.FormEvent) {
     e.preventDefault();
