@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
   Cpu,
@@ -198,35 +198,22 @@ export default function SettingsView({
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
-  const [active, setActive] = useState('profile');
+  const [active, setActive] = useState('account');
   const sections = [
-    { id: 'profile', label: 'Profile', icon: UserRound },
-    { id: 'tax', label: 'Tax', icon: Receipt },
-    { id: 'usage', label: 'AI usage', icon: Zap },
+    { id: 'account', label: 'Account', icon: UserRound },
     { id: 'data', label: 'Data & imports', icon: Database },
     ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }] : []),
   ];
-
-  useEffect(() => {
-    const els = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-section]'),
-    );
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]) setActive((visible[0].target as HTMLElement).id);
-      },
-      { rootMargin: '-90px 0px -60% 0px' },
-    );
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [isAdmin]);
+  const current = sections.some((x) => x.id === active) ? active : 'account';
 
   return (
     <div className="settings-shell">
-      <button type="button" data-slot="link" className="back-link" onClick={onBack}>
+      <button
+        type="button"
+        data-slot="link"
+        className="back-link"
+        onClick={onBack}
+      >
         <ArrowLeft size={15} /> Back to dashboard
       </button>
       <div className="page-head">
@@ -241,14 +228,12 @@ export default function SettingsView({
             <a
               key={id}
               href={`#${id}`}
-              className={active === id ? 'active' : ''}
-              aria-current={active === id ? 'true' : undefined}
+              className={current === id ? 'active' : ''}
+              aria-current={current === id ? 'page' : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 setActive(id);
-                document
-                  .getElementById(id)
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                window.scrollTo({ top: 0 });
               }}
             >
               <Icon size={16} aria-hidden="true" /> {label}
@@ -256,142 +241,197 @@ export default function SettingsView({
           ))}
         </nav>
         <div className="set-content">
-          <Section
-            id="profile"
-            icon={<UserRound size={18} />}
-            title="Profile"
-            description="The Google account you're signed in with."
-          >
-            <div className="profile-row">
-              <UserAvatar name={name} email={email} picture={picture} large />
-              <div className="profile-text">
-                <strong>{name ?? 'Signed in'}</strong>
-                <span>{email}</span>
-              </div>
-              <span className={isAdmin ? 'role-pill admin' : 'role-pill'}>
-                <ShieldCheck size={13} aria-hidden="true" />
-                {isAdmin ? 'Super admin' : 'Member'}
-              </span>
-              <button
-                type="button"
-                className="secondary compact signout-link"
-                onClick={() => {
-                  window.location.href = '/api/auth/logout';
-                }}
+          {current === 'account' && (
+            <>
+              <Section
+                id="profile"
+                icon={<UserRound size={18} />}
+                title="Profile"
+                description="The Google account you're signed in with."
               >
-                <LogOut size={14} /> Sign out
-              </button>
-            </div>
-          </Section>
-
-          <Section
-            id="tax"
-            icon={<Receipt size={18} />}
-            title="Tax status"
-            description="Sets the rate used to estimate tax on gains and dividends in Reports."
-          >
-            <RadioGroup
-              className="option-cards"
-              value={filerStatus}
-              onValueChange={(v) => onFilerStatus(v as 'filer' | 'non-filer')}
-            >
-              {(
-                [
-                  ['filer', 'Filer', '15%'],
-                  ['non-filer', 'Non-filer', '30%'],
-                ] as const
-              ).map(([value, label, rate]) => (
-                <label
-                  key={value}
-                  htmlFor={`tax-${value}`}
-                  className={filerStatus === value ? 'option-card selected' : 'option-card'}
-                >
-                  <RadioGroupItem id={`tax-${value}`} value={value} />
-                  <span>
-                    <strong>{label}</strong>
-                    <small>{rate} tax on gains and dividends</small>
+                <div className="profile-row">
+                  <UserAvatar
+                    name={name}
+                    email={email}
+                    picture={picture}
+                    large
+                  />
+                  <div className="profile-text">
+                    <strong>{name ?? 'Signed in'}</strong>
+                    <span>{email}</span>
+                  </div>
+                  <span className={isAdmin ? 'role-pill admin' : 'role-pill'}>
+                    <ShieldCheck size={13} aria-hidden="true" />
+                    {isAdmin ? 'Super admin' : 'Member'}
                   </span>
-                </label>
-              ))}
-            </RadioGroup>
-            {!filerStatus && (
-              <p className="set-hint">Choose one to see after-tax figures in Reports.</p>
-            )}
-            <ul className="set-note">
-              <li>Capital gains are netted per July–June tax year before the rate is applied.</li>
-              <li>Deductions you record (broker, NCCPL or CDC) are kept as actual figures and never recalculated when you change this.</li>
-              <li>Real capital gains tax depends on the acquisition date and current rules, so estimates are indicative, not your tax liability.</li>
-            </ul>
-          </Section>
-
-          <Section
-            id="usage"
-            icon={<Zap size={18} />}
-            title="AI usage"
-            description="Tokens and estimated cost since usage tracking began."
-          >
-            <div className="stat-tiles">
-              {(
-                [
-                  ['Input tokens', usage && usage.inputTokens.toLocaleString()],
-                  ['Output tokens', usage && usage.outputTokens.toLocaleString()],
-                  ['Estimated cost', usage && usd.format(usage.costUsd)],
-                ] as const
-              ).map(([label, value]) => (
-                <div key={label} className="stat-tile">
-                  <small>{label}</small>
-                  {value ? <strong>{value}</strong> : <Skeleton className="h-7 w-24" />}
+                  <button
+                    type="button"
+                    className="secondary compact signout-link"
+                    onClick={() => {
+                      window.location.href = '/api/auth/logout';
+                    }}
+                  >
+                    <LogOut size={14} /> Sign out
+                  </button>
                 </div>
-              ))}
-            </div>
-          </Section>
+              </Section>
 
-          <Section
-            id="data"
-            icon={<Database size={18} />}
-            title="Data & imports"
-            description="Back up your ledger, or bring in history from your broker and CDC."
-          >
-            <Row
-              label="CDC dividends"
-              hint="CDC Access export (JSON). Only Paid rows are imported; bank and personal fields are never read."
+              <Section
+                id="tax"
+                icon={<Receipt size={18} />}
+                title="Tax status"
+                description="Sets the rate used to estimate tax on gains and dividends in Reports."
+              >
+                <RadioGroup
+                  className="option-cards"
+                  value={filerStatus}
+                  onValueChange={(v) =>
+                    onFilerStatus(v as 'filer' | 'non-filer')
+                  }
+                >
+                  {(
+                    [
+                      ['filer', 'Filer', '15%'],
+                      ['non-filer', 'Non-filer', '30%'],
+                    ] as const
+                  ).map(([value, label, rate]) => (
+                    <label
+                      key={value}
+                      htmlFor={`tax-${value}`}
+                      className={
+                        filerStatus === value
+                          ? 'option-card selected'
+                          : 'option-card'
+                      }
+                    >
+                      <RadioGroupItem id={`tax-${value}`} value={value} />
+                      <span>
+                        <strong>{label}</strong>
+                        <small>{rate} tax on gains and dividends</small>
+                      </span>
+                    </label>
+                  ))}
+                </RadioGroup>
+                {!filerStatus && (
+                  <p className="set-hint">
+                    Choose one to see after-tax figures in Reports.
+                  </p>
+                )}
+                <ul className="set-note">
+                  <li>
+                    Capital gains are netted per July–June tax year before the
+                    rate is applied.
+                  </li>
+                  <li>
+                    Deductions you record (broker, NCCPL or CDC) are kept as
+                    actual figures and never recalculated when you change this.
+                  </li>
+                  <li>
+                    Real capital gains tax depends on the acquisition date and
+                    current rules, so estimates are indicative, not your tax
+                    liability.
+                  </li>
+                </ul>
+              </Section>
+
+              <Section
+                id="usage"
+                icon={<Zap size={18} />}
+                title="AI usage"
+                description="Tokens and estimated cost since usage tracking began."
+              >
+                <div className="stat-tiles">
+                  {(
+                    [
+                      [
+                        'Input tokens',
+                        usage && usage.inputTokens.toLocaleString(),
+                      ],
+                      [
+                        'Output tokens',
+                        usage && usage.outputTokens.toLocaleString(),
+                      ],
+                      ['Estimated cost', usage && usd.format(usage.costUsd)],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="stat-tile">
+                      <small>{label}</small>
+                      {value ? (
+                        <strong>{value}</strong>
+                      ) : (
+                        <Skeleton className="h-7 w-24" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            </>
+          )}
+
+          {current === 'data' && (
+            <Section
+              id="data"
+              icon={<Database size={18} />}
+              title="Data & imports"
+              description="Back up your ledger, or bring in history from your broker and CDC."
             >
-              <UploadButton accept="application/json,.json" disabled={busy} onFile={onImportCdc} />
-            </Row>
-            <Row
-              label="Finqalab trades"
-              hint="Periodic Trade Details Report (PDF). Re-uploading or overlapping reports won't duplicate trades."
-            >
-              <UploadButton accept="application/pdf,.pdf" disabled={busy} onFile={onImportFinqalab} />
-            </Row>
-            <Row
-              label="AHL trades"
-              hint="Trade history (JSON). Fees are rebuilt from gross rate and net amount; overlapping files are deduplicated."
-            >
-              <UploadButton accept="application/json,.json" disabled={busy} onFile={onImportAhl} />
-            </Row>
-            <Row label="Backup" hint="Download your whole ledger as a JSON file.">
-              <button className="secondary compact" onClick={onExport}>
-                <Download size={14} /> Export backup
-              </button>
-            </Row>
-            <div className="danger-zone">
-              <div className="set-row-text">
-                <strong>Restore from backup</strong>
-                <span>
-                  Replaces your entire portfolio with the backup file. Export a backup first.
-                </span>
+              <Row
+                label="CDC dividends"
+                hint="CDC Access export (JSON). Only Paid rows are imported; bank and personal fields are never read."
+              >
+                <UploadButton
+                  accept="application/json,.json"
+                  disabled={busy}
+                  onFile={onImportCdc}
+                />
+              </Row>
+              <Row
+                label="Finqalab trades"
+                hint="Periodic Trade Details Report (PDF). Re-uploading or overlapping reports won't duplicate trades."
+              >
+                <UploadButton
+                  accept="application/pdf,.pdf"
+                  disabled={busy}
+                  onFile={onImportFinqalab}
+                />
+              </Row>
+              <Row
+                label="AHL trades"
+                hint="Trade history (JSON). Fees are rebuilt from gross rate and net amount; overlapping files are deduplicated."
+              >
+                <UploadButton
+                  accept="application/json,.json"
+                  disabled={busy}
+                  onFile={onImportAhl}
+                />
+              </Row>
+              <Row
+                label="Backup"
+                hint="Download your whole ledger as a JSON file."
+              >
+                <button className="secondary compact" onClick={onExport}>
+                  <Download size={14} /> Export backup
+                </button>
+              </Row>
+              <div className="danger-zone">
+                <div className="set-row-text">
+                  <strong>Restore from backup</strong>
+                  <span>
+                    Replaces your entire portfolio with the backup file. Export
+                    a backup first.
+                  </span>
+                </div>
+                <UploadButton
+                  accept="application/json,.json"
+                  disabled={busy}
+                  label="Restore…"
+                  onFile={setPendingRestore}
+                />
               </div>
-              <UploadButton
-                accept="application/json,.json"
-                disabled={busy}
-                label="Restore…"
-                onFile={setPendingRestore}
-              />
-            </div>
-          </Section>
+            </Section>
+          )}
 
-          {isAdmin && (
+          {isAdmin && current === 'research' && (
             <Section
               id="research"
               icon={<Cpu size={18} />}
@@ -404,7 +444,9 @@ export default function SettingsView({
                   className="set-input"
                   value={rs.model}
                   onChange={(e) =>
-                    onResearchSettings({ model: e.target.value as ResearchSettings['model'] })
+                    onResearchSettings({
+                      model: e.target.value as ResearchSettings['model'],
+                    })
                   }
                 >
                   {RESEARCH_MODELS.map((m) => (
@@ -420,7 +462,8 @@ export default function SettingsView({
                   value={rs.reasoningEffort}
                   onChange={(e) =>
                     onResearchSettings({
-                      reasoningEffort: e.target.value as ResearchSettings['reasoningEffort'],
+                      reasoningEffort: e.target
+                        .value as ResearchSettings['reasoningEffort'],
                     })
                   }
                 >
@@ -472,8 +515,8 @@ export default function SettingsView({
           <AlertDialogHeader>
             <AlertDialogTitle>Replace your portfolio?</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingRestore?.name} will replace everything in your current portfolio. Export a
-              backup first if you might need it.
+              {pendingRestore?.name} will replace everything in your current
+              portfolio. Export a backup first if you might need it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
