@@ -9,8 +9,16 @@
 //  - the production-writing workflows are never dispatched from staging (see dispatchBlockedReason).
 import { dispatchBlockedReason, type DispatchConfig } from './github-dispatch.ts';
 
-export type RequestKind = 'payouts' | 'ipo';
-export const WORKFLOWS: Record<RequestKind, string> = { payouts: 'psx-payouts.yml', ipo: 'psx-ipo.yml' };
+export type RequestKind = 'payouts' | 'ipo' | 'company' | 'quotes';
+export const WORKFLOWS: Record<RequestKind, string> = {
+  payouts: 'psx-payouts.yml', ipo: 'psx-ipo.yml', company: 'psx-directory.yml', quotes: 'psx-quotes.yml',
+};
+/**
+ * The `inputs` each workflow declares (GitHub rejects an undeclared input). The quote scraper declares none:
+ * it serves every open `quotes` request it finds in D1, so a delayed or lost dispatch loses nothing.
+ */
+export const workflowInputs = (kind: RequestKind, tickers: string[]): Record<string, string> | undefined =>
+  kind === 'quotes' ? undefined : kind === 'company' ? { tickers: tickers.join(','), mode: 'incremental' } : { tickers: tickers.join(',') };
 /** A queued or running request older than this is reported as timed out. */
 export const REQUEST_TIMEOUT_MS = 20 * 60_000;
 /** Most tickers one request may cover. */
@@ -29,6 +37,7 @@ export type RequestRow = {
   rows_found: number | null;
   coverage_from: string | null;
   error: string | null;
+  outcome?: string | null;
 };
 
 export type TickerState = {
@@ -98,8 +107,10 @@ export async function requestRefresh(
   tickers: string[],
   now = Date.now(),
   fetcher: typeof fetch = fetch,
+  /** Most tickers this call may cover; quote refreshes pass a larger cap so a portfolio is never truncated. */
+  maxTickers = MAX_REQUEST_TICKERS,
 ): Promise<RequestResult> {
-  const unique = [...new Set(tickers)].filter((t) => TICKER.test(t)).slice(0, MAX_REQUEST_TICKERS);
+  const unique = [...new Set(tickers)].filter((t) => TICKER.test(t)).slice(0, maxTickers);
   if (!unique.length) return { dispatched: false, queued: [], alreadyRunning: [], reason: 'No tickers to fetch.' };
   const blocked = dispatchBlockedReason(config);
   if (blocked) return { dispatched: false, queued: [], alreadyRunning: [], reason: blocked };
@@ -112,17 +123,28 @@ export async function requestRefresh(
   if (!toFetch.length)
     return { dispatched: false, queued: [], alreadyRunning: inFlight, reason: 'A fetch for these companies is already running.' };
   const at = new Date(now).toISOString();
-  await db.batch(
+  // Claim each ticker atomically: the upsert only takes over a request that is not in flight (or that timed
+  // out), so two simultaneous callers cannot both dispatch for the same company.
+  const cutoff = new Date(now - REQUEST_TIMEOUT_MS).toISOString();
+  const claims = await db.batch(
     toFetch.map((ticker) =>
       db
         .prepare(
           `INSERT INTO refresh_requests (kind,ticker,status,requested_at,attempts) VALUES (?,?, 'queued', ?, 1)
            ON CONFLICT(kind,ticker) DO UPDATE SET status='queued', requested_at=excluded.requested_at,
-             dispatched_at=NULL, started_at=NULL, completed_at=NULL, error=NULL, attempts=refresh_requests.attempts+1`,
+             dispatched_at=NULL, started_at=NULL, completed_at=NULL, error=NULL, outcome=NULL, attempts=refresh_requests.attempts+1
+           WHERE refresh_requests.status IN ('completed','failed') OR refresh_requests.requested_at <= ?`,
         )
-        .bind(kind, ticker, at),
+        .bind(kind, ticker, at, cutoff),
     ),
   );
+  const claimed = toFetch.filter((_, index) => (claims[index]?.meta?.changes ?? 0) > 0);
+  const lost = toFetch.filter((ticker) => !claimed.includes(ticker));
+  inFlight.push(...lost);
+  if (!claimed.length)
+    return { dispatched: false, queued: [], alreadyRunning: inFlight, reason: 'A fetch for these companies is already running.' };
+  toFetch.length = 0;
+  toFetch.push(...claimed);
   const fail = async (message: string) => {
     await db
       .batch(
@@ -146,7 +168,7 @@ export async function requestRefresh(
           'User-Agent': 'psx-portfolio-worker',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ref: 'main', inputs: { tickers: toFetch.join(',') } }),
+        body: JSON.stringify({ ref: 'main', ...(workflowInputs(kind, toFetch) ? { inputs: workflowInputs(kind, toFetch) } : {}) }),
         signal: AbortSignal.timeout(8000),
       },
     );

@@ -30,6 +30,7 @@ export const SHARED_TABLES: readonly string[] = [
   'price_history',
   'refresh_state',
   'security_catalog',
+  'security_face_values',
   'refresh_requests',
   'ipo_offers',
 ];

@@ -10,6 +10,8 @@
 import type { Company, Portfolio } from './portfolio.ts';
 import type { FactsResult } from './company-facts-store.ts';
 import type { CompanyFacts } from './company-facts.ts';
+import type { CompanyLookup } from './api-types.ts';
+import { isPlaceholderName } from './company-directory.ts';
 
 export function titleCaseSector(raw: string): string {
   return raw
@@ -45,4 +47,31 @@ export function newTickers(previous: Portfolio | null, incoming: Portfolio): str
   return incoming.companies
     .map((c) => c.ticker)
     .filter((ticker) => !previousTickers.has(ticker));
+}
+
+/** A company whose name is still the ticker (or empty) or that has no sector: details a lookup can fill in. */
+export const hasPlaceholderDetails = (company: Pick<Company, 'ticker' | 'name' | 'sector'>) =>
+  isPlaceholderName(company.name, company.ticker) || !(company.sector ?? '').trim();
+
+/**
+ * Applies resolved directory details to `companies` in place and returns the tickers it changed.
+ *  - `replace` tickers (just added by this save) take the directory's name and sector outright: the symbol's
+ *    identity is shared, so the verified values win over whatever a statement or form carried;
+ *  - every other ticker is only repaired where a field is still a placeholder, so an intentional
+ *    rename or sector choice the user made on an existing company is never touched;
+ *  - companies the lookup could not resolve are left exactly as they are.
+ * Account-specific settings (target, approval, note, face value, ...) are never read or written.
+ */
+export function applyLookups(companies: Company[], lookups: CompanyLookup[], replace: ReadonlySet<string> = new Set()): string[] {
+  const byTicker = new Map(lookups.filter((l) => l.state === 'resolved' && l.company).map((l) => [l.ticker, l.company!]));
+  const changed: string[] = [];
+  for (const company of companies) {
+    const found = byTicker.get(company.ticker);
+    if (!found) continue;
+    const before = `${company.name}\u0000${company.sector}`;
+    if (replace.has(company.ticker) || isPlaceholderName(company.name, company.ticker)) company.name = found.name;
+    if (replace.has(company.ticker) || !(company.sector ?? '').trim()) company.sector = found.sector;
+    if (`${company.name}\u0000${company.sector}` !== before) changed.push(company.ticker);
+  }
+  return changed;
 }

@@ -51,9 +51,16 @@ export type PortfolioResponse = {
   portfolio: Portfolio;
   revision: number;
   announcements: PayoutAnnouncement[];
+  /** Companies whose name or sector the shared directory has not resolved yet (additive; old clients ignore it). */
+  pendingCompanies?: string[];
 };
-/** PUT /api/portfolio body. A stale `revision` is answered with 409. */
-export type SavePortfolioRequest = { portfolio: Portfolio; revision: number };
+/**
+ * PUT /api/portfolio body. A stale `revision` is answered with 409. `createCompanies` is the strict
+ * Add Company intent: those tickers must be new to the portfolio and fully resolved in the shared company
+ * directory, and their name and sector are taken from it. Omitted (imports, old clients), the save is tolerant:
+ * unresolved metadata is kept as entered and repaired by a later save.
+ */
+export type SavePortfolioRequest = { portfolio: Portfolio; revision: number; createCompanies?: string[] };
 export type SavePortfolioResponse = { revision: number };
 
 /** POST /api/quotes body: `{ tickers }` (optionally `?force=1`). */
@@ -215,6 +222,35 @@ export type IpoOffersResponse = {
   overall: RefreshOverall;
   dispatchEnabled: boolean;
   disabledReason: string | null;
+  queued?: string[];
+  message?: string;
+};
+
+/** What the shared company directory knows about one symbol. */
+export type CompanyLookup = {
+  ticker: string;
+  /** `resolved`: name and sector are verified; `pending`: a lookup is under way; `unresolved`: no usable evidence yet. */
+  state: 'resolved' | 'pending' | 'unresolved';
+  company: {
+    name: string;
+    sector: string;
+    sectorCode: string | null;
+    securityType: 'equity' | 'etf' | 'debt' | null;
+    listingStatus: 'listed' | 'delisted' | null;
+    /** Verified current face value (Rs), or null when none is on file. */
+    faceValue: number | null;
+  } | null;
+  source: 'directory' | 'facts' | null;
+  /** Safe, user-facing explanation (never a provider error). */
+  message: string | null;
+  /** True when POST /api/companies can start a lookup for this symbol. */
+  canRequest: boolean;
+};
+/** GET /api/companies?tickers=A,B (cached, read-only) and POST /api/companies (queues missing lookups). */
+export type CompaniesResponse = {
+  companies: CompanyLookup[];
+  dispatchEnabled: boolean;
+  /** POST only. */
   queued?: string[];
   message?: string;
 };
