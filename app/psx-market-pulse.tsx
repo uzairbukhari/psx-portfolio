@@ -239,6 +239,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
 
   const index = summary?.index ?? null;
   const indexUp = (index?.change ?? 0) >= 0;
+  const headlineMeta = summary?.indices?.find((entry) => entry.code === 'KSE100')?.meta ?? null;
   const newestQuote = summary?.companies.reduce<string | null>(
     (latest, company) =>
       company.retrievedAt && (!latest || company.retrievedAt > latest)
@@ -311,24 +312,6 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
         </div>
       </div>
       {error && <p role="alert" className="notice error pulse-error">{error}</p>}
-      {!!summary?.indices?.length && (
-        <ul className="pulse-indices" aria-label="Market indices">
-          {summary.indices.map((entry) => (
-            <li key={entry.code} className="pulse-indices__item">
-              <span className="muted pulse-label">{entry.label}</span>
-              <b>{entry.close.toLocaleString()}</b>
-              <span className={entry.change >= 0 ? 'pos' : 'neg'}>
-                {entry.change >= 0 ? '▲' : '▼'} {Math.abs(entry.change).toLocaleString()} ({entry.changePercent.toFixed(2)}%)
-              </span>
-              <Sparkline points={entry.series} up={entry.change >= 0} />
-              <small className={`pulse-fresh pulse-fresh--${entry.meta.freshness}`} title={entry.meta.reason}>
-                {entry.meta.freshness === 'fresh' ? 'Fresh' : entry.meta.freshness === 'delayed' ? 'Delayed' : 'Stale'} · {entry.asOf}
-              </small>
-              {entry.meta.lastFailure && <small className="muted">Last refresh failed; showing earlier value</small>}
-            </li>
-          ))}
-        </ul>
-      )}
       {summary?.breadth && summary.breadth.covered > 0 && (
         <p className="muted pulse-breadth">
           {summary.breadth.advances.toLocaleString()} up · {summary.breadth.declines.toLocaleString()} down · {summary.breadth.unchanged.toLocaleString()} unchanged
@@ -350,7 +333,14 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
               <div>Low<b>{index.low.toLocaleString()}</b></div>
               <div>YTD<b>{index.ytdChangePercent.toFixed(2)}%</b></div>
             </div>
-            <small className="pulse-index-source">PSX index time: {index.asOf || 'Unavailable'}</small>
+            <small className="pulse-index-source">
+              PSX index time: {index.asOf || 'Unavailable'}
+              {headlineMeta && (
+                <span className={`pulse-fresh pulse-fresh--${headlineMeta.freshness}`} title={headlineMeta.reason}>
+                  {' · '}{headlineMeta.freshness === 'fresh' ? 'Fresh' : headlineMeta.freshness === 'delayed' ? 'Delayed' : 'Stale'}
+                </span>
+              )}
+            </small>
           </div>
         )}
         <div className="pulse-shortlist">
