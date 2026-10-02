@@ -30,7 +30,7 @@ test('portfolio GET does not inject cached quotes for another portfolio ticker',
 test('portfolio GET keeps a newer saved quote over an older cached refresh', async () => {
   const saved = { price: 120, asOf: 'Tue, Sep 29, 2026 10:38 AM', date: '2026-09-29', source: 'x', fetchedAt: '2026-09-29T05:38:00Z' };
   const portfolio = { companies: [{ ticker: 'MEBL' }, { ticker: 'LUCK' }], trades: [], quotes: { MEBL: saved }, budgets: {} };
-  const row = (ticker, date, at) => ({ ticker, price: 100, as_of: 'old', quote_date: date, source: 'y', fetched_at: at });
+  const row = (ticker, date, at) => ({ ticker, price: 100, as_of: 'old', quote_date: date, source: 'https://dps.psx.com.pk/indices/ALLSHR', fetched_at: at });
   globalThis.__portfolioDB = { prepare() { return { bind() { return this; }, async first() { return { payload: JSON.stringify(portfolio), revision: 2 }; }, async all() { return { results: [row('MEBL', '2026-09-28', '2026-09-28T11:00:00Z'), row('LUCK', '2026-09-28', '2026-09-28T11:00:00Z')] }; } }; } };
   const body = await (await route.GET(new Request('https://test/api/portfolio'))).json();
   assert.equal(body.portfolio.quotes.MEBL.price, 120);

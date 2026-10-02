@@ -111,6 +111,27 @@ export type Quote = {
  * wins, then a later fetch time. A manually verified quote holds until PSX
  * publishes a price for a strictly later trading day.
  */
+/** Quotes must come from a PSX page: a company page or the index scrape the cron uses. */
+const PSX_SOURCE_PREFIX = 'https://dps.psx.com.pk/';
+/**
+ * Shape check shared by `validate`, the quote cache merge and the refresh
+ * button, so one malformed cached quote can be skipped instead of blocking
+ * every save of the portfolio.
+ */
+export function isValidQuote(q: Quote | undefined | null): q is Quote {
+  return (
+    !!q &&
+    Number.isFinite(q.price) &&
+    q.price > 0 &&
+    q.price <= 1e8 &&
+    dateOK(q.date) &&
+    q.date <= today() &&
+    typeof q.asOf === 'string' &&
+    typeof q.source === 'string' &&
+    q.source.startsWith(PSX_SOURCE_PREFIX) &&
+    typeof q.fetchedAt === 'string'
+  );
+}
 export function quoteSupersedes(candidate: Quote, current: Quote | undefined) {
   if (!current) return true;
   if (candidate.date !== current.date) return candidate.date > current.date;
@@ -1101,20 +1122,7 @@ export function validate(p: Portfolio) {
         );
   }
   for (const [t, q] of Object.entries(p.quotes)) {
-    if (
-      !tickers.has(t) ||
-      !q ||
-      !Number.isFinite(q.price) ||
-      q.price <= 0 ||
-      q.price > 1e8 ||
-      !dateOK(q.date) ||
-      q.date > today() ||
-      typeof q.asOf !== 'string' ||
-      typeof q.source !== 'string' ||
-      !q.source.startsWith('https://dps.psx.com.pk/') ||
-      typeof q.fetchedAt !== 'string'
-    )
-      throw new UserError('Invalid quote.');
+    if (!tickers.has(t) || !isValidQuote(q)) throw new UserError(`Invalid quote for ${t}.`);
   }
   for (const [month, budget] of Object.entries(p.budgets))
     if (

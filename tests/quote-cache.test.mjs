@@ -15,14 +15,14 @@ const row = (ticker, date, fetchedAt, price = 100) => ({
   price,
   as_of: 'as of',
   quote_date: date,
-  source: 'psx',
+  source: 'https://dps.psx.com.pk/company/X',
   fetched_at: fetchedAt,
 });
 const quote = (date, fetchedAt, price = 100, manual) => ({
   price,
   asOf: 'as of',
   date,
-  source: 'psx',
+  source: 'https://dps.psx.com.pk/company/X',
   fetchedAt,
   ...(manual ? { manual } : {}),
 });
@@ -52,6 +52,11 @@ test('mergeQuotes keeps newer or manual saved quotes and fills the rest', () => 
   assert.equal(merged.OTHER, undefined);
 });
 
+test('mergeQuotes skips malformed cache rows instead of poisoning the portfolio', () => {
+  const row = (ticker, source) => ({ ticker, price: 100, as_of: 'now', quote_date: '2026-01-02', source, fetched_at: '2026-01-02T00:00:00Z' });
+  const merged = mergeQuotes({}, [row('GOOD', 'https://dps.psx.com.pk/indices/ALLSHR'), row('BAD', 'https://evil.test/')], ['GOOD', 'BAD']);
+  assert.deepEqual(Object.keys(merged), ['GOOD']);
+});
 test('mergeQuotes keeps a manual quote against a same-day or older PSX quote', () => {
   const merged = mergeQuotes(
     {

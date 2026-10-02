@@ -68,6 +68,7 @@ import {
   type Company,
   type Dividend,
   type StockSplit,
+  isValidQuote,
   quoteSupersedes,
   supersedeAutoWithImports,
   confirmDividendReceipt,
@@ -1025,6 +1026,7 @@ export default function Dashboard({
       const fresh = Object.fromEntries(
         Object.entries(d.quotes).filter(
           ([ticker, quote]) =>
+            isValidQuote(quote) &&
             !(d.stale?.[ticker] && p!.quotes[ticker]) &&
             quoteSupersedes(quote, p!.quotes[ticker]),
         ),

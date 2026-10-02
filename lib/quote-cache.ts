@@ -1,4 +1,4 @@
-import { quoteSupersedes, type Quote } from './portfolio.ts';
+import { isValidQuote, quoteSupersedes, type Quote } from './portfolio.ts';
 import { fetchBudget, type FetchBudget } from './psx-fetch.ts';
 import { pakistanMarketState } from './psx-market.ts';
 import { fetchPsxQuote } from './psx-quotes.ts';
@@ -81,7 +81,9 @@ export function mergeQuotes(
   for (const row of rows) {
     if (!wanted.has(row.ticker)) continue;
     const cached = rowToQuote(row);
-    if (quoteSupersedes(cached, merged[row.ticker])) merged[row.ticker] = cached;
+    // A malformed cache row must never reach a portfolio, where it would fail every save.
+    if (isValidQuote(cached) && quoteSupersedes(cached, merged[row.ticker]))
+      merged[row.ticker] = cached;
   }
   return merged;
 }
