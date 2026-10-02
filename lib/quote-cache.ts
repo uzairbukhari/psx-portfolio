@@ -236,10 +236,17 @@ export async function refreshQuotes(
     if (result.quotes[ticker]) result.stale[ticker] = reason;
     else result.failed[ticker] = reason;
   };
+  let blocked = false;
   for (let index = 0; index < due.length; index += CONCURRENCY) {
     await Promise.all(
       due.slice(index, index + CONCURRENCY).map(async (ticker) => {
-        if (budget.left <= 0) return miss(ticker, 'Refresh limit reached; try again shortly.');
+        if (budget.left <= 0)
+          return miss(
+            ticker,
+            blocked
+              ? 'Skipped: PSX is refusing requests from this network, so prices come from the scheduled scraper.'
+              : 'Refresh limit reached; try again shortly.',
+          );
         try {
           await sleep(Math.random() * MAX_JITTER_MS);
           const quote = await fetchQuote(ticker, budget);
@@ -248,7 +255,10 @@ export async function refreshQuotes(
           result.fetched.push(ticker);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown failure';
-          if (BLOCKED.test(message)) budget.left = 0;
+          if (BLOCKED.test(message)) {
+            blocked = true;
+            budget.left = 0;
+          }
           miss(ticker, message.slice(0, 1000));
         }
       }),
@@ -257,7 +267,7 @@ export async function refreshQuotes(
   await writeQuotes(db, fresh);
   // Budget deferrals are not failures; real fetch errors are recorded without touching any stored price.
   const errors = Object.fromEntries(
-    Object.entries({ ...result.failed, ...result.stale }).filter(([, reason]) => !/Refresh limit reached/.test(reason)),
+    Object.entries({ ...result.failed, ...result.stale }).filter(([, reason]) => !/Refresh limit reached|Skipped: PSX is refusing/.test(reason)),
   );
   await recordQuoteFailures(db, errors).catch(() => {});
   return result;

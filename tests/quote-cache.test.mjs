@@ -250,3 +250,15 @@ test('a due list longer than the fetch budget is serviced stalest-first so every
   }
   assert.equal(served.size, tickers.length);
 });
+
+test('after PSX blocks the network, skipped tickers say so instead of "Refresh limit reached"', async () => {
+  const db = fakeDB([]);
+  const result = await refreshQuotes(db, ['A1', 'B1', 'C1', 'D1', 'E1', 'F1'], {
+    now: new Date('2026-09-29T06:00:00Z'),
+    fetchQuote: async () => { throw Error('520 from PSX'); },
+  });
+  const reasons = Object.values(result.failed);
+  assert.ok(reasons.some((r) => /520 from PSX/.test(r)));
+  assert.ok(reasons.some((r) => /refusing requests from this network/.test(r)));
+  assert.ok(!reasons.some((r) => /Refresh limit reached/.test(r)));
+});
