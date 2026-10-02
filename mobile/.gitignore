@@ -7,3 +7,6 @@ android/
 *.ipa
 expo-env.d.ts
 .env*
+
+# Firebase client config (holds an API key); EAS supplies it via the GOOGLE_SERVICES_JSON file env var
+google-services*.json
