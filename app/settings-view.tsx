@@ -30,6 +30,7 @@ import {
   RESEARCH_MODELS,
   type ResearchSettings,
 } from '@/lib/portfolio';
+import { useConfirm } from '@/components/confirm-dialog';
 import { UserAvatar } from './user-avatar';
 import './settings.css';
 
@@ -198,28 +199,34 @@ export default function SettingsView({
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
-  // Settings opens from a tab click, so it is never part of the server render.
-  const staging = typeof document !== 'undefined' && document.documentElement.dataset.appEnv === 'staging';
-  const [resetText, setResetText] = useState('');
-  const [resetBusy, setResetBusy] = useState(false);
-  const [resetError, setResetError] = useState<string | null>(null);
-  async function resetData() {
-    setResetBusy(true);
-    setResetError(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [clearBusy, setClearBusy] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+  async function clearData() {
+    const ok = await confirm({
+      title: 'Delete all your holdings data?',
+      description:
+        'This permanently deletes all your holdings, trades, dividends, saved prices, notifications and Monthly Picks runs. Your account stays. This cannot be undone. Export a backup first.',
+      confirmLabel: 'Delete my data',
+      destructive: true,
+    });
+    if (!ok) return;
+    setClearBusy(true);
+    setClearError(null);
     try {
-      const res = await fetch('/api/admin/reset-portfolio', {
-        method: 'POST',
+      const res = await fetch('/api/me/data', {
+        method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ confirm: resetText.trim() }),
+        body: JSON.stringify({ confirm: true }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? 'Could not reset your data.');
+        throw new Error(body?.error ?? 'Could not delete your data.');
       }
       window.location.href = '/';
     } catch (e) {
-      setResetError(e instanceof Error ? e.message : 'Could not reset your data.');
-      setResetBusy(false);
+      setClearError(e instanceof Error ? e.message : 'Could not delete your data.');
+      setClearBusy(false);
     }
   }
   const [deleting, setDeleting] = useState(false);
@@ -437,27 +444,19 @@ export default function SettingsView({
                 onFile={setPendingRestore}
               />
             </div>
-            {isAdmin && staging && (
-              <div className="danger-zone">
-                <div className="set-row-text">
-                  <strong>Reset my data (staging only)</strong>
-                  <span>
-                    Deletes your holdings, trades, dividends, quotes, notifications and Monthly Picks runs so you can
-                    test as a fresh user. Other users are untouched. Type RESET to confirm.
-                  </span>
-                  {resetError && <span role="alert">{resetError}</span>}
-                </div>
-                <input
-                  className="set-input"
-                  aria-label="Type RESET to confirm"
-                  value={resetText}
-                  onChange={(e) => setResetText(e.target.value)}
-                />
-                <button type="button" className="secondary compact" disabled={resetBusy || resetText.trim() !== 'RESET'} onClick={() => void resetData()}>
-                  {resetBusy ? 'Resetting…' : 'Reset my data'}
-                </button>
+            <div className="danger-zone">
+              <div className="set-row-text">
+                <strong>Delete my holdings data</strong>
+                <span>
+                  Deletes all your holdings, trades, dividends, saved prices, notifications and Monthly Picks runs so
+                  you can start fresh. Your account stays. This cannot be undone. Export a backup first.
+                </span>
+                {clearError && <span role="alert">{clearError}</span>}
               </div>
-            )}
+              <button type="button" className="secondary compact" disabled={clearBusy} onClick={() => void clearData()}>
+                {clearBusy ? 'Deleting…' : 'Delete data…'}
+              </button>
+            </div>
             <div className="danger-zone">
               <div className="set-row-text">
                 <strong>Delete account</strong>
@@ -543,6 +542,7 @@ export default function SettingsView({
           )}
         </div>
       </div>
+      {confirmDialog}
       <AlertDialog
         open={!!pendingRestore}
         onOpenChange={(open) => {
