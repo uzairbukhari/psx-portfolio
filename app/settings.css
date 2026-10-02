@@ -22,7 +22,7 @@
 .set-nav a:hover{color:var(--foreground);background:rgba(148,178,225,.06)}
 .set-nav a.active{color:#fff;background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.3)}
 .set-nav a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
-.set-content{display:flex;flex-direction:column;gap:20px;max-width:760px;min-width:0}
+.set-content{display:flex;flex-direction:column;gap:20px;min-width:0}
 .set-card{scroll-margin-top:24px;border:1px solid var(--card-border);border-radius:var(--radius);background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .set-card-head{display:flex;gap:14px;align-items:flex-start;justify-content: flex-start;padding:22px 24px 18px;border-bottom:1px solid var(--border)}
 .set-card-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:36px;height:36px;border-radius:10px;background:rgba(59,130,246,.14);color:#7ea6e6}
