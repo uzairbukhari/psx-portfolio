@@ -276,3 +276,38 @@ export const mobileSessions = sqliteTable(
   },
   (table) => [index('mobile_sessions_email_idx').on(table.email)],
 );
+
+// Per-company, per-kind state of on-demand GitHub Actions scrapes ('payouts' = historical dividend
+// announcements, 'ipo' = official offer evidence). Written by the Worker (queued) and the scraper
+// (running / completed / failed); the status API derives the user-visible state from it.
+export const refreshRequests = sqliteTable(
+  'refresh_requests',
+  {
+    kind: text('kind').notNull(),
+    ticker: text('ticker').notNull(),
+    status: text('status').notNull(),
+    requestedAt: text('requested_at').notNull(),
+    dispatchedAt: text('dispatched_at'),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+    attempts: integer('attempts').notNull().default(0),
+    rowsFound: integer('rows_found'),
+    coverageFrom: text('coverage_from'),
+    error: text('error'),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.ticker] })],
+);
+
+// Official IPO / offer-for-sale evidence found by scripts/psx-ipo-scrape.mjs (see lib/ipo-offers.ts).
+export const ipoOffers = sqliteTable('ipo_offers', {
+  ticker: text('ticker').primaryKey(),
+  status: text('status').notNull(),
+  offerPrice: real('offer_price'),
+  allotmentDate: text('allotment_date'),
+  listingDate: text('listing_date'),
+  evidence: text('evidence'),
+  verification: text('verification'),
+  reason: text('reason'),
+  error: text('error'),
+  checkedAt: text('checked_at').notNull(),
+});

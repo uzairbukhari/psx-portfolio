@@ -5,6 +5,7 @@
 import type { PayoutAnnouncement } from './psx-payouts.ts';
 import type { Portfolio, Quote } from './portfolio.ts';
 import type { PricePoint } from './price-history.ts';
+import type { IpoLookup } from './ipo-offers.ts';
 import type { MonthlyPicksResearch } from './monthly-picks.ts';
 import type { ProgressStepKey } from './monthly-picks-progress.ts';
 export type { DataMeta, Freshness } from './market-meta.ts';
@@ -174,4 +175,46 @@ export type MarketBreadthView = {
   advances: number; declines: number; unchanged: number; volume: number;
   covered: number; sourceRows: number; excluded: number; volumeMissing: number;
   source: string; asOf: string | null; retrievedAt: string | null;
+};
+
+/** Where a per-company on-demand fetch (historical dividend announcements, IPO evidence) stands. */
+export type RefreshTickerState = {
+  ticker: string;
+  state: 'none' | 'queued' | 'running' | 'completed' | 'failed';
+  requestedAt?: string;
+  completedAt?: string;
+  /** Rows the last successful fetch returned; 0 is a successful empty result, not a failure. */
+  rowsFound?: number | null;
+  /** Earliest announcement date the source returned; earlier history is not covered. */
+  coverageFrom?: string | null;
+  error?: string | null;
+  attempts?: number;
+};
+export type RefreshOverall = 'idle' | 'queued' | 'running' | 'completed' | 'partial' | 'failed';
+
+/** GET/POST /api/dividends/refresh: historical announcement fetch status for the signed-in ledger. */
+export type DividendRefreshResponse = {
+  /** Portfolio revision the ticker list was derived from. */
+  revision: number;
+  tickers: string[];
+  states: RefreshTickerState[];
+  overall: RefreshOverall;
+  announcements: PayoutAnnouncement[];
+  dispatchEnabled: boolean;
+  disabledReason: string | null;
+  /** POST only: what this call did. */
+  queued?: string[];
+  alreadyRunning?: string[];
+  message?: string;
+};
+
+/** GET/POST /api/ipo-offers: official offer evidence for symbols that need an assumed acquisition. */
+export type IpoOffersResponse = {
+  lookups: IpoLookup[];
+  states: RefreshTickerState[];
+  overall: RefreshOverall;
+  dispatchEnabled: boolean;
+  disabledReason: string | null;
+  queued?: string[];
+  message?: string;
 };

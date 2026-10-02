@@ -96,3 +96,73 @@ export function latestCompletedSessionDate(now: Date): string {
   if (isTradingDay(date) && minutes >= closeMinutes(pkt.getUTCDay())) return date;
   return lastTradingDay(shift(date, -1));
 }
+
+/**
+ * Historical calendar for date recovery (broker statements, past dividend cutoffs). Kept apart from
+ * `isTradingDay` so live-market behaviour is unchanged.
+ *
+ * Tiers: `official` = the year's full list from psx.com.pk (2026); `reported` = lunar holidays taken
+ * from press reports of PSX notices (the exchange page only publishes the current year), so a date
+ * that depends on one of them is flagged unconfirmed; fixed national holidays are always certain.
+ * The reported list covers only from `REPORTED_FROM`; earlier dates have no lunar information.
+ * 2025 sources: https://profit.pakistantoday.com.pk/2024/12/24/psx-announces-its-holiday-calendar-for-2025/
+ * (Eid-ul-Fitr 30 Mar–1 Apr, Juma-tul-Wida 28 Mar, Eid-ul-Azha 7–9 Jun, Ashura 5–6 Jul, Eid Milad 5 Sep).
+ */
+export const REPORTED_FROM = '2024-11-01';
+const REPORTED_LUNAR_HOLIDAYS = new Set([
+  '2025-03-28', '2025-03-30', '2025-03-31', '2025-04-01',
+  '2025-06-07', '2025-06-08', '2025-06-09',
+  '2025-07-05', '2025-07-06', '2025-09-05',
+]);
+export type CalendarTier = 'official' | 'reported' | 'none';
+export function calendarTier(date: string): CalendarTier {
+  if (calendarCovers(date)) return 'official';
+  return date >= REPORTED_FROM && date < '2026-01-01' ? 'reported' : 'none';
+}
+const isFixedHoliday = (date: string) => FIXED_HOLIDAYS.includes(date.slice(5));
+const isWeekend = (date: string) => [0, 6].includes(parse(date).getUTCDay());
+/** Trading day under the best calendar known for that date. */
+export function isHistoricalTradingDay(date: string): boolean {
+  return isTradingDay(date) && !REPORTED_LUNAR_HOLIDAYS.has(date);
+}
+/** True when whether `date` is a holiday rests on information that is not official (reported or absent). */
+function holidayUncertain(date: string): boolean {
+  if (isWeekend(date) || isFixedHoliday(date)) return false;
+  const tier = calendarTier(date);
+  if (tier === 'official') return false;
+  return tier === 'none' || REPORTED_LUNAR_HOLIDAYS.has(date);
+}
+
+/** The trading day `n` sessions before `date`; `certain` is false when a skipped or counted day's status is unverified. */
+export function tradingDaysBefore(date: string, n: number): { date: string; certain: boolean } {
+  let d = date;
+  let certain = true;
+  for (let left = n; left > 0; ) {
+    d = shift(d, -1);
+    if (isHistoricalTradingDay(d)) {
+      left--;
+      // A counted weekday is only trustworthy if nothing could have closed it unseen.
+      if (calendarTier(d) === 'none') certain = false;
+    } else if (holidayUncertain(d)) certain = false;
+  }
+  return { date: d, certain };
+}
+
+/**
+ * Trade (execution) date for a statement settlement date: `settlement` is `T+n`'s n sessions later.
+ * Uncertain when the settlement day is itself not a known trading day, or when the walk back
+ * crosses a lunar holiday that only press reports (or nothing) confirm.
+ */
+export function executionDateFromSettlement(settlementDate: string, n: 1 | 2) {
+  const back = tradingDaysBefore(settlementDate, n);
+  const certain = back.certain && isHistoricalTradingDay(settlementDate);
+  return { date: back.date, certain, tier: calendarTier(settlementDate) };
+}
+
+/** Last qualifying trade date for a book closure, on the historical calendar (see `dividendEntitlement`). */
+export function historicalEntitlement(bookClosureStart: string): Entitlement {
+  const t1 = tradingDaysBefore(bookClosureStart, 1);
+  const useT1 = t1.date >= SETTLEMENT_T1_FROM;
+  const result = useT1 ? t1 : tradingDaysBefore(bookClosureStart, 2);
+  return { date: result.date, settlement: useT1 ? 'T+1' : 'T+2', certain: result.certain };
+}

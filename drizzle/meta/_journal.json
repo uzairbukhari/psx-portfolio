@@ -162,6 +162,13 @@
       "when": 1790939963382,
       "tag": "0022_violet_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1790942463405,
+      "tag": "0023_special_big_bertha",
+      "breakpoints": true
     }
   ]
 }

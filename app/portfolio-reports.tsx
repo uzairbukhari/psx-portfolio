@@ -307,6 +307,8 @@ export default function PortfolioReports({
                 : 'Net of tax (estimated unless a deduction is recorded)'}
               {report.realized.expectedDividends.count > 0 &&
                 ` · ${report.realized.expectedDividends.count} expected, ${money(report.realized.expectedDividends.grossAmount)} gross not yet confirmed`}
+              {report.realized.receivedUnknownPaymentDate.count > 0 &&
+                ` · ${report.realized.receivedUnknownPaymentDate.count} received on your confirmation with no payment date (${money(report.realized.receivedUnknownPaymentDate.grossAmount)} gross, calculated; shown by book closure and kept out of any tax year)`}
             </small>
           </div>
           <div

@@ -27,6 +27,7 @@ const SHARED = [
   'api-validate',
   'portfolio-counts',
   'security-catalog',
+  'ipo-offers',
 ];
 const FORBIDDEN = /from\s+['"](cloudflare:|next\/|@\/|react-dom|node:)/;
 

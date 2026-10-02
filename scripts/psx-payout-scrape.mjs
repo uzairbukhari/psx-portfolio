@@ -8,6 +8,7 @@
 import { pathToFileURL } from 'node:url';
 import { d1, heldTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
+import { markFinished, markRunning } from './refresh-state.mjs';
 import { fetchPsxPayoutsHtml } from '../lib/psx-fetch.ts';
 import { parsePayouts } from '../lib/psx-payouts.ts';
 import { announcementKey, buildPushMessages, newAnnouncements } from '../lib/dividend-push.ts';
@@ -76,11 +77,18 @@ async function main() {
   const tickers = await heldTickers(tickerArg);
   const rows = [];
   const failed = [];
+  const results = [];
+  if (!dryRun) await markRunning('payouts', tickers).catch((error) => console.log(`Request state not updated: ${error.message}`));
   for (const ticker of tickers) {
     try {
-      rows.push(...parsePayouts(await fetchPsxPayoutsHtml(ticker), ticker));
+      const found = parsePayouts(await fetchPsxPayoutsHtml(ticker), ticker);
+      rows.push(...found);
+      // A page with no announcements is a successful empty fetch, not a failure.
+      results.push({ ticker, rows: found.length, coverageFrom: found.map((r) => r.announcedOn).sort()[0] ?? null });
     } catch (error) {
-      failed.push(`${ticker}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      failed.push(`${ticker}: ${message}`);
+      results.push({ ticker, error: message });
     }
   }
   console.log(
@@ -96,6 +104,7 @@ async function main() {
     );
     const before = { keys: new Set(stored.map(announcementKey)), tickers: new Set(stored.map((r) => r.ticker)) };
     await upsert(rows, new Date().toISOString());
+    await markFinished('payouts', results).catch((error) => console.log(`Request state not updated: ${error.message}`));
     await notifyPhones(rows, before).catch((error) => console.log(`Push notifications skipped: ${error instanceof Error ? error.message : error}`));
   }
   process.exitCode = scrapeExitCode(tickers.length, failed.length);

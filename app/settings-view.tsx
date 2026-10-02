@@ -9,6 +9,7 @@ import {
   Download,
   LogOut,
   Receipt,
+  RefreshCw,
   ShieldCheck,
   Upload,
   UserRound,
@@ -181,6 +182,7 @@ export default function SettingsView({
   onImportCdc,
   onImportFinqalab,
   onImportAhl,
+  dividendSync,
 }: {
   name: string | null;
   email: string;
@@ -198,6 +200,7 @@ export default function SettingsView({
   onImportCdc: (file: File) => void;
   onImportFinqalab: (file: File) => void;
   onImportAhl: (file: File) => void;
+  dividendSync?: ReactNode;
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
@@ -261,6 +264,7 @@ export default function SettingsView({
     { id: 'tax', label: 'Tax', icon: Receipt },
     { id: 'usage', label: 'AI usage', icon: Zap },
     { id: 'data', label: 'Data & imports', icon: Database },
+    ...(dividendSync ? [{ id: 'sync-dividends', label: 'Sync dividends', icon: RefreshCw }] : []),
     ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }, { id: 'health', label: 'System health', icon: Activity }] : []),
   ];
 
@@ -423,9 +427,9 @@ export default function SettingsView({
             </Row>
             <Row
               label="AHL trades"
-              hint="Trade history (JSON). Fees are rebuilt from gross rate and net amount; overlapping files are deduplicated."
+              hint="Client Ledger (PDF) or trade history (JSON). A PDF is read in your browser and shown for review before anything is saved; deposits, withdrawals, interest, charges and tax entries are never imported. Re-uploads and overlapping files won't duplicate trades."
             >
-              <UploadButton accept="application/json,.json" disabled={busy} onFile={onImportAhl} />
+              <UploadButton accept="application/pdf,.pdf,application/json,.json" disabled={busy} onFile={onImportAhl} />
             </Row>
             <Row label="Backup" hint="Download your whole ledger as a JSON file.">
               <button className="secondary compact" onClick={onExport}>
@@ -472,6 +476,17 @@ export default function SettingsView({
               </button>
             </div>
           </Section>
+
+          {dividendSync && (
+            <Section
+              id="sync-dividends"
+              icon={<RefreshCw size={18} />}
+              title="Sync dividends"
+              description="Backfill cash dividends from your whole holding history and approve them as received."
+            >
+              {dividendSync}
+            </Section>
+          )}
 
           {isAdmin && (
             <Section
