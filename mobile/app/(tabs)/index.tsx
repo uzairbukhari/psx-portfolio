@@ -12,6 +12,7 @@ import { type } from '@/theme/tokens';
 import { AppBar } from '@/ui/AppBar';
 import { Icon, type IconName } from '@/ui/Icon';
 import { MarketPulse } from '@/ui/MarketPulse';
+import { ValueVsMoneyInCard } from '@/ui/TrackRecordCards';
 import { Amount, Button, Card, EmptyState, ListRow, Loading, Notice, Screen, SectionLabel, Stat, StatusChip, StepsBar, useKitStyles } from '@/ui/kit';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -195,6 +196,8 @@ export default function Today() {
       ) : open.length === 0 ? (
         <EmptyState icon="holdings" title="No open positions yet" body="Record your first buy or import your broker history." action={<Button label="Add a trade" icon="plus" onPress={() => router.push('/transaction')} />} />
       ) : null}
+
+      {open.length > 0 || totals.heldCount > 0 ? <ValueVsMoneyInCard collapsible /> : null}
 
       <MarketPulse />
     </Screen>
