@@ -1111,7 +1111,7 @@ export function validate(p: Portfolio) {
       q.date > today() ||
       typeof q.asOf !== 'string' ||
       typeof q.source !== 'string' ||
-      !q.source.startsWith('https://dps.psx.com.pk/company/' + t) ||
+      !q.source.startsWith('https://dps.psx.com.pk/') ||
       typeof q.fetchedAt !== 'string'
     )
       throw new UserError('Invalid quote.');
