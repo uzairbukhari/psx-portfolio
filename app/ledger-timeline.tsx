@@ -212,17 +212,20 @@ export default function LedgerTimeline({
   }, [portfolio]);
   const voidedCount = entries.filter((e) => e.voided).length;
   const q = query.trim().toLowerCase();
+  const matchesSearch = (e: LedgerEntry) =>
+    !q ||
+    e.ticker.toLowerCase().includes(q) ||
+    (names.get(e.ticker) ?? '').toLowerCase().includes(q);
   const visible = entries.filter(
     (e) =>
       (showVoided || !e.voided) &&
       (filter === 'all' ||
         e.type === filter ||
         (filter === 'buy' && e.type === 'opening')) &&
-      (!q ||
-        e.ticker.toLowerCase().includes(q) ||
-        (names.get(e.ticker) ?? '').toLowerCase().includes(q)),
+      matchesSearch(e),
   );
-  const live = visible.filter((e) => !e.voided);
+  // The summary cards ignore the type filter (they follow the search only).
+  const live = entries.filter((e) => !e.voided && matchesSearch(e));
   const sum = (types: EntryType[]) =>
     live
       .filter((e) => types.includes(e.type) && !e.expected)
