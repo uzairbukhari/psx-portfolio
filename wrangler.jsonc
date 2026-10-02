@@ -16,11 +16,47 @@
     "ALLOWED_EMAILS": "",
     // Public OAuth client ID from Google Cloud Console (not a secret).
     "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+    // Comma-separated iOS + Android OAuth client IDs (public, not secrets) whose Google
+    // ID tokens the native apps may exchange at /api/auth/mobile/google. Empty = off.
+    "GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
     // Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
     // data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
     "GITHUB_REPO": "uzairbukhari/psx-portfolio",
     // Per-user AI spend cap per PKT calendar month, in USD. Over the cap, Monthly
     // Picks runs use the quantitative ranking instead of the AI call. "0" disables AI.
-    "AI_MONTHLY_CAP_USD": "1"
+    "AI_MONTHLY_CAP_USD": "1",
+    // "true" once the quote-refresh Worker's every-minute cron is deployed: it then owns Monthly
+    // Picks execution and GET /api/recommendations becomes read-only. Keep "false" until then.
+    "PICKS_BACKGROUND": "false",
+    // Deployment label; the staging Worker sets "staging", which shows a STAGING badge.
+    "APP_ENV": "production"
+  },
+  // Staging: a separate Worker + D1 database (see CLAUDE.md "Staging"). Wrangler
+  // environments do not inherit vars or bindings, so everything is repeated here.
+  // Selected with `CLOUDFLARE_ENV=staging` at build time / `--env staging`.
+  // Not deployed: the quote-refresh cron Worker, and no GITHUB_DISPATCH_TOKEN secret.
+  "env": {
+    "staging": {
+      "name": "psx-portfolio-sip-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "psx_portfolio_sip_staging",
+          // Created by the owner with `npx wrangler d1 create`. If this is ever reset
+          // to all zeros, the deploy-staging workflow skips deploying.
+          "database_id": "f4ee7f4b-bfe7-4dc3-95ab-475917aee59b",
+          "migrations_dir": "drizzle"
+        }
+      ],
+      "vars": {
+        "ALLOWED_EMAILS": "suzairbukhari@gmail.com",
+        "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+        "GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+        "GITHUB_REPO": "uzairbukhari/psx-portfolio",
+        "AI_MONTHLY_CAP_USD": "0.25",
+        "PICKS_BACKGROUND": "false",
+        "APP_ENV": "staging"
+      }
+    }
   }
 }

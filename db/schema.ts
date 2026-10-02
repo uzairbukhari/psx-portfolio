@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 export const portfolios = sqliteTable('portfolios', {
   userId: text('user_id').primaryKey(),
   payload: text('payload').notNull(),
@@ -43,6 +43,15 @@ export const monthlyRecommendations = sqliteTable(
     snapshot: text('snapshot'),
     gatherStartedAt: text('gather_started_at'),
     pendingTickers: text('pending_tickers'),
+    // Durable execution: the cron processor claims a run with a lease token, advances it one
+    // step, and releases it. A run is due when `next_attempt_at` has passed and no live lease exists.
+    nextAttemptAt: text('next_attempt_at'),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: text('lease_expires_at'),
+    deadlineAt: text('deadline_at'),
+    // Persisted, user-visible progress (JSON): phase milestone plus real company counts.
+    progress: text('progress'),
+    idempotencyKey: text('idempotency_key'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -51,6 +60,8 @@ export const monthlyRecommendations = sqliteTable(
       table.userId,
       table.createdAt,
     ),
+    index('idx_monthly_recommendations_due').on(table.status, table.nextAttemptAt),
+    uniqueIndex('uq_monthly_recommendations_idem').on(table.userId, table.idempotencyKey),
   ],
 );
 
@@ -107,7 +118,75 @@ export const quoteRefreshes = sqliteTable('quote_refreshes', {
   source: text('source').notNull(),
   fetchedAt: text('fetched_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  // When PSX says the price was quoted (ISO, from the display time in `as_of`); null when unknown.
+  observedAt: text('observed_at'),
 });
+
+// Refresh attempts, kept apart from observations: a failed attempt never changes how old a stored
+// price looks, and the oldest-attempted ticker is serviced first so no symbol is starved.
+export const refreshState = sqliteTable(
+  'refresh_state',
+  {
+    kind: text('kind').notNull(),
+    key: text('key').notNull(),
+    lastAttemptAt: text('last_attempt_at'),
+    lastSuccessAt: text('last_success_at'),
+    lastError: text('last_error'),
+    failureCount: integer('failure_count').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.kind, table.key] })],
+);
+
+// Shared catalog of securities seen in validated PSX observations (the All-Share table). It records
+// what PSX lists, not issuer identity: `security_type` stays null until a source states it.
+export const securityCatalog = sqliteTable('security_catalog', {
+  ticker: text('ticker').primaryKey(),
+  name: text('name').notNull(),
+  sector: text('sector'),
+  securityType: text('security_type'),
+  source: text('source').notNull(),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  // Company directory (scripts/psx-directory-scrape.mjs). Provenance is kept per field: the name and sector
+  // can come from different sources, and nothing here is ever promoted from a user's own portfolio data.
+  sectorCode: text('sector_code'),
+  sectorName: text('sector_name'),
+  nameSource: text('name_source'),
+  sectorSource: text('sector_source'),
+  sourceUrls: text('source_urls'),
+  // 'resolved' = name and sector both verified from PSX/issuer data; 'incomplete' = something missing;
+  // 'unresolved' = a lookup was tried and the evidence was insufficient.
+  resolutionStatus: text('resolution_status').notNull().default('incomplete'),
+  listingStatus: text('listing_status'),
+  verifiedAt: text('verified_at'),
+  profileFetchedAt: text('profile_fetched_at'),
+  // Hash of the observed fields, so an incremental run can tell a changed listing from an unchanged one.
+  fingerprint: text('fingerprint'),
+  // Current verified face value (Rs); the dated evidence lives in security_face_values.
+  faceValue: real('face_value'),
+  faceValueSource: text('face_value_source'),
+  faceValueVerifiedAt: text('face_value_verified_at'),
+});
+
+// Dated face-value evidence per ticker. A capital change (split / consolidation) adds a row with a later
+// `effective_from` instead of overwriting the old one, so a past dividend keeps the face value that applied then.
+export const securityFaceValues = sqliteTable(
+  'security_face_values',
+  {
+    ticker: text('ticker').notNull(),
+    // First date this face value applied; '' = from the earliest date the evidence covers.
+    effectiveFrom: text('effective_from').notNull().default(''),
+    faceValue: real('face_value').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    sourceLabel: text('source_label'),
+    evidence: text('evidence'),
+    verifiedAt: text('verified_at').notNull(),
+    // 'verified', or 'conflict' when a second source disagreed for the same start date: a conflicting row is
+    // never used to calculate anything (the value stays unresolved) and the disagreement is kept in `evidence`.
+    status: text('status').notNull().default('verified'),
+  },
+  (t) => [primaryKey({ columns: [t.ticker, t.effectiveFrom] })],
+);
 
 export const aiUsage = sqliteTable(
   'ai_usage',
@@ -218,3 +297,58 @@ export const rateLimits = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.action] })],
 );
+
+// One row per signed-in phone/tablet. The app token carries the row id (`sid`),
+// so revoking a row signs that device out on its next request.
+export const mobileSessions = sqliteTable(
+  'mobile_sessions',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull(),
+    deviceName: text('device_name').notNull(),
+    platform: text('platform').notNull(),
+    createdAt: text('created_at').notNull(),
+    lastSeenAt: text('last_seen_at').notNull(),
+    revokedAt: text('revoked_at'),
+    // Expo push token of this device, set by the app after sign-in; used by the dividend notifier.
+    pushToken: text('push_token'),
+  },
+  (table) => [index('mobile_sessions_email_idx').on(table.email)],
+);
+
+// Per-company, per-kind state of on-demand GitHub Actions scrapes ('payouts' = historical dividend
+// announcements, 'ipo' = official offer evidence). Written by the Worker (queued) and the scraper
+// (running / completed / failed); the status API derives the user-visible state from it.
+export const refreshRequests = sqliteTable(
+  'refresh_requests',
+  {
+    kind: text('kind').notNull(),
+    ticker: text('ticker').notNull(),
+    status: text('status').notNull(),
+    requestedAt: text('requested_at').notNull(),
+    dispatchedAt: text('dispatched_at'),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+    attempts: integer('attempts').notNull().default(0),
+    rowsFound: integer('rows_found'),
+    coverageFrom: text('coverage_from'),
+    error: text('error'),
+    // Quote refreshes: 'updated' | 'already_current' | 'fallback_used' | 'failed'.
+    outcome: text('outcome'),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.ticker] })],
+);
+
+// Official IPO / offer-for-sale evidence found by scripts/psx-ipo-scrape.mjs (see lib/ipo-offers.ts).
+export const ipoOffers = sqliteTable('ipo_offers', {
+  ticker: text('ticker').primaryKey(),
+  status: text('status').notNull(),
+  offerPrice: real('offer_price'),
+  allotmentDate: text('allotment_date'),
+  listingDate: text('listing_date'),
+  evidence: text('evidence'),
+  verification: text('verification'),
+  reason: text('reason'),
+  error: text('error'),
+  checkedAt: text('checked_at').notNull(),
+});

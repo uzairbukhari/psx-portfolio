@@ -2,12 +2,14 @@
 
 import { useRef, useState, type ReactNode } from 'react';
 import {
+  Activity,
   ArrowLeft,
   Cpu,
   Database,
   Download,
   LogOut,
   Receipt,
+  RefreshCw,
   ShieldCheck,
   Upload,
   UserRound,
@@ -30,6 +32,8 @@ import {
   RESEARCH_MODELS,
   type ResearchSettings,
 } from '@/lib/portfolio';
+import { useConfirm } from '@/components/confirm-dialog';
+import SystemHealth from './system-health';
 import { UserAvatar } from './user-avatar';
 import './settings.css';
 
@@ -178,6 +182,7 @@ export default function SettingsView({
   onImportCdc,
   onImportFinqalab,
   onImportAhl,
+  dividendSync,
 }: {
   name: string | null;
   email: string;
@@ -195,14 +200,70 @@ export default function SettingsView({
   onImportCdc: (file: File) => void;
   onImportFinqalab: (file: File) => void;
   onImportAhl: (file: File) => void;
+  dividendSync?: ReactNode;
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [clearBusy, setClearBusy] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+  async function clearData() {
+    const ok = await confirm({
+      title: 'Delete all your holdings data?',
+      description:
+        'This permanently deletes all your holdings, trades, dividends, saved prices, notifications and Monthly Picks runs. Your account stays. This cannot be undone. Export a backup first.',
+      confirmLabel: 'Delete my data',
+      destructive: true,
+    });
+    if (!ok) return;
+    setClearBusy(true);
+    setClearError(null);
+    try {
+      const res = await fetch('/api/me/data', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Could not delete your data.');
+      }
+      window.location.href = '/';
+    } catch (e) {
+      setClearError(e instanceof Error ? e.message : 'Could not delete your data.');
+      setClearBusy(false);
+    }
+  }
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteReady = deleteConfirm.trim().toLowerCase() === email.toLowerCase();
+  async function deleteAccount() {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch('/api/me', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: deleteConfirm.trim() }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Could not delete your account.');
+      }
+      window.location.href = '/';
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete your account.');
+      setDeleteBusy(false);
+    }
+  }
   const [active, setActive] = useState('account');
   const sections = [
     { id: 'account', label: 'Account', icon: UserRound },
     { id: 'data', label: 'Data & imports', icon: Database },
-    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }] : []),
+    ...(dividendSync ? [{ id: 'sync-dividends', label: 'Sync dividends', icon: RefreshCw }] : []),
+    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }, { id: 'health', label: 'System health', icon: Activity }] : []),
   ];
   const current = sections.some((x) => x.id === active) ? active : 'account';
 
@@ -379,55 +440,87 @@ export default function SettingsView({
                 label="CDC dividends"
                 hint="CDC Access export (JSON). Only Paid rows are imported; bank and personal fields are never read."
               >
-                <UploadButton
-                  accept="application/json,.json"
-                  disabled={busy}
-                  onFile={onImportCdc}
-                />
-              </Row>
-              <Row
-                label="Finqalab trades"
-                hint="Periodic Trade Details Report (PDF). Re-uploading or overlapping reports won't duplicate trades."
-              >
-                <UploadButton
-                  accept="application/pdf,.pdf"
-                  disabled={busy}
-                  onFile={onImportFinqalab}
-                />
-              </Row>
-              <Row
-                label="AHL trades"
-                hint="Trade history (JSON). Fees are rebuilt from gross rate and net amount; overlapping files are deduplicated."
-              >
-                <UploadButton
-                  accept="application/json,.json"
-                  disabled={busy}
-                  onFile={onImportAhl}
-                />
-              </Row>
-              <Row
-                label="Backup"
-                hint="Download your whole ledger as a JSON file."
-              >
-                <button className="secondary compact" onClick={onExport}>
-                  <Download size={14} /> Export backup
-                </button>
-              </Row>
-              <div className="danger-zone">
-                <div className="set-row-text">
-                  <strong>Restore from backup</strong>
-                  <span>
-                    Replaces your entire portfolio with the backup file. Export
-                    a backup first.
-                  </span>
-                </div>
-                <UploadButton
-                  accept="application/json,.json"
-                  disabled={busy}
-                  label="Restore…"
-                  onFile={setPendingRestore}
-                />
+              <UploadButton accept="application/json,.json" disabled={busy} onFile={onImportCdc} />
+            </Row>
+            <Row
+              label="Finqalab trades"
+              hint="Periodic Trade Details Report (PDF). Re-uploading or overlapping reports won't duplicate trades."
+            >
+              <UploadButton accept="application/pdf,.pdf" disabled={busy} onFile={onImportFinqalab} />
+            </Row>
+            <Row
+              label="AHL trades"
+              hint="Client Ledger (PDF) or trade history (JSON). A PDF is read in your browser and shown for review before anything is saved; deposits, withdrawals, interest, charges and tax entries are never imported. Re-uploads and overlapping files won't duplicate trades."
+            >
+              <UploadButton accept="application/pdf,.pdf,application/json,.json" disabled={busy} onFile={onImportAhl} />
+            </Row>
+            <Row label="Backup" hint="Download your whole ledger as a JSON file.">
+              <button className="secondary compact" onClick={onExport}>
+                <Download size={14} /> Export backup
+              </button>
+            </Row>
+            <div className="danger-zone">
+              <div className="set-row-text">
+                <strong>Restore from backup</strong>
+                <span>
+                  Replaces your entire portfolio with the backup file. Export a backup first.
+                </span>
               </div>
+              <UploadButton
+                accept="application/json,.json"
+                disabled={busy}
+                label="Restore…"
+                onFile={setPendingRestore}
+              />
+            </div>
+            <div className="danger-zone">
+              <div className="set-row-text">
+                <strong>Delete my holdings data</strong>
+                <span>
+                  Deletes all your holdings, trades, dividends, saved prices, notifications and Monthly Picks runs so
+                  you can start fresh. Your account stays. This cannot be undone. Export a backup first.
+                </span>
+                {clearError && <span role="alert">{clearError}</span>}
+              </div>
+              <button type="button" className="secondary compact" disabled={clearBusy} onClick={() => void clearData()}>
+                {clearBusy ? 'Deleting…' : 'Delete data…'}
+              </button>
+            </div>
+            <div className="danger-zone">
+              <div className="set-row-text">
+                <strong>Delete account</strong>
+                <span>
+                  Permanently deletes your portfolio, AI reviews and usage, research jobs and signed-in
+                  phones. This cannot be undone. Export a backup first.
+                </span>
+              </div>
+              <button type="button" className="secondary compact" onClick={() => setDeleting(true)}>
+                Delete account…
+              </button>
+            </div>
+            </Section>
+          )}
+
+          {dividendSync && current === 'sync-dividends' && (
+            <Section
+              id="sync-dividends"
+              icon={<RefreshCw size={18} />}
+              title="Sync dividends"
+              description="Backfill cash dividends from your whole holding history and approve them as received."
+            >
+              {dividendSync}
+            </Section>
+          )}
+
+          {isAdmin && current === 'health' && (
+            <Section
+              id="health"
+              icon={<Activity size={18} />}
+              title="System health"
+              badge="Super admin"
+              description="Monthly Picks run processor, data freshness and recent scrape failures."
+            >
+              <SystemHealth />
             </Section>
           )}
 
@@ -505,6 +598,7 @@ export default function SettingsView({
           )}
         </div>
       </div>
+      {confirmDialog}
       <AlertDialog
         open={!!pendingRestore}
         onOpenChange={(open) => {
@@ -533,6 +627,54 @@ export default function SettingsView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog
+        open={deleting}
+        onOpenChange={(open) => {
+          if (deleteBusy) return;
+          setDeleting(open);
+          if (!open) {
+            setDeleteConfirm('');
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes everything stored for {email}: your portfolio and ledger, AI
+              reviews, research jobs and signed-in phones. Type your email address to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <input
+            type="email"
+            className="set-input"
+            aria-label="Type your email address to confirm"
+            placeholder={email}
+            autoComplete="off"
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+          />
+          {deleteError && <p className="set-hint" role="alert">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!deleteReady || deleteBusy}
+              onClick={(e) => {
+                e.preventDefault();
+                void deleteAccount();
+              }}
+            >
+              {deleteBusy ? 'Deleting…' : 'Delete everything'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <p className="muted settings-about">
+        <b>About.</b> Plans are estimates. Actual execution prices, fees, taxes and corporate
+        actions may differ. No orders are placed by this dashboard.
+      </p>
     </div>
   );
 }

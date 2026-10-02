@@ -22,7 +22,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { money, round, type Portfolio } from '@/lib/portfolio';
+import { money, moneyShort, round, type Portfolio } from '@/lib/portfolio';
 import { TickerLink } from './ticker-link';
 import {
   portfolioReport,
@@ -55,11 +55,11 @@ const dividendCompanyConfig = {
 } satisfies ChartConfig;
 
 const realizedActivityConfig = {
-  net: { label: 'Net realized gain', color: 'var(--primary)' },
+  net: { label: 'Net realised gain', color: 'var(--primary)' },
 } satisfies ChartConfig;
 
 const realizedCompanyConfig = {
-  net: { label: 'Net realized gain', color: 'var(--primary)' },
+  net: { label: 'Net realised gain', color: 'var(--primary)' },
 } satisfies ChartConfig;
 
 const performanceConfig = {
@@ -185,7 +185,15 @@ export default function PortfolioReports({
 }: {
   portfolio: Portfolio;
 }) {
-  const [view, setView] = useState<'all' | 'allocation' | 'performance' | 'income' | 'activity'>('all');
+  const [view, setView] = useState<
+    'all' | 'allocation' | 'performance' | 'income' | 'activity'
+  >(() =>
+    // Phones start on Performance rather than rendering every chart at once.
+    typeof window !== 'undefined' &&
+    window.matchMedia('(max-width: 760px)').matches
+      ? 'performance'
+      : 'all',
+  );
   const report = portfolioReport(portfolio);
   const completeQuotes =
     report.summary.quoteCoverage.percentage === 100 &&
@@ -265,7 +273,7 @@ export default function PortfolioReports({
         <div className="reports-hero-stats">
           <div className="reports-priced-value">
             <span>Priced market value</span>
-            <strong>{money(report.summary.pricedValue)}</strong>
+            <strong>{moneyShort(report.summary.pricedValue)}</strong>
             <small>
               {report.summary.quoteCoverage.priced} of{' '}
               {report.summary.quoteCoverage.held} held companies priced
@@ -274,11 +282,11 @@ export default function PortfolioReports({
           <div
             className={`reports-priced-value ${totalGain === null ? '' : totalGain >= 0 ? 'pos' : 'neg'}`}
           >
-            <span>Unrealized gain / loss</span>
+            <span>Unrealised gain / loss</span>
             <strong>
               {totalGain === null
                 ? '—'
-                : `${totalGain >= 0 ? '+' : ''}${money(totalGain)}`}
+                : `${totalGain >= 0 ? '+' : ''}${moneyShort(totalGain)}`}
             </strong>
             <small>
               {totalGainPercent === null
@@ -290,8 +298,8 @@ export default function PortfolioReports({
             <span>Dividend income received</span>
             <strong>
               {totalDividendNet === null
-                ? money(report.realized.totalDividendIncomeGross)
-                : money(totalDividendNet)}
+                ? moneyShort(report.realized.totalDividendIncomeGross)
+                : moneyShort(totalDividendNet)}
             </strong>
             <small>
               {totalDividendNet === null
@@ -299,6 +307,8 @@ export default function PortfolioReports({
                 : 'Net of tax (estimated unless a deduction is recorded)'}
               {report.realized.expectedDividends.count > 0 &&
                 ` · ${report.realized.expectedDividends.count} expected, ${money(report.realized.expectedDividends.grossAmount)} gross not yet confirmed`}
+              {report.realized.receivedUnknownPaymentDate.count > 0 &&
+                ` · ${report.realized.receivedUnknownPaymentDate.count} received on your confirmation with no payment date (${money(report.realized.receivedUnknownPaymentDate.grossAmount)} gross, calculated; shown by book closure and kept out of any tax year)`}
             </small>
           </div>
           <div
@@ -308,11 +318,11 @@ export default function PortfolioReports({
             <strong>
               {grandTotalReturn === null
                 ? '—'
-                : `${grandTotalReturn >= 0 ? '+' : ''}${money(grandTotalReturn)}`}
+                : `${grandTotalReturn >= 0 ? '+' : ''}${moneyShort(grandTotalReturn)}`}
             </strong>
             <small>
               {grandTotalReturn !== null
-                ? 'Unrealized + realized sales + received dividends, after estimated tax'
+                ? 'Unrealised + realised sales + received dividends, after estimated tax'
                 : !portfolio.taxProfile
                   ? 'Set your filer status in Settings to include tax'
                   : 'Add missing purchase prices or cost basis to calculate'}
@@ -378,7 +388,7 @@ export default function PortfolioReports({
             ['allocation', 'Allocation'],
             ['performance', 'Performance'],
             ['income', 'Income'],
-            ['activity', 'Activity'],
+            ['activity', 'Investing'],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -396,8 +406,8 @@ export default function PortfolioReports({
         <section className="panel report-panel" data-group="performance">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
-              <h3>Realized gains by month</h3>
+              <p className="eyebrow">REALISED P&amp;L &amp; TAX</p>
+              <h3>Realised gains by month</h3>
             </div>
             <span>Estimated tax (15% filer / 30% non-filer), unless a deduction is recorded</span>
           </div>
@@ -459,18 +469,18 @@ export default function PortfolioReports({
               </BarChart>
             </ChartContainer>
           ) : (
-            <ReportEmpty>Record a sale to see realized gains here.</ReportEmpty>
+            <ReportEmpty>Record a sale to see realised gains here.</ReportEmpty>
           )}
           <p className="report-source">
-            Source: recorded sales · realized gains only
+            Source: recorded sales · realised gains only
           </p>
         </section>
 
         <section className="panel report-panel" data-group="performance">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">REALIZED P&amp;L &amp; TAX</p>
-              <h3>Realized gain / loss by company</h3>
+              <p className="eyebrow">REALISED P&amp;L &amp; TAX</p>
+              <h3>Realised gain / loss by company</h3>
             </div>
             <span>Net of estimated capital gains tax</span>
           </div>
@@ -497,7 +507,7 @@ export default function PortfolioReports({
                     }).format(value)
                   }
                   label={{
-                    value: 'Realized gain / loss (PKR)',
+                    value: 'Realised gain / loss (PKR)',
                     position: 'insideBottom',
                     offset: -12,
                   }}
@@ -555,7 +565,7 @@ export default function PortfolioReports({
               </BarChart>
             </ChartContainer>
           ) : (
-            <ReportEmpty>Record a sale to see realized gains here.</ReportEmpty>
+            <ReportEmpty>Record a sale to see realised gains here.</ReportEmpty>
           )}
           <p className="report-source">
             Source: recorded sales, ranked by absolute gain / loss
@@ -855,7 +865,7 @@ export default function PortfolioReports({
               <p className="eyebrow">PERFORMANCE</p>
               <h3>Gain / loss vs cost</h3>
             </div>
-            <span>Unrealized, by company</span>
+            <span>Unrealised, by company</span>
           </div>
           {report.performance.length ? (
             <>
@@ -937,7 +947,7 @@ export default function PortfolioReports({
             </ReportEmpty>
           )}
           <p className="report-source">
-            Source: recorded cost basis vs latest portfolio quotes · unrealized
+            Source: recorded cost basis vs latest portfolio quotes · unrealised
           </p>
         </section>
 

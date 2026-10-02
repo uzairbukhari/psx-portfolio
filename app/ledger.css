@@ -1,4 +1,4 @@
-/* Purchase log timeline + company page */
+/* Activity timeline + company page */
 .ledger-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .ledger-kpis div{border:1px solid var(--card-border);border-radius:12px;background:var(--card);padding:14px 18px}
 .ledger-kpis span{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;color:var(--muted-foreground)}
@@ -10,10 +10,20 @@
 .ledger-search{flex-direction:row;align-items:center;gap:8px;min-width:240px;border:1px solid var(--border);border-radius:9px;padding:0 12px;background:#0b1526;color:var(--muted-foreground)}
 .ledger-search input{border:0;padding:9px 0;background:transparent;font-size:14px}
 .ledger-search input:focus{outline:none}
-.ledger-voided{margin:0 0 0 auto;font-size:13px}
+.ledger-voided{margin:0 0 0 auto;font-size:13px;white-space:nowrap}
 .ledger-voided input{width:auto}
 .ledger-month{margin-bottom:18px;border:1px solid var(--card-border);border-radius:12px;background:var(--card);overflow:hidden}
-.ledger-month h4{margin:0;padding:10px 18px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted-foreground);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.ledger-month h4{margin:0;padding:0;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted-foreground);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.ledger-month h4 button,.ledger-month h4>div{display:flex;align-items:center;gap:8px;width:100%;margin:0;padding:10px 18px;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;text-align:left;cursor:pointer;box-shadow:none}
+.ledger-month h4>div{cursor:default}
+.ledger-month h4 button:hover{background:rgba(59,130,246,.06)}
+.ledger-month-total{margin-left:auto;display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;font-variant-numeric:tabular-nums;text-transform:none;letter-spacing:0;font-size:13px}
+.ledger-chev{transition:transform .15s ease;flex:none}
+.ledger-month h4 button[aria-expanded=false] .ledger-chev{transform:rotate(-90deg)}
+.ledger-month:has(h4 button[aria-expanded=false]) h4{border-bottom:0}
+.ledger-older{display:block;margin:0 auto 18px}
+.ledger-tk{display:inline-flex;align-items:baseline;gap:8px;min-width:0}
+.ledger-sip{font-size:11px;font-weight:700;border-radius:20px;padding:2px 7px;background:rgba(59,130,246,.16);color:#bcd4f7;white-space:nowrap}
 .ledger-row{display:grid;grid-template-columns:34px 92px minmax(0,1fr) auto 34px;gap:12px;align-items:center;padding:11px 18px;border-bottom:1px solid var(--border);transition:background .15s ease}
 .ledger-row:last-child{border-bottom:0}
 .ledger-row:hover{background:rgba(59,130,246,.06)}
@@ -31,13 +41,15 @@
 .ledger-row:hover .ledger-edit,.ledger-edit:focus-visible{opacity:1}
 .ledger-empty{padding:24px 0;text-align:center}
 @media(hover:none){.ledger-edit{opacity:1}}
-@media(max-width:760px){.ledger-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ledger-row{grid-template-columns:26px minmax(0,1fr) auto 32px;grid-template-areas:"d main amt edit" "d type type edit";row-gap:4px;padding:12px 14px}.ledger-date{grid-area:d}.ledger-main{grid-area:main}.ledger-amount{grid-area:amt}.ledger-type{grid-area:type;justify-self:start;padding:2px 8px}.ledger-edit{grid-area:edit;opacity:1}.ledger-search{min-width:0;flex:1}}
+@media(max-width:760px){.ledger-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ledger-row{grid-template-columns:24px auto minmax(0,1fr) auto 32px;grid-template-areas:"d type tk amt edit" ". det det sip .";row-gap:2px;column-gap:8px;padding:9px 12px}.ledger-date{grid-area:d}.ledger-main{display:contents}.ledger-tk{display:contents}.ledger-main .quote-btn{grid-area:tk;min-width:0}.ledger-sip{grid-area:sip;justify-self:end}.ledger-main small{grid-area:det}.ledger-confirm{grid-area:det;justify-self:end}.ledger-amount{grid-area:amt}.ledger-type{grid-area:type;padding:2px 8px}.ledger-edit{grid-area:edit;opacity:1}.ledger-bar .seg{flex:1 1 100%;overflow-x:auto}.ledger-bar .seg button{flex:1;white-space:nowrap}.ledger-search{min-width:0;flex:1 1 0;order:2;margin:0}.ledger-voided{order:3;flex:none;margin:0}.ledger-bar{gap:10px}.ledger-month h4 button,.ledger-month h4>div{padding:10px 12px}.ledger-month-total{font-size:12px;gap:8px}}
 
 /* Company page */
-.company-back{margin:22px 0 4px}
+.back-link.company-back{margin:14px 0 6px}
 .company-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 22px}
 .company-head h1{margin:6px 0 4px}
 .company-head p{margin:0}
+.company-actions{display:flex;gap:8px;align-items:center}
+.company-more{width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center}
 .company-price{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
 .company-price strong{font-size:34px;letter-spacing:-1px;font-variant-numeric:tabular-nums}
 .company-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px}
@@ -58,5 +70,5 @@
 .dividend-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .dividend-charts .company-chart{height:220px;min-height:220px}
 @media(max-width:900px){.company-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.dividend-charts{grid-template-columns:1fr}}
-@media(max-width:760px){.company-price strong{font-size:28px}}
+@media(max-width:760px){.company-price strong{font-size:28px}.company-cards article{padding:14px}.company-cards strong{font-size:clamp(15px,5vw,20px);letter-spacing:-.4px}.company-actions{position:fixed;left:0;right:0;bottom:0;z-index:35;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--background);border-top:1px solid var(--border)}.company-actions>button:first-child{flex:1}.company-page{padding-bottom:calc(72px + env(safe-area-inset-bottom))}}
 .ledger-bar>.seg+.ledger-search{margin-left:auto}

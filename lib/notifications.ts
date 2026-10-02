@@ -1,6 +1,5 @@
 import {
   autoDividendId,
-  DEFAULT_FACE_VALUE,
   entitlementDate,
   money,
   round,
@@ -10,6 +9,7 @@ import {
   type Portfolio,
 } from './portfolio.ts';
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import { faceValueFor, type FaceValueEvidence } from './face-values.ts';
 
 export const MAX_NOTIFICATIONS = 200;
 /** Announcements older than this with a finished book closure are history, not news. */
@@ -56,13 +56,14 @@ export function announcementNotifications(
   announcements: PayoutAnnouncement[],
   asOf: string,
   now: string,
+  faceValueEvidence: Record<string, FaceValueEvidence[]> = {},
 ): AppNotification[] {
   const known = new Set((p.notifications ?? []).map((n) => n.id));
-  const faceValues = new Map(p.companies.map((c) => [c.ticker, c.faceValue]));
+  const companies = new Map(p.companies.map((c) => [c.ticker, c]));
   const cutoff = shiftDays(asOf, -RECENT_DAYS);
   const out: AppNotification[] = [];
   for (const a of announcements) {
-    if (!faceValues.has(a.ticker)) continue;
+    if (!companies.has(a.ticker)) continue;
     const id = `ann:${autoDividendId(a)}:${a.kind}`;
     if (known.has(id)) continue;
     const upcoming = a.bookClosureStart > asOf;
@@ -76,11 +77,14 @@ export function announcementNotifications(
     const closure = `book closure ${a.bookClosureStart}${a.bookClosureEnd !== a.bookClosureStart ? ' to ' + a.bookClosureEnd : ''}`;
     let title: string, body: string;
     if (a.kind === 'cash') {
-      const perShare =
-        a.perShareRs ??
-        round(((a.percent ?? 0) / 100) * (faceValues.get(a.ticker) ?? DEFAULT_FACE_VALUE));
+      // A percentage of face value without a known face value has no amount: say so instead of guessing.
+      const faceValue = a.perShareRs === null && a.percent !== null ? faceValueFor(companies.get(a.ticker), faceValueEvidence[a.ticker], entitlementDate(a.bookClosureStart)) : null;
+      const perShare = a.perShareRs ?? (a.percent === null || faceValue === null ? null : round((a.percent / 100) * faceValue));
       title = `${a.ticker} announced a cash dividend`;
-      body = `${a.details}, Rs ${perShare}/share; ${closure}. About ${money(round(perShare * shares))} on ${shares} shares if you still hold them on ${entitlementDate(a.bookClosureStart)} — it is recorded automatically after book closure starts.`;
+      body =
+        perShare === null || !(perShare > 0)
+          ? `${a.details}; ${closure}. The amount depends on the face value of ${a.ticker}, which is not confirmed yet, so no amount is calculated. Confirm the face value in Dividend sync or the company settings.`
+          : `${a.details}, Rs ${perShare}/share; ${closure}. About ${money(round(perShare * shares))} on ${shares} shares if you still hold them on ${entitlementDate(a.bookClosureStart)} — it is recorded automatically after book closure starts.`;
     } else {
       title = `${a.ticker} announced a ${a.kind === 'bonus' ? 'bonus issue' : 'right issue'}`;
       body = `${a.details}; ${closure}. Not recorded automatically — add the resulting shares to your ledger yourself.`;

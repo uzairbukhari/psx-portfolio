@@ -51,7 +51,10 @@ export async function verifySession(
       name?: string | null;
       picture?: string | null;
       exp?: number;
+      aud?: string;
     };
+    // App tokens share the signing key; they are only valid as bearer tokens.
+    if (data.aud) return null;
     if (!data.email || typeof data.exp !== 'number' || data.exp < Date.now())
       return null;
     return {

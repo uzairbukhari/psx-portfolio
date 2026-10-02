@@ -125,7 +125,7 @@ test('Pakistan market schedule covers weekdays and the Friday break', () => {
   assert.equal(pakistanMarketState(new Date('2026-09-21T10:30:00Z')).isOpen, false);
   assert.deepEqual(
     pakistanMarketState(new Date('2026-09-25T07:00:00Z')),
-    { isOpen: false, label: 'Friday break', estimated: true, timeZone: 'Asia/Karachi' },
+    { isOpen: false, label: 'Friday break', estimated: false, timeZone: 'Asia/Karachi' },
   );
   assert.equal(pakistanMarketState(new Date('2026-09-25T09:32:00Z')).isOpen, true);
   assert.equal(pakistanMarketState(new Date('2026-09-26T06:00:00Z')).isOpen, false);
@@ -191,4 +191,23 @@ test('buildMarketSummary grows today\'s KSE100 series and carries every ALLSHR q
   assert.equal(summary.quotes[0].symbol, 'MEBL');
   assert.equal(summary.quotes[0].high, null);
   assert.equal(buildMarketSummary(null, index, rows, 'x').series.length, 1);
+});
+
+test('a weekday exchange holiday is closed, not open (Pakistan Day 2026-03-23 is a Monday)', () => {
+  const state = pakistanMarketState(new Date('2026-03-23T05:00:00Z'));
+  assert.equal(state.isOpen, false);
+  assert.equal(state.label, 'Holiday');
+  assert.equal(pakistanMarketState(new Date('2026-08-14T05:00:00Z')).isOpen, false, 'Independence Day falls on a Friday in 2026');
+});
+
+test('market state is labelled estimated only when the calendar for that year is unknown', () => {
+  assert.equal(pakistanMarketState(new Date('2026-09-21T05:00:00Z')).estimated, false);
+  assert.equal(pakistanMarketState(new Date('2027-09-20T05:00:00Z')).estimated, true);
+});
+
+test('year boundary: 1 Jan is still evaluated in Pakistan time', () => {
+  // 2026-12-31T20:00Z is already 2027-01-01 01:00 in Karachi (a Friday).
+  const state = pakistanMarketState(new Date('2026-12-31T20:00:00Z'));
+  assert.equal(state.isOpen, false);
+  assert.equal(state.estimated, true, '2027 holidays are not published yet');
 });

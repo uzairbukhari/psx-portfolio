@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getViewer } from '@/lib/auth';
 import Dashboard from '../portfolio';
 export const metadata = {
-  title: 'Research desk | PSX Portfolio',
+  title: 'Research desk | Sipwise',
   description: 'Company research jobs, dossiers and screening.',
 };
 export default async function ResearchDeskPage() {

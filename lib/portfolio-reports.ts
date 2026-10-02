@@ -111,6 +111,8 @@ export type PortfolioReport = {
     taxYears: TaxYearSummary[];
     /** Announced dividends awaiting receipt confirmation; not part of any income total. */
     expectedDividends: ReturnType<typeof taxSummary>['expectedDividends'];
+    /** Received on the user's confirmation with no known payment date; never given a made-up date. */
+    receivedUnknownPaymentDate: ReturnType<typeof taxSummary>['receivedUnknownPaymentDate'];
     taxProfileSet: boolean;
   };
   summary: {
@@ -448,6 +450,7 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
       netRealizedReturn: tax.netRealizedReturn,
       taxYears: tax.taxYears,
       expectedDividends: tax.expectedDividends,
+      receivedUnknownPaymentDate: tax.receivedUnknownPaymentDate,
       taxProfileSet: portfolio.taxProfile !== undefined,
     },
     summary: {

@@ -1,7 +1,7 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from '../../portfolio';
 export const metadata = {
-  title: 'Company | PSX Portfolio',
+  title: 'Company | Sipwise',
   description: 'Price performance, purchases and dividends for one company.',
 };
 export default async function CompanyPage() {

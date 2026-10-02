@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { holdings, positionTimeline } from '../lib/portfolio.ts';
-import { parseEod, parseIntraday, sliceRange, rangeChange, portfolioValueSeries, sliceValueRange } from '../lib/price-history.ts';
+import { fillChangeFromHistory, parseEod, parseIntraday, sliceRange, rangeChange, portfolioValueSeries, sliceValueRange } from '../lib/price-history.ts';
 
 const DAY = 86_400;
 test('parseEod sorts chronologically and drops bad rows', () => {
@@ -84,4 +84,38 @@ test('portfolioValueSeries reports tickers whose ledger sells more than was held
   assert.deepEqual(portfolioValueSeries(p, eod).inconsistent, ['AAA']);
   const clean = pf([trade('1', 'AAA', 'buy', '2026-01-02', 10)]);
   assert.deepEqual(portfolioValueSeries(clean, eod).inconsistent, []);
+});
+
+// PKT midnight of a calendar day as unix seconds.
+const pkt = (d) => Date.parse(`${d}T00:00:00+05:00`) / 1000;
+const row = (o = {}) => ({ ticker: 'MEBL', price: 110, change: null, changePercent: null, previousClose: null, ...o });
+const hist = { MEBL: [[pkt('2026-09-29'), 98], [pkt('2026-09-30'), 100], [pkt('2026-10-01'), 105]] };
+test('fillChangeFromHistory uses the close before the quote day (same-day eod row ignored)', () => {
+  const [r] = fillChangeFromHistory([row()], hist, { MEBL: '2026-10-01' }, '2026-10-01');
+  assert.equal(r.previousClose, 100);
+  assert.equal(r.change, 10);
+  assert.equal(r.changePercent, 10);
+});
+test('fillChangeFromHistory uses the latest close when the quote is from a later day', () => {
+  const [r] = fillChangeFromHistory([row()], hist, { MEBL: '2026-10-02' }, '2026-10-02');
+  assert.equal(r.previousClose, 105);
+  assert.equal(r.change, 5);
+});
+test('fillChangeFromHistory leaves rows without history, price or with a change alone', () => {
+  const rows = [row({ ticker: 'LUCK' }), row({ price: null }), row({ change: 1, changePercent: 1 })];
+  const out = fillChangeFromHistory(rows, hist, {}, '2026-10-01');
+  assert.deepEqual(out, rows);
+});
+test('fillChangeFromHistory spans a weekend or holiday gap', () => {
+  const gap = { MEBL: [[pkt('2026-09-25'), 90], [pkt('2026-09-24'), 80]] };
+  const [r] = fillChangeFromHistory([row({ price: 99 })], gap, { MEBL: '2026-09-28' }, '2026-09-28');
+  assert.equal(r.previousClose, 90);
+  assert.equal(r.change, 9);
+  assert.equal(r.changePercent, 10);
+});
+
+test('eodKeep keeps a longer history for the KSE-100 only', async () => {
+  const { eodKeep } = await import('../lib/price-history.ts');
+  assert.equal(eodKeep('KSE100'), 2500);
+  assert.equal(eodKeep('MEBL'), 420);
 });

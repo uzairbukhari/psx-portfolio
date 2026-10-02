@@ -6,7 +6,7 @@ import { announcementNotifications, dividendNotifications, addNotifications, MAX
 const NOW = '2025-08-20T10:00:00Z';
 const buy = (date, shares) => ({ id: 'b' + date, ticker: 'MEBL', kind: 'buy', date, shares, price: 100, fees: 0, month: date.slice(0, 7), note: '' });
 const pf = (extra = {}) => ({
-  companies: [{ ticker: 'MEBL', name: 'Meezan', target: 0, approved: true, screenDate: '', note: '' }],
+  companies: [{ ticker: 'MEBL', name: 'Meezan', target: 0, approved: true, screenDate: '', note: '', faceValue: 10 }],
   trades: [buy('2025-01-02', 100)], quotes: {}, budgets: {}, ...extra,
 });
 const ann = (extra = {}) => ({

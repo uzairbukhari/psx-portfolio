@@ -1,6 +1,6 @@
 'use client';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import type {
   IndexPoint,
   IndexSummary,
@@ -8,6 +8,7 @@ import type {
   ShortlistPerformance,
 } from '@/lib/psx-market';
 import type { PypsxLiveQuote } from '@/lib/pypsx-market';
+import type { MarketBreadthView, MarketIndexView } from '@/lib/api-types';
 import { TabLoader } from './tab-loader';
 import { TickerLink } from './ticker-link';
 
@@ -17,6 +18,8 @@ export interface PsxMarketPulseHandle {
 
 interface MarketSummary {
   index: IndexSummary | null;
+  indices?: MarketIndexView[];
+  breadth?: MarketBreadthView | null;
   series: IndexPoint[];
   companies: ShortlistPerformance[];
   market: MarketState;
@@ -86,7 +89,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   const [liveConnected, setLiveConnected] = useState(false);
   const [liveReceivedAt, setLiveReceivedAt] = useState<string | null>(null);
   const [stale, setStale] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const liveActive = useRef(false);
+  // Outside a session the saved closing values are shown and no refresh is requested.
+  const sessionOpen = useRef(false);
 
   const request = useCallback(async (refresh = false, force = false) => {
     const res = await fetch(`/api/market-summary${force ? '?force=1' : ''}`, {
@@ -99,6 +105,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     };
     if (!res.ok || !body.summary) throw Error(body.error || 'Market update failed.');
     setSummary(body.summary);
+    sessionOpen.current = body.summary.market.isOpen;
     setFetchedAt(body.fetchedAt ?? null);
     setError('');
   }, []);
@@ -106,10 +113,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   useEffect(() => {
     const initial = window.setTimeout(() => void request().catch(() => {}), 0);
     const timer = window.setInterval(() => {
-      if (!document.hidden && !liveActive.current) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+      if (!document.hidden && !liveActive.current && sessionOpen.current) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
     }, 60_000);
     const visible = () => {
-      if (!document.hidden) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+      if (!document.hidden) void request(sessionOpen.current).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
     };
     document.addEventListener('visibilitychange', visible);
     return () => {
@@ -130,19 +137,30 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       return;
     }
     let source: EventSource | null = null;
+    // Native EventSource reconnects forever; bound it so a failing feed falls back to delayed polling.
+    let failures = 0;
+    let retryTimer: number | undefined;
     const connect = () => {
       if (document.hidden || source) return;
       source = new EventSource('/api/market-stream');
       source.addEventListener('status', (event) => {
-        const status = JSON.parse((event as MessageEvent<string>).data) as { connected?: boolean };
+        const status = JSON.parse((event as MessageEvent<string>).data) as { connected?: boolean; reason?: string };
         liveActive.current = status.connected === true;
         setLiveConnected(liveActive.current);
+        if (status.connected === true) failures = 0;
+        else if (status.reason) {
+          // Server closed an idle or long-lived stream: reconnect once, after a pause.
+          source?.close();
+          source = null;
+          retryTimer = window.setTimeout(connect, 5000);
+        }
       });
       source.addEventListener('quote', (event) => {
-        const update = JSON.parse((event as MessageEvent<string>).data) as PypsxLiveQuote;
+        const update = JSON.parse((event as MessageEvent<string>).data) as PypsxLiveQuote & { timeKnown?: boolean };
         liveActive.current = true;
         setLiveConnected(true);
-        setLiveReceivedAt(update.receivedAt);
+        // A tick without a provider timestamp updates the price but is not shown as a freshly timed quote.
+        if (update.timeKnown !== false) setLiveReceivedAt(update.receivedAt);
         setSummary((current) => {
           if (!current) return current;
           const providerOpen = update.providerMarketState === 'OPN';
@@ -172,7 +190,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
                 low: update.low ?? company.low,
                 volume: update.volume ?? company.volume,
                 sourceTimestamp: update.sourceTimestamp ?? company.sourceTimestamp,
-                retrievedAt: update.receivedAt,
+                retrievedAt: update.timeKnown === false ? company.retrievedAt : update.receivedAt,
               };
             }),
           };
@@ -181,6 +199,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       source.onerror = () => {
         liveActive.current = false;
         setLiveConnected(false);
+        source?.close();
+        source = null;
+        failures += 1;
+        if (failures <= 3) retryTimer = window.setTimeout(connect, 5000 * 3 ** (failures - 1));
       };
     };
     const visibility = () => {
@@ -194,6 +216,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     connect();
     document.addEventListener('visibilitychange', visibility);
     return () => {
+      window.clearTimeout(retryTimer);
       source?.close();
       liveActive.current = false;
       document.removeEventListener('visibilitychange', visibility);
@@ -216,6 +239,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
 
   const index = summary?.index ?? null;
   const indexUp = (index?.change ?? 0) >= 0;
+  const headlineMeta = summary?.indices?.find((entry) => entry.code === 'KSE100')?.meta ?? null;
   const newestQuote = summary?.companies.reduce<string | null>(
     (latest, company) =>
       company.retrievedAt && (!latest || company.retrievedAt > latest)
@@ -239,7 +263,30 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   }, [displayedAt]);
 
   return (
-    <section className="pulse">
+    <section className="pulse" data-expanded={expanded || undefined}>
+      <button
+        type="button"
+        className="pulse-summary secondary"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className={`pulse-dot${summary?.market.isOpen ? '' : ' pulse-dot--closed'}`} aria-hidden="true" />
+        <span className="pulse-summary__text">
+          {index ? (
+            <>
+              KSE100 {index.close.toLocaleString()}{' '}
+              <b className={indexUp ? 'pos' : 'neg'}>
+                {indexUp ? '▲' : '▼'}
+                {Math.abs(index.changePercent).toFixed(2)}%
+              </b>
+            </>
+          ) : (
+            'Market pulse'
+          )}
+          {summary ? ` · ${summary.market.label}` : ''}
+        </span>
+        {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
       <div className="pulse-head">
         <div>
           <p className="eyebrow">
@@ -248,7 +295,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
           </p>
           {summary && (
             <span className="pulse-source">
-              {summary.market.label}{summary.market.estimated ? ' (estimated)' : ''} · {liveConnected ? 'Live via pyPSX' : intradayAvailable ? 'pyPSX intraday · live when open' : `${summary.source.delayMinutes}-minute delayed PSX data`}
+              {summary.market.label}{summary.market.estimated ? ' (estimated)' : ''} · {liveConnected ? 'Live' : intradayAvailable ? 'Intraday · live when open' : `Delayed ${summary.source.delayMinutes} min`}
             </span>
           )}
         </div>
@@ -265,27 +312,37 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
         </div>
       </div>
       {error && <p role="alert" className="notice error pulse-error">{error}</p>}
-      <div className="pulse-grid pulse-grid--shortlist">
-        <div className="pulse-index">
-          <span className="muted pulse-label">KSE100 Index</span>
-          {index ? (
-            <>
-              <div className="pulse-index__value">{index.close.toLocaleString()}</div>
-              <span className={`pulse-index__change ${indexUp ? 'pos' : 'neg'}`}>
-                {indexUp ? '▲' : '▼'} {Math.abs(index.change).toLocaleString()} ({index.changePercent.toFixed(2)}%)
-              </span>
-              <Sparkline points={summary?.series ?? []} up={indexUp} />
-              <div className="pulse-stats">
-                <div>High<b>{index.high.toLocaleString()}</b></div>
-                <div>Low<b>{index.low.toLocaleString()}</b></div>
-                <div>YTD<b>{index.ytdChangePercent.toFixed(2)}%</b></div>
-              </div>
-              <small className="pulse-index-source">PSX index time: {index.asOf || 'Unavailable'}</small>
-            </>
-          ) : (
-            <p className="pulse-empty">KSE100 data is unavailable.</p>
-          )}
-        </div>
+      {summary?.breadth && summary.breadth.covered > 0 && (
+        <p className="muted pulse-breadth">
+          {summary.breadth.advances.toLocaleString()} up · {summary.breadth.declines.toLocaleString()} down · {summary.breadth.unchanged.toLocaleString()} unchanged
+          {' '}across {summary.breadth.covered.toLocaleString()} securities in the {summary.breadth.source}
+          {summary.breadth.excluded > 0 ? ` (${summary.breadth.excluded.toLocaleString()} without valid prices left out)` : ''}.
+        </p>
+      )}
+      <div className={`pulse-grid pulse-grid--shortlist${index ? '' : ' pulse-grid--solo'}`}>
+        {index && (
+          <div className="pulse-index">
+            <span className="muted pulse-label">KSE100 Index</span>
+            <div className="pulse-index__value">{index.close.toLocaleString()}</div>
+            <span className={`pulse-index__change ${indexUp ? 'pos' : 'neg'}`}>
+              {indexUp ? '▲' : '▼'} {Math.abs(index.change).toLocaleString()} ({index.changePercent.toFixed(2)}%)
+            </span>
+            <Sparkline points={summary?.series ?? []} up={indexUp} />
+            <div className="pulse-stats">
+              <div>High<b>{index.high.toLocaleString()}</b></div>
+              <div>Low<b>{index.low.toLocaleString()}</b></div>
+              <div>YTD<b>{index.ytdChangePercent.toFixed(2)}%</b></div>
+            </div>
+            <small className="pulse-index-source">
+              PSX index time: {index.asOf || 'Unavailable'}
+              {headlineMeta && (
+                <span className={`pulse-fresh pulse-fresh--${headlineMeta.freshness}`} title={headlineMeta.reason}>
+                  {' · '}{headlineMeta.freshness === 'fresh' ? 'Fresh' : headlineMeta.freshness === 'delayed' ? 'Delayed' : 'Stale'}
+                </span>
+              )}
+            </small>
+          </div>
+        )}
         <div className="pulse-shortlist">
           <div className="pulse-shortlist__head">
             <div>

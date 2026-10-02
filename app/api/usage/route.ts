@@ -1,3 +1,4 @@
+import type { UsageResponse } from '@/lib/api-types';
 import { db, identity, failure } from '@/lib/server';
 
 export async function GET(req: Request) {
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
       .bind(owner)
       .first<{ inputTokens: number; outputTokens: number; costUsd: number }>();
     return Response.json(
-      row ?? { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+      (row ?? { inputTokens: 0, outputTokens: 0, costUsd: 0 }) satisfies UsageResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

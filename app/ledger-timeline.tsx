@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Pencil, Search } from 'lucide-react';
+import { ChevronDown, Pencil, Search } from 'lucide-react';
 import {
   money,
   type Dividend,
@@ -21,6 +21,8 @@ export type LedgerEntry = {
   type: EntryType;
   label: string;
   detail: string;
+  /** SIP plan month (YYYY-MM) for monthly-plan buys, shown as a chip. */
+  sipMonth?: string;
   fees: number | null;
   amount: number | null;
   /** true when the amount is money received rather than paid */
@@ -42,6 +44,23 @@ const FILTERS: [Filter, string][] = [
 ];
 
 const cents = (n: number) => Math.round(n * 100) / 100;
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+const sipChip = (month: string) =>
+  `SIP ${MONTHS[Number(month.slice(5, 7)) - 1] ?? month}`;
 
 const monthLabel = (date: string) =>
   new Date(`${date.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString('en-GB', {
@@ -82,11 +101,15 @@ export function buildEntries({
       ticker: t.ticker,
       type: t.kind,
       label:
-        t.kind === 'opening' ? 'Opening' : t.kind === 'sell' ? 'Sale' : 'Purchase',
+        t.kind === 'opening'
+          ? 'Opening'
+          : t.kind === 'sell'
+            ? 'Sale'
+            : 'Purchase',
       detail:
         `${t.shares.toLocaleString()} sh` +
-        (t.price === null ? '' : ` @ ${money(t.price)}`) +
-        (t.month ? ` · ${t.month}` : ''),
+        (t.price === null ? '' : ` @ ${money(t.price)}`),
+      sipMonth: t.month || undefined,
       fees: t.fees,
       amount: cash,
       inflow: t.kind === 'sell',
@@ -127,7 +150,8 @@ export function buildEntries({
       voided: !!d.voided,
       expected,
       correct: () => onCorrectDividend(d),
-      confirm: expected && onConfirmDividend ? () => onConfirmDividend(d) : undefined,
+      confirm:
+        expected && onConfirmDividend ? () => onConfirmDividend(d) : undefined,
     });
   }
   for (const s of splits) {
@@ -156,16 +180,21 @@ export default function LedgerTimeline({
   entries,
   ticker,
   onOpenCompany,
+  hideKpis,
 }: {
   portfolio: Portfolio;
   entries: LedgerEntry[];
   /** When set the list is already scoped to one company: hides the ticker and search. */
   ticker?: string;
   onOpenCompany?: (ticker: string) => void;
+  hideKpis?: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [showVoided, setShowVoided] = useState(false);
+  // Per-month open/closed overrides; unset months follow the default (latest 3 open).
+  const [monthOpen, setMonthOpen] = useState<Record<string, boolean>>({});
+  const [showOlder, setShowOlder] = useState(false);
   const names = useMemo(
     () => new Map(portfolio.companies.map((c) => [c.ticker, c.name])),
     [portfolio.companies],
@@ -197,8 +226,20 @@ export default function LedgerTimeline({
     else groups.push([m, [e]]);
   }
 
+  const collapsible = !ticker && !q && filter === 'all';
+  const isOpen = (month: string, index: number) =>
+    !collapsible || (monthOpen[month] ?? (showOlder || index < 3));
+  const olderCount = collapsible ? Math.max(0, groups.length - 3) : 0;
+  const flow = (rows: LedgerEntry[], types: EntryType[]) =>
+    cents(
+      rows
+        .filter((e) => !e.voided && !e.expected && types.includes(e.type))
+        .reduce((a, e) => a + (e.amount ?? 0), 0),
+    );
+
   return (
     <div className="ledger">
+      {!hideKpis && (
       <div className="ledger-kpis">
         <div>
           <span>Invested</span>
@@ -217,6 +258,7 @@ export default function LedgerTimeline({
           <b>{money(cents(fees))}</b>
         </div>
       </div>
+      )}
       <div className="ledger-bar">
         <div className="seg" aria-label="Entry type">
           {FILTERS.map(([value, label]) => (
@@ -255,61 +297,129 @@ export default function LedgerTimeline({
       {groups.length === 0 ? (
         <p className="muted ledger-empty">Nothing matches these filters.</p>
       ) : (
-        groups.map(([month, rows]) => (
-          <section key={month} className="ledger-month">
-            <h4>{month}</h4>
-            {rows.map((e) => (
-              <div
-                key={e.key}
-                className={'ledger-row' + (e.voided ? ' row-voided' : '')}
-              >
-                <span className="ledger-date">{e.date.slice(8)}</span>
-                <span className={`ledger-type type-${e.type}`}>{e.label}</span>
-                <div className="ledger-main">
-                  {!ticker && (
-                    <button
-                      type="button"
-                      className="quote-btn ticker"
-                      onClick={() => onOpenCompany?.(e.ticker)}
-                    >
-                      {e.ticker}
-                    </button>
-                  )}
-                  <small>
-                    {e.detail}
-                    {e.voided ? ' · voided' : ''}
-                  </small>
-                  {!e.voided && e.confirm && (
-                    <button type="button" className="link-button ledger-confirm" onClick={e.confirm}>
-                      Mark received
-                    </button>
-                  )}
-                </div>
-                <span
-                  className={'ledger-amount amount' + (e.inflow ? ' pos-text' : '')}
-                >
-                  {e.amount === null
-                    ? e.type === 'split'
-                      ? '—'
-                      : 'Unknown'
-                    : (e.inflow ? '+' : '') + money(cents(e.amount))}
-                </span>
-                {!e.voided ? (
+        groups.map(([month, rows], index) => {
+          const open = isOpen(month, index);
+          const invested = flow(rows, ['buy', 'opening']);
+          const received = flow(rows, ['sell', 'dividend']);
+          const totals = (
+            <span className="ledger-month-total">
+              {invested > 0 && <span>Invested {money(invested)}</span>}
+              {received > 0 && (
+                <span className="pos-text">Received {money(received)}</span>
+              )}
+            </span>
+          );
+          return (
+            <section key={month} className="ledger-month">
+              {collapsible ? (
+                <h4>
                   <button
                     type="button"
-                    className="secondary compact ledger-edit"
-                    aria-label={`Correct ${e.label.toLowerCase()} for ${e.ticker}`}
-                    onClick={e.correct}
+                    aria-expanded={open}
+                    onClick={() =>
+                      setMonthOpen({ ...monthOpen, [month]: !open })
+                    }
                   >
-                    <Pencil size={13} />
+                    <ChevronDown
+                      size={15}
+                      className="ledger-chev"
+                      aria-hidden="true"
+                    />
+                    <span>{month}</span>
+                    {totals}
                   </button>
-                ) : (
-                  <span />
-                )}
-              </div>
-            ))}
-          </section>
-        ))
+                </h4>
+              ) : (
+                <h4>
+                  <div>
+                    <span>{month}</span>
+                    {totals}
+                  </div>
+                </h4>
+              )}
+              {open &&
+                rows.map((e) => (
+                  <div
+                    key={e.key}
+                    className={'ledger-row' + (e.voided ? ' row-voided' : '')}
+                  >
+                    <span className="ledger-date">{e.date.slice(8)}</span>
+                    <span className={`ledger-type type-${e.type}`}>
+                      {e.label}
+                    </span>
+                    <div className="ledger-main">
+                      <span className="ledger-tk">
+                        {!ticker && (
+                          <button
+                            type="button"
+                            className="quote-btn ticker"
+                            onClick={() => onOpenCompany?.(e.ticker)}
+                          >
+                            {e.ticker}
+                          </button>
+                        )}
+                        {e.sipMonth && (
+                          <span className="ledger-sip">
+                            {sipChip(e.sipMonth)}
+                          </span>
+                        )}
+                      </span>
+                      <small>
+                        {e.detail}
+                        {e.voided ? ' · voided' : ''}
+                      </small>
+                      {!e.voided && e.confirm && (
+                        <button
+                          type="button"
+                          className="link-button ledger-confirm"
+                          onClick={e.confirm}
+                        >
+                          Mark received
+                        </button>
+                      )}
+                    </div>
+                    <span
+                      className={
+                        'ledger-amount amount' + (e.inflow ? ' pos-text' : '')
+                      }
+                    >
+                      {e.amount === null
+                        ? e.type === 'split'
+                          ? '—'
+                          : 'Unknown'
+                        : (e.inflow ? '+' : '') + money(cents(e.amount))}
+                    </span>
+                    {!e.voided ? (
+                      <button
+                        type="button"
+                        className="secondary compact ledger-edit"
+                        aria-label={`Correct ${e.label.toLowerCase()} for ${e.ticker}`}
+                        onClick={e.correct}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
+                ))}
+            </section>
+          );
+        })
+      )}
+      {olderCount > 0 && (
+        <button
+          type="button"
+          className="secondary ledger-older"
+          onClick={() => {
+            setShowOlder(!showOlder);
+            setMonthOpen({});
+          }}
+        >
+          {showOlder
+            ? 'Collapse older months'
+            : `Show older months (${olderCount})`}
+        </button>
       )}
     </div>
   );

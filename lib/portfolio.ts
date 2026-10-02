@@ -1,6 +1,7 @@
 import type { PayoutAnnouncement } from './psx-payouts.ts';
 import { dividendEntitlement, lastTradingDay } from './psx-calendar.ts';
 import { UserError } from './user-error.ts';
+import { faceValueFor, type FaceValueEvidence } from './face-values.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -23,8 +24,13 @@ export type Company = {
   approved: boolean;
   screenDate: string;
   note: string;
-  /** Face value in PKR; PSX quotes cash dividends as a percentage of it. Defaults to 10. */
+  /**
+   * Face value in PKR that this account uses; PSX quotes many cash dividends as a percentage of it. Never
+   * defaulted: with no value here and no verified evidence, a percentage payout has no calculated amount.
+   */
   faceValue?: number;
+  /** True when `faceValue` is the account's own "assume Rs 10" choice rather than a verified or entered value. */
+  faceValueAssumed?: boolean;
 };
 export type Trade = {
   id: string;
@@ -42,6 +48,29 @@ export type Trade = {
   voided?: boolean;
   /** Broker/NCCPL capital-gains-tax deduction recorded for a sale; an actual figure, never re-estimated. */
   taxWithheld?: number;
+  /** Broker statement settlement date, when the statement printed one (`date` is the execution date). */
+  settlementDate?: string;
+  /** `inferred` = `date` was derived from the settlement date and an unverified calendar, or assumed. Absent = reported. */
+  dateCertainty?: 'confirmed' | 'inferred';
+  /** Non-reversible statement key (account fingerprint + voucher); never a name or account number. */
+  statementRef?: string;
+  /** Net cash the broker reported for this trade (buy: paid, sell: received), kept so rounding stays auditable. */
+  netCash?: number;
+  /** Set when this acquisition was assumed rather than reported by a broker. */
+  inferred?: InferredAcquisition;
+  /** Id of the trade that replaced this inferred acquisition once the real purchase was imported (audit trail). */
+  supersededBy?: string;
+};
+/** Provenance of an acquisition the user asked us to assume so a sale has a cost basis. */
+export type InferredAcquisition = {
+  basis: 'ipo-offer' | 'sale-price-fallback';
+  /** Where the price came from: an official-document URL, or the sale it was reconstructed from. */
+  priceSource: string;
+  dateBasis: 'allotment' | 'listing' | 'day-before-sale';
+  /** externalId of the sale that needed this acquisition. */
+  forSale: string;
+  /** Shown wherever the trade appears. */
+  label: string;
 };
 export type StockSplit = {
   id: string;
@@ -77,6 +106,26 @@ export type Dividend = {
   paymentDate?: string;
   /** Actual tax withheld for a received manual/auto dividend; an actual figure, never re-estimated. */
   taxWithheld?: number;
+  /**
+   * Receipt the user confirmed without knowing the payment date (historical sync). `paymentDate`
+   * stays absent; the gross amount is the frozen entitlement, not CDC evidence, and no tax is invented.
+   */
+  paymentDateUnknown?: boolean;
+  /** ISO time the user confirmed receipt in the historical review. */
+  receiptConfirmedAt?: string;
+  /** Frozen entitlement basis recorded at approval. */
+  entitlement?: DividendEntitlementBasis;
+};
+export type DividendEntitlementBasis = {
+  shares: number;
+  perShare: number;
+  bookClosureEnd: string;
+  details: string;
+  announcedOn: string;
+  faceValue: number | null;
+  rateSource: 'rupees' | 'percent-of-face-value';
+  /** False when a holiday or acquisition-date assumption fed the cutoff. */
+  certain: boolean;
 };
 export type AppNotification = {
   id: string;
@@ -111,6 +160,27 @@ export type Quote = {
  * wins, then a later fetch time. A manually verified quote holds until PSX
  * publishes a price for a strictly later trading day.
  */
+/** Quotes must come from a PSX page: a company page or the index scrape the cron uses. */
+const PSX_SOURCE_PREFIX = 'https://dps.psx.com.pk/';
+/**
+ * Shape check shared by `validate`, the quote cache merge and the refresh
+ * button, so one malformed cached quote can be skipped instead of blocking
+ * every save of the portfolio.
+ */
+export function isValidQuote(q: Quote | undefined | null): q is Quote {
+  return (
+    !!q &&
+    Number.isFinite(q.price) &&
+    q.price > 0 &&
+    q.price <= 1e8 &&
+    dateOK(q.date) &&
+    q.date <= today() &&
+    typeof q.asOf === 'string' &&
+    typeof q.source === 'string' &&
+    q.source.startsWith(PSX_SOURCE_PREFIX) &&
+    typeof q.fetchedAt === 'string'
+  );
+}
 export function quoteSupersedes(candidate: Quote, current: Quote | undefined) {
   if (!current) return true;
   if (candidate.date !== current.date) return candidate.date > current.date;
@@ -196,6 +266,11 @@ export const money = (n: number | null) =>
         currency: 'PKR',
         maximumFractionDigits: 2,
       }).format(n);
+/** money() without paise for big summary figures (|amount| >= 10,000). */
+export const moneyShort = (n: number | null) =>
+  n === null || Math.abs(n) < 10000
+    ? money(n)
+    : new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(n);
 /** Rounds to paisa, half away from zero for negative values as well as positive. */
 export const round = (n: number) => {
   const r = (Math.sign(n) * Math.round((Math.abs(n) + Number.EPSILON) * 100)) / 100;
@@ -372,6 +447,31 @@ export function sharesHeldBefore(p: Portfolio, ticker: string, date: string) {
   }
   return shares;
 }
+/**
+ * Sales of `ticker` that the ledger cannot cover: walking its events in ledger order, how many shares
+ * each sale is short of what was held (and treating the shortfall as acquired just before it). Used to
+ * size assumed acquisitions after existing openings and splits have been counted.
+ */
+export function saleShortfalls(p: Portfolio, ticker: string) {
+  const out: { tradeId: string; date: string; shortfall: number }[] = [];
+  let shares = 0;
+  for (const event of ledgerEventsFor(p, ticker)) {
+    if (event.type === 'split') {
+      shares = applySplit(shares, event.value);
+      continue;
+    }
+    const t = event.value;
+    if (t.kind !== 'sell') {
+      shares += t.shares;
+      continue;
+    }
+    if (t.shares > shares) {
+      out.push({ tradeId: t.id, date: t.date, shortfall: t.shares - shares });
+      shares = 0;
+    } else shares -= t.shares;
+  }
+  return out;
+}
 export type RealizedSale = {
   tradeId: string;
   ticker: string;
@@ -421,6 +521,7 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
   }
   return out;
 }
+/** The common PSX face value, offered only as an explicit, account-level assumption (never applied silently). */
 export const DEFAULT_FACE_VALUE = 10;
 /** Last qualifying trade date for a book closure start (PSX calendar and settlement rules; see `dividendEntitlement`). */
 export const entitlementDate = (bookClosureStart: string) =>
@@ -444,6 +545,8 @@ export function confirmDividendReceipt(
 ): Dividend {
   if (!dateOK(receipt.paymentDate)) throw new UserError('Enter a valid payment date.');
   const out: Dividend = { ...d, status: 'received', paymentDate: receipt.paymentDate };
+  // A real date replaces an earlier "received, date unknown" confirmation.
+  delete out.paymentDateUnknown;
   if (receipt.grossAmount !== undefined) out.grossAmount = round(receipt.grossAmount);
   if (receipt.taxWithheld !== undefined) out.taxWithheld = round(receipt.taxWithheld);
   return out;
@@ -453,14 +556,14 @@ export function confirmDividendReceipt(
 const AMOUNT_TOLERANCE = 0.02;
 const WINDOW_BEFORE_DAYS = 7;
 const WINDOW_AFTER_DAYS = 60;
-const inPayoutWindow = (date: string, bookClosureStart: string) =>
+export const inPayoutWindow = (date: string, bookClosureStart: string) =>
   date >= shiftDays(bookClosureStart, -WINDOW_BEFORE_DAYS) &&
   date <= shiftDays(bookClosureStart, WINDOW_AFTER_DAYS);
-const amountsAgree = (a: number, b: number) =>
+export const amountsAgree = (a: number, b: number) =>
   a > 0 && b > 0 && Math.abs(a - b) / Math.max(a, b) <= AMOUNT_TOLERANCE;
 
 /** Gross amount of a dividend: recorded for imports and received ones, derived from the ledger while expected. */
-function dividendGross(p: Portfolio, d: Dividend) {
+export function dividendGross(p: Portfolio, d: Dividend) {
   if (d.source === 'import') return d.grossAmount ?? 0;
   if (d.source === 'auto' && dividendStatus(d) === 'expected')
     return round(
@@ -484,6 +587,7 @@ export function pendingAutoDividends(
   p: Portfolio,
   announcements: PayoutAnnouncement[],
   asOf: string = today(),
+  faceValueEvidence: Record<string, FaceValueEvidence[]> = {},
 ): Dividend[] {
   const tickers = new Map(p.companies.map((c) => [c.ticker, c]));
   const all = p.dividends ?? [];
@@ -496,13 +600,13 @@ export function pendingAutoDividends(
     if (p.dividendTrackingFrom && a.bookClosureStart < p.dividendTrackingFrom) continue;
     const externalId = autoDividendId(a);
     if (seen.has(externalId)) continue;
-    const perShare =
-      a.perShareRs ??
-      (a.percent === null
-        ? null
-        : round((a.percent / 100) * (company.faceValue ?? DEFAULT_FACE_VALUE)));
-    if (perShare === null || !(perShare > 0)) continue;
     const entitlement = dividendEntitlement(a.bookClosureStart);
+    // A percentage of face value needs a face value that applied on the entitlement date (the account's own
+    // value or verified evidence). Without one no amount is invented: the payout waits for it.
+    const faceValue = a.perShareRs === null && a.percent !== null ? faceValueFor(company, faceValueEvidence[a.ticker], entitlement.date) : null;
+    const perShare =
+      a.perShareRs ?? (a.percent === null || faceValue === null ? null : round((a.percent / 100) * faceValue));
+    if (perShare === null || !(perShare > 0)) continue;
     const shares = sharesHeldOn(p, a.ticker, entitlement.date);
     if (shares <= 0) continue;
     seen.add(externalId);
@@ -627,6 +731,8 @@ export type TaxedDividend = {
   source: 'manual' | 'import' | 'auto';
   status: 'expected' | 'received';
   paymentDate?: string;
+  /** Received on the user's confirmation with no known payment date. */
+  paymentDateUnknown?: boolean;
   entitlementDate?: string;
   entitlementCertain?: boolean;
   grossAmount: number;
@@ -730,6 +836,7 @@ export function taxSummary(p: Portfolio) {
         source: d.source,
         status: dividendStatus(d),
         paymentDate: d.paymentDate,
+        paymentDateUnknown: d.paymentDateUnknown,
         entitlementDate: d.entitlementDate,
         entitlementCertain: d.entitlementCertain,
         grossAmount,
@@ -783,6 +890,13 @@ export function taxSummary(p: Portfolio) {
     totalDividendIncomeGross,
     totalDividendTax,
     netRealizedReturn,
+    /** Received dividends confirmed without a payment date: kept out of payment-date and tax-year views. */
+    receivedUnknownPaymentDate: {
+      count: received.filter((d) => d.paymentDateUnknown).length,
+      grossAmount: round(
+        received.filter((d) => d.paymentDateUnknown).reduce((a, d) => a + d.grossAmount, 0),
+      ),
+    },
     /** Announced but unconfirmed dividends: planning figures, never income. */
     expectedDividends: {
       count: expected.length,
@@ -873,6 +987,52 @@ export function holdings(p: Portfolio) {
       quote: q,
     };
   });
+}
+export type PortfolioSummaryHolding = Pick<
+  ReturnType<typeof holdings>[number],
+  'ticker' | 'shares' | 'cost' | 'value' | 'quote'
+>;
+export type PortfolioSummary = {
+  /** Open positions (shares > 0). */
+  heldCount: number;
+  /** Market value of the open positions that have a usable price. */
+  value: number;
+  /** Remaining cost of all open positions; null while any cost is unknown. */
+  cost: number | null;
+  /** Unrealised gain; null unless every open position has both a price and a known cost. */
+  gain: number | null;
+  gainPercent: number | null;
+  /** Open positions without a usable price (none, or one dated before the latest split). */
+  missingPrice: string[];
+  /** Open positions whose remaining cost is unknown. */
+  unknownCost: string[];
+  incomplete: ('missing-price' | 'unknown-cost')[];
+  /** Oldest quote date (YYYY-MM-DD) among the priced open positions. */
+  oldestQuoteDate: string | null;
+};
+/**
+ * One definition of the headline numbers for web and mobile. Value counts every priced holding,
+ * cost and gain are only reported when they are complete, and `incomplete` says why not.
+ */
+export function portfolioSummary(held: PortfolioSummaryHolding[]): PortfolioSummary {
+  const open = held.filter((h) => h.shares > 0);
+  const missing = open.filter((h) => !h.quote || h.value === null);
+  const unknown = open.filter((h) => h.cost === null);
+  const value = round(open.reduce((a, h) => a + (h.value ?? 0), 0));
+  const cost = unknown.length ? null : round(open.reduce((a, h) => a + (h.cost ?? 0), 0));
+  const gain = cost === null || missing.length ? null : round(value - cost);
+  const dates = open.flatMap((h) => (h.quote && h.value !== null ? [h.quote.date] : [])).sort();
+  return {
+    heldCount: open.length,
+    value,
+    cost,
+    gain,
+    gainPercent: gain !== null && cost !== null && cost > 0 ? (gain / cost) * 100 : null,
+    missingPrice: missing.map((h) => h.ticker),
+    unknownCost: unknown.map((h) => h.ticker),
+    incomplete: [...(missing.length ? ['missing-price' as const] : []), ...(unknown.length ? ['unknown-cost' as const] : [])],
+    oldestQuoteDate: dates[0] ?? null,
+  };
 }
 export function validate(p: Portfolio) {
   if (
@@ -991,7 +1151,20 @@ export function validate(p: Portfolio) {
         (t.kind !== 'sell' ||
           !Number.isFinite(t.taxWithheld) ||
           t.taxWithheld < 0 ||
-          t.taxWithheld > 1e9))
+          t.taxWithheld > 1e9)) ||
+      (t.settlementDate !== undefined && !dateOK(t.settlementDate)) ||
+      (t.dateCertainty !== undefined && !['confirmed', 'inferred'].includes(t.dateCertainty)) ||
+      (t.statementRef !== undefined && (typeof t.statementRef !== 'string' || t.statementRef.length > 80)) ||
+      (t.netCash !== undefined && (!Number.isFinite(t.netCash) || t.netCash < 0 || t.netCash > 1e10)) ||
+      (t.supersededBy !== undefined && (typeof t.supersededBy !== 'string' || t.supersededBy.length > 80)) ||
+      (t.inferred !== undefined &&
+        (t.kind !== 'buy' ||
+          !t.inferred ||
+          !['ipo-offer', 'sale-price-fallback'].includes(t.inferred.basis) ||
+          !['allotment', 'listing', 'day-before-sale'].includes(t.inferred.dateBasis) ||
+          typeof t.inferred.priceSource !== 'string' || t.inferred.priceSource.length > 300 ||
+          typeof t.inferred.forSale !== 'string' || t.inferred.forSale.length > 120 ||
+          typeof t.inferred.label !== 'string' || t.inferred.label.length > 300))
     )
       throw new UserError('Invalid transaction. Check dates, shares and price.');
     if (
@@ -1050,20 +1223,7 @@ export function validate(p: Portfolio) {
         );
   }
   for (const [t, q] of Object.entries(p.quotes)) {
-    if (
-      !tickers.has(t) ||
-      !q ||
-      !Number.isFinite(q.price) ||
-      q.price <= 0 ||
-      q.price > 1e8 ||
-      !dateOK(q.date) ||
-      q.date > today() ||
-      typeof q.asOf !== 'string' ||
-      typeof q.source !== 'string' ||
-      !q.source.startsWith('https://dps.psx.com.pk/company/' + t) ||
-      typeof q.fetchedAt !== 'string'
-    )
-      throw new UserError('Invalid quote.');
+    if (!tickers.has(t) || !isValidQuote(q)) throw new UserError(`Invalid quote for ${t}.`);
   }
   for (const [month, budget] of Object.entries(p.budgets))
     if (
@@ -1150,7 +1310,23 @@ export function validate(p: Portfolio) {
             d.taxWithheld > (d.grossAmount ?? 0))) ||
         (d.source === 'auto' &&
           d.status === 'received' &&
-          d.paymentDate === undefined)
+          d.paymentDate === undefined &&
+          !(d.paymentDateUnknown === true && typeof d.receiptConfirmedAt === 'string' &&
+            Number.isFinite(Date.parse(d.receiptConfirmedAt)))) ||
+        (d.paymentDateUnknown !== undefined &&
+          (d.paymentDateUnknown !== true || d.paymentDate !== undefined || d.source !== 'auto' ||
+            d.status !== 'received')) ||
+        (d.receiptConfirmedAt !== undefined &&
+          (typeof d.receiptConfirmedAt !== 'string' || !Number.isFinite(Date.parse(d.receiptConfirmedAt)))) ||
+        (d.entitlement !== undefined &&
+          (!d.entitlement || !Number.isSafeInteger(d.entitlement.shares) || d.entitlement.shares <= 0 ||
+            !Number.isFinite(d.entitlement.perShare) || d.entitlement.perShare <= 0 ||
+            !dateOK(d.entitlement.bookClosureEnd) ||
+            typeof d.entitlement.details !== 'string' || d.entitlement.details.length > 200 ||
+            !dateOK(d.entitlement.announcedOn) ||
+            (d.entitlement.faceValue !== null && !(d.entitlement.faceValue > 0)) ||
+            !['rupees', 'percent-of-face-value'].includes(d.entitlement.rateSource) ||
+            typeof d.entitlement.certain !== 'boolean'))
       )
         throw new UserError('Invalid dividend record.');
       if (d.source === 'manual' || d.source === 'auto') {
@@ -1269,6 +1445,10 @@ export function dateOK(s: string) {
     new Date(s).toISOString().slice(0, 10) === s
   );
 }
+/** A company can reach at most this share (%) of the portfolio; also the cap on AI-proposed weights. */
+export const WEIGHT_CAP = 20;
+/** A Shariah screen older than this many days pauses new SIP allocations. */
+export const SCREEN_MAX_AGE_DAYS = 183;
 export function plan(
   p: Portfolio,
   month: string,
@@ -1315,10 +1495,11 @@ export function plan(
       h.approved &&
       h.screenDate &&
       h.screenDate <= today() &&
-      (Date.parse(today()) - Date.parse(h.screenDate)) / 86400000 <= 183,
+      (Date.parse(today()) - Date.parse(h.screenDate)) / 86400000 <=
+        SCREEN_MAX_AGE_DAYS,
   );
   const rows = candidates.map((h) => {
-    const cap = (Math.min(h.target, 20) / 100) * post;
+    const cap = (Math.min(h.target, WEIGHT_CAP) / 100) * post;
     return {
       ticker: h.ticker,
       name: h.name,
@@ -1447,7 +1628,6 @@ export function researchInsights(
     };
   });
 }
-const WEIGHT_CAP = 20;
 function capAndNormalize(
   tickers: string[],
   units: number[],

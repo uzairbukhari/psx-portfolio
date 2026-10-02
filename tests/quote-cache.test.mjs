@@ -15,14 +15,14 @@ const row = (ticker, date, fetchedAt, price = 100) => ({
   price,
   as_of: 'as of',
   quote_date: date,
-  source: 'psx',
+  source: 'https://dps.psx.com.pk/company/X',
   fetched_at: fetchedAt,
 });
 const quote = (date, fetchedAt, price = 100, manual) => ({
   price,
   asOf: 'as of',
   date,
-  source: 'psx',
+  source: 'https://dps.psx.com.pk/company/X',
   fetchedAt,
   ...(manual ? { manual } : {}),
 });
@@ -52,6 +52,11 @@ test('mergeQuotes keeps newer or manual saved quotes and fills the rest', () => 
   assert.equal(merged.OTHER, undefined);
 });
 
+test('mergeQuotes skips malformed cache rows instead of poisoning the portfolio', () => {
+  const row = (ticker, source) => ({ ticker, price: 100, as_of: 'now', quote_date: '2026-01-02', source, fetched_at: '2026-01-02T00:00:00Z' });
+  const merged = mergeQuotes({}, [row('GOOD', 'https://dps.psx.com.pk/indices/ALLSHR'), row('BAD', 'https://evil.test/')], ['GOOD', 'BAD']);
+  assert.deepEqual(Object.keys(merged), ['GOOD']);
+});
 test('mergeQuotes keeps a manual quote against a same-day or older PSX quote', () => {
   const merged = mergeQuotes(
     {
@@ -142,8 +147,11 @@ test('refreshQuotes fetches only stale tickers and falls back to cache on failur
   assert.equal(result.stale.LUCK, '503 from PSX');
   assert.equal(result.failed.NEW, '503 from PSX');
   assert.equal(result.quotes.HUBC.price, 200);
-  assert.equal(db.writes.length, 1);
-  assert.equal(db.writes[0][0], 'HUBC');
+  const quoteRows = db.writes.filter((args) => args.length === 8);
+  assert.equal(quoteRows.length, 1);
+  assert.equal(quoteRows[0][0], 'HUBC');
+  const failedAttempts = db.writes.filter((args) => args[0] === 'quote' && typeof args[3] === 'string' && /503/.test(args[3])).map((args) => args[1]).sort();
+  assert.deepEqual(failedAttempts, ['LUCK', 'NEW'], 'failed attempts are recorded apart from observations');
 });
 
 test('refreshQuotes stops at the budget and serves the rest from cache', async () => {
@@ -214,4 +222,43 @@ test('rebaseWatchQuotes keeps day change when a newer company-page price overtak
   assert.equal(out[0].changePercent, 2.59);
   assert.equal(out[0].retrievedAt, '2026-09-29T09:00:00Z');
   assert.equal(out[1].change, 5, 'no cached price leaves the quote untouched');
+});
+
+test('a due list longer than the fetch budget is serviced stalest-first so every symbol is eventually refreshed', async () => {
+  const { refreshQuotes } = await import('../lib/quote-cache.ts');
+  const { fetchBudget } = await import('../lib/psx-fetch.ts');
+  const tickers = Array.from({ length: 12 }, (_, i) => `T${String(i).padStart(2, '0')}`);
+  const stored = new Map();
+  const db = {
+    prepare: (sql) => ({
+      all: async () => ({ results: [...stored].map(([ticker, fetched_at]) => ({ ticker, price: 1, as_of: 'x', quote_date: '2026-10-02', source: 's', fetched_at })) }),
+      bind: (...args) => ({ sql, args }),
+    }),
+    batch: async (statements) => {
+      for (const { args } of statements)
+        for (let i = 0; i < args.length; i += 7) stored.set(args[i], args[i + 5]);
+    },
+  };
+  const served = new Set();
+  const clock = { n: 0 };
+  for (let run = 0; run < 6 && served.size < tickers.length; run++) {
+    const result = await refreshQuotes(db, tickers, {
+      budget: fetchBudget(3), now: new Date('2026-10-02T06:00:00Z'), force: true,
+      fetchQuote: async (ticker) => ({ price: 1, asOf: 'x', date: '2026-10-02', source: 's', fetchedAt: `2026-10-02T05:${String(++clock.n).padStart(2, '0')}:00Z` }),
+    });
+    result.fetched.forEach((t) => served.add(t));
+  }
+  assert.equal(served.size, tickers.length);
+});
+
+test('after PSX blocks the network, skipped tickers say so instead of "Refresh limit reached"', async () => {
+  const db = fakeDB([]);
+  const result = await refreshQuotes(db, ['A1', 'B1', 'C1', 'D1', 'E1', 'F1'], {
+    now: new Date('2026-09-29T06:00:00Z'),
+    fetchQuote: async () => { throw Error('520 from PSX'); },
+  });
+  const reasons = Object.values(result.failed);
+  assert.ok(reasons.some((r) => /520 from PSX/.test(r)));
+  assert.ok(reasons.some((r) => /refusing requests from this network/.test(r)));
+  assert.ok(!reasons.some((r) => /Refresh limit reached/.test(r)));
 });

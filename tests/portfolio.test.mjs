@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
+import {isValidQuote,initialPortfolio,holdings,validate,plan,validateReview,researchInsights,researchWeightProfile,today,SECTORS,DEFAULT_RESEARCH_SETTINGS,sharesHeldOn,realizedSales,taxSummary} from '../lib/portfolio.ts';
 const month=today().slice(0,7),date=today();
 const fresh=()=>({companies:[{ticker:'TEST',name:'Test',target:100,approved:true,screenDate:date,note:''}],trades:[],quotes:{TEST:{price:20,date,asOf:date,source:'https://dps.psx.com.pk/company/TEST',fetchedAt:new Date().toISOString()}},budgets:{[month]:10000}});
 const trade=(id,shares,price,kind='buy',fees=0)=>({id,ticker:'TEST',date,kind,shares,price,fees,month:kind==='buy'?month:'',note:''});
 test('weighted average includes buy fees and partial sales preserve average',()=>{const p=fresh();p.trades=[trade('1',100,10,'buy',10),trade('2',50,20,'buy',20),trade('3',50,30,'sell',5)];validate(p);const h=holdings(p)[0];assert.equal(h.shares,100);assert.equal(h.cost,1353.33);assert.equal(h.realized,818.33);assert.ok(Math.abs(h.average-2030/150)<1e-8)});
 test('unknown opening cost stays unknown after purchases, resets after exit',()=>{const p=fresh();p.trades=[trade('0',10,null,'opening'),trade('1',10,20)];assert.equal(holdings(p)[0].cost,null);p.trades.push(trade('2',20,30,'sell'),trade('3',5,25));assert.equal(holdings(p)[0].cost,125);assert.equal(holdings(p)[0].realized,null)});
 test('reject overselling, negative fees, future or impossible dates and duplicates',()=>{for(const entry of [trade('1',1,1,'sell'),{...trade('1',1,1),fees:-1},{...trade('1',1,1),date:'2099-01-01'},{...trade('1',1,1),date:'2026-02-30'}]){const p=fresh();p.trades=[entry];assert.throws(()=>validate(p))}const p=fresh();p.companies.push(p.companies[0]);assert.throws(()=>validate(p))});
+test('accepts index-scraper quote source, rejects non-PSX source',()=>{const p=fresh();p.quotes.TEST.source='https://dps.psx.com.pk/indices/ALLSHR';validate(p);p.quotes.TEST.source='https://example.com/company/TEST';assert.throws(()=>validate(p),/Invalid quote for TEST/)});
+test('isValidQuote rejects malformed quotes without throwing',()=>{const q=fresh().quotes.TEST;assert.equal(isValidQuote(q),true);for(const bad of [undefined,null,{...q,price:0},{...q,price:NaN},{...q,date:'2099-01-01'},{...q,source:'https://evil.test/'},{...q,fetchedAt:undefined}])assert.equal(isValidQuote(bad),false)});
 test('voided trades are excluded without deleting their audit entries',()=>{const p=fresh();p.trades=[{...trade('1',10,10),voided:true},trade('2',20,20)];assert.equal(holdings(p)[0].shares,20);assert.equal(p.trades.length,2)});
 test('SYS 5-for-1 split adjusts only pre-split shares and preserves total cost',()=>{
   const p=fresh();
@@ -284,4 +286,12 @@ test('validate rejects malformed saved AI review, research and notification tick
   const note = (ticker) => ({ ...fresh(), notifications: [{ id: 'n1', at: new Date().toISOString(), kind: 'info', ticker, title: 't', body: 'b', read: false }] });
   validate(note('TEST'));
   assert.throws(() => validate(note('<script>')), /notifications/);
+});
+
+test('moneyShort drops paise only for amounts of 10,000 or more', async () => {
+  const { money, moneyShort } = await import('../lib/portfolio.ts');
+  assert.equal(moneyShort(504565.4), money(504565).replace(/\.00$/, ''));
+  assert.equal(moneyShort(-12000.5).includes('.'), false);
+  assert.equal(moneyShort(9999.5), money(9999.5));
+  assert.equal(moneyShort(null), 'Unknown');
 });

@@ -42,3 +42,5 @@ next-env.d.ts
 *.tsbuildinfo
 .dev.vars
 dividend-list.json
+mobile/sipwise-37903-firebase-adminsdk-fbsvc-2ef7be32fa.json
+mobile/sipwise-37903-firebase-adminsdk-fbsvc-9f5b18a76e.json

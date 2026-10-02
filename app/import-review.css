@@ -1,0 +1,42 @@
+/* Shared styles for the AHL statement import preview and the historical dividend review. */
+.import-review{max-width:1040px!important;width:calc(100vw - 32px)}
+.import-review h3.ir-h{margin:22px 0 8px;font-size:16px}
+.ir-summary{display:flex;flex-wrap:wrap;gap:8px 22px;margin:14px 0;font-size:14px;color:var(--muted-foreground)}
+.ir-summary b{color:var(--foreground)}
+.ir-excluded{font-size:13px;margin:0 0 6px}
+.ir-banner{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:9px;margin:12px 0;font-size:14px;border:1px solid var(--border);background:rgba(59,130,246,.08);color:var(--foreground)}
+.ir-banner.ir-warn{background:rgba(211,154,41,.14);color:#e8c27a;border-color:rgba(211,154,41,.32)}
+.ir-banner.ir-ok{background:rgba(34,224,160,.1);color:#8ff0cd;border-color:rgba(34,224,160,.3)}
+.ir-toggle{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:8px!important;margin:4px 0!important;font-weight:400!important;font-size:13px!important}
+.ir-toggle input{width:auto!important;margin:0}
+.ir-table-wrap{overflow:auto;max-height:340px;border:1px solid var(--border);border-radius:9px}
+.ir-table{width:100%;border-collapse:collapse;font-size:13px}
+.ir-table th{position:sticky;top:0;background:#0d1526;text-align:left;font-weight:600;white-space:nowrap}
+.ir-table td,.ir-table th{padding:8px 10px!important;font-size:13px!important;vertical-align:top;border-bottom:1px solid var(--border)}
+.ir-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ir-table small{display:block;max-width:300px;white-space:normal;font-size:11px;margin-top:2px}
+.ir-table tr.ir-duplicate td{opacity:.6}
+.ir-table tr.ir-ambiguous td:first-child{box-shadow:inset 3px 0 0 #d39a29}
+.ir-table select,.ir-table input[type=date]{padding:6px 8px!important;font-size:13px!important;width:auto;min-width:140px}
+.ir-date{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.ir-assumed{border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin:10px 0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.ir-assumed small a{margin-right:10px}
+.ir-inline{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.ir-inline label{margin:0!important;font-size:12px!important}
+.ir-inline input{padding:6px 8px!important;font-size:13px!important;width:140px}
+.ir-list{margin:0;padding-left:18px;font-size:13px;color:var(--muted-foreground)}
+.ir-warnings{margin:14px 0;font-size:13px}
+.ir-warnings summary{cursor:pointer;color:var(--muted-foreground)}
+.ir-actions{justify-content:flex-end;margin-top:18px}
+.ir-controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;margin:12px 0}
+.ir-controls label{margin:0!important}
+.ir-controls input[type=date]{width:auto;padding:8px 10px!important;font-size:14px!important}
+.ir-status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted-foreground);margin:6px 0 12px}
+.ir-status .tick{display:inline-flex;gap:5px;align-items:center}
+.ir-pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(255,255,255,.07)}
+.ir-pill.ok{color:var(--success);background:rgba(34,224,160,.14)}
+.ir-pill.bad{color:var(--danger);background:rgba(255,93,108,.14)}
+.ir-pill.wait{color:#e8c27a;background:rgba(211,154,41,.14)}
+.ir-totals{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;justify-content:space-between;margin-top:12px}
+.ir-issue{color:#e8c27a}
+@media(max-width:760px){.ir-table-wrap{max-height:none}}

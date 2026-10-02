@@ -11,6 +11,8 @@ declare namespace Cloudflare {
     OPENAI_MODEL?: string;
     /** Per-user AI spend cap per PKT month in USD (Monthly Picks); defaults to 1. */
     AI_MONTHLY_CAP_USD?: string;
+    /** "true" when the per-minute cron Worker owns Monthly Picks execution (GET becomes read-only). */
+    PICKS_BACKGROUND?: string;
   }
 }
 declare namespace Cloudflare {
@@ -21,6 +23,8 @@ declare namespace Cloudflare {
     PYPSX_OWNER_EMAIL?: string;
     GOOGLE_CLIENT_ID?: string;
     GOOGLE_CLIENT_SECRET?: string;
+    /** Comma-separated Google OAuth client IDs (iOS + Android) accepted as ID-token audiences from the native apps. */
+    GOOGLE_MOBILE_CLIENT_IDS?: string;
     SESSION_SECRET?: string;
   }
 }
@@ -30,5 +34,11 @@ declare namespace Cloudflare {
     // OAuth for requests on a loopback host. Never set on the deployed Worker.
     DEV_AUTH_EMAIL?: string;
     DEV_AUTH_NAME?: string;
+  }
+}
+declare namespace Cloudflare {
+  interface Env {
+    /** "staging" on the staging Worker (shows a STAGING badge); "production" otherwise. */
+    APP_ENV?: string;
   }
 }

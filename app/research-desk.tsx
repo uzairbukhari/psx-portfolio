@@ -1,4 +1,5 @@
 'use client';
+import { useConfirm } from '@/components/confirm-dialog';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   Download,
@@ -133,6 +134,7 @@ export default function ResearchDesk({
   onSave,
   onOpenSettings,
 }: Props) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [selected, setSelected] = useState<string | null>(null),
     [draft, setDraft] = useState<ResearchCompany | null>(null),
     [jobs, setJobs] = useState<Job[]>([]),
@@ -365,7 +367,14 @@ export default function ResearchDesk({
     }
   };
   const deleteResearch = async (value: string) => {
-    if (!window.confirm(`Delete all research for ${value}? This cannot be undone.`))
+    if (
+      !(await confirm({
+        title: `Delete all research for ${value}?`,
+        description: 'This cannot be undone.',
+        confirmLabel: 'Delete',
+        destructive: true,
+      }))
+    )
       return;
     setBusy(true);
     setError('');
@@ -527,6 +536,7 @@ export default function ResearchDesk({
     research.filter((item) => item.status === 'Update needed').length;
   return (
     <section className="research-queue">
+      {confirmDialog}
       <div className="research-hero">
         <div>
           <p className="eyebrow">PSX RESEARCH DESK</p>

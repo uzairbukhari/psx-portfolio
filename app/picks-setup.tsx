@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { DatabaseZap, Loader2, Search, Sparkles } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { money, today, type Company, type Portfolio } from '@/lib/portfolio';
+import { portfolioCounts } from '@/lib/portfolio-counts';
 import type { FactsInfo } from './use-recommendations';
 
 export const MAX_SHORTLIST = 15;
@@ -140,6 +141,12 @@ export default function PicksSetup(props: Props) {
           <div>
             <h3>Shortlist <span className="mp-count">{shortlist.length}/{MAX_SHORTLIST}</span></h3>
             <p className="muted">Tick to include a company; click a card to open its page.</p>
+            <p className="muted" aria-label="Counts">
+              {(() => {
+                const c = portfolioCounts(portfolio, shortlist);
+                return `${c.savedCompanies} saved · ${c.holdings} held · ${c.shortlisted} shortlisted`;
+              })()}
+            </p>
           </div>
           <div className="mp-shortlist__tools">
             {!!targeted.length && <button type="button" className="link-button" onClick={() => setShortlist(targeted)}>Target holdings</button>}

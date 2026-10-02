@@ -76,9 +76,9 @@ const metrics = (extra = {}) => ({ unavailable: null, recentAnnouncements: [], m
 const company = (ticker) => ({ ticker, name: ticker, sector: 'Bank', source: `https://dps.psx.com.pk/company/${ticker}`, price: 100, priceDate: '2026-09-30', metrics: metrics() });
 const snapshot = (tickers) => ({
   generatedOn: '2026-09-30', contributionMonth: '2026-10', freshMoneyPkr: 100000, shortlist: tickers, dataAsOf: '2026-09-30',
-  companies: tickers.map(company), scores: tickers.map((t, i) => ({ ticker: t, score: 80 - i * 5, confidence: 'High', metrics: metrics() })),
+  companies: tickers.map(company), scores: tickers.map((t, i) => ({ ticker: t, score: 80 - i * 5, confidence: 'High', evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics() })),
 });
-const aiPick = (ticker, allocationPct) => ({ ticker, allocationPct, confidence: 'High', thesis: 't', catalysts: [], risks: [] });
+const aiPick = (ticker, allocationPct) => ({ ticker, allocationPct, confidence: 'High', thesis: 't', evidence: ['peTtm'], catalysts: [], risks: [] });
 const aiOut = (picks, unallocatedPct) => ({ marketOutlook: 'x', picks, coverage: [], unallocatedPct });
 
 test('AI output with one surviving company cannot reach 100%', () => {
@@ -107,7 +107,7 @@ test('AI and quant results obey the same cap and totals', () => {
 });
 
 test('quantAllocation still water-fills and leaves cash when everything is capped', () => {
-  const one = quantAllocation([{ ticker: 'A', score: 90, confidence: 'High', metrics: metrics() }]);
+  const one = quantAllocation([{ ticker: 'A', score: 90, confidence: 'High', evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics() }]);
   assert.deepEqual(one.picks.map((p) => p.allocationPct), [35]);
   assert.equal(one.unallocatedPct, 65);
 });

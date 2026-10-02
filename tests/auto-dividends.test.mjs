@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { validate, taxSummary, entitlementDate, pendingAutoDividends, holdings } from '../lib/portfolio.ts';
 
 const ASOF = '2026-01-01';
-const company = (extra = {}) => ({ ticker: 'MEBL', name: 'Meezan', target: 0, approved: true, screenDate: '', note: '', ...extra });
+const company = (extra = {}) => ({ ticker: 'MEBL', name: 'Meezan', target: 0, approved: true, screenDate: '', note: '', faceValue: 10, ...extra });
 const buy = (id, date, shares) => ({ id, ticker: 'MEBL', kind: 'buy', date, shares, price: 100, fees: 0, month: date.slice(0, 7), note: '' });
 const portfolio = (trades, extra = {}) => ({
   companies: [company()], trades, quotes: {}, budgets: {}, taxProfile: { filerStatus: 'filer' }, ...extra,

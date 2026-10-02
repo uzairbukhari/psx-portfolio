@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "40816623403",
+    "project_id": "sipwise-37903",
+    "storage_bucket": "sipwise-37903.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:40816623403:android:aaad649171b22dbd070f6e",
+        "android_client_info": {
+          "package_name": "com.uzairbukhari.sipwise"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBt36Hho3hfjspFew1Kqi_XcifZ9FHXSrw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:40816623403:android:921d7023dbbd707e070f6e",
+        "android_client_info": {
+          "package_name": "com.uzairbukhari.sipwise.staging"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBt36Hho3hfjspFew1Kqi_XcifZ9FHXSrw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

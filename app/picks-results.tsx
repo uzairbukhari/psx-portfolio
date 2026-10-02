@@ -1,8 +1,9 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import { ChevronDown, ExternalLink, RefreshCw } from 'lucide-react';
+import { ChevronDown, ExternalLink, Plus, RefreshCw } from 'lucide-react';
 import { money, type Portfolio } from '@/lib/portfolio';
+import { explainSizing } from '@/lib/monthly-picks-allocation';
 import { estimateMonthlyPicks, summarizeEstimates, type CompanyOutlook, type MonthlyPickEstimate } from '@/lib/monthly-picks';
 import type { Recommendation } from './use-recommendations';
 
@@ -34,9 +35,10 @@ type Props = {
   onRefreshPrices: () => void;
   onManualPrice: (ticker: string) => void;
   onOpenCompany: (ticker: string) => void;
+  onRecordBuys?: (picks: { ticker: string; shares: number; price: number | null }[], month: string) => void;
 };
 
-export default function PicksResults({ run, portfolio, onRefreshPrices, onManualPrice, onOpenCompany }: Props) {
+export default function PicksResults({ run, portfolio, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys }: Props) {
   // Keep the SPA (no reload) for plain clicks; modified clicks fall through to the real link.
   const open_ = (ticker: string) => (event: React.MouseEvent) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -54,6 +56,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
     [legacy, result, portfolio, run.amount, run.feePct],
   );
   const summary = useMemo(() => summarizeEstimates(estimates, run.amount), [estimates, run.amount]);
+  const recordable = estimates.filter((pick) => pick.shares !== null && pick.shares > 0 && pick.price !== null && pick.price > 0);
   const names = useMemo(() => new Map(portfolio.companies.map((company) => [company.ticker, company.name])), [portfolio.companies]);
 
   const [filter, setFilter] = useState<(typeof OUTLOOKS)[number] | 'All'>('All');
@@ -83,16 +86,21 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
           <button type="button" className="secondary compact" onClick={onRefreshPrices}><RefreshCw size={14} /> Refresh prices</button>
         </div>
         <div className="mp-kpis">
-          <div><span>Fresh money</span><b>{money(run.amount)}</b></div>
           <div><span>Allocated to picks</span><b>{money(summary.allocatedPkr)}</b></div>
-          <div><span>Planned cash reserve</span><b>{money(summary.plannedCashPkr)}</b></div>
-          <div><span>Whole-share leftover</span><b>{summary.roundingLeftoverPkr === null ? 'Incomplete' : money(summary.roundingLeftoverPkr)}</b></div>
-          <div><span>Estimated unspent</span><b>{summary.unspentPkr === null ? 'Incomplete' : money(summary.unspentPkr)}</b></div>
+          <div><span>Not invested</span><b>{summary.unspentPkr === null ? 'Incomplete' : money(summary.unspentPkr)}</b></div>
           <div><span>Companies scored</span><b>{result.assessedCount ?? result.coverage.length}/{result.totalCount ?? result.coverage.length}</b></div>
         </div>
+        <details className="mp-kpi-details">
+          <summary>Details</summary>
+          <div className="mp-kpis">
+            <div><span>Fresh money</span><b>{money(run.amount)}</b></div>
+            <div><span>Planned cash reserve</span><b>{money(summary.plannedCashPkr)}</b></div>
+            <div><span>Left after rounding</span><b>{summary.roundingLeftoverPkr === null ? 'Incomplete' : money(summary.roundingLeftoverPkr)}</b></div>
+          </div>
+        </details>
         {summary.incomplete && (
           <output className="notice">
-            Estimate incomplete: no recent price for {summary.missingPrices.join(', ')}, so whole-share leftover and unspent money cannot be calculated yet. Refresh prices or enter one.
+            Estimate incomplete: no recent price for {summary.missingPrices.join(', ')}, so what is left after rounding and what is not invested cannot be calculated yet. Refresh prices or enter one.
           </output>
         )}
         {!!estimates.length && (
@@ -107,6 +115,12 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
           </>
         )}
         <p className="mp-outlook">{result.marketOutlook}</p>
+        {result.fallbackReason && <p className="mp-outlook" role="note">{result.fallbackReason}</p>}
+        {explainSizing(result.sizing).length > 0 && (
+          <ul className="mp-outlook" aria-label="Allocation limits applied">
+            {explainSizing(result.sizing).map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        )}
       </section>
 
       <div className="mp-tabs">
@@ -120,6 +134,14 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
 
       {view === 'picks' && (
       <div className="mp-cards">
+        {recordable.length > 0 && onRecordBuys && (
+          <div className="mp-record">
+            <button type="button" onClick={() => onRecordBuys(recordable.map((pick) => ({ ticker: pick.ticker, shares: pick.shares!, price: pick.price })), run.month)}>
+              <Plus size={16} /> Record these buys
+            </button>
+            <small>Opens the Add transaction form for each pick, one at a time.</small>
+          </div>
+        )}
         {estimates.map((pick, index) => (
           <article className="mp-card" key={pick.ticker}>
             <header className="mp-card__head">
@@ -140,6 +162,11 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
               </div>
             )}
             <p className="mp-thesis">{pick.thesis}</p>
+            {!!pick.evidenceRefs?.length && (
+              <p className="muted" aria-label="Evidence cited">
+                Evidence: {pick.evidenceRefs.map((ref) => `${ref.label} ${ref.value}`).join(' · ')}
+              </p>
+            )}
             <div className="mp-quantity">
               {pick.shares === null ? (
                 <>

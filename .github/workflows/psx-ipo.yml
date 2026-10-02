@@ -1,0 +1,37 @@
+name: PSX IPO lookup
+
+# On-demand only: the app dispatches this when an imported broker statement has a sale with no purchase
+# history and the user asks for the official IPO offer price. PSX drops Cloudflare egress, so the lookup runs
+# on a GitHub runner and writes the shared D1 `ipo_offers` table (and `refresh_requests` state).
+on:
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: 'Comma-separated PSX symbols to look up'
+        required: true
+
+concurrency:
+  group: psx-ipo-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN are `prod` environment secrets.
+    environment: prod
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: Look up official offer documents
+        # The dispatch input is untrusted text: pass it through the environment, never interpolate it.
+        run: node scripts/psx-ipo-scrape.mjs "--tickers=$TICKERS"
+        env:
+          TICKERS: ${{ inputs.tickers }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

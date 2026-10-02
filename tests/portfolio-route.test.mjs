@@ -7,8 +7,9 @@ const base = new URL('../', import.meta.url);
 const source = readFileSync(new URL('app/api/portfolio/route.ts', base), 'utf8')
   .replace("import { db, identity, failure } from '@/lib/server';", `const db=()=>globalThis.__portfolioDB; const identity=async()=> 'owner'; const failure=(e,status)=>Response.json({error:e.message},{status:status??e.status??400});`)
   .replace("import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';", `import { blankPortfolio, validate } from '${new URL('lib/portfolio.ts', base).href}';`)
-  .replace("import { applyFacts, newTickers } from '@/lib/company-enrichment';", `import { applyFacts, newTickers } from '${new URL('lib/company-enrichment.ts', base).href}';`)
-  .replace("import { gatherFacts } from '@/lib/company-facts-store';", `const gatherFacts=async()=>[];`)
+  .replace("import { enrichForSave, overlayForRead } from '@/lib/company-save';", `const enrichForSave=async()=>({repaired:[],pending:[],queued:[]}); const overlayForRead=async()=>[];`)
+  .replace("import { readFaceValues } from '@/lib/face-values';", `const readFaceValues=async()=>({});`)
+  .replace("import { dispatchConfig } from '@/lib/dispatch-config';", `const dispatchConfig=()=>({});`)
   .replace("import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';", `import { mergeQuotes, readQuoteRows } from '${new URL('lib/quote-cache.ts', base).href}';`)
   .replace("import { readAnnouncements } from '@/lib/dividend-announcements';", `import { readAnnouncements } from '${new URL('lib/dividend-announcements.ts', base).href}';`)
   .replace(/from '@\/lib\/([\w-]+)'/g, (_, name) => `from '${new URL(`lib/${name}.ts`, base).href}'`);
@@ -30,7 +31,7 @@ test('portfolio GET does not inject cached quotes for another portfolio ticker',
 test('portfolio GET keeps a newer saved quote over an older cached refresh', async () => {
   const saved = { price: 120, asOf: 'Tue, Sep 29, 2026 10:38 AM', date: '2026-09-29', source: 'x', fetchedAt: '2026-09-29T05:38:00Z' };
   const portfolio = { companies: [{ ticker: 'MEBL' }, { ticker: 'LUCK' }], trades: [], quotes: { MEBL: saved }, budgets: {} };
-  const row = (ticker, date, at) => ({ ticker, price: 100, as_of: 'old', quote_date: date, source: 'y', fetched_at: at });
+  const row = (ticker, date, at) => ({ ticker, price: 100, as_of: 'old', quote_date: date, source: 'https://dps.psx.com.pk/indices/ALLSHR', fetched_at: at });
   globalThis.__portfolioDB = { prepare() { return { bind() { return this; }, async first() { return { payload: JSON.stringify(portfolio), revision: 2 }; }, async all() { return { results: [row('MEBL', '2026-09-28', '2026-09-28T11:00:00Z'), row('LUCK', '2026-09-28', '2026-09-28T11:00:00Z')] }; } }; } };
   const body = await (await route.GET(new Request('https://test/api/portfolio'))).json();
   assert.equal(body.portfolio.quotes.MEBL.price, 120);

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useConfirm } from '@/components/confirm-dialog';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -24,6 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { Toaster, toast } from '@/components/ui/toast';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Popover,
@@ -33,18 +35,24 @@ import {
 import {
   RefreshCw,
   Plus,
-  X,
   Wallet,
   LogOut,
   Settings,
   ChevronDown,
   MoreHorizontal,
   Bell,
+  BarChart3,
+  ScrollText,
+  Sparkles,
+  FlaskConical,
 } from 'lucide-react';
+import { LogoMark, Wordmark } from '@/components/logo';
 import {
   holdings,
+  portfolioSummary,
   plan,
   money,
+  moneyShort,
   today,
   round,
   validate,
@@ -60,8 +68,7 @@ import {
   type Company,
   type Dividend,
   type StockSplit,
-  pendingAutoDividends,
-  startDividendTracking,
+  isValidQuote,
   quoteSupersedes,
   supersedeAutoWithImports,
   confirmDividendReceipt,
@@ -69,9 +76,9 @@ import {
 } from '@/lib/portfolio';
 import {
   addNotifications,
-  announcementNotifications,
   dividendNotifications,
 } from '@/lib/notifications';
+import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
 import PortfolioValueCard from './portfolio-value-card';
@@ -82,27 +89,42 @@ import ResearchDesk from './research-desk';
 import { SignIn, LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import NotificationsView from './notifications-view';
+import TargetsEditor from './targets-editor';
 import SettingsView from './settings-view';
+import { AhlImportDialog } from './ahl-import-dialog';
+import { DividendSyncView } from './dividend-sync-view';
+import { parseAhlLedgerText, type AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import MonthlyPicks from './monthly-picks';
 import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
 import { importAhlTrades, parseAhlHistory } from './ahl-import';
-import { verifyPsxSymbol } from './psx-symbol';
+import { importCdcDividends } from '@/lib/cdc-import';
+import type { PortfolioResponse } from '@/lib/api-types';
+import { useCompanyLookup, type LookupView } from './use-company-lookup';
+import { canSaveCompany } from '@/lib/company-lookup-client';
+import { followQuoteJob, isPending, isProblem, jobMessage } from '@/lib/quote-refresh-client';
+import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
+import type { QuotesResponse } from '@/lib/api-types';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
   reports: '/reports',
   sip: '/sip',
-  history: '/history',
+  history: '/activity',
   'research-desk': '/research-desk',
   settings: '/settings',
   notifications: '/notifications',
 };
 const PATH_TABS: Record<string, string> = Object.fromEntries(
-  Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
+  [...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]), ['/history', 'history']],
 );
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
+function subscribeWide(onChange: () => void) {
+  const query = window.matchMedia('(min-width: 1100px)');
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
 function companyFromPathname(pathname: string): string {
   const match = COMPANY_PATH.exec(pathname);
   return match ? match[1].toUpperCase() : '';
@@ -118,6 +140,9 @@ type ApiResponse = {
   error?: string;
   portfolio: Portfolio;
   revision: number;
+  details?: { ticker: string; name: string; sector: string }[];
+  pendingCompanies?: string[];
+  faceValues?: PortfolioResponse['faceValues'];
   announcements?: PayoutAnnouncement[];
   available?: boolean;
   cached?: boolean;
@@ -128,13 +153,39 @@ type ApiResponse = {
   summary?: string;
   weights?: Record<string, number>;
 };
-type QuoteRefreshResponse = {
-  quotes: Portfolio['quotes'];
-  errors: string[];
-  reasons?: Record<string, string>;
-  stale?: Record<string, string>;
-  error?: string;
-};
+const SHORTLISTED = '__shortlisted';
+/** Add Company may save only once the directory answered for exactly this symbol. */
+const lookupReady = (lookup: LookupView, ticker: string) =>
+  lookup.ticker === ticker.trim().toUpperCase() && canSaveCompany({ state: lookup.status, company: lookup.company });
+/** Asks for a price for a company that has none yet; the scheduled scraper does the fetch. */
+async function queueQuoteRefresh(tickers: string[]) {
+  try {
+    await fetch('/api/quotes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickers }),
+    });
+  } catch {
+    /* the scheduled scraper prices held companies anyway */
+  }
+}
+/** Status line under the symbol field while the company directory is consulted. */
+function CompanyLookupNote({ lookup, ticker }: { lookup: LookupView & { retry: () => void }; ticker: string }) {
+  if (!ticker.trim()) return null;
+  const current = lookup.ticker === ticker.trim().toUpperCase();
+  if (!current || lookup.status === 'idle')
+    return /^[A-Z0-9]{2,12}$/.test(ticker.trim().toUpperCase()) ? <p className="muted" role="status">Checking company details…</p> : <p className="muted">Enter a PSX symbol (2-12 letters or digits).</p>;
+  if (lookup.status === 'loading') return <p className="muted" role="status">Checking company details…</p>;
+  if (lookup.status === 'pending')
+    return <p className="muted" role="status">{lookup.message ?? 'Looking up this company…'}</p>;
+  if (lookup.status === 'resolved') return null;
+  return (
+    <p className="notice error" role="alert">
+      {lookup.message ?? 'Company details could not be found.'}{' '}
+      <button type="button" className="secondary compact" onClick={lookup.retry}>Try again</button>
+    </p>
+  );
+}
 type HoldingsSortKey =
   | 'name'
   | 'shares'
@@ -152,21 +203,31 @@ function download(name: string, data: string, type = 'application/json') {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+type TxType = 'buy' | 'sell' | 'dividend' | 'split' | 'opening';
+const TX_TYPES: { type: TxType; label: string }[] = [
+  { type: 'buy', label: 'Buy' },
+  { type: 'sell', label: 'Sell' },
+  { type: 'dividend', label: 'Dividend' },
+  { type: 'split', label: 'Bonus / split' },
+  { type: 'opening', label: 'Opening balance' },
+];
 const blankTrade = (
-  ticker = 'MEBL',
-  kind: 'buy' | 'sell' = 'buy',
+  ticker = '',
+  kind: Trade['kind'] = 'buy',
   price: number | null = null,
 ): Trade => ({
   id: crypto.randomUUID(),
   ticker,
   kind,
   date: today(),
-  shares: 1,
+  shares: 0,
   price,
   fees: 0,
   month: kind === 'buy' ? today().slice(0, 7) : '',
   note: '',
 });
+type PickBuy = { ticker: string; shares: number; price: number | null };
+type PickQueue = { picks: PickBuy[]; month: string; index: number };
 const blankDividend = (ticker: string): Dividend => ({
   id: crypto.randomUUID(),
   ticker,
@@ -180,104 +241,84 @@ const blankStockSplit = (ticker: string): StockSplit => ({
   id: crypto.randomUUID(),
   ticker,
   date: today(),
-  oldShares: 1,
-  newShares: 2,
+  oldShares: 0,
+  newShares: 0,
   note: '',
 });
-function parseCdcAmount(v: unknown): number {
-  return typeof v === 'string' ? Number(v.replace(/,/g, '')) : Number(v);
-}
-function parseCdcPaymentDate(s: string): string | null {
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
-  if (!m) return null;
-  const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  return dateOK(iso) ? iso : null;
-}
-type CdcImportSummary = {
-  dividends: Dividend[];
-  imported: number;
-  skippedNotPaid: number;
-  skippedDuplicate: number;
-  skippedUnknownTicker: number;
-  skippedInvalid: number;
-};
-function importCdcDividends(
-  raw: unknown,
-  companies: Company[],
-  existing: Dividend[],
-): CdcImportSummary {
-  const rows: unknown[] = Array.isArray(raw)
-    ? raw
-    : Array.isArray((raw as { data?: unknown } | null)?.data)
-      ? (raw as { data: unknown[] }).data
-      : [];
-  const tickers = new Set(companies.map((c) => c.ticker));
-  const seenIds = new Set(
-    existing.filter((d) => !d.voided && d.externalId).map((d) => d.externalId),
-  );
-  const summary: CdcImportSummary = {
-    dividends: [],
-    imported: 0,
-    skippedNotPaid: 0,
-    skippedDuplicate: 0,
-    skippedUnknownTicker: 0,
-    skippedInvalid: 0,
-  };
-  for (const row of rows) {
-    const r = row as Record<string, unknown>;
-    if (
-      typeof r.dividendStatus !== 'string' ||
-      r.dividendStatus.toUpperCase() !== 'PAID'
-    ) {
-      summary.skippedNotPaid++;
-      continue;
-    }
-    const eventId = typeof r.eventId === 'string' ? r.eventId : undefined;
-    if (eventId && seenIds.has(eventId)) {
-      summary.skippedDuplicate++;
-      continue;
-    }
-    const ticker =
-      typeof r.securitySymbol === 'string'
-        ? r.securitySymbol.toUpperCase()
-        : '';
-    if (!tickers.has(ticker)) {
-      summary.skippedUnknownTicker++;
-      continue;
-    }
-    const date =
-      typeof r.paymentDate === 'string'
-        ? parseCdcPaymentDate(r.paymentDate)
-        : null;
-    const gross = parseCdcAmount(r.grossDividendAmount);
-    const net = parseCdcAmount(r.netDividendAmount);
-    if (
-      !date ||
-      !Number.isFinite(gross) ||
-      gross < 0 ||
-      !Number.isFinite(net) ||
-      net < 0 ||
-      net > gross
-    ) {
-      summary.skippedInvalid++;
-      continue;
-    }
-    summary.dividends.push({
-      id: crypto.randomUUID(),
-      ticker,
-      date,
-      source: 'import',
-      grossAmount: round(gross),
-      netAmount: round(net),
-      externalId: eventId,
-      financialYear:
-        typeof r.financialYear === 'string' ? r.financialYear : undefined,
-      note: '',
-    });
-    if (eventId) seenIds.add(eventId);
-    summary.imported++;
+/** Searchable ticker + name picker. Owned-only pickers only emit tickers from the list. */
+function TickerPicker({
+  value,
+  onChange,
+  companies,
+  allowNew,
+  disabled,
+}: {
+  value: string;
+  onChange: (ticker: string) => void;
+  companies: Company[];
+  allowNew: boolean;
+  disabled?: boolean;
+}) {
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
+  const q = query.trim().toLowerCase();
+  const matches = companies
+    .filter(
+      (c) =>
+        !q ||
+        c.ticker.toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q),
+    )
+    .slice(0, 8);
+  function type(text: string) {
+    setQuery(text);
+    setOpen(true);
+    const exact = companies.find(
+      (c) => c.ticker.toLowerCase() === text.trim().toLowerCase(),
+    );
+    onChange(exact ? exact.ticker : allowNew ? text.trim().toUpperCase() : '');
   }
-  return summary;
+  return (
+    <div className="ticker-picker">
+      <input
+        role="combobox"
+        aria-expanded={open}
+        aria-controls="ticker-picker-list"
+        aria-label="Company symbol"
+        placeholder={allowNew ? 'Search or type a PSX symbol' : 'Search your companies'}
+        autoComplete="off"
+        autoCapitalize="characters"
+        spellCheck={false}
+        required
+        disabled={disabled}
+        value={query}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => type(e.target.value)}
+      />
+      {open && matches.length > 0 && (
+        <div id="ticker-picker-list" className="ticker-options">
+          {matches.map((c) => (
+            <button
+              type="button"
+              data-slot="option"
+              key={c.ticker}
+              aria-pressed={c.ticker === value}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setQuery(c.ticker);
+                setOpen(false);
+                onChange(c.ticker);
+              }}
+            >
+              <b>{c.ticker}</b>
+              <span>{c.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 export default function Dashboard({
   email,
@@ -292,7 +333,14 @@ export default function Dashboard({
 }) {
   const isAdmin = role === 'super_admin';
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
+  // From 1100px the market pulse sits beside the value card's chart; below it stays under the table.
+  const widePulse = useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia('(min-width: 1100px)').matches,
+    () => null,
+  );
   const initialPathname = usePathname();
+  const [bellOpen, setBellOpen] = useState(false);
   const [tab, setTabState] = useState(() =>
     allowTab(tabFromPathname(initialPathname), isAdmin),
   );
@@ -317,15 +365,18 @@ export default function Dashboard({
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, [isAdmin]);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [pickQueue, setPickQueue] = useState<PickQueue | null>(null);
   const [p, setP] = useState<Portfolio | null>(null),
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState(''),
+    [message, setMessageState] = useState(''),
     [failed, setFailed] = useState(false),
     [month, setMonth] = useState(today().slice(0, 7)),
     [fees, setFees] = useState(0),
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
+    [ahlStatement, setAhlStatement] = useState<{ statement: AhlLedgerStatement; fileName: string } | null>(null),
     [editing, setEditing] = useState<string | null>(null),
     [stockSplit, setStockSplit] = useState<StockSplit | null>(null),
     [editingStockSplit, setEditingStockSplit] = useState<string | null>(null),
@@ -339,6 +390,8 @@ export default function Dashboard({
     [editingDividend, setEditingDividend] = useState<string | null>(null),
     [company, setCompany] = useState<Company | null>(null),
     [creatingCompany, setCreatingCompany] = useState(false),
+    [txType, setTxType] = useState<TxType>('buy'),
+    [txCompany, setTxCompany] = useState({ name: '', sector: '' }),
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
     [quoteDate, setQuoteDate] = useState(today()),
@@ -346,16 +399,133 @@ export default function Dashboard({
       inputTokens: number;
       outputTokens: number;
       costUsd: number;
-    } | null>(null);
+    } | null>(null),
+    [pendingCompanies, setPendingCompanies] = useState<string[]>([]);
+  // Add Company: the ticker is the only typed identity field; name and sector come from the shared directory.
+  const txNewTicker =
+    !p || !trade || editing || editingDividend || editingStockSplit || txType === 'sell' || txType === 'dividend' || txType === 'split' ||
+    p.companies.some((c) => c.ticker === trade.ticker)
+      ? ''
+      : trade.ticker;
+  const txLookup = useCompanyLookup(txNewTicker);
+  const companyLookup = useCompanyLookup(creatingCompany && company ? company.ticker : '');
+  useEffect(() => {
+    if (!creatingCompany) return;
+    const name = companyLookup.company?.name ?? '';
+    const sector = companyLookup.company?.sector ?? '';
+    setCompany((c) => (c && (c.name !== name || c.sector !== sector) ? { ...c, name, sector } : c));
+  }, [creatingCompany, companyLookup.company]);
+  useEffect(() => {
+    const name = txLookup.company?.name ?? '';
+    const sector = txLookup.company?.sector ?? '';
+    setTxCompany((c) => (c.name === name && c.sector === sector ? c : { name, sector }));
+  }, [txLookup.company]);
   const [holdingsSort, setHoldingsSort] = useState<{
       key: HoldingsSortKey;
       dir: 'asc' | 'desc';
     } | null>(null),
     [sectorFilter, setSectorFilter] = useState<string>(''),
-    [showSoldOut, setShowSoldOut] = useState(false);
+    [showSoldOut, setShowSoldOut] = useState(false),
+    [targetsOpen, setTargetsOpen] = useState(false);
+  // Status messages surface as toasts instead of an inline banner: errors
+  // persist until dismissed, successes auto-dismiss. Before the first
+  // portfolio load, the full-page LoadError screen shows `message` itself.
+  const loadedRef = useRef(false);
+  const quoteAlive = useRef(true);
+  const quoteRunning = useRef(false);
+  useEffect(() => {
+    quoteAlive.current = true;
+    return () => {
+      quoteAlive.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    loadedRef.current = !!p;
+  }, [p]);
+  function showToast(s: string, error: boolean) {
+    if (!s || !loadedRef.current) return;
+    toast.add({
+      description: s,
+      type: error ? 'error' : 'success',
+      priority: error ? 'high' : 'low',
+      timeout: error ? 0 : 5000,
+    });
+  }
   function notify(s: string, error = false) {
-    setMessage(s);
+    setMessageState(s);
     setFailed(error);
+    showToast(s, error);
+  }
+  /** Applies refreshed prices locally. They are already in the shared cache the next load merges in, so no save is needed. */
+  function applyQuotes(quotes: Portfolio['quotes'], stale: Record<string, string> = {}) {
+    setP((current) => {
+      if (!current) return current;
+      const fresh = Object.fromEntries(
+        Object.entries(quotes).filter(
+          ([ticker, quote]) =>
+            isValidQuote(quote) && !(stale[ticker] && current.quotes[ticker]) && quoteSupersedes(quote, current.quotes[ticker]),
+        ),
+      );
+      return Object.keys(fresh).length ? { ...current, quotes: { ...current.quotes, ...fresh } } : current;
+    });
+  }
+  /** POST starts (or joins) a refresh; GET with `since` (even empty) only reads its state. */
+  async function quoteCall(tickers: string[], since?: string) {
+    if (!tickers.length) throw Error('No companies to price.');
+    const r =
+      since === undefined
+        ? await fetch('/api/quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tickers }),
+          })
+        : await fetch(`/api/quotes?tickers=${tickers.join(',')}${since ? `&since=${encodeURIComponent(since)}` : ''}`);
+    const d = (await r.json()) as QuotesResponse & { error?: string };
+    if (!r.ok) throw Error(d.error);
+    return d;
+  }
+  /** Follows a refresh job to its end and reports it with the single user-facing message for its state. */
+  async function followRefresh(tickers: string[], start: boolean) {
+    const final = await followQuoteJob({
+      start: start ? () => quoteCall(tickers) : undefined,
+      poll: (since) => quoteCall(tickers, since ?? ''),
+      cancelled: () => !quoteAlive.current,
+      onPending: (d) => applyQuotes(d.quotes, d.stale),
+    });
+    if (!quoteAlive.current) return;
+    applyQuotes(final.quotes, final.stale);
+    if (isPending(final.job)) return notify(QUOTE_MESSAGES.pending);
+    if (final.job) notify(jobMessage(final.job), isProblem(final.job));
+  }
+  async function refresh() {
+    if (!p || quoteRunning.current) return;
+    quoteRunning.current = true;
+    setBusy(true);
+    try {
+      notify(QUOTE_MESSAGES.pending);
+      void pulseRef.current?.refresh();
+      await followRefresh(p.companies.map((c) => c.ticker), true);
+    } catch (e) {
+      notify(e instanceof Error && e.message ? e.message : QUOTE_MESSAGES.failed, true);
+    } finally {
+      quoteRunning.current = false;
+      setBusy(false);
+    }
+  }
+  /** After a reload, picks up a refresh that is still queued or running instead of starting another. */
+  async function resumeRefresh(tickers: string[]) {
+    if (quoteRunning.current || !tickers.length) return;
+    try {
+      const d = await quoteCall(tickers, '');
+      if (!isPending(d.job)) return;
+      quoteRunning.current = true;
+      notify(QUOTE_MESSAGES.pending);
+      await followRefresh(tickers, false);
+    } catch {
+      /* nothing to resume */
+    } finally {
+      quoteRunning.current = false;
+    }
   }
   async function load() {
     setBusy(true);
@@ -365,7 +535,9 @@ export default function Dashboard({
       if (!r.ok) throw Error(d.error);
       setP(d.portfolio);
       setRevision(d.revision);
-      await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? []);
+      setPendingCompanies(d.pendingCompanies ?? []);
+      void resumeRefresh(d.portfolio.companies.map((c) => c.ticker));
+      await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
     } catch (e) {
       notify(String(e), true);
     } finally {
@@ -382,64 +554,48 @@ export default function Dashboard({
     loaded: Portfolio,
     loadedRevision: number,
     announcements: PayoutAnnouncement[],
+    faceValues: NonNullable<PortfolioResponse['faceValues']>,
   ) {
-    let current = loaded,
-      currentRevision = loadedRevision;
-    for (let tries = 0; tries < 3; tries++) {
-      let pending: Dividend[], news: AppNotification[];
-      const now = new Date().toISOString();
-      // Expected dividends only start from the day tracking began: set that date once and
-      // void unconfirmed auto dividends for earlier book closures.
-      const next = clone(current);
-      const tracking = startDividendTracking(next);
-      try {
-        pending = pendingAutoDividends(next, announcements);
-        news = [
-          ...dividendNotifications(pending, now),
-          ...announcementNotifications(next, announcements, today(), now),
-        ];
-      } catch {
-        return;
-      }
-      if (!news.length && !tracking.set && !tracking.voided.length) return;
-      if (pending.length)
-        next.dividends = [...(next.dividends ?? []), ...pending];
-      addNotifications(next, news);
-      try {
-        validate(next);
-        const r = await fetch('/api/portfolio', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ portfolio: next, revision: currentRevision }),
-        });
-        if (r.status === 409) {
+    const result = await syncAutoDividends(
+      { portfolio: loaded, revision: loadedRevision },
+      announcements,
+      {
+        save: async (next, revision) => {
+          const r = await fetch('/api/portfolio', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ portfolio: next, revision }),
+          });
+          if (r.status === 409) return { conflict: true };
+          const saved = (await r.json()) as ApiResponse;
+          if (!r.ok) throw Error(saved.error);
+          return { revision: saved.revision };
+        },
+        reload: async () => {
           const fresh = await fetch('/api/portfolio');
-          if (!fresh.ok) return;
+          if (!fresh.ok) return null;
           const d = (await fresh.json()) as ApiResponse;
-          if (!d.portfolio) return;
-          current = d.portfolio;
-          currentRevision = d.revision;
-          setP(current);
-          setRevision(currentRevision);
-          continue;
-        }
-        const saved = (await r.json()) as ApiResponse;
-        if (!r.ok) throw Error(saved.error);
-        setP(next);
-        setRevision(saved.revision);
-        if (tracking.voided.length)
-          notify(
-            `${tracking.voided.length} past expected dividend${tracking.voided.length === 1 ? '' : 's'} voided: expected dividends now start from ${next.dividendTrackingFrom}.`,
-          );
-        else if (pending.length)
-          notify(
-            `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
-          );
-        return;
-      } catch (e) {
-        notify('Could not record PSX dividends: ' + String(e), true);
-        return;
-      }
+          return d.portfolio ? { portfolio: d.portfolio, revision: d.revision } : null;
+        },
+      },
+      { faceValues },
+    );
+    if (result.portfolio !== loaded) {
+      setP(result.portfolio);
+      setRevision(result.revision);
+    }
+    if (result.status === 'failed')
+      notify('Could not record PSX dividends: ' + result.error, true);
+    else if (result.status === 'saved' && result.update) {
+      const { next, pending, voided } = result.update;
+      if (voided.length)
+        notify(
+          `${voided.length} past expected dividend${voided.length === 1 ? '' : 's'} voided: expected dividends now start from ${next.dividendTrackingFrom}.`,
+        );
+      else if (pending.length)
+        notify(
+          `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
+        );
     }
   }
   /** Persists read/cleared state of the notification list. */
@@ -472,6 +628,7 @@ export default function Dashboard({
   async function save(
     next: Portfolio,
     success = 'Saved to your private portfolio.',
+    options: { createCompanies?: string[] } = {},
   ) {
     if (busy)
       throw Error('Wait for the current operation to finish.');
@@ -481,13 +638,26 @@ export default function Dashboard({
       const r = await fetch('/api/portfolio', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolio: next, revision }),
+        body: JSON.stringify({ portfolio: next, revision, ...(options.createCompanies ? { createCompanies: options.createCompanies } : {}) }),
       });
       const d = (await r.json()) as ApiResponse;
       if (!r.ok) throw Error(d.error);
+      // Show the name and sector the server filled in from the company directory.
+      for (const detail of d.details ?? []) {
+        const company = next.companies.find((c) => c.ticker === detail.ticker);
+        if (company) {
+          company.name = detail.name;
+          company.sector = detail.sector;
+        }
+      }
       setP(next);
       setRevision(d.revision);
-      notify(success);
+      setPendingCompanies(d.pendingCompanies ?? []);
+      notify(
+        d.pendingCompanies?.length
+          ? `${success} Company details for ${d.pendingCompanies.join(', ')} are still being looked up; your transactions are saved and the details will fill in on a later load.`
+          : success,
+      );
     } catch (e) {
       notify(String(e), true);
       throw e;
@@ -550,8 +720,8 @@ export default function Dashboard({
     return (
       <main className="app-loading">
         <div className="brand">
-          <Wallet size={26} />
-          <span>PSX / PERSONAL INVESTING</span>
+          <LogoMark size={28} />
+          <Wordmark />
         </div>
         <Spinner className="size-6" />
         <p className="muted">Loading your holdings…</p>
@@ -600,7 +770,7 @@ export default function Dashboard({
     );
     if (ambiguous.length)
       throw Error(
-        `Nothing was imported: ${ambiguous.map((d) => `${d.ticker} ${d.date}`).join(', ')} could belong to more than one expected PSX dividend. Void the expected record that does not apply (Purchase log), then import again.`,
+        `Nothing was imported: ${ambiguous.map((d) => `${d.ticker} ${d.date}`).join(', ')} could belong to more than one expected PSX dividend. Void the expected record that does not apply (Activity), then import again.`,
       );
     const superseded = replaced.length;
     const at = new Date().toISOString();
@@ -655,6 +825,12 @@ export default function Dashboard({
   };
   const importAhl = (f: File) => {
     attempt(async () => {
+    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+      // Read locally, then review: nothing is saved until the preview is confirmed.
+      const { text, pages } = await extractPdfText(new Uint8Array(await f.arrayBuffer()));
+      setAhlStatement({ statement: await parseAhlLedgerText(text, pages), fileName: f.name });
+      return;
+    }
     const rows = parseAhlHistory(JSON.parse(await f.text()));
     const result = importAhlTrades(p, rows);
     if (!result.imported) {
@@ -712,13 +888,8 @@ export default function Dashboard({
       .slice()
       .sort((a, b) => (b.value ?? -1) - (a.value ?? -1)),
     held = hs.filter((h) => h.shares > 0),
-    missing = held.filter((h) => !h.quote),
-    unknown = held.filter((h) => h.cost === null),
-    value = round(held.reduce((a, h) => a + (h.value ?? 0), 0)),
-    cost = unknown.length
-      ? null
-      : round(held.reduce((a, h) => a + (h.cost ?? 0), 0)),
-    gain = cost === null || missing.length ? null : round(value - cost);
+    { value, cost, gain, missingPrice: missing, unknownCost: unknown } =
+      portfolioSummary(hs);
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -735,9 +906,11 @@ export default function Dashboard({
       new Set(hs.map((h) => h.sector).filter((s): s is string => !!s)),
     ),
     rowsBase = showSoldOut ? held.concat(soldOut) : held,
-    rowsFiltered = sectorFilter
-      ? rowsBase.filter((h) => h.sector === sectorFilter)
-      : rowsBase,
+    rowsFiltered = !sectorFilter
+      ? rowsBase
+      : sectorFilter === SHORTLISTED
+        ? rowsBase.filter((h) => h.target > 0)
+        : rowsBase.filter((h) => h.sector === sectorFilter),
     holdingsSortAccessor: Record<
       HoldingsSortKey,
       (h: (typeof hs)[number]) => number | string
@@ -769,6 +942,68 @@ export default function Dashboard({
         : { key, dir: 'desc' },
     );
   }
+  const gainPct = (h: (typeof hs)[number]) =>
+    h.gain !== null && h.cost !== null && h.cost > 0
+      ? (h.gain / h.cost) * 100
+      : null;
+  const gainText = (h: (typeof hs)[number]) => {
+    const pct = gainPct(h);
+    return pct === null
+      ? ''
+      : `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)}%`;
+  };
+  const gainClass = (h: (typeof hs)[number]) =>
+    h.gain === null ? undefined : h.gain >= 0 ? 'pos-text' : 'neg-text';
+  const openQuoteEntry = (h: (typeof hs)[number]) => {
+    setQuoteTicker(h.ticker);
+    setQuotePrice(h.quote?.price.toString() ?? '');
+    setQuoteDate(h.quote?.date ?? today());
+  };
+  const holdingActions = (h: (typeof hs)[number]) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="secondary compact icon-btn"
+        aria-label={`Actions for ${h.ticker}`}
+      >
+        <MoreHorizontal size={16} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onClick={() => openCompany(h.ticker)}
+        >
+          View company
+        </DropdownMenuItem>
+        {h.shares > 0 && (
+          <DropdownMenuItem
+            onClick={() =>
+              openTx('sell', h.ticker, h.quote?.price ?? null)
+            }
+          >
+            Sell
+          </DropdownMenuItem>
+        )}
+        {h.shares > 0 && (
+          <DropdownMenuItem
+            onClick={() => openTx('dividend', h.ticker)}
+          >
+            Dividend
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          onClick={() => {
+            setCreatingCompany(false);
+            setCompany({
+              ...p.companies.find(
+                (c) => c.ticker === h.ticker,
+              )!,
+            });
+          }}
+        >
+          Edit
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   function sortIndicator(key: HoldingsSortKey) {
     if (!holdingsSort || holdingsSort.key !== key) return null;
     return holdingsSort.dir === 'asc' ? ' ▲' : ' ▼';
@@ -816,12 +1051,81 @@ export default function Dashboard({
     if (window.location.pathname !== path) window.history.pushState(null, '', path);
     window.scrollTo({ top: 0 });
   }
+  /** Opens the one Add transaction dialog, preset to a type and (optionally) a company. */
+  function openTx(type: TxType, ticker = '', price: number | null = null) {
+    setEditing(null);
+    setEditingDividend(null);
+    setEditingStockSplit(null);
+    setTxType(type);
+    setTxCompany({ name: '', sector: '' });
+    setTrade(
+      blankTrade(ticker, type === 'sell' || type === 'opening' ? type : 'buy', price),
+    );
+    setDividend(blankDividend(ticker));
+    setStockSplit(blankStockSplit(ticker));
+  }
+  /** Monthly Picks "Record these buys": walks the dialog through each priced pick in turn. */
+  function openPick(queue: PickQueue, index: number) {
+    const pick = queue.picks[index];
+    if (!pick) {
+      setPickQueue(null);
+      closeTx();
+      return;
+    }
+    setPickQueue({ ...queue, index });
+    openTx('buy', pick.ticker, pick.price);
+    setTrade((t) => t && { ...t, shares: pick.shares, month: queue.month });
+  }
+  function recordPicks(picks: PickBuy[], pickMonth: string) {
+    const valid = picks.filter((x) => x.price !== null && x.price > 0 && x.shares > 0);
+    if (valid.length) openPick({ picks: valid, month: pickMonth, index: 0 }, 0);
+  }
+  function closeTx() {
+    setTrade(null);
+    setDividend(null);
+    setStockSplit(null);
+    setEditing(null);
+    setEditingDividend(null);
+    setEditingStockSplit(null);
+  }
+  /** Keeps the fields every type shares (company, date, note) in step across the forms. */
+  function patchTx(patch: { ticker?: string; date?: string; note?: string }) {
+    setTrade((x) => x && { ...x, ...patch });
+    setDividend((x) => x && { ...x, ...patch });
+    setStockSplit((x) => x && { ...x, ...patch });
+  }
+  function switchTx(next: TxType) {
+    if (!p) return;
+    setTxType(next);
+    if (next === 'buy' || next === 'sell' || next === 'opening') {
+      setTrade(
+        (t) =>
+          t && {
+            ...t,
+            kind: next,
+            month: next === 'buy' ? today().slice(0, 7) : '',
+            price:
+              next === 'sell'
+                ? (t.price ?? p.quotes[t.ticker]?.price ?? null)
+                : t.price,
+          },
+      );
+    }
+    if (
+      next !== 'buy' &&
+      next !== 'opening' &&
+      !p.companies.some((c) => c.ticker === trade?.ticker)
+    )
+      patchTx({ ticker: '' });
+  }
   function correctTrade(t: Trade) {
     setEditing(t.id);
+    setTxType(t.kind);
     setTrade({ ...t });
   }
   function correctDividend(d: Dividend) {
     setEditingDividend(d.id);
+    setTxType('dividend');
     setDividend(
       d.source === 'auto'
         ? {
@@ -832,6 +1136,9 @@ export default function Dashboard({
             entitlementDate: undefined,
             entitlementCertain: undefined,
             paymentDate: undefined,
+            paymentDateUnknown: undefined,
+            receiptConfirmedAt: undefined,
+            entitlement: undefined,
           }
         : { ...d },
     );
@@ -862,55 +1169,30 @@ export default function Dashboard({
   }
   function correctStockSplit(entry: StockSplit) {
     setEditingStockSplit(entry.id);
+    setTxType('split');
     setStockSplit({ ...entry });
-  }
-  async function refresh() {
-    setBusy(true);
-    try {
-      notify('Fetching PSX prices…');
-      void pulseRef.current?.refresh();
-      const r = await fetch('/api/quotes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickers: p!.companies.map((c) => c.ticker) }),
-      });
-      const d = (await r.json()) as QuoteRefreshResponse;
-      if (!r.ok) throw Error(d.error);
-      // A stale cached quote must not replace one the ledger already holds, and
-      // an older or same-day PSX price never replaces a newer or manual quote.
-      const fresh = Object.fromEntries(
-        Object.entries(d.quotes).filter(
-          ([ticker, quote]) =>
-            !(d.stale?.[ticker] && p!.quotes[ticker]) &&
-            quoteSupersedes(quote, p!.quotes[ticker]),
-        ),
-      );
-      const next = { ...p!, quotes: { ...p!.quotes, ...fresh } };
-      validate(next);
-      const s = await fetch('/api/portfolio', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolio: next, revision }),
-      });
-      const saved = (await s.json()) as ApiResponse;
-      if (!s.ok) throw Error(saved.error);
-      setP(next);
-      setRevision(saved.revision);
-      const stale = Object.keys(d.stale ?? {});
-      notify(
-        `${Object.keys(d.quotes).length - stale.length} PSX prices up to date.${stale.length ? ` Last saved price kept for ${stale.join(', ')} (${[...new Set(Object.values(d.stale ?? {}))].join(' | ')}).` : ''}${d.errors.length ? ' Unavailable: ' + d.errors.join(', ') + '. Previous quotes retained.' + (d.reasons ? ' Reason: ' + [...new Set(Object.values(d.reasons))].join(' | ') : '') : ''}`,
-        !!d.errors.length || !!stale.length,
-      );
-    } catch (e) {
-      notify(String(e), true);
-    } finally {
-      setBusy(false);
-    }
   }
   async function record(e: React.FormEvent) {
     e.preventDefault();
     if (!trade) return;
+    if (!trade.ticker) throw Error('Choose a company first.');
     const next = clone(p!);
+    const isNew = !next.companies.some((c) => c.ticker === trade.ticker);
+    if (isNew) {
+      if (!/^[A-Z0-9]{2,12}$/.test(trade.ticker))
+        throw Error('Enter a valid PSX symbol (2-12 letters or digits).');
+      if (!lookupReady(txLookup, trade.ticker))
+        throw Error('Wait for the company details to be found before saving a new company.');
+      next.companies.push({
+        ticker: trade.ticker,
+        name: txLookup.company!.name,
+        sector: txLookup.company!.sector,
+        target: 0,
+        approved: false,
+        screenDate: '',
+        note: '',
+      });
+    }
     if (editing) {
       const old = next.trades.find((t) => t.id === editing);
       if (old) old.voided = true;
@@ -924,15 +1206,18 @@ export default function Dashboard({
       next,
       editing
         ? 'Correction saved. Previous entry retained as voided.'
-        : 'Transaction saved as a new line item. Holdings and average cost updated.',
+        : `${isNew ? `${trade.ticker} added to your companies. ` : ''}Transaction saved as a new line item. Holdings and average cost updated.`,
+      isNew ? { createCompanies: [trade.ticker] } : {},
     );
-    setTrade(null);
-    setEditing(null);
-    if (tab !== 'company') setTab('history');
+    if (isNew) void queueQuoteRefresh([trade.ticker]);
+    closeTx();
+    if (pickQueue && !editing) openPick(pickQueue, pickQueue.index + 1);
   }
   async function recordStockSplit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!stockSplit) return;
+    if (!p!.companies.some((c) => c.ticker === stockSplit.ticker))
+      throw Error('Choose a company you own.');
     const next = clone(p!);
     next.stockSplits ??= [];
     if (editingStockSplit) {
@@ -954,13 +1239,13 @@ export default function Dashboard({
         ? 'Stock split correction saved. Previous entry retained as voided.'
         : 'Stock split saved. Shares and average costs were recalculated.',
     );
-    setStockSplit(null);
-    setEditingStockSplit(null);
-    if (tab !== 'company') setTab('history');
+    closeTx();
   }
   async function recordDividend(e: React.FormEvent) {
     e.preventDefault();
     if (!dividend) return;
+    if (!p!.companies.some((c) => c.ticker === dividend.ticker))
+      throw Error('Choose a company you own.');
     const next = clone(p!);
     next.dividends = next.dividends ?? [];
     if (editingDividend) {
@@ -989,9 +1274,7 @@ export default function Dashboard({
         ? 'Correction saved. Previous dividend record retained as voided.'
         : 'Dividend recorded.',
     );
-    setDividend(null);
-    setEditingDividend(null);
-    if (tab !== 'company') setTab('history');
+    closeTx();
   }
   async function saveCompany(e: React.FormEvent) {
     e.preventDefault();
@@ -1000,32 +1283,36 @@ export default function Dashboard({
     const at = next.companies.findIndex((c) => c.ticker === company.ticker);
     if (creatingCompany) {
       if (at >= 0) throw Error(`${company.ticker} is already in your portfolio.`);
-      const quote = await verifyPsxSymbol(company.ticker);
-      next.quotes[company.ticker] = quote;
+      if (!lookupReady(companyLookup, company.ticker))
+        throw Error('Wait for the company details to be found before saving.');
     }
-    if (at >= 0) next.companies[at] = company;
-    else next.companies.push(company);
+    const entry = creatingCompany
+      ? { ...company, name: companyLookup.company!.name, sector: companyLookup.company!.sector }
+      : company;
+    if (at >= 0) next.companies[at] = entry;
+    else next.companies.push(entry);
     await save(
       next,
-      creatingCompany
-        ? `${company.ticker} confirmed on PSX and added to your portfolio.`
-        : undefined,
+      creatingCompany ? `${company.ticker} added to your portfolio.` : undefined,
+      creatingCompany ? { createCompanies: [company.ticker] } : {},
     );
+    if (creatingCompany) void queueQuoteRefresh([company.ticker]);
     setCompany(null);
     setCreatingCompany(false);
   }
   return (
     <CompanyNavProvider value={openCompany}>
     <main className="desk">
-      <header>
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+      <header className={'app-header' + (chromeless ? ' no-tabs' : '')}>
         <button
           type="button"
           data-slot="brand"
           className="brand"
           onClick={() => setTab('holdings')}
         >
-          <Wallet size={29} />
-          <span>PSX / PERSONAL INVESTING</span>
+          <LogoMark size={28} />
+          <Wordmark />
         </button>
         <div className="header-right">
           <button
@@ -1044,16 +1331,25 @@ export default function Dashboard({
             data-slot="hdr"
             className="hdr-btn"
             disabled={busy}
-            aria-label="Record a purchase"
-            onClick={() => {
-              setEditing(null);
-              setTrade(blankTrade(companyTicker || 'MEBL'));
-            }}
+            aria-label="Add transaction"
+            onClick={() =>
+              openTx('buy', tab === 'company' ? companyTicker : '')
+            }
           >
             <Plus size={18} />
-            <span className="hdr-label">Record a purchase</span>
+            <span className="hdr-label">Add transaction</span>
           </button>
-          <Popover>
+          <Popover
+            open={bellOpen}
+            onOpenChange={(next) => {
+              // Phones skip the popover (it can't fit): go straight to the page.
+              if (next && window.matchMedia('(max-width:760px)').matches) {
+                setTab('notifications');
+                return;
+              }
+              setBellOpen(next);
+            }}
+          >
             <PopoverTrigger
               className="bell-trigger hdr-btn"
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
@@ -1136,7 +1432,10 @@ export default function Dashboard({
                   type="button"
                   data-slot="link"
                   className="link-button"
-                  onClick={() => setTab('notifications')}
+                  onClick={() => {
+                    setBellOpen(false);
+                    setTab('notifications');
+                  }}
                 >
                   View all notifications
                 </button>
@@ -1179,50 +1478,58 @@ export default function Dashboard({
             </DropdownMenu>
           )}
         </div>
-      </header>
-      {!chromeless && (
-        <section className="heading">
-          <div>
-            <p className="eyebrow">YOUR LONG-TERM PICTURE</p>
-            <h1>Portfolio & SIP desk</h1>
-            <p>
-              A clear record of what you own. A considered plan for what comes
-              next.
-            </p>
-          </div>
-        </section>
-      )}
-      {message && (
-        <div
-          role={failed ? 'alert' : 'status'}
-          className={'notice ' + (failed ? 'error' : 'success')}
-        >
-          <span>{message}</span>
-          <button
-            type="button"
-            data-slot="notice-close"
-            className="notice-close"
-            aria-label="Dismiss message"
-            onClick={() => setMessage('')}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         {!chromeless && (
-          <TabsList>
-            <TabsTrigger value="holdings">Holdings</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="history">Purchase log</TabsTrigger>
-            <TabsTrigger value="sip">Monthly Picks</TabsTrigger>
+          <TabsList variant="line">
+            <TabsTrigger value="holdings">
+              <Wallet className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Holdings</span>
+              <span className="tab-short">Holdings</span>
+            </TabsTrigger>
+            <TabsTrigger value="reports">
+              <BarChart3 className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Reports</span>
+              <span className="tab-short">Reports</span>
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <ScrollText className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Activity</span>
+              <span className="tab-short">Activity</span>
+            </TabsTrigger>
+            <TabsTrigger value="sip">
+              <Sparkles className="tab-icon" aria-hidden="true" />
+              <span className="tab-long">Monthly Picks</span>
+              <span className="tab-short">Picks</span>
+            </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="research-desk">Research desk</TabsTrigger>
+              <TabsTrigger value="research-desk">
+                <FlaskConical className="tab-icon" aria-hidden="true" />
+                <span className="tab-long">Research desk</span>
+                <span className="tab-short">Research</span>
+              </TabsTrigger>
             )}
           </TabsList>
         )}
+      </header>
         <TabsContent value="holdings">
-          <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />
+          {p.companies.length === 0 ? (
+            <div className="panel empty-holdings">
+              <h2>No holdings yet</h2>
+              <p>Record your first purchase to start tracking your portfolio.</p>
+              <button disabled={busy} onClick={() => openTx('buy')}>
+                <Plus size={16} /> Add your first transaction
+              </button>
+            </div>
+          ) : (
+          <>
+          {pendingCompanies.length > 0 && (
+            <p className="notice" role="status">
+              Company details for {pendingCompanies.join(', ')} are still being looked up. Your transactions are saved;
+              names and sectors fill in automatically once PSX details are found.{' '}
+              <button type="button" className="secondary compact" disabled={busy} onClick={() => void load()}>
+                Check again
+              </button>
+            </p>
+          )}
           <PortfolioValueCard
             p={p}
             value={value}
@@ -1232,21 +1539,26 @@ export default function Dashboard({
             missingCount={missing.length}
             unknownCount={unknown.length}
             newBuys={newBuys}
+            aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} /> : undefined}
           />
-          <div className="section-top">
-            <div>
-              <h2>Your companies</h2>
-              <p>
+          <div className="holdings-head">
+            <h2>
+              Your companies
+              <span className="count-badge">
                 {held.length} {held.length === 1 ? 'holding' : 'holdings'}
-                {sectorFilter ? ` · filtered to ${sectorFilter}` : ''}
-                {showSoldOut && soldOut.length
-                  ? ` · ${soldOut.length} sold out shown`
-                  : ''}
-              </p>
-            </div>
+              </span>
+            </h2>
             <button
-              className="secondary"
+              className="secondary compact holdings-add holdings-targets"
               disabled={busy}
+              onClick={() => setTargetsOpen(true)}
+            >
+              Targets
+            </button>
+            <button
+              className="secondary compact holdings-add"
+              disabled={busy}
+              aria-label="Add company"
               onClick={() => {
                 setCreatingCompany(true);
                 setCompany({
@@ -1260,35 +1572,133 @@ export default function Dashboard({
                 });
               }}
             >
-              <Plus size={16} /> Add company
+              <Plus size={15} /> <span className="holdings-add__label">Add company</span>
             </button>
-          </div>
-          <div className="holdings-toolbar">
-            <label className="holdings-toolbar-filter">
-              Sector
+            <select
+              className="holdings-filter"
+              aria-label="Filter companies"
+              value={sectorFilter}
+              onChange={(e) => setSectorFilter(e.target.value)}
+            >
+              <option value="">All sectors</option>
+              <option value={SHORTLISTED}>Shortlisted only</option>
+              {sectorsInUse.map((sector) => (
+                <option key={sector} value={sector}>
+                  {sector}
+                </option>
+              ))}
+            </select>
+            <div className="holdings-sort">
               <select
-                value={sectorFilter}
-                onChange={(e) => setSectorFilter(e.target.value)}
+                aria-label="Sort holdings"
+                value={holdingsSort?.key ?? ''}
+                onChange={(e) => {
+                  const key = e.target.value as HoldingsSortKey | '';
+                  if (!key) setHoldingsSort(null);
+                  else if (holdingsSort?.key !== key) toggleHoldingsSort(key);
+                }}
               >
-                <option value="">All sectors</option>
-                {sectorsInUse.map((sector) => (
-                  <option key={sector} value={sector}>
-                    {sector}
+                <option value="">Sort: market value</option>
+                {(
+                  [
+                    ['name', 'Company'],
+                    ['value', 'Market value'],
+                    ['gain', 'Gain / loss'],
+                    ['shares', 'Shares'],
+                    ['average', 'Avg. cost'],
+                    ['price', 'Latest price'],
+                    ['weight', 'Portfolio weight'],
+                  ] as [HoldingsSortKey, string][]
+                ).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    Sort: {label}
                   </option>
                 ))}
               </select>
-            </label>
+              {holdingsSort && (
+                <button
+                  type="button"
+                  className="secondary compact"
+                  aria-label="Reverse sort order"
+                  onClick={() => toggleHoldingsSort(holdingsSort.key)}
+                >
+                  {holdingsSort.dir === 'asc' ? '▲' : '▼'}
+                </button>
+              )}
+            </div>
             {soldOut.length > 0 && (
-              <label className="check-row">
+              <label className="check-row holdings-soldout">
                 <Checkbox
                   checked={showSoldOut}
                   onCheckedChange={(v) => setShowSoldOut(!!v)}
                 />{' '}
-                Show companies fully sold ({soldOut.length})
+                Show sold out ({soldOut.length})
               </label>
             )}
           </div>
-          <section className="panel table-panel">
+          <div className="holdings-cards">
+            {displayedHoldings.map((h) => (
+              <article className="holding-card" key={h.ticker}>
+                <div className="holding-card__head">
+                  <button
+                    type="button"
+                    className="holding-card__title"
+                    onClick={() => openCompany(h.ticker)}
+                  >
+                    <b className="ticker">
+                      {h.ticker}
+                    </b>
+                    <small>{h.name}</small>
+                  </button>
+                  {holdingActions(h)}
+                </div>
+                <dl className="holding-card__grid">
+                  <div>
+                    <dt>Value</dt>
+                    <dd className="amount">
+                      {h.value === null ? '—' : moneyShort(h.value)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Gain</dt>
+                    <dd className={gainClass(h)}>
+                      {h.gain === null ? '—' : moneyShort(h.gain)}
+                      {gainPct(h) !== null && <small>{gainText(h)}</small>}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Shares @ avg cost</dt>
+                    <dd>
+                      {h.shares.toLocaleString()}
+                      <small>
+                        @ {h.average === null ? '—' : money(h.average)}
+                      </small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Price</dt>
+                    <dd>
+                      <button
+                        type="button"
+                        className="quote-btn"
+                        onClick={() => openQuoteEntry(h)}
+                      >
+                        {h.quote ? money(h.quote.price) : 'Add price'}
+                      </button>
+                      {h.quote && (
+                        <small>
+                          {h.quote.date}
+                          {h.quote.manual ? ' · manual' : ''}
+                          {h.quote.date !== today() ? ' · older quote' : ''}
+                        </small>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+          <section className="panel table-panel holdings-table">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1327,12 +1737,23 @@ export default function Dashboard({
                       >
                         {h.ticker}
                       </button>
+                      {h.target > 0 && (
+                        <span
+                          className="shortlist-dot"
+                          title="On SIP shortlist"
+                          aria-label="On SIP shortlist"
+                        />
+                      )}
                       <small>
                         {h.name}
                         {h.sector ? ` · ${h.sector}` : ''}
                       </small>
                       {h.target > 0 && (
-                        <span className="tag">SIP shortlist</span>
+                        <span
+                          className="shortlist-dot"
+                          title="On SIP shortlist"
+                          aria-label="On SIP shortlist"
+                        />
                       )}
                     </TableCell>
                     <TableCell className="amount">
@@ -1361,19 +1782,11 @@ export default function Dashboard({
                       )}
                     </TableCell>
                     <TableCell>
-                      {h.value === null ? '—' : money(h.value)}
+                      {h.value === null ? '—' : moneyShort(h.value)}
                     </TableCell>
-                    <TableCell
-                      style={{
-                        color:
-                          h.gain === null
-                            ? 'inherit'
-                            : h.gain >= 0
-                              ? '#22e0a0'
-                              : '#ff5d6c',
-                      }}
-                    >
-                      {h.gain === null ? '—' : money(h.gain)}
+                    <TableCell className={gainClass(h)}>
+                      {h.gain === null ? '—' : moneyShort(h.gain)}
+                      {gainPct(h) !== null && <small>{gainText(h)}</small>}
                     </TableCell>
                     <TableCell>
                       {!missing.length && value > 0 ? (
@@ -1394,59 +1807,7 @@ export default function Dashboard({
                       )}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          className="secondary compact icon-btn"
-                          aria-label={`Actions for ${h.ticker}`}
-                        >
-                          <MoreHorizontal size={16} />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => openCompany(h.ticker)}
-                          >
-                            View company
-                          </DropdownMenuItem>
-                          {h.shares > 0 && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEditing(null);
-                                setTrade(
-                                  blankTrade(
-                                    h.ticker,
-                                    'sell',
-                                    h.quote?.price ?? null,
-                                  ),
-                                );
-                              }}
-                            >
-                              Sell
-                            </DropdownMenuItem>
-                          )}
-                          {h.shares > 0 && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEditingDividend(null);
-                                setDividend(blankDividend(h.ticker));
-                              }}
-                            >
-                              Dividend
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setCreatingCompany(false);
-                              setCompany({
-                                ...p.companies.find(
-                                  (c) => c.ticker === h.ticker,
-                                )!,
-                              });
-                            }}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {holdingActions(h)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1457,6 +1818,9 @@ export default function Dashboard({
               values exclude cash and unrecorded corporate actions.
             </p>
           </section>
+          {widePulse === false && <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />}
+          </>
+          )}
         </TabsContent>
         <TabsContent value="reports">
           <PortfolioReports portfolio={p} />
@@ -1470,6 +1834,7 @@ export default function Dashboard({
             setFeePct={setFees}
             busy={busy}
             onSave={save}
+            onRecordBuys={recordPicks}
             onRefreshPrices={refresh}
             onOpenCompany={openCompany}
             onManualPrice={(ticker) => {
@@ -1480,23 +1845,16 @@ export default function Dashboard({
           />
         </TabsContent>
         <TabsContent value="history">
-          <div className="section-top">
-            <div>
-              <h2>Purchase log</h2>
-              <p>
-                Every purchase, sale, dividend and split in one dated timeline.
-                Open a company for its own page.
-              </p>
-            </div>
+          <div className="activity-head">
+            <h2>Activity</h2>
             <button
+              className="compact"
               disabled={busy}
-              onClick={() => {
-                setEditing(null);
-                setTrade(blankTrade(p.companies[0]?.ticker ?? 'MEBL'));
-              }}
+              onClick={() => openTx('buy')}
             >
-              <Plus size={16} /> Add purchase
+              <Plus size={15} /> Add transaction
             </button>
+            <p>Every buy, sale, dividend and split, newest first.</p>
           </div>
           <LedgerTimeline
             portfolio={p}
@@ -1514,28 +1872,16 @@ export default function Dashboard({
               taxed={taxedDividends}
               busy={busy}
               onBack={() => setTab('holdings')}
-              onAddPurchase={() => {
-                setEditing(null);
-                setTrade(blankTrade(companyTicker));
-              }}
-              onSell={() => {
-                setEditing(null);
-                setTrade(
-                  blankTrade(
-                    companyTicker,
-                    'sell',
-                    hs.find((h) => h.ticker === companyTicker)?.quote?.price ?? null,
-                  ),
-                );
-              }}
-              onDividend={() => {
-                setEditingDividend(null);
-                setDividend(blankDividend(companyTicker));
-              }}
-              onSplit={() => {
-                setEditingStockSplit(null);
-                setStockSplit(blankStockSplit(companyTicker));
-              }}
+              onAddPurchase={() => openTx('buy', companyTicker)}
+              onSell={() =>
+                openTx(
+                  'sell',
+                  companyTicker,
+                  hs.find((h) => h.ticker === companyTicker)?.quote?.price ?? null,
+                )
+              }
+              onDividend={() => openTx('dividend', companyTicker)}
+              onSplit={() => openTx('split', companyTicker)}
               onEdit={() => {
                 const c = p.companies.find((x) => x.ticker === companyTicker);
                 if (!c) return;
@@ -1576,6 +1922,14 @@ export default function Dashboard({
             onImportCdc={importCdc}
             onImportFinqalab={importFinqalab}
             onImportAhl={importAhl}
+            dividendSync={
+              <DividendSyncView
+                portfolio={p}
+                revision={revision}
+                busy={busy}
+                onSave={async (next, message) => { await save(next, message); }}
+              />
+            }
           />
         </TabsContent>
         <TabsContent value="notifications">
@@ -1591,368 +1945,399 @@ export default function Dashboard({
         <div className="row">
           <span>All amounts in PKR · Private saved ledger</span>
         </div>
-        <p>
-          Plans are estimates. Actual execution prices, fees, taxes and
-          corporate actions may differ. No orders are placed by this dashboard.
-        </p>
       </footer>
+      {confirmDialog}
+      {ahlStatement && (
+        <AhlImportDialog
+          statement={ahlStatement.statement}
+          fileName={ahlStatement.fileName}
+          portfolio={p}
+          revision={revision}
+          busy={busy}
+          onCancel={() => setAhlStatement(null)}
+          onCommit={async (next, message) => {
+            await save(next, message + unknownCostWarning(next));
+            setAhlStatement(null);
+          }}
+        />
+      )}
       <Dialog
-        open={!!trade}
-        onOpenChange={(open) => {
-          if (!open) setTrade(null);
-        }}
-      >
-        <DialogContent className="form-dialog">
-          <DialogTitle>
-            {editing
-              ? 'Correct transaction'
-              : trade?.kind === 'sell'
-                ? 'Record a sale'
-                : 'Record a purchase'}
-          </DialogTitle>
-          <DialogDescription>
-            {trade?.kind === 'opening'
-              ? 'Enter the original average purchase cost if known. The statement date remains the opening snapshot date.'
-              : 'Record the shares and actual price from your broker confirmation.'}
-          </DialogDescription>
-          {trade && (
-            <form onSubmit={(e) => attempt(() => record(e))}>
-              {!editing && trade.kind !== 'opening' && (
-                <div className="row" style={{ marginBottom: 16 }}>
-                  <button
-                    type="button"
-                    className={
-                      trade.kind === 'buy' ? 'compact' : 'secondary compact'
-                    }
-                    onClick={() =>
-                      setTrade({
-                        ...trade,
-                        kind: 'buy',
-                        month: today().slice(0, 7),
-                      })
-                    }
-                  >
-                    Buy
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      trade.kind === 'sell' ? 'compact' : 'secondary compact'
-                    }
-                    onClick={() =>
-                      setTrade({
-                        ...trade,
-                        kind: 'sell',
-                        month: '',
-                        price:
-                          trade.price ?? p.quotes[trade.ticker]?.price ?? null,
-                      })
-                    }
-                  >
-                    Sell
-                  </button>
-                </div>
-              )}
-              <div className="form-grid">
-                <label>
-                  Company symbol
-                  <input
-                    list="symbols"
-                    required
-                    value={trade.ticker}
-                    onChange={(e) =>
-                      setTrade({
-                        ...trade,
-                        ticker: e.target.value.toUpperCase(),
-                      })
-                    }
-                  />
-                  <datalist id="symbols">
-                    {p.companies.map((c) => (
-                      <option key={c.ticker} value={c.ticker}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </datalist>
-                </label>
-                <label>
-                  {trade.kind === 'opening'
-                    ? 'Opening snapshot date'
-                    : 'Trade date'}
-                  <input
-                    type="date"
-                    max={today()}
-                    required
-                    value={trade.date}
-                    onChange={(e) =>
-                      setTrade({ ...trade, date: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Number of shares
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    required
-                    value={trade.shares}
-                    onChange={(e) =>
-                      setTrade({ ...trade, shares: Number(e.target.value) })
-                    }
-                  />
-                </label>
-                <label>
-                  {trade.kind === 'opening'
-                    ? 'Average cost per share (optional)'
-                    : 'Price per share (PKR)'}
-                  <input
-                    type="number"
-                    min="0.0001"
-                    step="any"
-                    required={trade.kind !== 'opening'}
-                    value={trade.price ?? ''}
-                    onChange={(e) =>
-                      setTrade({
-                        ...trade,
-                        price:
-                          e.target.value === '' ? null : Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Fees (PKR)
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={trade.fees}
-                    onChange={(e) =>
-                      setTrade({ ...trade, fees: Number(e.target.value) })
-                    }
-                  />
-                </label>
-                {trade.kind === 'buy' && (
-                  <label>
-                    SIP month (optional)
-                    <input
-                      type="month"
-                      value={trade.month}
-                      onChange={(e) =>
-                        setTrade({ ...trade, month: e.target.value })
-                      }
-                    />
-                  </label>
-                )}
-                <label className="wide">
-                  Note
-                  <textarea
-                    maxLength={2000}
-                    value={trade.note}
-                    onChange={(e) =>
-                      setTrade({ ...trade, note: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              <p>
-                {trade.price === null
-                  ? 'Cost remains unknown.'
-                  : `Cash ${trade.kind === 'sell' ? 'received' : 'invested'}: ${money(trade.shares * trade.price + (trade.kind === 'sell' ? -trade.fees : trade.fees))}`}
-              </p>
-              <div className="row">
-                <button disabled={busy} type="submit">
-                  Save {trade.kind === 'sell' ? 'sale' : 'entry'}
-                </button>
-                {editing && (
-                  <button
-                    className="secondary"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          'Void this entry? Its audit record will remain.',
-                        )
-                      )
-                        return;
-                      attempt(async () => {
-                        const next = clone(p);
-                        next.trades.find((t) => t.id === editing)!.voided =
-                          true;
-                        await save(next, 'Entry voided.');
-                        setTrade(null);
-                      });
-                    }}
-                  >
-                    Void entry
-                  </button>
-                )}
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!stockSplit}
+        open={!!(trade || dividend || stockSplit)}
         onOpenChange={(open) => {
           if (!open) {
-            setStockSplit(null);
-            setEditingStockSplit(null);
+            setPickQueue(null);
+            closeTx();
           }
         }}
       >
-        <DialogContent className="form-dialog">
-          <DialogTitle>
-            {editingStockSplit ? 'Correct stock split' : 'Record stock split'}
-          </DialogTitle>
-          <DialogDescription>
-            A split changes the number of shares held before its effective date.
-            Total purchase cost stays unchanged.
-          </DialogDescription>
-          {stockSplit && (
-            <form onSubmit={(e) => attempt(() => recordStockSplit(e))}>
-              <div className="form-grid">
-                <label>
-                  Company symbol
-                  <input required disabled value={stockSplit.ticker} />
-                </label>
-                <label>
-                  Effective date
-                  <input
-                    type="date"
-                    max={today()}
-                    required
-                    value={stockSplit.date}
-                    onChange={(e) =>
-                      setStockSplit({ ...stockSplit, date: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Old shares
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    required
-                    value={stockSplit.oldShares}
-                    onChange={(e) =>
-                      setStockSplit({
-                        ...stockSplit,
-                        oldShares: Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  New shares
-                  <input
-                    type="number"
-                    min={stockSplit.oldShares + 1}
-                    step="1"
-                    required
-                    value={stockSplit.newShares}
-                    onChange={(e) =>
-                      setStockSplit({
-                        ...stockSplit,
-                        newShares: Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-                <label className="wide">
-                  Note
-                  <textarea
-                    maxLength={2000}
-                    placeholder="For example: Face value changed from PKR 10 to PKR 2."
-                    value={stockSplit.note}
-                    onChange={(e) =>
-                      setStockSplit({ ...stockSplit, note: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              {(() => {
-                try {
-                  const base = clone(p);
-                  if (editingStockSplit) {
-                    const old = (base.stockSplits ?? []).find(
-                      (entry) => entry.id === editingStockSplit,
-                    );
-                    if (old) old.voided = true;
+        <DialogContent className="form-dialog tx-dialog">
+          {(() => {
+            const correcting = !!(editing || editingDividend || editingStockSplit);
+            const t = trade,
+              d = dividend,
+              sp = stockSplit;
+            const ticker =
+              txType === 'dividend' ? d?.ticker : txType === 'split' ? sp?.ticker : t?.ticker;
+            const owned = !!ticker && p.companies.some((c) => c.ticker === ticker);
+            const isTrade = txType === 'buy' || txType === 'sell' || txType === 'opening';
+            const addNew =
+              !correcting && isTrade && txType !== 'sell' && !!ticker && !owned &&
+              /^[A-Z0-9]{2,12}$/.test(ticker);
+            const date = (isTrade ? t?.date : txType === 'dividend' ? d?.date : sp?.date) ?? '';
+            const title = correcting
+              ? txType === 'dividend'
+                ? 'Correct dividend'
+                : txType === 'split'
+                  ? 'Correct stock split'
+                  : 'Correct transaction'
+              : 'Add transaction';
+            const description = {
+              buy: 'Record the shares and actual price from your broker confirmation.',
+              sell: 'Record the shares and actual price from your broker confirmation.',
+              opening:
+                'Enter the original average purchase cost if known. The statement date remains the opening snapshot date.',
+              dividend:
+                'Enter the per-share amount from your dividend notice. The gross amount is computed from the shares you held on the payment date.',
+              split:
+                'A split or bonus issue changes the number of shares held before its effective date. Total purchase cost stays unchanged. A 1 for 4 bonus is 4 old shares becoming 5 new.',
+            }[txType];
+            const voidEntry = async () => {
+              const ok = () =>
+                confirm({
+                  title: `Void this ${editing ? 'entry' : editingDividend ? 'dividend record' : 'stock split'}?`,
+                  description: 'Its audit record will remain.',
+                  confirmLabel: 'Void',
+                  destructive: true,
+                });
+              if (editing) {
+                if (!(await ok())) return;
+                attempt(async () => {
+                  const next = clone(p);
+                  next.trades.find((x) => x.id === editing)!.voided = true;
+                  await save(next, 'Entry voided.');
+                  closeTx();
+                });
+              } else if (editingDividend) {
+                if (!(await ok())) return;
+                attempt(async () => {
+                  const next = clone(p);
+                  next.dividends!.find((x) => x.id === editingDividend)!.voided = true;
+                  await save(next, 'Dividend record voided.');
+                  closeTx();
+                });
+              } else if (editingStockSplit) {
+                if (!(await ok())) return;
+                attempt(async () => {
+                  const next = clone(p);
+                  next.stockSplits!.find((x) => x.id === editingStockSplit)!.voided = true;
+                  await save(next, 'Stock split voided.');
+                  closeTx();
+                });
+              }
+            };
+            return (
+              <>
+                <DialogTitle>{pickQueue ? `Pick ${pickQueue.index + 1} of ${pickQueue.picks.length} · ${title}` : title}</DialogTitle>
+                <DialogDescription>{description}</DialogDescription>
+                <form
+                  onSubmit={(e) =>
+                    attempt(() =>
+                      txType === 'dividend'
+                        ? recordDividend(e)
+                        : txType === 'split'
+                          ? recordStockSplit(e)
+                          : record(e),
+                    )
                   }
-                  const before = sharesHeldBefore(
-                    base,
-                    stockSplit.ticker,
-                    stockSplit.date,
-                  );
-                  const after =
-                    (before * stockSplit.newShares) / stockSplit.oldShares;
-                  const preview = clone(base);
-                  preview.stockSplits ??= [];
-                  preview.stockSplits.push(stockSplit);
-                  validate(preview);
-                  const result = holdings(preview).find(
-                    (entry) => entry.ticker === stockSplit.ticker,
-                  );
-                  return (
-                    <div className="mini-stat split-preview">
-                      <span>Preview</span>
-                      <b>
-                        {before.toLocaleString()} → {after.toLocaleString()} shares
-                        on {stockSplit.date}
-                      </b>
-                      <small>
-                        Current: {result?.shares.toLocaleString() ?? '—'} shares ·
-                        Total cost {result?.cost === null ? 'unknown' : money(result?.cost ?? null)} ·
-                        Average {result?.average === null ? 'unknown' : money(result?.average ?? null)}
-                      </small>
+                >
+                  {!correcting && (
+                    <fieldset className="tx-types">
+                      <legend className="sr-only">Transaction type</legend>
+                      {TX_TYPES.map((x) => (
+                        <button
+                          key={x.type}
+                          type="button"
+                          aria-pressed={txType === x.type}
+                          className={txType === x.type ? 'compact' : 'secondary compact'}
+                          onClick={() => switchTx(x.type)}
+                        >
+                          {x.label}
+                        </button>
+                      ))}
+                    </fieldset>
+                  )}
+                  <div className="form-grid">
+                    <div className="wide tx-field">
+                      <span>Company</span>
+                      <TickerPicker
+                        key={txType}
+                        value={ticker ?? ''}
+                        companies={p.companies}
+                        allowNew={!correcting && isTrade && txType !== 'sell'}
+                        disabled={correcting && !isTrade}
+                        onChange={(v) => patchTx({ ticker: v })}
+                      />
                     </div>
-                  );
-                } catch (error) {
-                  return (
-                    <p className="notice error">
-                      {error instanceof Error ? error.message : String(error)}
+                    {addNew && (
+                      <div className="wide tx-newco">
+                        <p>
+                          <b>Add {ticker} to your companies</b>
+                          <span>
+                            {' '}
+                            It is not in your portfolio yet. Its name and sector come from the shared
+                            PSX company directory; the company and this entry are saved together.
+                          </span>
+                        </p>
+                        <CompanyLookupNote lookup={txLookup} ticker={ticker ?? ''} />
+                        <div className="form-grid">
+                          <label>
+                            Company name
+                            <input readOnly value={lookupReady(txLookup, ticker ?? '') ? txCompany.name : ''} placeholder="Found from the PSX directory" />
+                          </label>
+                          <label>
+                            Sector
+                            <input readOnly value={lookupReady(txLookup, ticker ?? '') ? txCompany.sector : ''} placeholder="Found from the PSX directory" />
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                    <label>
+                      {txType === 'opening'
+                        ? 'Opening snapshot date'
+                        : txType === 'dividend'
+                          ? 'Payment date'
+                          : txType === 'split'
+                            ? 'Effective date'
+                            : 'Trade date'}
+                      <input
+                        type="date"
+                        max={today()}
+                        required
+                        value={date}
+                        onChange={(e) => patchTx({ date: e.target.value })}
+                      />
+                    </label>
+                    {isTrade && t && (
+                      <>
+                        <label>
+                          Number of shares
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            step="1"
+                            required
+                            value={t.shares || ''}
+                            onChange={(e) => setTrade({ ...t, shares: Number(e.target.value) })}
+                          />
+                        </label>
+                        <label>
+                          {txType === 'opening'
+                            ? 'Average cost per share (optional)'
+                            : 'Price per share (PKR)'}
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min="0.0001"
+                            step="any"
+                            required={txType !== 'opening'}
+                            value={t.price ?? ''}
+                            onChange={(e) =>
+                              setTrade({
+                                ...t,
+                                price: e.target.value === '' ? null : Number(e.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Fees (PKR)
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            placeholder="0"
+                            value={t.fees || ''}
+                            onChange={(e) => setTrade({ ...t, fees: Number(e.target.value) })}
+                          />
+                        </label>
+                        {txType === 'buy' && (
+                          <label>
+                            SIP month (optional)
+                            <input
+                              type="month"
+                              value={t.month}
+                              onChange={(e) => setTrade({ ...t, month: e.target.value })}
+                            />
+                          </label>
+                        )}
+                      </>
+                    )}
+                    {txType === 'dividend' && d && (
+                      <label>
+                        Dividend per share (PKR)
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="any"
+                          required
+                          value={d.perShare || ''}
+                          onChange={(e) => setDividend({ ...d, perShare: Number(e.target.value) })}
+                        />
+                      </label>
+                    )}
+                    {txType === 'split' && sp && (
+                      <>
+                        <label>
+                          Old shares
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            step="1"
+                            required
+                            placeholder="e.g. 4"
+                            value={sp.oldShares || ''}
+                            onChange={(e) =>
+                              setStockSplit({ ...sp, oldShares: Number(e.target.value) })
+                            }
+                          />
+                        </label>
+                        <label>
+                          New shares
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={sp.oldShares + 1}
+                            step="1"
+                            required
+                            placeholder="e.g. 5"
+                            value={sp.newShares || ''}
+                            onChange={(e) =>
+                              setStockSplit({ ...sp, newShares: Number(e.target.value) })
+                            }
+                          />
+                        </label>
+                      </>
+                    )}
+                    <label className="wide">
+                      Note
+                      <textarea
+                        maxLength={2000}
+                        placeholder={
+                          txType === 'split'
+                            ? 'For example: 25% bonus, or face value changed from PKR 10 to PKR 2.'
+                            : undefined
+                        }
+                        value={(isTrade ? t?.note : txType === 'dividend' ? d?.note : sp?.note) ?? ''}
+                        onChange={(e) => patchTx({ note: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  {isTrade && t && (
+                    <p>
+                      {txType === 'opening' && t.price === null
+                        ? 'Cost remains unknown.'
+                        : t.shares > 0 && t.price !== null
+                          ? `Cash ${txType === 'sell' ? 'received' : txType === 'opening' ? 'cost' : 'invested'}: ${money(t.shares * t.price + (txType === 'sell' ? -t.fees : t.fees))}${t.fees ? ' incl. fees' : ''}`
+                          : 'Enter shares and price to see the cash total.'}
                     </p>
-                  );
-                }
-              })()}
-              <div className="row">
-                <button disabled={busy} type="submit">
-                  Save stock split
-                </button>
-                {editingStockSplit && (
-                  <button
-                    className="secondary"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          'Void this stock split? Its audit record will remain.',
-                        )
-                      )
-                        return;
-                      attempt(async () => {
-                        const next = clone(p);
-                        next.stockSplits!.find(
-                          (entry) => entry.id === editingStockSplit,
-                        )!.voided = true;
-                        await save(next, 'Stock split voided.');
-                        setStockSplit(null);
-                        setEditingStockSplit(null);
-                      });
-                    }}
-                  >
-                    Void entry
-                  </button>
-                )}
-              </div>
-            </form>
-          )}
+                  )}
+                  {txType === 'dividend' && d && (() => {
+                    const shares = d.ticker ? sharesHeldOn(p, d.ticker, d.date) : 0;
+                    const gross = round((d.perShare ?? 0) * shares);
+                    const rate = p.taxProfile
+                      ? p.taxProfile.filerStatus === 'filer'
+                        ? 0.15
+                        : 0.3
+                      : null;
+                    return (
+                      <p>
+                        {shares} shares held on {d.date} · Gross {money(gross)}
+                        {rate === null
+                          ? ' · Set your filer status in Settings to estimate tax.'
+                          : ` · Tax ${money(round(gross * rate))} · Net ${money(round(gross * (1 - rate)))}`}
+                      </p>
+                    );
+                  })()}
+                  {txType === 'split' && sp && (() => {
+                    if (!sp.ticker || sp.oldShares <= 0 || sp.newShares <= 0)
+                      return (
+                        <p className="muted">
+                          Pick a company and enter the old and new share counts to see a preview.
+                        </p>
+                      );
+                    try {
+                      const base = clone(p);
+                      if (editingStockSplit) {
+                        const old = (base.stockSplits ?? []).find((x) => x.id === editingStockSplit);
+                        if (old) old.voided = true;
+                      }
+                      const before = sharesHeldBefore(base, sp.ticker, sp.date);
+                      const after = (before * sp.newShares) / sp.oldShares;
+                      const preview = clone(base);
+                      preview.stockSplits ??= [];
+                      preview.stockSplits.push(sp);
+                      validate(preview);
+                      const result = holdings(preview).find((x) => x.ticker === sp.ticker);
+                      return (
+                        <div className="mini-stat split-preview">
+                          <span>Preview</span>
+                          <b>
+                            {before.toLocaleString()} → {after.toLocaleString()} shares on {sp.date}
+                          </b>
+                          <small>
+                            Current: {result?.shares.toLocaleString() ?? '—'} shares · Total cost{' '}
+                            {result?.cost === null ? 'unknown' : money(result?.cost ?? null)} · Average{' '}
+                            {result?.average === null ? 'unknown' : money(result?.average ?? null)}
+                          </small>
+                        </div>
+                      );
+                    } catch (error) {
+                      return (
+                        <p className="notice error">
+                          {error instanceof Error ? error.message : String(error)}
+                        </p>
+                      );
+                    }
+                  })()}
+                  <div className="row tx-actions">
+                    <button disabled={busy || (addNew && !lookupReady(txLookup, ticker ?? ''))} type="submit">
+                      {txType === 'sell'
+                        ? 'Save sale'
+                        : txType === 'dividend'
+                          ? 'Save dividend'
+                          : txType === 'split'
+                            ? 'Save stock split'
+                            : 'Save entry'}
+                    </button>
+                    {pickQueue && (
+                      <button
+                        className="secondary"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => openPick(pickQueue, pickQueue.index + 1)}
+                      >
+                        Skip
+                      </button>
+                    )}
+                    {correcting && (
+                      <button
+                        className="secondary"
+                        type="button"
+                        disabled={busy}
+                        onClick={voidEntry}
+                      >
+                        Void entry
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
       <Dialog
@@ -2016,118 +2401,6 @@ export default function Dashboard({
         </DialogContent>
       </Dialog>
       <Dialog
-        open={!!dividend}
-        onOpenChange={(open) => {
-          if (!open) setDividend(null);
-        }}
-      >
-        <DialogContent className="form-dialog">
-          <DialogTitle>
-            {editingDividend ? 'Correct dividend' : 'Record a dividend'}
-          </DialogTitle>
-          <DialogDescription>
-            Enter the per-share amount from your dividend notice. The gross
-            amount is computed from the shares you held on the payment date.
-          </DialogDescription>
-          {dividend && (
-            <form onSubmit={(e) => attempt(() => recordDividend(e))}>
-              <div className="form-grid">
-                <label>
-                  Company symbol
-                  <input required disabled value={dividend.ticker} />
-                </label>
-                <label>
-                  Payment date
-                  <input
-                    type="date"
-                    max={today()}
-                    required
-                    value={dividend.date}
-                    onChange={(e) =>
-                      setDividend({ ...dividend, date: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Dividend per share (PKR)
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    required
-                    value={dividend.perShare ?? 0}
-                    onChange={(e) =>
-                      setDividend({
-                        ...dividend,
-                        perShare: Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-                <label className="wide">
-                  Note
-                  <textarea
-                    maxLength={2000}
-                    value={dividend.note}
-                    onChange={(e) =>
-                      setDividend({ ...dividend, note: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              {(() => {
-                const shares = sharesHeldOn(p, dividend.ticker, dividend.date);
-                const gross = round((dividend.perShare ?? 0) * shares);
-                const rate = p.taxProfile
-                  ? p.taxProfile.filerStatus === 'filer'
-                    ? 0.15
-                    : 0.3
-                  : null;
-                return (
-                  <p>
-                    {shares} shares held on {dividend.date} · Gross{' '}
-                    {money(gross)}
-                    {rate === null
-                      ? ' · Set your filer status in Settings to estimate tax.'
-                      : ` · Tax ${money(round(gross * rate))} · Net ${money(round(gross * (1 - rate)))}`}
-                  </p>
-                );
-              })()}
-              <div className="row">
-                <button disabled={busy} type="submit">
-                  Save dividend
-                </button>
-                {editingDividend && (
-                  <button
-                    className="secondary"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          'Void this dividend record? Its audit record will remain.',
-                        )
-                      )
-                        return;
-                      attempt(async () => {
-                        const next = clone(p);
-                        next.dividends!.find(
-                          (d) => d.id === editingDividend,
-                        )!.voided = true;
-                        await save(next, 'Dividend record voided.');
-                        setDividend(null);
-                      });
-                    }}
-                  >
-                    Void entry
-                  </button>
-                )}
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog
         open={!!company}
         onOpenChange={(open) => {
           if (!open) {
@@ -2162,39 +2435,52 @@ export default function Dashboard({
                 </label>
                 <label>
                   Company name
-                  <input
-                    required
-                    maxLength={150}
-                    value={company.name}
-                    onChange={(e) =>
-                      setCompany({ ...company, name: e.target.value })
-                    }
-                  />
+                  {creatingCompany ? (
+                    <input readOnly value={lookupReady(companyLookup, company.ticker) ? company.name : ''} placeholder="Found from the PSX directory" />
+                  ) : (
+                    <input
+                      required
+                      maxLength={150}
+                      value={company.name}
+                      onChange={(e) =>
+                        setCompany({ ...company, name: e.target.value })
+                      }
+                    />
+                  )}
                 </label>
                 <label>
                   Sector
-                  <select
-                    required
-                    value={company.sector ?? ''}
-                    onChange={(e) =>
-                      setCompany({
-                        ...company,
-                        sector: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="" disabled>
-                      Select sector
-                    </option>
-                    {Array.from(new Set([...SECTORS, ...sectorsInUse]))
-                      .sort()
-                      .map((sector) => (
-                        <option key={sector} value={sector}>
-                          {sector}
-                        </option>
-                      ))}
-                  </select>
+                  {creatingCompany ? (
+                    <input readOnly value={lookupReady(companyLookup, company.ticker) ? company.sector : ''} placeholder="Found from the PSX directory" />
+                  ) : (
+                    <select
+                      required
+                      value={company.sector ?? ''}
+                      onChange={(e) =>
+                        setCompany({
+                          ...company,
+                          sector: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="" disabled>
+                        Select sector
+                      </option>
+                      {Array.from(new Set([...SECTORS, ...sectorsInUse, ...(company.sector ? [company.sector] : [])]))
+                        .sort()
+                        .map((sector) => (
+                          <option key={sector} value={sector}>
+                            {sector}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                 </label>
+                {creatingCompany && (
+                  <div className="wide">
+                    <CompanyLookupNote lookup={companyLookup} ticker={company.ticker} />
+                  </div>
+                )}
                 <label>
                   Target weight (%)
                   <input
@@ -2224,6 +2510,8 @@ export default function Dashboard({
                         faceValue: e.target.value
                           ? Number(e.target.value)
                           : undefined,
+                        // A value typed here is the account's own, no longer an assumption.
+                        faceValueAssumed: undefined,
                       })
                     }
                   />
@@ -2261,17 +2549,24 @@ export default function Dashboard({
               </div>
               <p className="muted">
                 {creatingCompany
-                  ? 'The symbol is checked against PSX before this company is saved.'
+                  ? 'Enter the PSX symbol; the company name and sector come from the shared PSX company directory and cannot be edited.'
                   : 'This existing symbol has already been created in your portfolio.'}{' '}
                 Screens older than 183 days pause new allocations. Total targets
                 must equal 100%; calculator caps new exposure at 20% per
                 company.
               </p>
-              <button disabled={busy}>Save company</button>
+              <button disabled={busy || (creatingCompany && !lookupReady(companyLookup, company.ticker))}>Save company</button>
             </form>
           )}
         </DialogContent>
       </Dialog>
+      <TargetsEditor
+        portfolio={p}
+        open={targetsOpen}
+        busy={busy}
+        onOpenChange={setTargetsOpen}
+        onSave={(next, message) => save(next, message)}
+      />
       <Dialog
         open={!!quoteTicker}
         onOpenChange={(open) => {
@@ -2340,6 +2635,7 @@ export default function Dashboard({
         </DialogContent>
       </Dialog>
     </main>
+    <Toaster />
     </CompanyNavProvider>
   );
 }
