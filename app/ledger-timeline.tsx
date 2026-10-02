@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, Pencil, Search } from 'lucide-react';
 import {
   money,
+  realizedSales,
   type Dividend,
   type Portfolio,
   type StockSplit,
@@ -199,6 +200,16 @@ export default function LedgerTimeline({
     () => new Map(portfolio.companies.map((c) => [c.ticker, c.name])),
     [portfolio.companies],
   );
+  // Realized gain per sale (average-cost basis), keyed like the ledger entries.
+  const gains = useMemo(() => {
+    const out = new Map<string, number | null>();
+    try {
+      for (const s of realizedSales(portfolio)) out.set('t' + s.tradeId, s.realizedGain);
+    } catch {
+      // An invalid ledger is reported elsewhere; skip gains rather than break Activity.
+    }
+    return out;
+  }, [portfolio]);
   const voidedCount = entries.filter((e) => e.voided).length;
   const q = query.trim().toLowerCase();
   const visible = entries.filter(
@@ -217,6 +228,11 @@ export default function LedgerTimeline({
       .filter((e) => types.includes(e.type) && !e.expected)
       .reduce((a, e) => a + (e.amount ?? 0), 0);
   const fees = live.reduce((a, e) => a + (e.fees ?? 0), 0);
+  const sales = live.filter((e) => e.type === 'sell');
+  const pnlKnown = sales.filter((e) => gains.get(e.key) != null);
+  const pnl = cents(pnlKnown.reduce((a, e) => a + (gains.get(e.key) ?? 0), 0));
+  const pnlUnknown = sales.length - pnlKnown.length;
+  const signed = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '') + money(Math.abs(n));
 
   const groups: [string, LedgerEntry[]][] = [];
   for (const e of visible) {
@@ -248,6 +264,17 @@ export default function LedgerTimeline({
         <div>
           <span>Sold</span>
           <b>{money(cents(sum(['sell'])))}</b>
+        </div>
+        <div>
+          <span>Realized profit / loss</span>
+          {sales.length === 0 ? (
+            <b>—</b>
+          ) : (
+            <b className={pnl > 0 ? 'pos-text' : pnl < 0 ? 'neg-text' : undefined}>
+              {signed(pnl)}
+            </b>
+          )}
+          {pnlUnknown > 0 && <small>{pnlUnknown} sale(s) without a cost basis</small>}
         </div>
         <div>
           <span>Dividends received</span>
@@ -366,6 +393,15 @@ export default function LedgerTimeline({
                       </span>
                       <small>
                         {e.detail}
+                        {e.type === 'sell' && !e.voided && gains.get(e.key) != null && (
+                          <>
+                            {' · '}
+                            <span className={gains.get(e.key)! >= 0 ? 'pos-text' : 'neg-text'}>
+                              {gains.get(e.key)! >= 0 ? 'Profit ' : 'Loss '}
+                              {money(Math.abs(gains.get(e.key)!))}
+                            </span>
+                          </>
+                        )}
                         {e.voided ? ' · voided' : ''}
                       </small>
                       {!e.voided && e.confirm && (

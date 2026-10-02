@@ -1,8 +1,8 @@
 /* Activity timeline + company page */
-.ledger-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.ledger-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .ledger-kpis div{border:1px solid var(--card-border);border-radius:12px;background:var(--card);padding:14px 18px}
 .ledger-kpis span{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.7px;font-weight:700;color:var(--muted-foreground)}
-.ledger-kpis b{display:block;margin-top:6px;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.ledger-kpis small{margin-top:4px;font-size:11px}.ledger-kpis b{display:block;margin-top:6px;font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
 .ledger-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px;padding:8px 0}
 .seg{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03)}
 .seg button{background:transparent!important;color:var(--muted-foreground)!important;box-shadow:none!important;border-radius:7px!important;padding:6px 12px!important;font-size:13px!important;transform:none!important}
