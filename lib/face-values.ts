@@ -127,7 +127,7 @@ export function extractFaceValueEvidence(rawText: string, ctx: ExtractContext): 
 
   // The tail is a lookahead so one statement never swallows the next ("... Rs. 10 each and ... Rs. 100 each").
   const stated = new RegExp(
-    String.raw`(?:(?:face|par|nominal)\s+value\s+(?:of\s+|is\s+|was\s+)?(?:the\s+(?:company's\s+)?(?:ordinary\s+)?shares?\s+(?:is\s+|of\s+)?)?|shares?\s+of\s+)${RS}\s*${AMOUNT}\s*(?:\/-)?(?=(?<tail>[\s\S]{0,120}))`,
+    String.raw`(?:(?:face|par|nominal)\s+value\s+(?:of\s+|is\s+|was\s+)?(?:the\s+(?:company(?:'s)?\s+)?(?:ordinary\s+)?shares?\s+(?:is\s+|of\s+)?)?|shares?\s+of\s+)${RS}\s*${AMOUNT}\s*(?:\/-)?(?=(?<tail>[\s\S]{0,120}))`,
     'gi',
   );
   const found: { value: number; unchanged: boolean; snippet: string }[] = [];
