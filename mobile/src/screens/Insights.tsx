@@ -6,6 +6,7 @@ import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
 import { signedMoney, signedPercent } from '@/data/format';
 import { usePortfolio } from '@/data/usePortfolio';
 import { useTheme } from '@/theme/ThemeProvider';
+import { BenchmarkCard, MoneyWeightedReturnCard, ValueVsMoneyInCard } from '@/ui/TrackRecordCards';
 import { Amount, Card, Collapsible, Loading, Muted, Notice, ProgressBar, Stat, useKitStyles } from '@/ui/kit';
 
 function Bar({ label, value, fraction, tone }: { label: string; value: string; fraction: number; tone?: string }) {
@@ -75,6 +76,9 @@ export function Insights() {
         </Muted>
       </Card>
 
+      <ValueVsMoneyInCard />
+      <MoneyWeightedReturnCard />
+
       <Collapsible title="Allocation" defaultOpen>
         {r.companyAllocation.map((a) => (
           <Bar key={a.ticker} label={a.ticker} value={pct(a.weight)} fraction={a.weight / maxAlloc} />
@@ -135,12 +139,7 @@ export function Insights() {
         <Muted>How this is calculated: realised gain is sales at average cost, after fees. Only dividends marked received count; expected ones do not.</Muted>
       </Collapsible>
 
-      <Collapsible title="Compare with KSE-100">
-        <Muted>
-          A fair comparison needs daily KSE-100 history matched to when you added money. That history is not collected yet, so Sipwise draws no benchmark line rather than an
-          unfair one.
-        </Muted>
-      </Collapsible>
+      <BenchmarkCard />
     </>
   );
 }

@@ -47,3 +47,34 @@ export function LineChart({ points, height = 150, label = 'Price chart' }: { poi
     </View>
   );
 }
+
+export type ChartSeries = { points: [number, number][]; color: string; dashed?: boolean; width?: number };
+
+/**
+ * Two or more lines on shared axes (value against money in, portfolio against the index). The lines differ by
+ * stroke style as well as colour (the comparison is dashed), and `label` is the text alternative.
+ */
+export function MultiLineChart({ series, height = 170, label }: { series: ChartSeries[]; height?: number; label: string }) {
+  const [width, setWidth] = useState(0);
+  const pad = 6;
+  const all = series.flatMap((s) => s.points);
+  const paths: { d: string; s: ChartSeries }[] = [];
+  if (width > 0 && all.length > 1) {
+    const [x0, x1] = [Math.min(...all.map((p) => p[0])), Math.max(...all.map((p) => p[0]))];
+    const [y0, y1] = [Math.min(...all.map((p) => p[1])), Math.max(...all.map((p) => p[1]))];
+    const sx = (x: number) => pad + ((x - x0) / (x1 - x0 || 1)) * (width - pad * 2);
+    const sy = (y: number) => height - pad - ((y - y0) / (y1 - y0 || 1)) * (height - pad * 2);
+    for (const s of series) paths.push({ s, d: s.points.map((p, i) => `${i ? 'L' : 'M'}${sx(p[0]).toFixed(1)} ${sy(p[1]).toFixed(1)}`).join(' ') });
+  }
+  return (
+    <View style={{ height }} accessible accessibilityRole="image" accessibilityLabel={label} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      {paths.length ? (
+        <Svg width={width} height={height}>
+          {paths.map(({ d, s }, i) => (
+            <Path key={i} d={d} stroke={s.color} strokeWidth={s.width ?? 2} strokeDasharray={s.dashed ? '6 5' : undefined} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+          ))}
+        </Svg>
+      ) : null}
+    </View>
+  );
+}
