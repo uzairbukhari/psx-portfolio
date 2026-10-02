@@ -2,7 +2,7 @@
 // Pure over injected `post`/`get`/`sleep`, so the web UI and the tests share it. Polling is read-only:
 // stopping it (navigation, unmount) never cancels the server-side work, and a later page load resumes it.
 import type { QuotesResponse } from './api-types.ts';
-import { QUOTE_MESSAGES, type QuoteJob } from './quote-jobs.ts';
+import { QUOTE_MESSAGES, type QuoteJob } from './quote-job-types.ts';
 
 export const QUOTE_POLL_MS = 5_000;
 /** The server fails a request after 20 minutes; the client gives up a little later. */

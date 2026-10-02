@@ -1,7 +1,7 @@
 // Bookkeeping around one run of scripts/psx-quote-scrape.mjs: which open `quotes` requests it serves,
 // and how it completes them. `d1(sql, params)` is the scripts/d1-rest.mjs shape, so tests can drive it
 // with node:sqlite.
-import type { QuoteOutcome } from './quote-jobs.ts';
+import type { QuoteOutcome } from './quote-job-types.ts';
 import { REQUEST_TIMEOUT_MS } from './workflow-requests.ts';
 
 export type D1Query = (sql: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;

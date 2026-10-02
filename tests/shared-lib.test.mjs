@@ -29,6 +29,7 @@ const SHARED = [
   'security-catalog',
   'face-values',
   'ipo-offers',
+  'quote-job-types',
 ];
 const FORBIDDEN = /from\s+['"](cloudflare:|next\/|@\/|react-dom|node:)/;
 

@@ -206,7 +206,9 @@ export const evidenceFromStored = (r: StoredFace): FaceValueEvidence => ({
 });
 
 /** Evidence rows for the given tickers (chunked under D1's bound-parameter limit). */
-export async function readFaceValues(db: D1Database, tickers: string[]): Promise<Record<string, FaceValueEvidence[]>> {
+/** The slice of D1Database this needs, so the module stays free of Workers typings (it is shared with the mobile app). */
+type FaceValueDb = { prepare(sql: string): { bind(...args: unknown[]): { all<T>(): Promise<{ results: T[] }> } } };
+export async function readFaceValues(db: FaceValueDb, tickers: string[]): Promise<Record<string, FaceValueEvidence[]>> {
   const out: Record<string, FaceValueEvidence[]> = {};
   const unique = [...new Set(tickers)];
   for (let i = 0; i < unique.length; i += 90) {

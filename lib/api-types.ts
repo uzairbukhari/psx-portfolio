@@ -81,7 +81,7 @@ export type QuotesResponse = {
   /** Additive: per-ticker provider, source/fetch times, session and session-aware freshness. */
   meta?: Record<string, import('./market-meta.ts').DataMeta>;
   /** Additive: the manual-refresh job (state, verified per-ticker outcomes, the one user-facing message). */
-  job?: import('./quote-jobs.ts').QuoteJob;
+  job?: import('./quote-job-types.ts').QuoteJob;
 };
 
 export type UsageResponse = { inputTokens: number; outputTokens: number; costUsd: number };
