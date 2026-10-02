@@ -162,6 +162,11 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
               </div>
             )}
             <p className="mp-thesis">{pick.thesis}</p>
+            {!!pick.evidenceRefs?.length && (
+              <p className="muted" aria-label="Evidence cited">
+                Evidence: {pick.evidenceRefs.map((ref) => `${ref.label} ${ref.value}`).join(' · ')}
+              </p>
+            )}
             <div className="mp-quantity">
               {pick.shares === null ? (
                 <>

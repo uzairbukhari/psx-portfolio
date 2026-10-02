@@ -220,3 +220,16 @@ test('a completed run is reused only while holdings are unchanged', async () => 
   const fresh = await startRun(env, OWNER, body());
   assert.notEqual(fresh.id, first.id, 'new holdings start a new run');
 });
+
+test('the run snapshot freezes holdings, index context and policy versions', async () => {
+  const { env, db } = world();
+  db.sqlite.prepare("INSERT INTO market_summary_refreshes (id,payload,fetched_at,updated_at) VALUES ('latest',?,?,?)")
+    .run(JSON.stringify({ index: { close: 168346.16, asOf: '2026-10-02 15:11:00' } }), 'x', 'x');
+  const started = await startRun(env, OWNER, body());
+  const row = await drive(env, started.id);
+  const snapshot = JSON.parse(row.snapshot);
+  assert.deepEqual(snapshot.inputs.index, { code: 'KSE100', close: 168346.16, asOf: '2026-10-02 15:11:00' });
+  assert.equal(snapshot.inputs.policy.concentrationCapPct, 20);
+  assert.deepEqual(snapshot.inputs.holdings, []);
+  assert.ok(JSON.parse(row.result).versions.policy >= 3);
+});

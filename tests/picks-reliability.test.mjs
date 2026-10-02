@@ -103,3 +103,12 @@ test('an AI answer whose picks are all invalid is still rejected', () => {
   const raw = { marketOutlook: 'x', picks: [{ ticker: 'NOPE', allocationPct: 50, confidence: 'High', thesis: 'x' }], coverage: [], unallocatedPct: 50 };
   assert.equal(sanitizePicks(raw, snap()), null);
 });
+
+test('share estimates need a price from the latest completed session, not any price under 7 days old', async () => {
+  const { estimateMonthlyPicks } = await import('../lib/monthly-picks.ts');
+  const result = { marketOutlook: 'x', picks: [{ ticker: 'AAA', name: 'A', allocationPct: 20, confidence: 'High', thesis: 't', catalysts: [], risks: [], sourceUrls: [], evidenceStatus: 'ready' }], coverage: [], unallocatedPct: 80 };
+  const quote = (date) => ({ quotes: { AAA: { price: 100, asOf: 'x', date, source: 's', fetchedAt: `${date}T10:00:00Z` } } });
+  const now = new Date('2026-09-23T06:00:00Z'); // Wednesday 11:00 PKT; Tuesday 22nd is the latest completed session
+  assert.notEqual(estimateMonthlyPicks(result, quote('2026-09-22'), 100000, 0, now)[0].shares, null, 'last close is current');
+  assert.equal(estimateMonthlyPicks(result, quote('2026-09-18'), 100000, 0, now)[0].shares, null, 'a 5-day-old price is stale');
+});

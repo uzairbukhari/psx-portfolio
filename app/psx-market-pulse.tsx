@@ -134,19 +134,30 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       return;
     }
     let source: EventSource | null = null;
+    // Native EventSource reconnects forever; bound it so a failing feed falls back to delayed polling.
+    let failures = 0;
+    let retryTimer: number | undefined;
     const connect = () => {
       if (document.hidden || source) return;
       source = new EventSource('/api/market-stream');
       source.addEventListener('status', (event) => {
-        const status = JSON.parse((event as MessageEvent<string>).data) as { connected?: boolean };
+        const status = JSON.parse((event as MessageEvent<string>).data) as { connected?: boolean; reason?: string };
         liveActive.current = status.connected === true;
         setLiveConnected(liveActive.current);
+        if (status.connected === true) failures = 0;
+        else if (status.reason) {
+          // Server closed an idle or long-lived stream: reconnect once, after a pause.
+          source?.close();
+          source = null;
+          retryTimer = window.setTimeout(connect, 5000);
+        }
       });
       source.addEventListener('quote', (event) => {
-        const update = JSON.parse((event as MessageEvent<string>).data) as PypsxLiveQuote;
+        const update = JSON.parse((event as MessageEvent<string>).data) as PypsxLiveQuote & { timeKnown?: boolean };
         liveActive.current = true;
         setLiveConnected(true);
-        setLiveReceivedAt(update.receivedAt);
+        // A tick without a provider timestamp updates the price but is not shown as a freshly timed quote.
+        if (update.timeKnown !== false) setLiveReceivedAt(update.receivedAt);
         setSummary((current) => {
           if (!current) return current;
           const providerOpen = update.providerMarketState === 'OPN';
@@ -176,7 +187,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
                 low: update.low ?? company.low,
                 volume: update.volume ?? company.volume,
                 sourceTimestamp: update.sourceTimestamp ?? company.sourceTimestamp,
-                retrievedAt: update.receivedAt,
+                retrievedAt: update.timeKnown === false ? company.retrievedAt : update.receivedAt,
               };
             }),
           };
@@ -185,6 +196,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       source.onerror = () => {
         liveActive.current = false;
         setLiveConnected(false);
+        source?.close();
+        source = null;
+        failures += 1;
+        if (failures <= 3) retryTimer = window.setTimeout(connect, 5000 * 3 ** (failures - 1));
       };
     };
     const visibility = () => {
@@ -198,6 +213,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     connect();
     document.addEventListener('visibilitychange', visibility);
     return () => {
+      window.clearTimeout(retryTimer);
       source?.close();
       liveActive.current = false;
       document.removeEventListener('visibilitychange', visibility);

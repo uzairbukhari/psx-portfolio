@@ -18,12 +18,12 @@ import {
 } from './monthly-picks-flow.ts';
 import { takeRateLimit, waitText } from './rate-limit.ts';
 import {
-  WORKFLOW_VERSION, MIN_ADVANCE_VERSION, MODEL, BUDGET_USD, PICK_RESERVE,
+  WORKFLOW_VERSION, POLICY_VERSION, MIN_ADVANCE_VERSION, MODEL, BUDGET_USD, PICK_RESERVE,
   pickRequest, sanitizePicks, quantResult, outputText, usage,
   type ProviderResponse, type SnapshotV8,
 } from './monthly-picks-ai.ts';
 import type { MonthlyPicksResearch } from './monthly-picks.ts';
-import { applySizing, holdingsFingerprint, type HoldingValue } from './monthly-picks-allocation.ts';
+import { applySizing, holdingsFingerprint, CONTRIBUTION_CAP_PCT, CONCENTRATION_CAP_PCT, type HoldingValue } from './monthly-picks-allocation.ts';
 import { newProgress, parseProgress, progressPercent, withStep, isIndeterminate, type RunProgress } from './monthly-picks-progress.ts';
 import { UserError } from './user-error.ts';
 
@@ -133,7 +133,8 @@ async function heldValues(env: RunEnv, owner: string): Promise<HoldingValue[]> {
   return holdings(portfolio).filter((h) => h.shares > 0).map((h) => ({ ticker: h.ticker, valuePkr: h.value }));
 }
 
-async function buildSnapshot(env: RunEnv, row: Pick<Row, 'month' | 'amount' | 'created_at'>, shortlist: string[]): Promise<SnapshotV8> {
+async function buildSnapshot(env: RunEnv, row: Pick<Row, 'month' | 'amount' | 'created_at' | 'user_id'>, shortlist: string[]): Promise<SnapshotV8> {
+  const owner = row.user_id;
   const dataAsOf = today();
   const entries = await readFacts(env.db, shortlist);
   const quotes = new Map((await readQuoteRows(env.db).catch(() => [])).map((quote) => [quote.ticker, quote]));
@@ -163,7 +164,24 @@ async function buildSnapshot(env: RunEnv, row: Pick<Row, 'month' | 'amount' | 'c
   return {
     generatedOn: row.created_at.slice(0, 10), contributionMonth: row.month, freshMoneyPkr: row.amount,
     shortlist: [...shortlist], dataAsOf, companies, scores,
+    inputs: {
+      holdings: await heldValues(env, owner),
+      index: await indexContext(env),
+      policy: {
+        workflow: WORKFLOW_VERSION, policy: POLICY_VERSION, model: MODEL,
+        contributionCapPct: CONTRIBUTION_CAP_PCT, concentrationCapPct: CONCENTRATION_CAP_PCT, factsMaxAgeDays: FACTS_MAX_AGE_DAYS,
+      },
+    },
   };
+}
+
+/** KSE-100 as last stored by the market scraper, frozen into the run for context. */
+async function indexContext(env: RunEnv) {
+  try {
+    const saved = await env.db.prepare("SELECT payload FROM market_summary_refreshes WHERE id='latest'").first<{ payload: string }>();
+    const index = saved ? (JSON.parse(saved.payload) as { index?: { close?: number; asOf?: string } }).index : undefined;
+    return index && Number.isFinite(index.close) && index.asOf ? { code: 'KSE100', close: Number(index.close), asOf: index.asOf } : null;
+  } catch { return null; }
 }
 
 // ---------------------------------------------------------------- guarded writes

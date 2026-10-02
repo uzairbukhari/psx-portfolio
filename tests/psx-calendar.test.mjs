@@ -86,3 +86,12 @@ test('entitlement outside a fully known calendar year is flagged uncertain', () 
   assert.equal(dividendEntitlement('2025-08-20').certain, false);
   assert.equal(dividendEntitlement('2026-08-20').certain, true);
 });
+
+test('latestCompletedSessionDate: after the close, before the open, weekend, holiday', async () => {
+  const { latestCompletedSessionDate } = await import('../lib/psx-calendar.ts');
+  assert.equal(latestCompletedSessionDate(new Date('2026-09-22T11:00:00Z')), '2026-09-22', 'Tuesday 16:00 PKT, after the close');
+  assert.equal(latestCompletedSessionDate(new Date('2026-09-22T06:00:00Z')), '2026-09-21', 'Tuesday 11:00 PKT, session still open');
+  assert.equal(latestCompletedSessionDate(new Date('2026-09-26T06:00:00Z')), '2026-09-25', 'Saturday');
+  assert.equal(latestCompletedSessionDate(new Date('2026-03-23T12:00:00Z')), '2026-03-19', 'Pakistan Day plus Eid closures');
+  assert.equal(latestCompletedSessionDate(new Date('2026-09-25T10:00:00Z')), '2026-09-24', 'Friday 15:00 PKT, before the 16:30 close');
+});

@@ -114,7 +114,11 @@ export function MarketPulse() {
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         <StatusChip tone="neutral" text={`Market ${summary.market.label.toLowerCase()}${summary.market.estimated ? ' (estimated)' : ''}`} />
         <StatusChip tone="neutral" text="Index delayed" icon="info" />
-        {status === 'live' ? <StatusChip tone="primary" text="Live prices" icon="refresh" /> : null}
+        {status === 'live'
+          ? rows.some((r) => r.sourceTimestamp)
+            ? <StatusChip tone="primary" text="Live prices" icon="refresh" />
+            : <StatusChip tone="neutral" text="Connected, awaiting timed quotes" icon="info" />
+          : null}
       </View>
       {rows.length ? (
         <View style={{ gap: 4 }}>

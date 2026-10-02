@@ -239,6 +239,7 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
                 </View>
               </View>
               <Text style={styles.text}>{r.thesis}</Text>
+              {r.evidenceRefs?.length ? <Muted>Evidence: {r.evidenceRefs.map((ref) => `${ref.label} ${ref.value}`).join(' · ')}</Muted> : null}
               {r.risks.length ? <Muted>Risks: {r.risks.join('; ')}</Muted> : null}
               <Sources item={r} />
               {r.shares !== null && r.price !== null ? (

@@ -80,3 +80,19 @@ export function dividendEntitlement(bookClosureStart: string): Entitlement {
     certain: calendarCovers(bookClosureStart) && calendarCovers(t1),
   };
 }
+
+const PKT_OFFSET_MS = 5 * 3_600_000;
+/** Minutes after midnight PKT when the regular session closes, plus PSX's few minutes to publish closing prices. */
+const closeMinutes = (weekday: number) => (weekday === 5 ? 16 * 60 + 30 : 15 * 60 + 30) + 10;
+
+/**
+ * PKT date of the most recent regular session that has finished at `now`: today once the close has
+ * printed on a trading day, otherwise the previous trading day. Weekends and holidays are skipped.
+ */
+export function latestCompletedSessionDate(now: Date): string {
+  const pkt = new Date(now.getTime() + PKT_OFFSET_MS);
+  const date = iso(pkt);
+  const minutes = pkt.getUTCHours() * 60 + pkt.getUTCMinutes();
+  if (isTradingDay(date) && minutes >= closeMinutes(pkt.getUTCDay())) return date;
+  return lastTradingDay(shift(date, -1));
+}
