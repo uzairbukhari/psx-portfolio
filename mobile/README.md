@@ -49,3 +49,7 @@ The scripts publish for Android only (`--platform android`): a bare `eas update`
 ```
 npm run update:staging -- --message "what changed"
 ```
+
+### Automatic updates on merge
+
+`.github/workflows/mobile-update.yml` runs `update:staging` after every merge to `main` that touches `mobile/**` or `lib/**` (it can also be run by hand from the Actions tab). It type-checks and tests first, then publishes to the `staging` channel only, so it never spends a build. One-time setup: create an Expo access token (expo.dev > Account settings > Access tokens) and add it as the repository secret `EXPO_TOKEN`; without it the workflow skips. Changes to native code or `app.config.ts` plugins still need a manual `eas build`, because installed apps only accept updates for their own app version. Production stays manual (`npm run update:production`) until a production build is installed.
