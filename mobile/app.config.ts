@@ -35,6 +35,7 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
   backgroundColor: '#05070d',
+  owner: 'uzairbukhari',
   ios: { bundleIdentifier: bundleId, supportsTablet: false },
   android: {
     package: bundleId,
