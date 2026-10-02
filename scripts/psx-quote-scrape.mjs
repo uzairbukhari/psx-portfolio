@@ -17,7 +17,8 @@ import { d1, heldTickers as sharedHeldTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents } from '../lib/psx-market.ts';
-import { mergeIndexSnapshot, parseSupportedIndices } from '../lib/index-snapshot.ts';
+import { CATALOG_CHUNK, catalogRowParams, catalogUpsertSql } from '../lib/security-catalog.ts';
+import { growIndexSeries, mergeIndexSnapshot, parseSupportedIndices } from '../lib/index-snapshot.ts';
 import { fetchPsxQuote } from '../lib/psx-quotes.ts';
 import { QUOTE_ROWS_PER_STATEMENT, quoteRowParams, quoteUpsertSql, refreshStateSql } from '../lib/quote-write.ts';
 
@@ -67,6 +68,7 @@ export function buildMarketSummary(previous, index, constituents, retrievedAt, p
     index,
     // All four supported indices, merged per index so one failed panel keeps its last good value.
     indices: parsedIndices ? mergeIndexSnapshot(previous?.indices, parsedIndices, retrievedAt) : previous?.indices,
+    indexSeries: parsedIndices ? growIndexSeries(previous?.indexSeries, parsedIndices.indices) : previous?.indexSeries,
     series: series.slice(-MAX_SERIES_POINTS),
     quotes: constituents.map((row) => ({
       symbol: row.symbol,
@@ -158,6 +160,11 @@ async function main() {
   for (const message of failed) {
     const [ticker, ...rest] = message.split(': ');
     await d1(refreshStateSql(false), ['quote', ticker, now, rest.join(': ').slice(0, 300)]);
+  }
+  // Record every security PSX listed in this observation (shared catalog; no issuer or type is guessed).
+  for (let i = 0; i < constituents.length; i += CATALOG_CHUNK) {
+    const chunk = constituents.slice(i, i + CATALOG_CHUNK);
+    await d1(catalogUpsertSql(chunk.length), chunk.flatMap((row) => catalogRowParams({ ticker: row.symbol, name: row.name }, SOURCE, fetchedAt)));
   }
   const points = await writeMarketSummary(index, constituents, fetchedAt, parsedIndices);
   console.log(`Market summary: KSE100 ${index.close} (${points} chart points), ${constituents.length} ALLSHR quotes.`);

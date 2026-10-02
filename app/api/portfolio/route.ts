@@ -3,6 +3,7 @@ import { db, identity, failure } from '@/lib/server';
 import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';
 import { applyFacts, newTickers } from '@/lib/company-enrichment';
 import { gatherFacts } from '@/lib/company-facts-store';
+import { applyCatalog, readCatalog } from '@/lib/security-catalog';
 import { dispatchConfig } from '@/lib/dispatch-config';
 import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';
 import { readAnnouncements } from '@/lib/dividend-announcements';
@@ -60,6 +61,8 @@ export async function PUT(req: Request) {
       await gatherFacts(db(), dispatchConfig(), justAdded)
         .then((facts) => applyFacts(portfolio.companies, facts))
         .catch(() => {});
+      // Tickers PSX facts could not name yet get the name PSX lists in the shared catalog.
+      await readCatalog(db(), justAdded).then((catalog) => applyCatalog(portfolio.companies, catalog)).catch(() => {});
     }
     // Validate what is actually stored: after enrichment has filled company facts.
     validate(portfolio);

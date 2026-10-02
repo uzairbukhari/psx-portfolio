@@ -19,7 +19,7 @@ import {
   refreshQuotes,
 } from '@/lib/quote-cache';
 import { db, failure, identity } from '@/lib/server';
-import { INDEX_LABELS, SUPPORTED_INDICES, type IndexSnapshot } from '@/lib/index-snapshot';
+import { INDEX_LABELS, SUPPORTED_INDICES, type IndexSeries, type IndexSnapshot } from '@/lib/index-snapshot';
 import { dataMeta } from '@/lib/market-freshness';
 import { marketBreadth } from '@/lib/market-breadth';
 import { fetchPypsxIntradayFor, pypsxCredentialsFor } from '@/lib/pypsx-server';
@@ -47,6 +47,7 @@ interface MarketSummaryCache {
   index?: IndexSummary;
   /** KSE-100, KSE-30, KMI-30 and All-Share, each with its own source time and failure state. */
   indices?: IndexSnapshot;
+  indexSeries?: IndexSeries;
   series?: IndexPoint[];
   quotes?: MarketWatchQuote[];
 }
@@ -174,6 +175,9 @@ async function personalized(
           label: INDEX_LABELS[code],
           ...summary,
           retrievedAt: stored.retrievedAt,
+          // Sampled from real scrapes (one point each); gaps are never filled in.
+          series: cache.indexSeries?.[code] ?? [],
+          seriesKind: 'sampled' as const,
           // Source time and fetch time stay separate; a failed refresh never freshens old data.
           meta: dataMeta({
             provider: 'PSX Data Portal',
@@ -253,6 +257,7 @@ export async function POST(req: Request) {
     const cache: MarketSummaryCache = {
       // The Worker only refreshes KSE-100 itself; the scraper owns the other indices, so keep them.
       indices: previous.cache.indices,
+      indexSeries: previous.cache.indexSeries,
       index:
         indexResult.status === 'fulfilled' ? indexResult.value : previous.cache.index,
       series:

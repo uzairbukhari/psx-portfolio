@@ -233,3 +233,17 @@ test('the run snapshot freezes holdings, index context and policy versions', asy
   assert.deepEqual(snapshot.inputs.holdings, []);
   assert.ok(JSON.parse(row.result).versions.policy >= 3);
 });
+
+test('health warns about missed ingestion while the market is open and about unsettled scrapes', async () => {
+  const { env, db } = world();
+  const now = new Date('2026-09-22T06:00:00Z'); // Tuesday 11:00 PKT, market open
+  env.now = () => now;
+  db.sqlite.prepare("INSERT INTO quote_refreshes (ticker,price,as_of,quote_date,source,fetched_at,updated_at) VALUES ('AAA',1,'x','2026-09-22','s',?,?)")
+    .run('2026-09-22T05:00:00Z', 'x');
+  db.sqlite.prepare("INSERT INTO facts_requests (ticker,requested_at,attempted_at,error) VALUES ('AAA',?,NULL,NULL)").run('2026-09-22T05:30:00Z');
+  const health = await picksHealth(env);
+  assert.equal(health.marketOpen, true);
+  assert.equal(health.unsettledFactsRequests, 1);
+  assert.ok(health.warnings.some((w) => /market is open but the newest quote is 60 minutes old/.test(w)));
+  assert.ok(health.warnings.some((w) => /never finished/.test(w)));
+});

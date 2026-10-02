@@ -1,4 +1,6 @@
 import type { PriceHistoryBatchResponse, PriceHistoryResponse } from '@/lib/api-types';
+import { dataMeta } from '@/lib/market-freshness';
+import { pktDate, type PricePoint } from '@/lib/price-history';
 import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
 import { UserError } from '@/lib/user-error';
@@ -44,13 +46,28 @@ export async function GET(req: Request) {
         eod_fetched_at: string | null;
         intraday_fetched_at: string | null;
       }>();
+    const eod: PricePoint[] = row ? JSON.parse(row.eod) : [];
+    const intraday: PricePoint[] = row ? JSON.parse(row.intraday) : [];
+    // Judge a series by its newest point (the session it really covers), not by when it was fetched.
+    const metaFor = (points: PricePoint[], fetchedAt: string | null, precise: boolean) => {
+      const last = points.reduce((max, point) => Math.max(max, point[0]), 0);
+      return dataMeta({
+        provider: 'PSX Data Portal',
+        sourceUrl: `https://dps.psx.com.pk/company/${ticker}`,
+        sourceTimestamp: precise && last ? new Date(last * 1000).toISOString() : null,
+        sessionDate: last ? pktDate(last) : null,
+        fetchedAt,
+      });
+    };
     return Response.json(
       {
         ticker,
-        eod: row ? JSON.parse(row.eod) : [],
-        intraday: row ? JSON.parse(row.intraday) : [],
+        eod,
+        intraday,
         eodFetchedAt: row?.eod_fetched_at ?? null,
         intradayFetchedAt: row?.intraday_fetched_at ?? null,
+        eodMeta: metaFor(eod, row?.eod_fetched_at ?? null, false),
+        intradayMeta: metaFor(intraday, row?.intraday_fetched_at ?? null, true),
       } satisfies PriceHistoryResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );

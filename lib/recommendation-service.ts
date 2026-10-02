@@ -26,6 +26,7 @@ import type { MonthlyPicksResearch } from './monthly-picks.ts';
 import { applySizing, holdingsFingerprint, CONTRIBUTION_CAP_PCT, CONCENTRATION_CAP_PCT, type HoldingValue } from './monthly-picks-allocation.ts';
 import { newProgress, parseProgress, progressPercent, withStep, isIndeterminate, type RunProgress } from './monthly-picks-progress.ts';
 import { UserError } from './user-error.ts';
+import { pakistanMarketState } from './psx-market.ts';
 
 export type RunEnv = {
   db: D1Database;
@@ -575,6 +576,9 @@ export type PicksHealth = {
   quoteLagMinutes: number | null;
   recentFactsErrors: { ticker: string; error: string; attemptedAt: string | null }[];
   providerRequests24h: number;
+  marketOpen: boolean;
+  /** On-demand facts scrapes requested over 15 minutes ago that never settled. */
+  unsettledFactsRequests: number;
   warnings: string[];
 };
 
@@ -593,7 +597,17 @@ export async function picksHealth(env: RunEnv): Promise<PicksHealth> {
   const errors = (await env.db.prepare('SELECT ticker,error,attempted_at FROM facts_requests WHERE error IS NOT NULL ORDER BY attempted_at DESC LIMIT 5').all<{ ticker: string; error: string; attempted_at: string | null }>()).results;
   const requests = await one<{ n: number }>("SELECT COUNT(*) AS n FROM recommendation_attempts WHERE created_at>=?", dayAgo);
   const quoteLagMinutes = quote?.last ? Math.round((nowDate.getTime() - Date.parse(quote.last)) / 60_000) : null;
+  const market = pakistanMarketState(nowDate);
+  const unsettled = await one<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM facts_requests WHERE (attempted_at IS NULL OR attempted_at<requested_at) AND requested_at<?',
+    new Date(nowDate.getTime() - 15 * 60_000).toISOString(),
+  );
   const warnings: string[] = [];
+  // Missed ingestion: during a session the GitHub scraper should land a quote refresh every few minutes
+  // (GitHub may delay or drop scheduled runs, so a gap is worth surfacing, not assuming).
+  if (market.isOpen && (quoteLagMinutes === null || quoteLagMinutes > 30))
+    warnings.push(`The market is open but the newest quote is ${quoteLagMinutes === null ? 'missing' : `${quoteLagMinutes} minutes old`}. Check the PSX quotes workflow.`);
+  if ((unsettled?.n ?? 0) > 0) warnings.push(`${unsettled!.n} company-data request(s) were dispatched over 15 minutes ago and never finished.`);
   if ((stuck?.n ?? 0) > 0) warnings.push(`${stuck!.n} active run(s) have not progressed for over 10 minutes — check that the quote-refresh Worker cron (every minute) is deployed and running.`);
   if (!facts?.last) warnings.push('No company facts have ever been stored.');
   if (quoteLagMinutes !== null && quoteLagMinutes > 24 * 60 * 3) warnings.push('Quote cache has not been updated for over three days.');
@@ -610,6 +624,8 @@ export async function picksHealth(env: RunEnv): Promise<PicksHealth> {
     quoteLagMinutes,
     recentFactsErrors: errors.map((e) => ({ ticker: e.ticker, error: e.error, attemptedAt: e.attempted_at })),
     providerRequests24h: requests?.n ?? 0,
+    marketOpen: market.isOpen,
+    unsettledFactsRequests: unsettled?.n ?? 0,
     warnings,
   };
 }

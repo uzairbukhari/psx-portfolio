@@ -317,6 +317,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
               <span className={entry.change >= 0 ? 'pos' : 'neg'}>
                 {entry.change >= 0 ? '▲' : '▼'} {Math.abs(entry.change).toLocaleString()} ({entry.changePercent.toFixed(2)}%)
               </span>
+              <Sparkline points={entry.series} up={entry.change >= 0} />
               <small className={`pulse-fresh pulse-fresh--${entry.meta.freshness}`} title={entry.meta.reason}>
                 {entry.meta.freshness === 'fresh' ? 'Fresh' : entry.meta.freshness === 'delayed' ? 'Delayed' : 'Stale'} · {entry.asOf}
               </small>

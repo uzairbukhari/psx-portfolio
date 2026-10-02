@@ -25,6 +25,8 @@ const SHARED = [
   'monthly-picks-progress',
   'market-meta',
   'api-validate',
+  'portfolio-counts',
+  'security-catalog',
 ];
 const FORBIDDEN = /from\s+['"](cloudflare:|next\/|@\/|react-dom|node:)/;
 

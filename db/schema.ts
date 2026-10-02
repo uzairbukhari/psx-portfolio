@@ -137,6 +137,18 @@ export const refreshState = sqliteTable(
   (table) => [primaryKey({ columns: [table.kind, table.key] })],
 );
 
+// Shared catalog of securities seen in validated PSX observations (the All-Share table). It records
+// what PSX lists, not issuer identity: `security_type` stays null until a source states it.
+export const securityCatalog = sqliteTable('security_catalog', {
+  ticker: text('ticker').primaryKey(),
+  name: text('name').notNull(),
+  sector: text('sector'),
+  securityType: text('security_type'),
+  source: text('source').notNull(),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+});
+
 export const aiUsage = sqliteTable(
   'ai_usage',
   {

@@ -46,3 +46,16 @@ test('a failure with nothing stored creates no entry (never a zero)', () => {
   const merged = mergeIndexSnapshot(null, { indices: {}, failures: { KSE30: 'x' } }, '2026-10-02T05:00:00Z');
   assert.deepEqual(merged, {});
 });
+
+test('sampled series: one real point per new observation, reset each day, never interpolated', async () => {
+  const { growIndexSeries } = await import('../lib/index-snapshot.ts');
+  const at = (asOf, close) => ({ KSE30: { asOf, date: asOf.slice(0, 10), close } });
+  let series = growIndexSeries(null, at('2026-10-01 15:00:00', 100));
+  series = growIndexSeries(series, at('2026-10-02 10:00:00', 101));
+  assert.equal(series.KSE30.length, 1, 'yesterday point dropped on a new day');
+  series = growIndexSeries(series, at('2026-10-02 10:05:00', 102));
+  series = growIndexSeries(series, at('2026-10-02 10:05:00', 999));
+  series = growIndexSeries(series, at('2026-10-02 09:00:00', 5));
+  assert.deepEqual(series.KSE30.map((p) => p.value), [101, 102], 'repeat and older observations add nothing');
+  assert.equal(growIndexSeries(series, {}).KSE30.length, 2, 'a failed index keeps its series');
+});

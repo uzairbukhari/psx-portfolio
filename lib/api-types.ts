@@ -61,6 +61,8 @@ export type QuotesResponse = {
   errors: string[];
   reasons: Record<string, string>;
   stale: Record<string, string>;
+  /** Additive: per-ticker provider, source/fetch times, session and session-aware freshness. */
+  meta?: Record<string, import('./market-meta.ts').DataMeta>;
 };
 
 export type UsageResponse = { inputTokens: number; outputTokens: number; costUsd: number };
@@ -71,6 +73,9 @@ export type PriceHistoryResponse = {
   intraday: PricePoint[];
   eodFetchedAt: string | null;
   intradayFetchedAt: string | null;
+  /** Additive: freshness of the daily and intraday series, judged by their last point, not by fetch time. */
+  eodMeta?: import('./market-meta.ts').DataMeta;
+  intradayMeta?: import('./market-meta.ts').DataMeta;
 };
 export type PriceHistoryBatchResponse = {
   histories: Record<string, { eod: PricePoint[] }>;
@@ -139,7 +144,8 @@ export type PicksHealthResponse = {
   failedLast24h: number; completedLast24h: number; lastCompletedAt: string | null;
   lastFactsFetchedAt: string | null; lastQuoteFetchedAt: string | null; quoteLagMinutes: number | null;
   recentFactsErrors: { ticker: string; error: string; attemptedAt: string | null }[];
-  providerRequests24h: number; warnings: string[]; backgroundProcessing: boolean;
+  providerRequests24h: number; marketOpen: boolean; unsettledFactsRequests: number;
+  warnings: string[]; backgroundProcessing: boolean;
 };
 
 /** One of the four supported indices in GET /api/market-summary `summary.indices`. */
@@ -157,6 +163,9 @@ export type MarketIndexView = {
   low: number;
   ytdChangePercent: number;
   retrievedAt: string;
+  /** Sampled intraday points (one per scrape); empty when none yet. */
+  series: { time: number; value: number }[];
+  seriesKind: 'sampled';
   meta: import('./market-meta.ts').DataMeta;
 };
 

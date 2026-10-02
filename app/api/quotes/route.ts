@@ -1,4 +1,6 @@
 import type { QuotesResponse } from '@/lib/api-types';
+import { dataMeta } from '@/lib/market-freshness';
+import { quoteObservedAt } from '@/lib/quote-write';
 import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
 import { refreshQuotes } from '@/lib/quote-cache';
@@ -49,8 +51,23 @@ export async function POST(req: Request) {
     const errors = Object.keys(failed);
     if (!Object.keys(quotes).length && errors.length)
       throw new UserError('Every PSX quote request failed.');
+    const at = new Date().toISOString();
+    const meta = Object.fromEntries(
+      Object.entries(quotes).map(([ticker, quote]) => [
+        ticker,
+        dataMeta({
+          provider: 'PSX Data Portal',
+          sourceUrl: quote.source,
+          sourceTimestamp: quoteObservedAt(quote.asOf),
+          sessionDate: quote.date,
+          fetchedAt: quote.fetchedAt,
+          // A failed refresh is reported next to the old value; it never makes the value look newer.
+          lastFailure: stale[ticker] ? { at, message: stale[ticker] } : null,
+        }),
+      ]),
+    );
     return Response.json(
-      { quotes, errors, reasons: failed, stale } satisfies QuotesResponse,
+      { quotes, errors, reasons: failed, stale, meta } satisfies QuotesResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

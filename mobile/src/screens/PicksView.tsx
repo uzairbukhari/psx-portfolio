@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { money } from '@shared/portfolio.ts';
 import type { RecommendationRun } from '@shared/api-types.ts';
 import { pollIntervalMs } from '@shared/api-validate.ts';
+import { portfolioCounts } from '@shared/portfolio-counts.ts';
 import { explainSizing } from '@shared/monthly-picks-allocation.ts';
 import { PROGRESS_STEPS } from '@shared/monthly-picks-progress.ts';
 import { estimateMonthlyPicks, type MonthlyPicksResearch } from '@shared/monthly-picks.ts';
@@ -148,6 +149,7 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
 
       <Card>
         <SectionLabel>Companies to consider · {selected.length}/{MAX}</SectionLabel>
+        <Muted>{(() => { const c = portfolioCounts(portfolio, selected); return `${c.savedCompanies} saved · ${c.holdings} held · ${c.shortlisted} shortlisted`; })()}</Muted>
         <Input label="Search companies" value={query} onChangeText={setQuery} placeholder="Ticker or name" autoCapitalize="none" autoCorrect={false} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {targeted.length ? <Chip label="Use target companies" onPress={() => setShortlist(targeted.slice(0, MAX))} /> : null}

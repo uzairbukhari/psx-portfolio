@@ -60,3 +60,31 @@ export function mergeIndexSnapshot(
   }
   return next;
 }
+
+export type SeriesPoint = { time: number; value: number };
+export type IndexSeries = Partial<Record<IndexCode, SeriesPoint[]>>;
+const MAX_POINTS = 120;
+
+/** "2026-09-29 11:33:30" in Pakistan time (UTC+5) -> Unix seconds. */
+export function pktStampSeconds(stamp: string): number {
+  const [date, time = '00:00:00'] = stamp.split(' ');
+  return Math.round((Date.parse(`${date}T${time}Z`) - 5 * 3_600_000) / 1000);
+}
+
+/**
+ * Sampled intraday series: one real observed value per scrape, per index, reset each trading day.
+ * Nothing is interpolated or invented between samples, and a repeated or older observation adds no point.
+ */
+export function growIndexSeries(previous: IndexSeries | null | undefined, indices: ParsedIndices['indices']): IndexSeries {
+  const next: IndexSeries = { ...previous };
+  for (const code of SUPPORTED_INDICES) {
+    const summary = indices[code];
+    if (!summary) continue;
+    const time = pktStampSeconds(summary.asOf);
+    const dayStart = pktStampSeconds(`${summary.date} 00:00:00`);
+    const kept = (next[code] ?? []).filter((point) => point.time >= dayStart);
+    if (kept.length && kept[kept.length - 1].time >= time) { next[code] = kept; continue; }
+    next[code] = [...kept, { time, value: summary.close }].slice(-MAX_POINTS);
+  }
+  return next;
+}
