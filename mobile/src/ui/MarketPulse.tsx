@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import type { IndexPoint, IndexSummary, MarketState } from '@shared/psx-market.ts';
+import type { MarketBreadthView, MarketIndexView } from '@shared/api-types.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
 import { signedPercent } from '@/data/format';
@@ -15,7 +16,7 @@ import { LineChart } from './LineChart';
 import { Icon } from './Icon';
 import { Card, Muted, StatusChip, useKitStyles } from './kit';
 
-type Summary = { index: IndexSummary | null; series: IndexPoint[]; market: MarketState; live?: { available: boolean } };
+type Summary = { index: IndexSummary | null; indices?: MarketIndexView[]; breadth?: MarketBreadthView | null; series: IndexPoint[]; market: MarketState; live?: { available: boolean } };
 type Response = { summary?: Summary; fetchedAt?: string | null };
 
 const number = (n: number) => n.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -85,11 +86,39 @@ export function MarketPulse() {
           <Text style={{ color: tone, ...type.caption, fontVariant: ['tabular-nums'] }}>{signedPercent(index.changePercent)}</Text>
         </View>
       </View>
+      {summary.indices && summary.indices.length > 1 ? (
+        <View style={{ gap: 6 }} accessibilityLabel="Other indices">
+          {summary.indices.filter((entry) => entry.code !== 'KSE100').map((entry) => {
+            const entryUp = entry.change >= 0;
+            return (
+              <View key={entry.code} style={styles.row} accessible accessibilityLabel={`${entry.label} ${number(entry.close)}, ${signedPercentLabel(entry.changePercent)}, ${entry.meta.freshness}. ${entry.meta.reason}`}>
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={styles.text}>{entry.label}</Text>
+                  <Muted>{entry.meta.freshness === 'fresh' ? 'Fresh' : entry.meta.freshness === 'delayed' ? 'Delayed' : 'Stale'} · {entry.asOf}</Muted>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ color: colors.ink, ...type.number, fontVariant: ['tabular-nums'] }}>{number(entry.close)}</Text>
+                  <Text style={{ color: entryUp ? colors.gain : colors.loss, ...type.caption, fontVariant: ['tabular-nums'] }}>{signedPercent(entry.changePercent)}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+      {summary.breadth && summary.breadth.covered > 0 ? (
+        <Muted>
+          {summary.breadth.advances} up · {summary.breadth.declines} down · {summary.breadth.unchanged} unchanged across {summary.breadth.covered} securities in the {summary.breadth.source}.
+        </Muted>
+      ) : null}
       {points.length > 1 ? <LineChart points={points} height={70} label={`${index.name} today`} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         <StatusChip tone="neutral" text={`Market ${summary.market.label.toLowerCase()}${summary.market.estimated ? ' (estimated)' : ''}`} />
         <StatusChip tone="neutral" text="Index delayed" icon="info" />
-        {status === 'live' ? <StatusChip tone="primary" text="Live prices" icon="refresh" /> : null}
+        {status === 'live'
+          ? rows.some((r) => r.sourceTimestamp)
+            ? <StatusChip tone="primary" text="Live prices" icon="refresh" />
+            : <StatusChip tone="neutral" text="Connected, awaiting timed quotes" icon="info" />
+          : null}
       </View>
       {rows.length ? (
         <View style={{ gap: 4 }}>

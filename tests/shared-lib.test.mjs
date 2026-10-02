@@ -20,6 +20,14 @@ const SHARED = [
   'user-error',
   'ahl-import',
   'cdc-import',
+  'monthly-picks',
+  'monthly-picks-allocation',
+  'monthly-picks-progress',
+  'market-meta',
+  'api-validate',
+  'portfolio-counts',
+  'security-catalog',
+  'ipo-offers',
 ];
 const FORBIDDEN = /from\s+['"](cloudflare:|next\/|@\/|react-dom|node:)/;
 

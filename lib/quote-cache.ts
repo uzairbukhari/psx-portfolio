@@ -1,8 +1,9 @@
-import { quoteSupersedes, type Quote } from './portfolio.ts';
+import { isValidQuote, quoteSupersedes, type Quote } from './portfolio.ts';
 import { fetchBudget, type FetchBudget } from './psx-fetch.ts';
 import { pakistanMarketState } from './psx-market.ts';
 import { fetchPsxQuote } from './psx-quotes.ts';
 import { isTradingDay } from './psx-calendar.ts';
+import { QUOTE_ROWS_PER_STATEMENT, quoteRowParams, quoteUpsertSql, refreshStateSql } from './quote-write.ts';
 
 /**
  * `quote_refreshes` is the one shared, cross-user PSX quote cache. The cron
@@ -81,7 +82,9 @@ export function mergeQuotes(
   for (const row of rows) {
     if (!wanted.has(row.ticker)) continue;
     const cached = rowToQuote(row);
-    if (quoteSupersedes(cached, merged[row.ticker])) merged[row.ticker] = cached;
+    // A malformed cache row must never reach a portfolio, where it would fail every save.
+    if (isValidQuote(cached) && quoteSupersedes(cached, merged[row.ticker]))
+      merged[row.ticker] = cached;
   }
   return merged;
 }
@@ -150,40 +153,28 @@ export async function readQuoteRows(db: D1Database): Promise<QuoteRow[]> {
   return rows.results;
 }
 
-// D1 allows 100 bound parameters per statement; 7 per row.
-const ROWS_PER_STATEMENT = 14;
-
-/** Upserts quotes in as few D1 statements as possible (one batch call). */
+/** Upserts quotes in as few D1 statements as possible (one batch call); older observations lose. */
 export async function writeQuotes(db: D1Database, quotes: Record<string, Quote>) {
   const entries = Object.entries(quotes);
   if (!entries.length) return;
   const now = new Date().toISOString();
   const statements: D1PreparedStatement[] = [];
-  for (let index = 0; index < entries.length; index += ROWS_PER_STATEMENT) {
-    const chunk = entries.slice(index, index + ROWS_PER_STATEMENT);
+  for (let index = 0; index < entries.length; index += QUOTE_ROWS_PER_STATEMENT) {
+    const chunk = entries.slice(index, index + QUOTE_ROWS_PER_STATEMENT);
     statements.push(
-      db
-        .prepare(
-          `INSERT INTO quote_refreshes (ticker,price,as_of,quote_date,source,fetched_at,updated_at)
-           VALUES ${chunk.map(() => '(?,?,?,?,?,?,?)').join(',')}
-           ON CONFLICT(ticker) DO UPDATE SET
-             price=excluded.price, as_of=excluded.as_of, quote_date=excluded.quote_date,
-             source=excluded.source, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
-        )
-        .bind(
-          ...chunk.flatMap(([ticker, quote]) => [
-            ticker,
-            quote.price,
-            quote.asOf,
-            quote.date,
-            quote.source,
-            quote.fetchedAt,
-            now,
-          ]),
-        ),
+      db.prepare(quoteUpsertSql(chunk.length)).bind(...chunk.flatMap(([ticker, quote]) => quoteRowParams(ticker, quote, now))),
+      ...chunk.map(([ticker]) => db.prepare(refreshStateSql(true)).bind('quote', ticker, now, now)),
     );
   }
   await db.batch(statements);
+}
+
+/** Notes failed attempts so a failure is visible, and so the ticker is not retried ahead of untried ones. */
+export async function recordQuoteFailures(db: D1Database, failures: Record<string, string>) {
+  const entries = Object.entries(failures);
+  if (!entries.length) return;
+  const now = new Date().toISOString();
+  await db.batch(entries.map(([ticker, reason]) => db.prepare(refreshStateSql(false)).bind('quote', ticker, now, reason.slice(0, 300))));
 }
 
 export interface QuoteRefresh {
@@ -222,6 +213,11 @@ export async function refreshQuotes(
   const cached = new Map(
     (await readQuoteRows(db)).map((row) => [row.ticker, rowToQuote(row)]),
   );
+  // Last attempt per ticker (successful or not): among equally stale tickers, the one tried least recently goes first.
+  const attempted = new Map(
+    (await db.prepare("SELECT key, last_attempt_at FROM refresh_state WHERE kind='quote'").all<{ key: string; last_attempt_at: string | null }>()
+      .catch(() => ({ results: [] as { key: string; last_attempt_at: string | null }[] }))).results.map((r) => [r.key, r.last_attempt_at ?? '']),
+  );
   const result: QuoteRefresh = { quotes: {}, fetched: [], stale: {}, failed: {} };
   const due: string[] = [];
   for (const ticker of tickers) {
@@ -230,7 +226,9 @@ export async function refreshQuotes(
     if (force || !quote || !isFresh(quote.fetchedAt, now)) due.push(ticker);
   }
   due.sort((a, b) =>
-    (cached.get(a)?.fetchedAt ?? '').localeCompare(cached.get(b)?.fetchedAt ?? ''),
+    (cached.get(a)?.fetchedAt ?? '').localeCompare(cached.get(b)?.fetchedAt ?? '') ||
+    (attempted.get(a) ?? '').localeCompare(attempted.get(b) ?? '') ||
+    a.localeCompare(b),
   );
 
   const fresh: Record<string, Quote> = {};
@@ -238,10 +236,17 @@ export async function refreshQuotes(
     if (result.quotes[ticker]) result.stale[ticker] = reason;
     else result.failed[ticker] = reason;
   };
+  let blocked = false;
   for (let index = 0; index < due.length; index += CONCURRENCY) {
     await Promise.all(
       due.slice(index, index + CONCURRENCY).map(async (ticker) => {
-        if (budget.left <= 0) return miss(ticker, 'Refresh limit reached; try again shortly.');
+        if (budget.left <= 0)
+          return miss(
+            ticker,
+            blocked
+              ? 'Skipped: PSX is refusing requests from this network, so prices come from the scheduled scraper.'
+              : 'Refresh limit reached; try again shortly.',
+          );
         try {
           await sleep(Math.random() * MAX_JITTER_MS);
           const quote = await fetchQuote(ticker, budget);
@@ -250,12 +255,20 @@ export async function refreshQuotes(
           result.fetched.push(ticker);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown failure';
-          if (BLOCKED.test(message)) budget.left = 0;
+          if (BLOCKED.test(message)) {
+            blocked = true;
+            budget.left = 0;
+          }
           miss(ticker, message.slice(0, 1000));
         }
       }),
     );
   }
   await writeQuotes(db, fresh);
+  // Budget deferrals are not failures; real fetch errors are recorded without touching any stored price.
+  const errors = Object.fromEntries(
+    Object.entries({ ...result.failed, ...result.stale }).filter(([, reason]) => !/Refresh limit reached|Skipped: PSX is refusing/.test(reason)),
+  );
+  await recordQuoteFailures(db, errors).catch(() => {});
   return result;
 }

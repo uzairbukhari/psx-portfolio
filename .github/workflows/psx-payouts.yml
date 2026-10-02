@@ -8,9 +8,16 @@ on:
     # companies publish most payout announcements. GitHub may delay runs.
     - cron: '30 13 * * 1-5'
   workflow_dispatch:
+    inputs:
+      tickers:
+        description: 'Comma-separated PSX symbols to fetch (default: every held company)'
+        required: false
+        default: ''
 
+# Scheduled runs share one group; on-demand runs (historical dividend sync) get their own so a
+# queued dispatch is never replaced by a later one.
 concurrency:
-  group: psx-payouts
+  group: psx-payouts-${{ github.event_name == 'schedule' && 'cron' || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -28,8 +35,11 @@ jobs:
         with:
           node-version: 24
       - name: Refresh dividend_announcements from PSX
-        run: node scripts/psx-payout-scrape.mjs
+        # The symbols are validated by the script (^[A-Z0-9]{2,12}$) and passed through the
+        # environment, never interpolated into the shell command.
+        run: node scripts/psx-payout-scrape.mjs ${TICKERS:+"--tickers=$TICKERS"}
         env:
+          TICKERS: ${{ inputs.tickers }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Open or update a failure issue

@@ -139,3 +139,18 @@ test('soldOutPositions lists fully sold companies only', () => {
   p.trades[3].voided = true;
   assert.deepEqual(soldOutPositions(p, safeHoldings(p).held).map((h) => h.ticker), [], 'voided sell reopens the position');
 });
+
+test('a dividend received on the user\'s confirmation with no payment date reads as received with a null date', () => {
+  const p = blankPortfolio();
+  p.companies.push({ ticker: 'AAA', name: 'A', sector: '', target: 0, approved: false, screenDate: '', note: '' });
+  p.trades.push({ id: 't', ticker: 'AAA', kind: 'buy', date: '2025-01-02', shares: 100, price: 10, fees: 0, month: '', note: '' });
+  p.dividends = [{
+    id: 'auto-x', ticker: 'AAA', date: '2025-03-20', source: 'auto', status: 'received', paymentDateUnknown: true,
+    receiptConfirmedAt: '2026-10-02T08:00:00.000Z', perShare: 2, grossAmount: 200, externalId: 'x', note: '',
+  }];
+  const [row] = companyDividends(p, 'AAA');
+  assert.equal(row.status, 'received');
+  assert.equal(row.paymentDate, null);
+  assert.equal(row.gross, 200);
+  assert.equal(activityEntries(p).some((e) => e.kind === 'dividend' && e.date === '2025-03-20'), true);
+});

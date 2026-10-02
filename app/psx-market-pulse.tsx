@@ -8,6 +8,7 @@ import type {
   ShortlistPerformance,
 } from '@/lib/psx-market';
 import type { PypsxLiveQuote } from '@/lib/pypsx-market';
+import type { MarketBreadthView, MarketIndexView } from '@/lib/api-types';
 import { TabLoader } from './tab-loader';
 import { TickerLink } from './ticker-link';
 
@@ -17,6 +18,8 @@ export interface PsxMarketPulseHandle {
 
 interface MarketSummary {
   index: IndexSummary | null;
+  indices?: MarketIndexView[];
+  breadth?: MarketBreadthView | null;
   series: IndexPoint[];
   companies: ShortlistPerformance[];
   market: MarketState;
@@ -88,6 +91,8 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   const [stale, setStale] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const liveActive = useRef(false);
+  // Outside a session the saved closing values are shown and no refresh is requested.
+  const sessionOpen = useRef(false);
 
   const request = useCallback(async (refresh = false, force = false) => {
     const res = await fetch(`/api/market-summary${force ? '?force=1' : ''}`, {
@@ -100,6 +105,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     };
     if (!res.ok || !body.summary) throw Error(body.error || 'Market update failed.');
     setSummary(body.summary);
+    sessionOpen.current = body.summary.market.isOpen;
     setFetchedAt(body.fetchedAt ?? null);
     setError('');
   }, []);
@@ -107,10 +113,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   useEffect(() => {
     const initial = window.setTimeout(() => void request().catch(() => {}), 0);
     const timer = window.setInterval(() => {
-      if (!document.hidden && !liveActive.current) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+      if (!document.hidden && !liveActive.current && sessionOpen.current) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
     }, 60_000);
     const visible = () => {
-      if (!document.hidden) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+      if (!document.hidden) void request(sessionOpen.current).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
     };
     document.addEventListener('visibilitychange', visible);
     return () => {
@@ -131,19 +137,30 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       return;
     }
     let source: EventSource | null = null;
+    // Native EventSource reconnects forever; bound it so a failing feed falls back to delayed polling.
+    let failures = 0;
+    let retryTimer: number | undefined;
     const connect = () => {
       if (document.hidden || source) return;
       source = new EventSource('/api/market-stream');
       source.addEventListener('status', (event) => {
-        const status = JSON.parse((event as MessageEvent<string>).data) as { connected?: boolean };
+        const status = JSON.parse((event as MessageEvent<string>).data) as { connected?: boolean; reason?: string };
         liveActive.current = status.connected === true;
         setLiveConnected(liveActive.current);
+        if (status.connected === true) failures = 0;
+        else if (status.reason) {
+          // Server closed an idle or long-lived stream: reconnect once, after a pause.
+          source?.close();
+          source = null;
+          retryTimer = window.setTimeout(connect, 5000);
+        }
       });
       source.addEventListener('quote', (event) => {
-        const update = JSON.parse((event as MessageEvent<string>).data) as PypsxLiveQuote;
+        const update = JSON.parse((event as MessageEvent<string>).data) as PypsxLiveQuote & { timeKnown?: boolean };
         liveActive.current = true;
         setLiveConnected(true);
-        setLiveReceivedAt(update.receivedAt);
+        // A tick without a provider timestamp updates the price but is not shown as a freshly timed quote.
+        if (update.timeKnown !== false) setLiveReceivedAt(update.receivedAt);
         setSummary((current) => {
           if (!current) return current;
           const providerOpen = update.providerMarketState === 'OPN';
@@ -173,7 +190,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
                 low: update.low ?? company.low,
                 volume: update.volume ?? company.volume,
                 sourceTimestamp: update.sourceTimestamp ?? company.sourceTimestamp,
-                retrievedAt: update.receivedAt,
+                retrievedAt: update.timeKnown === false ? company.retrievedAt : update.receivedAt,
               };
             }),
           };
@@ -182,6 +199,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       source.onerror = () => {
         liveActive.current = false;
         setLiveConnected(false);
+        source?.close();
+        source = null;
+        failures += 1;
+        if (failures <= 3) retryTimer = window.setTimeout(connect, 5000 * 3 ** (failures - 1));
       };
     };
     const visibility = () => {
@@ -195,6 +216,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     connect();
     document.addEventListener('visibilitychange', visibility);
     return () => {
+      window.clearTimeout(retryTimer);
       source?.close();
       liveActive.current = false;
       document.removeEventListener('visibilitychange', visibility);
@@ -289,6 +311,31 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
         </div>
       </div>
       {error && <p role="alert" className="notice error pulse-error">{error}</p>}
+      {!!summary?.indices?.length && (
+        <ul className="pulse-indices" aria-label="Market indices">
+          {summary.indices.map((entry) => (
+            <li key={entry.code} className="pulse-indices__item">
+              <span className="muted pulse-label">{entry.label}</span>
+              <b>{entry.close.toLocaleString()}</b>
+              <span className={entry.change >= 0 ? 'pos' : 'neg'}>
+                {entry.change >= 0 ? '▲' : '▼'} {Math.abs(entry.change).toLocaleString()} ({entry.changePercent.toFixed(2)}%)
+              </span>
+              <Sparkline points={entry.series} up={entry.change >= 0} />
+              <small className={`pulse-fresh pulse-fresh--${entry.meta.freshness}`} title={entry.meta.reason}>
+                {entry.meta.freshness === 'fresh' ? 'Fresh' : entry.meta.freshness === 'delayed' ? 'Delayed' : 'Stale'} · {entry.asOf}
+              </small>
+              {entry.meta.lastFailure && <small className="muted">Last refresh failed; showing earlier value</small>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {summary?.breadth && summary.breadth.covered > 0 && (
+        <p className="muted pulse-breadth">
+          {summary.breadth.advances.toLocaleString()} up · {summary.breadth.declines.toLocaleString()} down · {summary.breadth.unchanged.toLocaleString()} unchanged
+          {' '}across {summary.breadth.covered.toLocaleString()} securities in the {summary.breadth.source}
+          {summary.breadth.excluded > 0 ? ` (${summary.breadth.excluded.toLocaleString()} without valid prices left out)` : ''}.
+        </p>
+      )}
       <div className={`pulse-grid pulse-grid--shortlist${index ? '' : ' pulse-grid--solo'}`}>
         {index && (
           <div className="pulse-index">

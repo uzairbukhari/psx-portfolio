@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 export const portfolios = sqliteTable('portfolios', {
   userId: text('user_id').primaryKey(),
   payload: text('payload').notNull(),
@@ -43,6 +43,15 @@ export const monthlyRecommendations = sqliteTable(
     snapshot: text('snapshot'),
     gatherStartedAt: text('gather_started_at'),
     pendingTickers: text('pending_tickers'),
+    // Durable execution: the cron processor claims a run with a lease token, advances it one
+    // step, and releases it. A run is due when `next_attempt_at` has passed and no live lease exists.
+    nextAttemptAt: text('next_attempt_at'),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: text('lease_expires_at'),
+    deadlineAt: text('deadline_at'),
+    // Persisted, user-visible progress (JSON): phase milestone plus real company counts.
+    progress: text('progress'),
+    idempotencyKey: text('idempotency_key'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -51,6 +60,8 @@ export const monthlyRecommendations = sqliteTable(
       table.userId,
       table.createdAt,
     ),
+    index('idx_monthly_recommendations_due').on(table.status, table.nextAttemptAt),
+    uniqueIndex('uq_monthly_recommendations_idem').on(table.userId, table.idempotencyKey),
   ],
 );
 
@@ -107,6 +118,35 @@ export const quoteRefreshes = sqliteTable('quote_refreshes', {
   source: text('source').notNull(),
   fetchedAt: text('fetched_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  // When PSX says the price was quoted (ISO, from the display time in `as_of`); null when unknown.
+  observedAt: text('observed_at'),
+});
+
+// Refresh attempts, kept apart from observations: a failed attempt never changes how old a stored
+// price looks, and the oldest-attempted ticker is serviced first so no symbol is starved.
+export const refreshState = sqliteTable(
+  'refresh_state',
+  {
+    kind: text('kind').notNull(),
+    key: text('key').notNull(),
+    lastAttemptAt: text('last_attempt_at'),
+    lastSuccessAt: text('last_success_at'),
+    lastError: text('last_error'),
+    failureCount: integer('failure_count').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.kind, table.key] })],
+);
+
+// Shared catalog of securities seen in validated PSX observations (the All-Share table). It records
+// what PSX lists, not issuer identity: `security_type` stays null until a source states it.
+export const securityCatalog = sqliteTable('security_catalog', {
+  ticker: text('ticker').primaryKey(),
+  name: text('name').notNull(),
+  sector: text('sector'),
+  securityType: text('security_type'),
+  source: text('source').notNull(),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
 });
 
 export const aiUsage = sqliteTable(
@@ -236,3 +276,38 @@ export const mobileSessions = sqliteTable(
   },
   (table) => [index('mobile_sessions_email_idx').on(table.email)],
 );
+
+// Per-company, per-kind state of on-demand GitHub Actions scrapes ('payouts' = historical dividend
+// announcements, 'ipo' = official offer evidence). Written by the Worker (queued) and the scraper
+// (running / completed / failed); the status API derives the user-visible state from it.
+export const refreshRequests = sqliteTable(
+  'refresh_requests',
+  {
+    kind: text('kind').notNull(),
+    ticker: text('ticker').notNull(),
+    status: text('status').notNull(),
+    requestedAt: text('requested_at').notNull(),
+    dispatchedAt: text('dispatched_at'),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+    attempts: integer('attempts').notNull().default(0),
+    rowsFound: integer('rows_found'),
+    coverageFrom: text('coverage_from'),
+    error: text('error'),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.ticker] })],
+);
+
+// Official IPO / offer-for-sale evidence found by scripts/psx-ipo-scrape.mjs (see lib/ipo-offers.ts).
+export const ipoOffers = sqliteTable('ipo_offers', {
+  ticker: text('ticker').primaryKey(),
+  status: text('status').notNull(),
+  offerPrice: real('offer_price'),
+  allotmentDate: text('allotment_date'),
+  listingDate: text('listing_date'),
+  evidence: text('evidence'),
+  verification: text('verification'),
+  reason: text('reason'),
+  error: text('error'),
+  checkedAt: text('checked_at').notNull(),
+});

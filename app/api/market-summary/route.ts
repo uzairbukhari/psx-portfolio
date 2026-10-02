@@ -1,8 +1,6 @@
 import { blankPortfolio, type Portfolio } from '@/lib/portfolio';
 import {
-  fetchPsxIndexSeries,
   fetchPsxIndexSummary,
-  fetchPsxMarketWatch,
   pakistanMarketState,
   selectShortlistPerformance,
   type IndexPoint,
@@ -19,6 +17,11 @@ import {
   refreshQuotes,
 } from '@/lib/quote-cache';
 import { db, failure, identity } from '@/lib/server';
+import { takeRateLimit, waitText } from '@/lib/rate-limit';
+import { UserError } from '@/lib/user-error';
+import { INDEX_LABELS, SUPPORTED_INDICES, type IndexSeries, type IndexSnapshot } from '@/lib/index-snapshot';
+import { dataMeta } from '@/lib/market-freshness';
+import { marketBreadth } from '@/lib/market-breadth';
 import { fetchPypsxIntradayFor, pypsxCredentialsFor } from '@/lib/pypsx-server';
 
 /**
@@ -33,9 +36,19 @@ const PSX_BUDGET = 35;
 /** Shortlist tickers refreshed per POST and pyPSX intraday calls per request. */
 const MAX_SHORTLIST_REFRESH = 30;
 const MAX_INTRADAY = 10;
+const FORCE_COOLDOWN = { windowMs: 60_000, max: 1 };
+
+/** PSX prints "2026-10-02 15:11:00" in Pakistan time (UTC+5). */
+const pktStampToIso = (stamp: string) => {
+  const parsed = Date.parse(`${stamp.replace(' ', 'T')}+05:00`);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+};
 
 interface MarketSummaryCache {
   index?: IndexSummary;
+  /** KSE-100, KSE-30, KMI-30 and All-Share, each with its own source time and failure state. */
+  indices?: IndexSnapshot;
+  indexSeries?: IndexSeries;
   series?: IndexPoint[];
   quotes?: MarketWatchQuote[];
 }
@@ -154,6 +167,37 @@ async function personalized(
   return {
     summary: {
       index: cache.index ?? null,
+      indices: SUPPORTED_INDICES.flatMap((code) => {
+        const stored = cache.indices?.[code];
+        if (!stored) return [];
+        const { summary } = stored;
+        return [{
+          code,
+          label: INDEX_LABELS[code],
+          ...summary,
+          retrievedAt: stored.retrievedAt,
+          // Sampled from real scrapes (one point each); gaps are never filled in.
+          series: cache.indexSeries?.[code] ?? [],
+          seriesKind: 'sampled' as const,
+          // Source time and fetch time stay separate; a failed refresh never freshens old data.
+          meta: dataMeta({
+            provider: 'PSX Data Portal',
+            sourceUrl: 'https://dps.psx.com.pk/',
+            sourceTimestamp: pktStampToIso(summary.asOf),
+            fetchedAt: stored.retrievedAt,
+            lastFailure: stored.lastFailure,
+          }),
+        }];
+      }),
+      // Counts come from one scrape's All-Share table. `coverage` is that table's size, not the number of PSX companies.
+      breadth: cache.quotes?.length
+        ? {
+            ...marketBreadth(cache.quotes),
+            source: 'All-Share constituents table',
+            asOf: cache.index?.asOf ?? null,
+            retrievedAt: fetchedAt,
+          }
+        : null,
       series,
       companies,
       market: pakistanMarketState(),
@@ -203,27 +247,20 @@ export async function POST(req: Request) {
         { headers: { 'Cache-Control': 'no-store' } },
       );
 
+    if (force) {
+      // A forced refresh asks PSX for the homepage; one per minute per account keeps shared provider load bounded.
+      const limit = await takeRateLimit(db(), user, 'market-force', FORCE_COOLDOWN);
+      if (!limit.allowed)
+        throw new UserError(
+          `Market refresh is limited to once a minute. Try again in ${waitText(limit.retryAfterMs)}.`,
+          429,
+        );
+    }
     const budget = fetchBudget(PSX_BUDGET);
-    // /timeseries/int and /market-watch currently 404 on PSX; a 404 is not
-    // retried, so each costs one subrequest and recovers if PSX restores them.
-    const [indexResult, seriesResult, quotesResult] = await Promise.allSettled([
-      fetchPsxIndexSummary('KSE100', budget),
-      fetchPsxIndexSeries('KSE100', 60, budget),
-      fetchPsxMarketWatch(budget),
-    ]);
-    const cache: MarketSummaryCache = {
-      index:
-        indexResult.status === 'fulfilled' ? indexResult.value : previous.cache.index,
-      series:
-        seriesResult.status === 'fulfilled' ? seriesResult.value : previous.cache.series,
-      // personalized() only lets these outrank the per-ticker cache when newer.
-      quotes: quotesResult.status === 'fulfilled' ? quotesResult.value : previous.cache.quotes,
-    };
-    if (
-      indexResult.status === 'rejected' &&
-      seriesResult.status === 'rejected' &&
-      quotesResult.status === 'rejected'
-    )
+    // The scraper owns charts, constituents and the other indices (PSX serves no intraday series or
+    // market-watch table to this Worker), so the Worker only refreshes the KSE-100 headline itself.
+    const [indexResult] = await Promise.allSettled([fetchPsxIndexSummary('KSE100', budget)]);
+    if (indexResult.status === 'rejected')
       return Response.json(
         {
           ...(await personalized(user, previous.cache, previous.fetchedAt)),
@@ -231,17 +268,23 @@ export async function POST(req: Request) {
         },
         { headers: { 'Cache-Control': 'no-store' } },
       );
-
+    // Never replace a newer observation with an older one (the scraper may have landed meanwhile).
+    const stored = previous.cache.index;
+    const index = stored && stored.asOf > indexResult.value.asOf ? stored : indexResult.value;
+    const cache: MarketSummaryCache = { ...previous.cache, index };
     const now = new Date().toISOString();
-    await db()
-      .prepare(
-        `INSERT INTO market_summary_refreshes (id,payload,fetched_at,updated_at)
-         VALUES ('latest',?,?,?)
-         ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
-      )
-      .bind(JSON.stringify(cache), now, now)
-      .run();
-    return Response.json(await personalized(user, cache, now, budget), {
+    // Compare-and-set on the row we read: if the scraper wrote since, keep its snapshot.
+    const written = previous.fetchedAt
+      ? await db()
+          .prepare("UPDATE market_summary_refreshes SET payload=?,fetched_at=?,updated_at=? WHERE id='latest' AND fetched_at=?")
+          .bind(JSON.stringify(cache), now, now, previous.fetchedAt)
+          .run()
+      : await db()
+          .prepare("INSERT OR IGNORE INTO market_summary_refreshes (id,payload,fetched_at,updated_at) VALUES ('latest',?,?,?)")
+          .bind(JSON.stringify(cache), now, now)
+          .run();
+    const current = written.meta.changes ? { cache, fetchedAt: now } : await cachedSummary();
+    return Response.json(await personalized(user, current.cache, current.fetchedAt), {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {

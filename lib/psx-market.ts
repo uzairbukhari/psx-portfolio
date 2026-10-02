@@ -1,4 +1,5 @@
 import { fetchPsx, type FetchBudget } from './psx-fetch.ts';
+import { calendarCovers, isTradingDay } from './psx-calendar.ts';
 
 function num(s: string | undefined): number {
   return Number((s ?? '').replace(/,/g, '').trim());
@@ -103,7 +104,7 @@ export interface MarketWatchQuote {
 
 export interface MarketState {
   isOpen: boolean;
-  label: 'Open' | 'Closed' | 'Friday break';
+  label: 'Open' | 'Closed' | 'Friday break' | 'Holiday';
   estimated: boolean;
   timeZone: 'Asia/Karachi';
 }
@@ -331,15 +332,25 @@ export async function fetchPsxIndexConstituents(
   return parseIndexConstituents(await response.text());
 }
 
-export async function fetchPsxMarketWatch(budget?: FetchBudget): Promise<MarketWatchQuote[]> {
-  const response = await fetchPsx('https://dps.psx.com.pk/market-watch', budget);
-  const retrievedAt = new Date().toISOString();
-  return parseMarketWatch(await response.text(), retrievedAt);
-}
+/** Calendar date (YYYY-MM-DD) in Pakistan time. */
+export const pktDateOf = (at: Date) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
 
+/**
+ * Whether the Pakistan Stock Exchange is trading at `at`. Weekends and the exchange holiday list
+ * (lib/psx-calendar.ts) are closed; Friday has its midday break. `estimated` is true when the
+ * holiday list for that year is not published yet, so the answer assumes a normal trading day.
+ */
 export function pakistanMarketState(at = new Date()): MarketState {
+  const date = pktDateOf(at);
+  const estimated = !calendarCovers(date);
+  const timeZone = 'Asia/Karachi';
+  if (!isTradingDay(date)) {
+    const weekend = [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+    return { isOpen: false, label: weekend ? 'Closed' : 'Holiday', estimated, timeZone };
+  }
   const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Karachi',
+    timeZone,
     weekday: 'short',
     hour: '2-digit',
     minute: '2-digit',
@@ -360,18 +371,12 @@ export function pakistanMarketState(at = new Date()): MarketState {
           : morning || afternoon
             ? 'Open'
             : 'Closed',
-      estimated: true,
-      timeZone: 'Asia/Karachi',
+      estimated,
+      timeZone,
     };
   }
-  const weekdayOpen = ['Mon', 'Tue', 'Wed', 'Thu'].includes(weekday);
-  const isOpen = weekdayOpen && minutes >= 9 * 60 + 32 && minutes < 15 * 60 + 30;
-  return {
-    isOpen,
-    label: isOpen ? 'Open' : 'Closed',
-    estimated: true,
-    timeZone: 'Asia/Karachi',
-  };
+  const isOpen = minutes >= 9 * 60 + 32 && minutes < 15 * 60 + 30;
+  return { isOpen, label: isOpen ? 'Open' : 'Closed', estimated, timeZone };
 }
 
 export function selectShortlistPerformance(
@@ -411,17 +416,4 @@ export function downsample(points: IndexPoint[], limit: number): IndexPoint[] {
   if (points.length <= limit) return points;
   const step = (points.length - 1) / (limit - 1);
   return Array.from({ length: limit }, (_, i) => points[Math.round(i * step)]);
-}
-
-export async function fetchPsxIndexSeries(
-  indexName = 'KSE100',
-  limit = 60,
-  budget?: FetchBudget,
-): Promise<IndexPoint[]> {
-  const response = await fetchPsx(`https://dps.psx.com.pk/timeseries/int/${indexName}`, budget);
-  const body = (await response.json()) as { status: number; data: [number, number, number][] };
-  if (body.status !== 1 || !Array.isArray(body.data))
-    throw Error('Unexpected PSX timeseries response');
-  const chronological = [...body.data].reverse().map(([time, value]) => ({ time, value }));
-  return downsample(chronological, limit);
 }

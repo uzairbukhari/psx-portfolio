@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { ChevronDown, ExternalLink, Plus, RefreshCw } from 'lucide-react';
 import { money, type Portfolio } from '@/lib/portfolio';
+import { explainSizing } from '@/lib/monthly-picks-allocation';
 import { estimateMonthlyPicks, summarizeEstimates, type CompanyOutlook, type MonthlyPickEstimate } from '@/lib/monthly-picks';
 import type { Recommendation } from './use-recommendations';
 
@@ -114,6 +115,12 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
           </>
         )}
         <p className="mp-outlook">{result.marketOutlook}</p>
+        {result.fallbackReason && <p className="mp-outlook" role="note">{result.fallbackReason}</p>}
+        {explainSizing(result.sizing).length > 0 && (
+          <ul className="mp-outlook" aria-label="Allocation limits applied">
+            {explainSizing(result.sizing).map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        )}
       </section>
 
       <div className="mp-tabs">
@@ -155,6 +162,11 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
               </div>
             )}
             <p className="mp-thesis">{pick.thesis}</p>
+            {!!pick.evidenceRefs?.length && (
+              <p className="muted" aria-label="Evidence cited">
+                Evidence: {pick.evidenceRefs.map((ref) => `${ref.label} ${ref.value}`).join(' · ')}
+              </p>
+            )}
             <div className="mp-quantity">
               {pick.shares === null ? (
                 <>

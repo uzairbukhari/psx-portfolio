@@ -1,5 +1,8 @@
 import { dateOK, round, today, type Portfolio } from './portfolio.ts';
+import { latestCompletedSessionDate } from './psx-calendar.ts';
 import { UserError } from './user-error.ts';
+import type { MonthlyPicksSizing } from './monthly-picks-allocation.ts';
+export type { MonthlyPicksSizing };
 
 export type SourceDetail = { url: string; title: string; date: string; sourceType?: 'primary' | 'secondary' | 'other' };
 export type EvidenceIssue = { ticker: string; kind: 'technical' | 'material_gap' | 'uncertainty'; message: string };
@@ -7,10 +10,13 @@ export type PickMetrics = {
   peTtm: number | null; earningsYieldPct: number | null; epsYoYPct: number | null;
   change1yPct: number | null; score: number | null;
 };
+/** A metric a pick cites, resolved from the run snapshot (never from model text). */
+export type EvidenceRef = { key: string; label: string; value: number };
 export type MonthlyPick = {
   ticker: string; name: string; allocationPct: number; confidence: 'High' | 'Medium' | 'Low';
   thesis: string; whySelected?: string; invalidation?: string; catalysts: string[]; risks: string[];
   sourceUrls: string[]; sourceDetails?: SourceDetail[]; evidenceStatus?: 'ready' | 'needs_repair';
+  evidenceRefs?: EvidenceRef[];
   metrics?: PickMetrics;
 };
 export type CompanyOutlook = {
@@ -24,20 +30,26 @@ export type MonthlyPicksResearch = {
   method?: 'ai' | 'quant'; dataAsOf?: string;
   /** Why a quant result was used instead of the AI ranking, when that is worth telling the user. */
   fallbackReason?: string;
+  /** Contribution/concentration limits applied when the run finished, against the holdings at that time. */
+  sizing?: MonthlyPicksSizing;
+  /** Workflow, policy and model that produced this result. */
+  versions?: { workflow: number; policy: number; model: string };
 };
 export type MonthlyPickEstimate = MonthlyPick & {
   allocationPkr: number; price: number | null; priceDate: string | null; shares: number | null;
   estimatedSpend: number | null; cashRemaining: number | null;
 };
 const ageDays = (date: string) => Math.floor((Date.parse(today()) - Date.parse(date)) / 86_400_000);
+/** A price may size new buys only if it is from the latest completed session or later, and not from the future. */
+const priceCurrent = (date: string, now: Date) => date >= latestCompletedSessionDate(now) && ageDays(date) >= 0;
 
-export function estimateMonthlyPicks(result: MonthlyPicksResearch, portfolio: Portfolio, amount: number, feePct: number): MonthlyPickEstimate[] {
+export function estimateMonthlyPicks(result: MonthlyPicksResearch, portfolio: Portfolio, amount: number, feePct: number, now: Date = new Date()): MonthlyPickEstimate[] {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) throw new UserError('Investment amount must be between PKR 0 and PKR 1 billion.');
   if (!Number.isFinite(feePct) || feePct < 0 || feePct > 10) throw new UserError('Fee estimate must be between 0% and 10%.');
   return result.picks.map((pick) => {
     const allocationPkr = Math.floor(Math.floor(amount * 100) * pick.allocationPct / 100) / 100;
     const quote = portfolio.quotes[pick.ticker];
-    const fresh = quote && Number.isFinite(quote.price) && quote.price > 0 && dateOK(quote.date) && ageDays(quote.date) >= 0 && ageDays(quote.date) <= 7;
+    const fresh = quote && Number.isFinite(quote.price) && quote.price > 0 && dateOK(quote.date) && priceCurrent(quote.date, now);
     if (!fresh || pick.evidenceStatus === 'needs_repair') return { ...pick, allocationPkr, price: null, priceDate: quote?.date ?? null, shares: null, estimatedSpend: null, cashRemaining: null };
     const unitCost = Math.ceil(quote.price * (1 + feePct / 100) * 100) / 100;
     const shares = Math.floor(allocationPkr / unitCost);

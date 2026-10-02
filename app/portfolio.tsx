@@ -68,6 +68,7 @@ import {
   type Company,
   type Dividend,
   type StockSplit,
+  isValidQuote,
   quoteSupersedes,
   supersedeAutoWithImports,
   confirmDividendReceipt,
@@ -90,6 +91,9 @@ import { UserAvatar } from './user-avatar';
 import NotificationsView from './notifications-view';
 import TargetsEditor from './targets-editor';
 import SettingsView from './settings-view';
+import { AhlImportDialog } from './ahl-import-dialog';
+import { DividendSyncView } from './dividend-sync-view';
+import { parseAhlLedgerText, type AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import MonthlyPicks from './monthly-picks';
 import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
@@ -339,6 +343,7 @@ export default function Dashboard({
     [fees, setFees] = useState(0),
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
+    [ahlStatement, setAhlStatement] = useState<{ statement: AhlLedgerStatement; fileName: string } | null>(null),
     [editing, setEditing] = useState<string | null>(null),
     [stockSplit, setStockSplit] = useState<StockSplit | null>(null),
     [editingStockSplit, setEditingStockSplit] = useState<string | null>(null),
@@ -670,6 +675,12 @@ export default function Dashboard({
   };
   const importAhl = (f: File) => {
     attempt(async () => {
+    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+      // Read locally, then review: nothing is saved until the preview is confirmed.
+      const { text, pages } = await extractPdfText(new Uint8Array(await f.arrayBuffer()));
+      setAhlStatement({ statement: await parseAhlLedgerText(text, pages), fileName: f.name });
+      return;
+    }
     const rows = parseAhlHistory(JSON.parse(await f.text()));
     const result = importAhlTrades(p, rows);
     if (!result.imported) {
@@ -975,6 +986,9 @@ export default function Dashboard({
             entitlementDate: undefined,
             entitlementCertain: undefined,
             paymentDate: undefined,
+            paymentDateUnknown: undefined,
+            receiptConfirmedAt: undefined,
+            entitlement: undefined,
           }
         : { ...d },
     );
@@ -1025,6 +1039,7 @@ export default function Dashboard({
       const fresh = Object.fromEntries(
         Object.entries(d.quotes).filter(
           ([ticker, quote]) =>
+            isValidQuote(quote) &&
             !(d.stale?.[ticker] && p!.quotes[ticker]) &&
             quoteSupersedes(quote, p!.quotes[ticker]),
         ),
@@ -1786,6 +1801,14 @@ export default function Dashboard({
             onImportCdc={importCdc}
             onImportFinqalab={importFinqalab}
             onImportAhl={importAhl}
+            dividendSync={
+              <DividendSyncView
+                portfolio={p}
+                revision={revision}
+                busy={busy}
+                onSave={async (next, message) => { await save(next, message); }}
+              />
+            }
           />
         </TabsContent>
         <TabsContent value="notifications">
@@ -1803,6 +1826,20 @@ export default function Dashboard({
         </div>
       </footer>
       {confirmDialog}
+      {ahlStatement && (
+        <AhlImportDialog
+          statement={ahlStatement.statement}
+          fileName={ahlStatement.fileName}
+          portfolio={p}
+          revision={revision}
+          busy={busy}
+          onCancel={() => setAhlStatement(null)}
+          onCommit={async (next, message) => {
+            await save(next, message + unknownCostWarning(next));
+            setAhlStatement(null);
+          }}
+        />
+      )}
       <Dialog
         open={!!(trade || dividend || stockSplit)}
         onOpenChange={(open) => {

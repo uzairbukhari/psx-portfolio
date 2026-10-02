@@ -31,7 +31,7 @@ async function loadPdfjs() {
   return pdfjsLib;
 }
 
-import { reconstructPageText } from '@/lib/pdf-layout.mjs';
+import { extractMarkedText } from '@/lib/pdf-layout.mjs';
 
 export async function extractPdfText(
   bytes: Uint8Array,
@@ -40,22 +40,9 @@ export async function extractPdfText(
   const pdfjsLib = await pdfjsLibPromise;
   const loadingTask = pdfjsLib.getDocument({ data: bytes });
   const doc = await loadingTask.promise;
-  const pages = doc.numPages;
-  const marked: string[] = [];
   try {
-    for (let pageNumber = 1; pageNumber <= pages; pageNumber++) {
-      const page = await doc.getPage(pageNumber);
-      try {
-        const content = await page.getTextContent();
-        const items = content.items.filter((item) => 'str' in item);
-        const text = reconstructPageText(items);
-        marked.push(`\n--- PDF PAGE ${pageNumber} ---\n${text.trim()}\n`);
-      } finally {
-        page.cleanup();
-      }
-    }
+    return { text: await extractMarkedText(doc), pages: doc.numPages };
   } finally {
     await loadingTask.destroy();
   }
-  return { text: marked.join(''), pages };
 }
