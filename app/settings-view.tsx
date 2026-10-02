@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Activity,
   ArrowLeft,
   Cpu,
   Database,
@@ -31,6 +32,7 @@ import {
   type ResearchSettings,
 } from '@/lib/portfolio';
 import { useConfirm } from '@/components/confirm-dialog';
+import SystemHealth from './system-health';
 import { UserAvatar } from './user-avatar';
 import './settings.css';
 
@@ -259,7 +261,7 @@ export default function SettingsView({
     { id: 'tax', label: 'Tax', icon: Receipt },
     { id: 'usage', label: 'AI usage', icon: Zap },
     { id: 'data', label: 'Data & imports', icon: Database },
-    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }] : []),
+    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }, { id: 'health', label: 'System health', icon: Activity }] : []),
   ];
 
   useEffect(() => {
@@ -470,6 +472,18 @@ export default function SettingsView({
               </button>
             </div>
           </Section>
+
+          {isAdmin && (
+            <Section
+              id="health"
+              icon={<Activity size={18} />}
+              title="System health"
+              badge="Super admin"
+              description="Monthly Picks run processor, data freshness and recent scrape failures."
+            >
+              <SystemHealth />
+            </Section>
+          )}
 
           {isAdmin && (
             <Section
