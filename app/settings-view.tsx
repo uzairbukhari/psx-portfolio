@@ -198,6 +198,30 @@ export default function SettingsView({
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
+  // Settings opens from a tab click, so it is never part of the server render.
+  const staging = typeof document !== 'undefined' && document.documentElement.dataset.appEnv === 'staging';
+  const [resetText, setResetText] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  async function resetData() {
+    setResetBusy(true);
+    setResetError(null);
+    try {
+      const res = await fetch('/api/admin/reset-portfolio', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: resetText.trim() }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Could not reset your data.');
+      }
+      window.location.href = '/';
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : 'Could not reset your data.');
+      setResetBusy(false);
+    }
+  }
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -413,6 +437,27 @@ export default function SettingsView({
                 onFile={setPendingRestore}
               />
             </div>
+            {isAdmin && staging && (
+              <div className="danger-zone">
+                <div className="set-row-text">
+                  <strong>Reset my data (staging only)</strong>
+                  <span>
+                    Deletes your holdings, trades, dividends, quotes, notifications and Monthly Picks runs so you can
+                    test as a fresh user. Other users are untouched. Type RESET to confirm.
+                  </span>
+                  {resetError && <span role="alert">{resetError}</span>}
+                </div>
+                <input
+                  className="set-input"
+                  aria-label="Type RESET to confirm"
+                  value={resetText}
+                  onChange={(e) => setResetText(e.target.value)}
+                />
+                <button type="button" className="secondary compact" disabled={resetBusy || resetText.trim() !== 'RESET'} onClick={() => void resetData()}>
+                  {resetBusy ? 'Resetting…' : 'Reset my data'}
+                </button>
+              </div>
+            )}
             <div className="danger-zone">
               <div className="set-row-text">
                 <strong>Delete account</strong>

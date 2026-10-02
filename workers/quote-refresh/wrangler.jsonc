@@ -6,7 +6,16 @@
   // Every 15 minutes, 04:00-11:45 UTC Monday-Friday = 09:00-16:45 Pakistan Standard Time
   // (UTC+5): covers the session plus the post-close print (Friday closes 16:30). Runs
   // outside trading hours cost no PSX calls once the closing quotes are cached.
-  "triggers": { "crons": ["*/15 4-11 * * 1-5"] },
+  // The every-minute trigger runs the Monthly Picks processor (lib/recommendation-service.ts):
+  // it advances due runs so they finish with no client open. Needs the same OPENAI_API_KEY secret
+  // and the vars below as the web Worker; set PICKS_BACKGROUND=true on the web Worker once this
+  // trigger is deployed (until then GET /api/recommendations keeps nudging runs itself).
+  "triggers": { "crons": ["*/15 4-11 * * 1-5", "* * * * *"] },
+  "vars": {
+    "AI_MONTHLY_CAP_USD": "1",
+    "GITHUB_REPO": "uzairbukhari/psx-portfolio",
+    "APP_ENV": "production"
+  },
   "d1_databases": [
     {
       "binding": "DB",

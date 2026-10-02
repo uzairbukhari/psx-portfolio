@@ -220,3 +220,30 @@ test('rebaseWatchQuotes keeps day change when a newer company-page price overtak
   assert.equal(out[0].retrievedAt, '2026-09-29T09:00:00Z');
   assert.equal(out[1].change, 5, 'no cached price leaves the quote untouched');
 });
+
+test('a due list longer than the fetch budget is serviced stalest-first so every symbol is eventually refreshed', async () => {
+  const { refreshQuotes } = await import('../lib/quote-cache.ts');
+  const { fetchBudget } = await import('../lib/psx-fetch.ts');
+  const tickers = Array.from({ length: 12 }, (_, i) => `T${String(i).padStart(2, '0')}`);
+  const stored = new Map();
+  const db = {
+    prepare: (sql) => ({
+      all: async () => ({ results: [...stored].map(([ticker, fetched_at]) => ({ ticker, price: 1, as_of: 'x', quote_date: '2026-10-02', source: 's', fetched_at })) }),
+      bind: (...args) => ({ sql, args }),
+    }),
+    batch: async (statements) => {
+      for (const { args } of statements)
+        for (let i = 0; i < args.length; i += 7) stored.set(args[i], args[i + 5]);
+    },
+  };
+  const served = new Set();
+  const clock = { n: 0 };
+  for (let run = 0; run < 6 && served.size < tickers.length; run++) {
+    const result = await refreshQuotes(db, tickers, {
+      budget: fetchBudget(3), now: new Date('2026-10-02T06:00:00Z'), force: true,
+      fetchQuote: async (ticker) => ({ price: 1, asOf: 'x', date: '2026-10-02', source: 's', fetchedAt: `2026-10-02T05:${String(++clock.n).padStart(2, '0')}:00Z` }),
+    });
+    result.fetched.forEach((t) => served.add(t));
+  }
+  assert.equal(served.size, tickers.length);
+});

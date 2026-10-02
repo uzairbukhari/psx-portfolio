@@ -160,7 +160,10 @@ export function sanitizePicks(raw: unknown, snapshot: SnapshotV8): MonthlyPicksR
       metrics: metricsFor(companyByTicker.get(ticker), scoreByTicker.get(ticker)),
     });
   }
-  if (!picks.length) return null;
+  // An explicit empty `picks` array is a valid decision to hold cash; picks that were all
+  // rejected by validation are not, and fall back to the quant result.
+  const requestedPicks = Array.isArray(parsed.picks) ? parsed.picks.length : 0;
+  if (!picks.length && (requestedPicks > 0 || !Number.isFinite(parsed.unallocatedPct) || Math.abs(Number(parsed.unallocatedPct) - 100) > 0.01)) return null;
 
   // Scale the model's allocations plus cash to 100 while preserving their proportions, then hold
   // every pick at the cap (re-splitting the excess; what cannot be placed stays cash). Doing the
@@ -173,7 +176,7 @@ export function sanitizePicks(raw: unknown, snapshot: SnapshotV8): MonthlyPicksR
   const allocated = new Map(constrained.allocations.map((a) => [a.ticker, a.allocationPct]));
   for (const pick of picks) pick.allocationPct = allocated.get(pick.ticker) ?? 0;
   const kept = picks.filter((p) => p.allocationPct >= 0.01);
-  if (!kept.length) return null;
+  if (!kept.length && picks.length) return null;
   picks.splice(0, picks.length, ...kept);
   const unallocatedPct = Math.round((100 - picks.reduce((sum, p) => sum + p.allocationPct, 0)) * 100) / 100;
 

@@ -9,6 +9,7 @@ const source = readFileSync(new URL('app/api/portfolio/route.ts', base), 'utf8')
   .replace("import { blankPortfolio, validate, type Portfolio } from '@/lib/portfolio';", `import { blankPortfolio, validate } from '${new URL('lib/portfolio.ts', base).href}';`)
   .replace("import { applyFacts, newTickers } from '@/lib/company-enrichment';", `import { applyFacts, newTickers } from '${new URL('lib/company-enrichment.ts', base).href}';`)
   .replace("import { gatherFacts } from '@/lib/company-facts-store';", `const gatherFacts=async()=>[];`)
+  .replace("import { dispatchConfig } from '@/lib/dispatch-config';", `const dispatchConfig=()=>({});`)
   .replace("import { mergeQuotes, readQuoteRows } from '@/lib/quote-cache';", `import { mergeQuotes, readQuoteRows } from '${new URL('lib/quote-cache.ts', base).href}';`)
   .replace("import { readAnnouncements } from '@/lib/dividend-announcements';", `import { readAnnouncements } from '${new URL('lib/dividend-announcements.ts', base).href}';`)
   .replace(/from '@\/lib\/([\w-]+)'/g, (_, name) => `from '${new URL(`lib/${name}.ts`, base).href}'`);

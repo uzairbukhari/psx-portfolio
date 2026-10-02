@@ -25,6 +25,9 @@
     // Per-user AI spend cap per PKT calendar month, in USD. Over the cap, Monthly
     // Picks runs use the quantitative ranking instead of the AI call. "0" disables AI.
     "AI_MONTHLY_CAP_USD": "1",
+    // "true" once the quote-refresh Worker's every-minute cron is deployed: it then owns Monthly
+    // Picks execution and GET /api/recommendations becomes read-only. Keep "false" until then.
+    "PICKS_BACKGROUND": "false",
     // Deployment label; the staging Worker sets "staging", which shows a STAGING badge.
     "APP_ENV": "production"
   },
@@ -51,6 +54,7 @@
         "GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
         "GITHUB_REPO": "uzairbukhari/psx-portfolio",
         "AI_MONTHLY_CAP_USD": "0.25",
+        "PICKS_BACKGROUND": "false",
         "APP_ENV": "staging"
       }
     }

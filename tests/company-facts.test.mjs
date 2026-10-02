@@ -59,7 +59,8 @@ test('computeMetrics derives earnings yield, YoY EPS growth and 52-week position
   const facts = parseCompanyPage(fixture('psx-luck.html'), 'LUCK', `${ASOF}T12:00:00Z`);
   const metrics = computeMetrics(facts, ASOF);
   assert.equal(metrics.earningsYieldPct, Math.round((100 / 13.09) * 100) / 100);
-  assert.equal(metrics.epsTtm, Math.round((9.21 + 5.89 + 9.98 + 9.22) * 100) / 100, 'TTM EPS sums the four available quarters');
+  // PSX lists Q3 2026, Q2, Q1 and Q3 2025 (Q4 is only in the annual table); summing those would mix years.
+  assert.equal(metrics.epsTtm, null, 'TTM EPS needs four consecutive quarters');
   assert.ok(metrics.epsYoYPct !== null, 'Q3 2025 is present alongside Q3 2026 so YoY growth is computable');
   assert.ok(metrics.pricePositionPct > 0 && metrics.pricePositionPct < 100);
   assert.equal(metrics.recentAnnouncements.length, 3);
@@ -89,7 +90,7 @@ test('quantScore is deterministic for identical input', () => {
 });
 
 test('quantAllocation caps a single strong pick at 35% and leaves the rest as cash', () => {
-  const scores = [{ ticker: 'AAA', score: 90, confidence: 'High', components: {}, metrics: { unavailable: undefined } }];
+  const scores = [{ ticker: 'AAA', score: 90, confidence: 'High', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: { unavailable: undefined } }];
   const { picks, unallocatedPct } = quantAllocation(scores);
   assert.deepEqual(picks, [{ ticker: 'AAA', score: 90, allocationPct: 35 }]);
   assert.equal(unallocatedPct, 65);
@@ -97,9 +98,9 @@ test('quantAllocation caps a single strong pick at 35% and leaves the rest as ca
 
 test('quantAllocation water-fills across several picks so allocations plus cash sum to 100', () => {
   const scores = [
-    { ticker: 'AAA', score: 90, confidence: 'High', components: {}, metrics: {} },
-    { ticker: 'BBB', score: 70, confidence: 'Medium', components: {}, metrics: {} },
-    { ticker: 'CCC', score: 60, confidence: 'Medium', components: {}, metrics: {} },
+    { ticker: 'AAA', score: 90, confidence: 'High', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: {} },
+    { ticker: 'BBB', score: 70, confidence: 'Medium', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: {} },
+    { ticker: 'CCC', score: 60, confidence: 'Medium', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: {} },
   ];
   const { picks, unallocatedPct } = quantAllocation(scores);
   const total = picks.reduce((sum, p) => sum + p.allocationPct, 0) + unallocatedPct;
@@ -109,16 +110,16 @@ test('quantAllocation water-fills across several picks so allocations plus cash 
 
 test('quantAllocation excludes companies below the threshold and unavailable companies', () => {
   const scores = [
-    { ticker: 'AAA', score: 90, confidence: 'High', components: {}, metrics: {} },
-    { ticker: 'WEAK', score: 40, confidence: 'Low', components: {}, metrics: {} },
-    { ticker: 'ZZZZ', score: 0, confidence: 'Low', components: {}, metrics: { unavailable: 'timeout' } },
+    { ticker: 'AAA', score: 90, confidence: 'High', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: {} },
+    { ticker: 'WEAK', score: 40, confidence: 'Low', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: {} },
+    { ticker: 'ZZZZ', score: 0, confidence: 'Low', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: { unavailable: 'timeout' } },
   ];
   const { picks } = quantAllocation(scores);
   assert.deepEqual(picks.map((p) => p.ticker), ['AAA']);
 });
 
 test('quantAllocation returns no picks and 100% cash when nothing meets the threshold', () => {
-  const scores = [{ ticker: 'AAA', score: 30, confidence: 'Low', components: {}, metrics: {} }];
+  const scores = [{ ticker: 'AAA', score: 30, confidence: 'Low', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: {} }];
   const { picks, unallocatedPct } = quantAllocation(scores);
   assert.deepEqual(picks, []);
   assert.equal(unallocatedPct, 100);

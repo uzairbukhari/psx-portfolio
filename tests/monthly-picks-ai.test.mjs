@@ -21,9 +21,9 @@ function snapshot() {
       { ticker: 'ZZZZ', name: 'ZZZZ', sector: 'Unknown', source: null, price: null, priceDate: null, metrics: metrics({ ticker: 'ZZZZ', name: 'ZZZZ', unavailable: 'PSX fetch failed (520)', peTtm: null, earningsYieldPct: null, epsYoYPct: null, mostRecentAnnouncement: null, recentAnnouncements: [], dataGaps: ['PSX data unavailable: PSX fetch failed (520)'] }) },
     ],
     scores: [
-      { ticker: 'AAA', score: 80, confidence: 'High', components: {}, metrics: metrics({ ticker: 'AAA' }) },
-      { ticker: 'BBB', score: 60, confidence: 'Medium', components: {}, metrics: metrics({ ticker: 'BBB' }) },
-      { ticker: 'ZZZZ', score: 0, confidence: 'Low', components: {}, metrics: metrics({ ticker: 'ZZZZ', unavailable: 'PSX fetch failed (520)' }) },
+      { ticker: 'AAA', score: 80, confidence: 'High', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics({ ticker: 'AAA' }) },
+      { ticker: 'BBB', score: 60, confidence: 'Medium', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics({ ticker: 'BBB' }) },
+      { ticker: 'ZZZZ', score: 0, confidence: 'Low', components: {}, evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics({ ticker: 'ZZZZ', unavailable: 'PSX fetch failed (520)' }) },
     ],
   };
 }

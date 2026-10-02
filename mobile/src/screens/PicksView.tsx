@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { money } from '@shared/portfolio.ts';
+import type { RecommendationRun } from '@shared/api-types.ts';
+import { pollIntervalMs } from '@shared/api-validate.ts';
+import { explainSizing } from '@shared/monthly-picks-allocation.ts';
+import { PROGRESS_STEPS } from '@shared/monthly-picks-progress.ts';
 import { estimateMonthlyPicks, type MonthlyPicksResearch } from '@shared/monthly-picks.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { parseNumber } from '@/data/mutations';
@@ -13,17 +17,7 @@ import { ReviewBuysSheet } from '@/ui/ReviewBuysSheet';
 import { Icon } from '@/ui/Icon';
 import { Avatar, Button, Card, Chip, Input, Loading, Muted, Notice, SectionLabel, StatusChip, useKitStyles } from '@/ui/kit';
 
-type Run = {
-  id: string;
-  month: string;
-  amount: number;
-  feePct: number;
-  status: string;
-  error: string | null;
-  result: MonthlyPicksResearch | null;
-  method?: 'ai' | 'quant';
-  progress?: { phase: 'gathering' | 'ranking'; pending: string[] };
-};
+type Run = RecommendationRun;
 const ACTIVE = ['queued', 'gathering', 'in_progress'];
 const MAX = MAX_SHORTLIST;
 
@@ -90,7 +84,11 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
     queryKey: ['recommendation', email, runId],
     enabled: Boolean(runId),
     queryFn: () => api.get<Run>(`/api/recommendations?id=${runId}`),
-    refetchInterval: (q) => (q.state.data && ACTIVE.includes(q.state.data.status) ? 4000 : false),
+    // 5 s for the first minute, then 15 s; stops when the run ends or the app is backgrounded.
+    refetchInterval: (q) => {
+      if (!q.state.data || !ACTIVE.includes(q.state.data.status) || AppState.currentState !== 'active') return false;
+      return pollIntervalMs(Date.now() - Date.parse(q.state.data.createdAt));
+    },
   });
   const current = run.data ?? null;
 
@@ -197,10 +195,17 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
       {active ? (
         <Card>
           <ActivityIndicator color={colors.primary} />
-          <Text style={[styles.strong, { textAlign: 'center' }]}>{current.status === 'gathering' ? 'Gathering company data' : 'Ranking your shortlist'}</Text>
+          <Text style={[styles.strong, { textAlign: 'center' }]}>
+            {PROGRESS_STEPS.find((s) => s.key === current.progress?.step)?.label ?? (current.status === 'gathering' ? 'Gathering company data' : 'Ranking your shortlist')}
+            {current.progress?.percent !== undefined && !current.progress.indeterminate ? ` · ${current.progress.percent}%` : ''}
+          </Text>
           <Text style={[styles.muted, { textAlign: 'center' }]}>
+            {current.progress?.total ? `${current.progress.completed ?? 0} of ${current.progress.total} companies gathered. ` : ''}
             {current.progress?.pending?.length ? `Waiting on ${current.progress.pending.join(', ')}. ` : ''}
-            This can take a few minutes. You can leave this screen and come back.
+            {current.progress?.retries ? `Retried ${current.progress.retries} time${current.progress.retries === 1 ? '' : 's'}. ` : ''}
+            {current.progress?.degraded ? 'Continuing with partial evidence. ' : ''}
+            {current.progress?.message ? `${current.progress.message} ` : ''}
+            The run continues on the server, so you can leave this screen and come back.
           </Text>
         </Card>
       ) : null}
@@ -209,6 +214,7 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
 
       {current?.status === 'completed' && current.result ? (
         <>
+          {explainSizing(current.result.sizing).map((line) => <Notice key={line}>{line}</Notice>)}
           {current.method === 'quant' ? <Notice>{current.result.fallbackReason ?? 'Ranked by the numbers only (no AI commentary).'}</Notice> : null}
           <Card>
             <Text style={styles.strong}>Market outlook</Text>

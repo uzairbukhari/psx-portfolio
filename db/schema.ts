@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 export const portfolios = sqliteTable('portfolios', {
   userId: text('user_id').primaryKey(),
   payload: text('payload').notNull(),
@@ -43,6 +43,15 @@ export const monthlyRecommendations = sqliteTable(
     snapshot: text('snapshot'),
     gatherStartedAt: text('gather_started_at'),
     pendingTickers: text('pending_tickers'),
+    // Durable execution: the cron processor claims a run with a lease token, advances it one
+    // step, and releases it. A run is due when `next_attempt_at` has passed and no live lease exists.
+    nextAttemptAt: text('next_attempt_at'),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: text('lease_expires_at'),
+    deadlineAt: text('deadline_at'),
+    // Persisted, user-visible progress (JSON): phase milestone plus real company counts.
+    progress: text('progress'),
+    idempotencyKey: text('idempotency_key'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -51,6 +60,8 @@ export const monthlyRecommendations = sqliteTable(
       table.userId,
       table.createdAt,
     ),
+    index('idx_monthly_recommendations_due').on(table.status, table.nextAttemptAt),
+    uniqueIndex('uq_monthly_recommendations_idem').on(table.userId, table.idempotencyKey),
   ],
 );
 

@@ -1,5 +1,7 @@
 import { dateOK, round, today, type Portfolio } from './portfolio.ts';
 import { UserError } from './user-error.ts';
+import type { MonthlyPicksSizing } from './monthly-picks-allocation.ts';
+export type { MonthlyPicksSizing };
 
 export type SourceDetail = { url: string; title: string; date: string; sourceType?: 'primary' | 'secondary' | 'other' };
 export type EvidenceIssue = { ticker: string; kind: 'technical' | 'material_gap' | 'uncertainty'; message: string };
@@ -24,6 +26,8 @@ export type MonthlyPicksResearch = {
   method?: 'ai' | 'quant'; dataAsOf?: string;
   /** Why a quant result was used instead of the AI ranking, when that is worth telling the user. */
   fallbackReason?: string;
+  /** Contribution/concentration limits applied when the run finished, against the holdings at that time. */
+  sizing?: MonthlyPicksSizing;
 };
 export type MonthlyPickEstimate = MonthlyPick & {
   allocationPkr: number; price: number | null; priceDate: string | null; shares: number | null;

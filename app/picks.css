@@ -198,3 +198,7 @@
 @media(max-width:560px){.mp-kpis,.mp-kpi-details .mp-kpis{grid-template-columns:1fr}}
 @media(max-width:760px){.mp-actionbar{bottom:calc(var(--bar-h,60px) + env(safe-area-inset-bottom))}.monthly-picks{padding-bottom:24px}.mp-shortlist{scroll-margin-bottom:140px}}
 .empty-holdings{text-align:center;padding:48px 24px!important}.empty-holdings h2{margin-top:0}
+.mp-bar{display:block;width:100%;height:6px;margin-bottom:12px;border:0;border-radius:999px;overflow:hidden;appearance:none;background:var(--border)}
+.mp-bar::-webkit-progress-bar{background:var(--border)}
+.mp-bar::-webkit-progress-value{background:var(--primary);border-radius:999px;transition:width .4s ease}
+.mp-bar::-moz-progress-bar{background:var(--primary);border-radius:999px}

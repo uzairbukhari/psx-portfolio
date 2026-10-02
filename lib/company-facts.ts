@@ -233,6 +233,55 @@ export type CompanyMetrics = {
   dataGaps: string[];
 };
 
+/** `Q3 2026` -> running quarter index. Null when a period repeats; labels that are not discrete quarters are ignored. */
+function quarterSeries(periods: FinancialPeriod[]): Map<number, number | null> | null {
+  const out = new Map<number, number | null>();
+  for (const p of periods) {
+    const match = p.period.match(/^Q([1-4])\s+(\d{4})$/);
+    if (!match) continue;
+    const index = Number(match[2]) * 4 + Number(match[1]) - 1;
+    if (out.has(index)) return null;
+    out.set(index, p.eps);
+  }
+  return out.size ? out : null;
+}
+/** Sum of the latest four consecutive quarters; any missing quarter makes it unavailable. */
+function trailingEps(series: Map<number, number | null>): number | null {
+  const latest = Math.max(...series.keys());
+  let total = 0;
+  for (let back = 0; back < 4; back++) {
+    const eps = series.get(latest - back);
+    if (eps === null || eps === undefined || !Number.isFinite(eps)) return null;
+    total += eps;
+  }
+  return round2(total);
+}
+function yearOverYear(series: Map<number, number | null>): number | null {
+  const latest = Math.max(...series.keys());
+  const now = series.get(latest);
+  const prior = series.get(latest - 4);
+  if (now === null || now === undefined || prior === null || prior === undefined) return null;
+  if (!Number.isFinite(now) || !Number.isFinite(prior) || prior === 0) return null;
+  return round2(((now - prior) / Math.abs(prior)) * 100);
+}
+/** Compound growth between the oldest and latest reported fiscal years, over the years actually elapsed. */
+function annualCagr(periods: FinancialPeriod[]): number | null {
+  const byYear = new Map<number, number>();
+  for (const p of periods) {
+    if (!/^\d{4}$/.test(p.period) || p.eps === null || !Number.isFinite(p.eps)) continue;
+    const year = Number(p.period);
+    if (byYear.has(year)) return null;
+    byYear.set(year, p.eps);
+  }
+  if (byYear.size < 2) return null;
+  const years = [...byYear.keys()].sort((a, b) => a - b);
+  const first = byYear.get(years[0])!;
+  const last = byYear.get(years.at(-1)!)!;
+  const elapsed = years.at(-1)! - years[0];
+  if (!(first > 0) || !(last > 0) || elapsed < 1) return null;
+  return round2((Math.pow(last / first, 1 / elapsed) - 1) * 100);
+}
+
 export function computeMetrics(facts: CompanyFacts | { ticker: string; unavailable: string }, asOf: string): CompanyMetrics {
   if ('unavailable' in facts) {
     return {
@@ -248,24 +297,14 @@ export function computeMetrics(facts: CompanyFacts | { ticker: string; unavailab
   if (peTtm === null) gaps.push('No P/E (TTM) published.');
   const earningsYieldPct = peTtm && peTtm > 0 ? round2(100 / peTtm) : null;
 
-  const quarters = facts.quarterly.filter((q) => q.eps !== null);
-  const epsTtm = quarters.length === 4 ? round2(quarters.reduce((sum, q) => sum + (q.eps ?? 0), 0)) : null;
-  if (epsTtm === null) gaps.push('Fewer than four published quarters of EPS.');
+  const quarterly = quarterSeries(facts.quarterly);
+  const epsTtm = quarterly ? trailingEps(quarterly) : null;
+  if (epsTtm === null) gaps.push('No four consecutive quarters of EPS.');
 
-  const latestQuarter = facts.quarterly[0];
-  const latestLabel = latestQuarter?.period.match(/^(Q\d)\s+(\d{4})$/);
-  const priorYearQuarter = latestLabel
-    ? facts.quarterly.find((q) => q.period === `${latestLabel[1]} ${Number(latestLabel[2]) - 1}`)
-    : undefined;
-  const epsYoYPct = latestQuarter?.eps && priorYearQuarter?.eps && priorYearQuarter.eps !== 0
-    ? round2(((latestQuarter.eps - priorYearQuarter.eps) / Math.abs(priorYearQuarter.eps)) * 100)
-    : null;
+  const epsYoYPct = quarterly ? yearOverYear(quarterly) : null;
   if (epsYoYPct === null) gaps.push('No matching year-ago quarter EPS for growth comparison.');
 
-  const annualEps = facts.annual.filter((a) => a.eps !== null && a.eps! > 0);
-  const epsAnnualCagrPct = annualEps.length >= 2 && annualEps.at(-1)!.eps! > 0
-    ? round2((Math.pow(annualEps[0].eps! / annualEps.at(-1)!.eps!, 1 / (annualEps.length - 1)) - 1) * 100)
-    : null;
+  const epsAnnualCagrPct = annualCagr(facts.annual);
 
   const netMargins = facts.ratios.netMargin.filter((v): v is number => v !== null);
   const netMarginTrendPct = netMargins.length >= 2 ? round2(netMargins[0] - netMargins.at(-1)!) : null;
@@ -297,43 +336,73 @@ function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
+export type ScoreEvidence = {
+  /** Share of the four scored metrics (valuation, growth, profitability, momentum) that were available. */
+  completeness: number;
+  metricCount: number;
+  missing: string[];
+};
 export type CompanyScore = {
   ticker: string;
+  /** 0-100 attractiveness among the shortlist, over available metrics only. */
   score: number;
+  /** Attractiveness and evidence quality together; a high score on thin evidence is never High. */
   confidence: 'High' | 'Medium' | 'Low';
-  components: { valuation: number; growth: number; profitability: number; momentum: number; catalyst: number };
+  components: { valuation: number | null; growth: number | null; profitability: number | null; momentum: number | null; catalyst: number | null };
+  evidence: ScoreEvidence;
   metrics: CompanyMetrics;
 };
 
-function percentileRanks(values: (number | null)[]): number[] {
-  const present = values.map((v, i) => ({ v, i })).filter((x): x is { v: number; i: number } => x.v !== null);
-  if (present.length < 2) return values.map(() => 50);
+/** Minimum scored metrics for a company to be selectable. */
+export const MIN_EVIDENCE_METRICS = 2;
+
+/** Average (mid) percentile ranks: ties share a rank, missing values stay null. */
+export function percentileRanks(values: (number | null)[]): (number | null)[] {
+  const present = values.flatMap((v, i) => (v !== null && Number.isFinite(v) ? [{ v, i }] : []));
+  if (present.length === 0) return values.map(() => null);
+  if (present.length === 1) return values.map((_, i) => (i === present[0].i ? 50 : null));
   const sorted = [...present].sort((a, b) => a.v - b.v);
-  const rankByIndex = new Map<number, number>();
-  sorted.forEach((item, order) => rankByIndex.set(item.i, (order / (sorted.length - 1)) * 100));
-  return values.map((_, i) => rankByIndex.get(i) ?? 50);
+  const rank = new Map<number, number>();
+  for (let start = 0; start < sorted.length;) {
+    let end = start;
+    while (end + 1 < sorted.length && sorted[end + 1].v === sorted[start].v) end++;
+    const mid = (start + end) / 2;
+    for (let k = start; k <= end; k++) rank.set(sorted[k].i, (mid / (sorted.length - 1)) * 100);
+    start = end + 1;
+  }
+  return values.map((_, i) => rank.get(i) ?? null);
 }
 
+const WEIGHTS = { valuation: 0.35, growth: 0.35, profitability: 0.15, momentum: 0.15 } as const;
+const SCORED = Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[];
+
 export function quantScore(metricsList: CompanyMetrics[]): CompanyScore[] {
-  const valuation = percentileRanks(metricsList.map((m) => m.earningsYieldPct));
-  const growth = percentileRanks(metricsList.map((m) => m.epsYoYPct ?? m.epsAnnualCagrPct));
-  const profitability = percentileRanks(metricsList.map((m) => m.netMarginTrendPct));
-  const momentum = percentileRanks(metricsList.map((m) => m.change1yPct));
-  const catalyst = percentileRanks(metricsList.map((m) => (m.mostRecentAnnouncement ? -m.mostRecentAnnouncement.ageDays : null)));
+  const only = (pick: (m: CompanyMetrics) => number | null) => metricsList.map((m) => (m.unavailable ? null : pick(m)));
+  const valuation = percentileRanks(only((m) => m.earningsYieldPct));
+  const growth = percentileRanks(only((m) => m.epsYoYPct ?? m.epsAnnualCagrPct));
+  const profitability = percentileRanks(only((m) => m.netMarginTrendPct));
+  const momentum = percentileRanks(only((m) => m.change1yPct));
+  // Announcement recency is context only: it is shown but never scored as a positive catalyst.
+  const catalyst = percentileRanks(only((m) => (m.mostRecentAnnouncement ? -m.mostRecentAnnouncement.ageDays : null)));
   return metricsList.map((metrics, i) => {
-    if (metrics.unavailable) {
-      return { ticker: metrics.ticker, score: 0, confidence: 'Low' as const, components: { valuation: 0, growth: 0, profitability: 0, momentum: 0, catalyst: 0 }, metrics };
-    }
     const components = { valuation: valuation[i], growth: growth[i], profitability: profitability[i], momentum: momentum[i], catalyst: catalyst[i] };
-    const score = round2(components.valuation * 0.30 + components.growth * 0.30 + components.profitability * 0.15 + components.momentum * 0.15 + components.catalyst * 0.10);
-    const confidence: CompanyScore['confidence'] = score >= 72 ? 'High' : score >= 60 ? 'Medium' : 'Low';
-    return { ticker: metrics.ticker, score, confidence, components, metrics };
+    if (metrics.unavailable) {
+      return { ticker: metrics.ticker, score: 0, confidence: 'Low' as const, components, evidence: { completeness: 0, metricCount: 0, missing: [...SCORED] }, metrics };
+    }
+    const present = SCORED.filter((key) => components[key] !== null);
+    const missing = SCORED.filter((key) => components[key] === null);
+    const weight = present.reduce((sum, key) => sum + WEIGHTS[key], 0);
+    const score = weight > 0 ? round2(present.reduce((sum, key) => sum + components[key]! * WEIGHTS[key], 0) / weight) : 0;
+    const completeness = round2(present.length / SCORED.length);
+    const confidence: CompanyScore['confidence'] =
+      score >= 72 && completeness >= 0.75 ? 'High' : score >= 60 && completeness >= 0.5 ? 'Medium' : 'Low';
+    return { ticker: metrics.ticker, score, confidence, components, evidence: { completeness, metricCount: present.length, missing }, metrics };
   });
 }
 
 export type QuantPick = { ticker: string; allocationPct: number; score: number };
 export function quantAllocation(scores: CompanyScore[], threshold = 55, maxPicks = 5, capPct = 35): { picks: QuantPick[]; unallocatedPct: number } {
-  const candidates = scores.filter((s) => !s.metrics.unavailable && s.score >= threshold)
+  const candidates = scores.filter((s) => !s.metrics.unavailable && s.evidence.metricCount >= MIN_EVIDENCE_METRICS && s.score >= threshold)
     .sort((a, b) => b.score - a.score).slice(0, maxPicks);
   if (!candidates.length) return { picks: [], unallocatedPct: 100 };
   // Same constraint set as the AI path (`constrainAllocations`): proportional to score, capped

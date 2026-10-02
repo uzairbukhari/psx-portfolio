@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { MonthlyPicksResearch } from '@/lib/monthly-picks';
+import type { RecommendationProgress } from '@/lib/api-types';
+import { pollIntervalMs } from '@/lib/api-validate';
 
 export type RunStatus =
   | 'queued' | 'gathering' | 'in_progress' | 'completed' | 'failed'
@@ -24,7 +26,7 @@ export type Recommendation = {
   workflowVersion?: number;
   method?: 'ai' | 'quant';
   dataAsOf?: string;
-  progress?: { phase: 'gathering' | 'ranking'; pending: string[]; startedAt: string };
+  progress?: RecommendationProgress;
 };
 
 export type FactsState = 'fresh' | 'stale' | 'missing' | 'failed';
@@ -90,7 +92,7 @@ export function useRecommendations() {
     if (!activeId) return;
     let cancelled = false;
     let timer: number | undefined;
-    let ticks = 0;
+    const startedPolling = Date.now();
     let failures = 0;
     const controller = new AbortController();
     const tick = async () => {
@@ -120,8 +122,7 @@ export function useRecommendations() {
           return;
         }
       }
-      ticks += 1;
-      timer = window.setTimeout(() => void tick(), ticks < 15 ? 2000 : 5000);
+      timer = window.setTimeout(() => void tick(), pollIntervalMs(Date.now() - startedPolling));
     };
     void tick();
     return () => {

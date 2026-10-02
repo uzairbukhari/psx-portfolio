@@ -18,6 +18,7 @@ import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents, parseIndexSummary } from '../lib/psx-market.ts';
 import { fetchPsxQuote } from '../lib/psx-quotes.ts';
+import { quoteUpsertSql } from '../lib/quote-write.ts';
 
 const MAX_FALLBACK = 20;
 // D1 allows 100 bound parameters per statement; 7 per row.
@@ -144,11 +145,7 @@ async function main() {
   for (let index = 0; index < entries.length; index += ROWS_PER_STATEMENT) {
     const chunk = entries.slice(index, index + ROWS_PER_STATEMENT);
     await d1(
-      `INSERT INTO quote_refreshes (ticker,price,as_of,quote_date,source,fetched_at,updated_at)
-       VALUES ${chunk.map(() => '(?,?,?,?,?,?,?)').join(',')}
-       ON CONFLICT(ticker) DO UPDATE SET
-         price=excluded.price, as_of=excluded.as_of, quote_date=excluded.quote_date,
-         source=excluded.source, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
+      quoteUpsertSql(chunk.length),
       chunk.flatMap(([ticker, quote]) => [
         ticker,
         quote.price,

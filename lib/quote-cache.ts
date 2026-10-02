@@ -3,6 +3,7 @@ import { fetchBudget, type FetchBudget } from './psx-fetch.ts';
 import { pakistanMarketState } from './psx-market.ts';
 import { fetchPsxQuote } from './psx-quotes.ts';
 import { isTradingDay } from './psx-calendar.ts';
+import { quoteUpsertSql } from './quote-write.ts';
 
 /**
  * `quote_refreshes` is the one shared, cross-user PSX quote cache. The cron
@@ -165,13 +166,7 @@ export async function writeQuotes(db: D1Database, quotes: Record<string, Quote>)
     const chunk = entries.slice(index, index + ROWS_PER_STATEMENT);
     statements.push(
       db
-        .prepare(
-          `INSERT INTO quote_refreshes (ticker,price,as_of,quote_date,source,fetched_at,updated_at)
-           VALUES ${chunk.map(() => '(?,?,?,?,?,?,?)').join(',')}
-           ON CONFLICT(ticker) DO UPDATE SET
-             price=excluded.price, as_of=excluded.as_of, quote_date=excluded.quote_date,
-             source=excluded.source, fetched_at=excluded.fetched_at, updated_at=excluded.updated_at`,
-        )
+        .prepare(quoteUpsertSql(chunk.length))
         .bind(
           ...chunk.flatMap(([ticker, quote]) => [
             ticker,
