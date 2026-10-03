@@ -210,10 +210,9 @@ export type RefreshTickerState = {
 };
 export type RefreshOverall = 'idle' | 'queued' | 'running' | 'completed' | 'partial' | 'failed';
 
-/** GET/POST /api/dividends/refresh: historical announcement fetch status for the signed-in ledger. */
+/** GET/POST /api/dividends/refresh?tickers=: historical announcement fetch status for the tickers the client names. */
 export type DividendRefreshResponse = {
-  /** Portfolio revision the ticker list was derived from. */
-  revision: number;
+  /** The tickers the client asked about (the server never derives them from a portfolio). */
   tickers: string[];
   states: RefreshTickerState[];
   overall: RefreshOverall;

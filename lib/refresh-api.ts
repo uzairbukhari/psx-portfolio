@@ -4,9 +4,8 @@ import type { DividendRefreshResponse, IpoOffersResponse } from './api-types.ts'
 import type { DispatchConfig } from './github-dispatch.ts';
 import { dispatchBlockedReason } from './github-dispatch.ts';
 import { readAnnouncements } from './dividend-announcements.ts';
-import { historicalTickers } from './dividend-history.ts';
+import { cleanLookupTickers } from './company-resolver.ts';
 import { CURATED_IPO_OFFERS, lookupFromRow, type IpoRow } from './ipo-evidence.ts';
-import type { Portfolio } from './portfolio.ts';
 import { takeRateLimit } from './rate-limit.ts';
 import { UserError } from './user-error.ts';
 import { MAX_REQUEST_TICKERS, overallState, readRequests, requestRefresh, tickerState, type RequestKind } from './workflow-requests.ts';
@@ -23,38 +22,38 @@ const statesFor = async (db: D1Database, kind: RequestKind, tickers: string[], n
   return { states, overall: overallState(states) };
 };
 
+/**
+ * The tickers a client names (`?tickers=` / body `tickers`): distinct, well-formed and capped. The server no longer
+ * opens a portfolio to decide which companies a person holds, so it cannot and does not try to verify the list.
+ */
+const named = (input: unknown) => cleanLookupTickers(input, MAX_REQUEST_TICKERS);
+
 export async function dividendRefreshStatus(
   db: D1Database,
-  portfolio: Portfolio,
-  revision: number,
+  tickersInput: unknown,
   config: DispatchConfig,
   now = Date.now(),
 ): Promise<DividendRefreshResponse> {
-  const tickers = historicalTickers(portfolio);
+  const tickers = named(tickersInput);
   const { states, overall } = await statesFor(db, 'payouts', tickers, now);
   const announcements = tickers.length ? await readAnnouncements(db, tickers).catch(() => []) : [];
   const blocked = dispatchBlockedReason(config);
-  return { revision, tickers, states, overall, announcements, dispatchEnabled: blocked === null, disabledReason: blocked };
+  return { tickers, states, overall, announcements, dispatchEnabled: blocked === null, disabledReason: blocked };
 }
 
 /**
- * Starts a refresh for the ledger's own historical tickers. A client may narrow the list but never widen it:
- * anything outside the user's active trade history is ignored, so the endpoint cannot be used to fan out
- * arbitrary symbols.
+ * Starts a refresh for the tickers the client names (distinct, well-formed, capped, rate-limited per account).
+ * This is a per-company public-data request: it reveals which companies were asked about, nothing more.
  */
 export async function requestDividendRefresh(
   db: D1Database,
   user: string,
-  portfolio: Portfolio,
-  revision: number,
+  tickersInput: unknown,
   config: DispatchConfig,
-  asked: unknown,
   fetcher: typeof fetch = fetch,
   now = Date.now(),
 ): Promise<DividendRefreshResponse> {
-  const eligible = historicalTickers(portfolio);
-  const wanted = Array.isArray(asked) ? asked.filter((t): t is string => typeof t === 'string') : eligible;
-  const tickers = eligible.filter((t) => wanted.includes(t)).slice(0, MAX_REQUEST_TICKERS);
+  const tickers = named(tickersInput);
   if (!tickers.length) throw new UserError('There are no companies in your trade history to refresh.');
   const blocked = dispatchBlockedReason(config);
   let result;
@@ -65,7 +64,7 @@ export async function requestDividendRefresh(
       throw new UserError(`Announcement refresh limit reached. Try again in ${Math.ceil(decision.retryAfterMs / 60_000)} minutes.`, 429);
     result = await requestRefresh(db, config, 'payouts', tickers, now, fetcher);
   }
-  const status = await dividendRefreshStatus(db, portfolio, revision, config, now);
+  const status = await dividendRefreshStatus(db, tickers, config, now);
   return {
     ...status,
     queued: result.queued,

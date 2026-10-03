@@ -12,6 +12,7 @@ import {
   type DividendCandidate,
 } from '@/lib/dividend-history';
 import { money, today, type Portfolio } from '@/lib/portfolio';
+import { historicalTickers } from '@/lib/dividend-history';
 import { useConfirm } from '@/components/confirm-dialog';
 import './import-review.css';
 
@@ -51,9 +52,15 @@ export function DividendSyncView({
   const fvRequested = useRef(false);
   const poll = useRef(0);
   const loading = data === null && !error;
+  // The companies in this ledger's trade history. Only these tickers are sent to the server (per-company public
+  // data requests); the ledger itself never leaves the device.
+  const tickers = useMemo(() => historicalTickers(portfolio), [portfolio]);
+  const tickerQuery = encodeURIComponent(tickers.join(','));
+  const tickersRef = useRef(tickers);
+  tickersRef.current = tickers;
 
   const load = useCallback(async () => {
-    const response = await fetch('/api/dividends/refresh');
+    const response = await fetch(`/api/dividends/refresh?tickers=${encodeURIComponent(tickersRef.current.join(','))}`);
     const body = (await response.json()) as DividendRefreshResponse & { error?: string };
     if (!response.ok) throw new Error(body.error);
     setData(body);
@@ -63,7 +70,7 @@ export function DividendSyncView({
   const stopPolling = useCallback(() => { poll.current++; }, []);
   useEffect(() => {
     let live = true;
-    void fetch('/api/dividends/refresh')
+    void fetch(`/api/dividends/refresh?tickers=${tickerQuery}`)
       .then(async (response) => {
         const body = (await response.json()) as DividendRefreshResponse & { error?: string };
         if (!response.ok) throw new Error(body.error);
@@ -92,7 +99,7 @@ export function DividendSyncView({
     setNote('');
     const ticket = ++poll.current;
     try {
-      const response = await fetch('/api/dividends/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const response = await fetch('/api/dividends/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: tickersRef.current }) });
       const body = (await response.json()) as DividendRefreshResponse & { error?: string };
       if (!response.ok) throw new Error(body.error);
       setData(body);
@@ -125,7 +132,7 @@ export function DividendSyncView({
     async function step() {
       try {
         const get = async () => {
-          const response = await fetch('/api/face-values');
+          const response = await fetch(`/api/face-values?tickers=${encodeURIComponent(tickersRef.current.join(','))}`);
           const body = (await response.json()) as FaceValuesResponse & { error?: string };
           if (!response.ok) throw new Error(body.error);
           return body;

@@ -96,6 +96,7 @@ import { AhlImportDialog } from './ahl-import-dialog';
 import { DividendSyncView } from './dividend-sync-view';
 import { parseAhlLedgerText, type AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
+import { watchTickers } from '@/lib/market-watch';
 import MonthlyPicks from './monthly-picks';
 import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
@@ -747,6 +748,12 @@ function DashboardContent({
   if (!p && !email) return <SignIn returnTo={initialPathname || '/'} />;
   if (!p)
     return <LoadError message={message} busy={busy} onRetry={load} />;
+  // The market pulse sends only these tickers to the server; names and saved quotes are merged back in locally.
+  const pulseWatch = {
+    tickers: watchTickers(p),
+    names: Object.fromEntries(p.companies.map((c) => [c.ticker, c.name])),
+    saved: p.quotes,
+  };
   const restoreBackup = (f: File) => {
     attempt(async () => {
       // Either an encrypted package (asks for its password) or a readable ledger from an older version. Both are
@@ -1568,7 +1575,7 @@ function DashboardContent({
             missingCount={missing.length}
             unknownCount={unknown.length}
             newBuys={newBuys}
-            aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} /> : undefined}
+            aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} /> : undefined}
           />
           <div className="holdings-head">
             <h2>
@@ -1847,7 +1854,7 @@ function DashboardContent({
               values exclude cash and unrecorded corporate actions.
             </p>
           </section>
-          {widePulse === false && <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} />}
+          {widePulse === false && <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} />}
           </>
           )}
         </TabsContent>

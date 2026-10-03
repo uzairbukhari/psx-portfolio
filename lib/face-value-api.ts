@@ -1,25 +1,20 @@
 // Request handling for /api/face-values (dividend review): verified face-value evidence for the ledger's own
 // companies, and a background fetch for the ones that have none. Free of Worker-only imports for testing.
 import type { FaceValuesResponse } from './api-types.ts';
-import { historicalTickers } from './dividend-history.ts';
+import { cleanLookupTickers } from './company-resolver.ts';
 import { readFaceValues } from './face-values.ts';
 import { dispatchBlockedReason, type DispatchConfig } from './github-dispatch.ts';
-import type { Portfolio } from './portfolio.ts';
 import { takeRateLimit } from './rate-limit.ts';
 import { UserError } from './user-error.ts';
 import { MAX_REQUEST_TICKERS, overallState, readRequests, requestRefresh, tickerState } from './workflow-requests.ts';
 
 export const FACE_VALUE_LIMIT = { windowMs: 6 * 3_600_000, max: 6 };
 
-/** The ledger's companies, optionally narrowed by the caller (never widened). */
-function scope(portfolio: Portfolio, asked: unknown): string[] {
-  const eligible = historicalTickers(portfolio);
-  const wanted = Array.isArray(asked) ? asked.filter((t): t is string => typeof t === 'string') : eligible;
-  return eligible.filter((t) => wanted.includes(t));
-}
+/** The tickers a client names: distinct, well-formed and capped. The server never opens a portfolio to check them. */
+const scope = (asked: unknown) => cleanLookupTickers(asked, MAX_REQUEST_TICKERS);
 
-export async function faceValueStatus(db: D1Database, portfolio: Portfolio, config: DispatchConfig, asked?: unknown, now = Date.now()): Promise<FaceValuesResponse> {
-  const tickers = scope(portfolio, asked);
+export async function faceValueStatus(db: D1Database, asked: unknown, config: DispatchConfig, now = Date.now()): Promise<FaceValuesResponse> {
+  const tickers = scope(asked);
   const evidence = tickers.length ? await readFaceValues(db, tickers) : {};
   const requests = await readRequests(db, 'facevalue', tickers);
   const states = tickers.map((t) => tickerState(requests.get(t), t, now));
@@ -31,13 +26,12 @@ export async function faceValueStatus(db: D1Database, portfolio: Portfolio, conf
 export async function requestFaceValues(
   db: D1Database,
   user: string,
-  portfolio: Portfolio,
-  config: DispatchConfig,
   asked: unknown,
+  config: DispatchConfig,
   fetcher: typeof fetch = fetch,
   now = Date.now(),
 ): Promise<FaceValuesResponse> {
-  const tickers = scope(portfolio, asked);
+  const tickers = scope(asked);
   if (!tickers.length) throw new UserError('There are no companies in your trade history to look up.');
   const evidence = await readFaceValues(db, tickers);
   const missing = tickers.filter((t) => !evidence[t]?.length).slice(0, MAX_REQUEST_TICKERS);
@@ -53,5 +47,5 @@ export async function requestFaceValues(
       message = result.dispatched ? 'Looking for verified face values.' : result.alreadyRunning.length ? 'A face value lookup is already running.' : 'The lookup could not be started right now. Please try again later.';
     }
   }
-  return { ...(await faceValueStatus(db, portfolio, config, asked, now)), queued, message };
+  return { ...(await faceValueStatus(db, tickers, config, now)), queued, message };
 }

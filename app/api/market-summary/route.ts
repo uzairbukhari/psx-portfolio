@@ -1,4 +1,5 @@
-import { blankPortfolio, type Portfolio, type Quote } from '@/lib/portfolio';
+import { type Quote } from '@/lib/portfolio';
+import { cleanWatchTickers } from '@/lib/market-watch';
 import {
   fetchPsxIndexSummary,
   pakistanMarketState,
@@ -67,31 +68,20 @@ async function cachedSummary() {
   }
 }
 
-async function personalized(
+/**
+ * The market view for the tickers the CLIENT names (`?tickers=`). The server never loads a portfolio: which
+ * companies to show, their names and any newer manual quotes are applied by the client (lib/market-watch.ts).
+ */
+async function marketView(
   user: string,
   cache: MarketSummaryCache,
   fetchedAt: string | null,
+  shortlist: string[],
   _budget?: FetchBudget,
 ) {
-  const portfolioRow = await db()
-    .prepare('SELECT payload FROM portfolios WHERE user_id=?')
-    .bind(user)
-    .first<{ payload: string }>();
-  const portfolio: Portfolio = portfolioRow
-    ? JSON.parse(portfolioRow.payload)
-    : blankPortfolio();
-  const shortlist = portfolio.monthlyPicksShortlist?.length
-    ? portfolio.monthlyPicksShortlist
-    : portfolio.companies
-        .filter((company) => company.target > 0)
-        .map((company) => company.ticker);
-  // The shortlist is priced from the shared per-ticker quote cache the scheduled scraper keeps
-  // current; Cloudflare never fetches company prices itself (PSX refuses its network).
-  const refreshed: Record<string, Quote> = {};
-  const quotes = {
-    ...mergeQuotes(portfolio.quotes, await readQuoteRows(db()), shortlist),
-    ...refreshed,
-  };
+  // Priced from the shared per-ticker quote cache the scheduled scraper keeps current; Cloudflare never
+  // fetches company prices itself (PSX refuses its network).
+  const quotes: Record<string, Quote> = mergeQuotes({}, await readQuoteRows(db()), shortlist);
   const fallback = Object.fromEntries(
     Object.entries(quotes).map(([ticker, quote]) => [
       ticker,
@@ -101,7 +91,7 @@ async function personalized(
   const intraday = await fetchPypsxIntradayFor(user, shortlist.slice(0, MAX_INTRADAY));
   const withIntraday = selectShortlistPerformance(
     shortlist,
-    portfolio.companies,
+    [],
     rebaseWatchQuotes(cache.quotes ?? [], quotes),
     fallback,
   ).map((company) => {
@@ -191,6 +181,8 @@ async function personalized(
         : null,
       series,
       companies,
+      /** Cache quotes behind `companies`, so the client can tell whether a saved/manual quote is newer. */
+      quotes,
       market: pakistanMarketState(),
       source: {
         name: 'PSX Data Portal',
@@ -212,7 +204,7 @@ export async function GET(req: Request) {
   try {
     const user = await identity(req);
     const { cache, fetchedAt } = await cachedSummary();
-    return Response.json(await personalized(user, cache, fetchedAt), {
+    return Response.json(await marketView(user, cache, fetchedAt, cleanWatchTickers(new URL(req.url).searchParams.get('tickers'))), {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {
@@ -223,6 +215,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await identity(req, true);
+    const watch = cleanWatchTickers(new URL(req.url).searchParams.get('tickers'));
     const previous = await cachedSummary();
     const market = pakistanMarketState();
     const force = new URL(req.url).searchParams.get('force') === '1';
@@ -232,7 +225,7 @@ export async function POST(req: Request) {
     if ((!market.isOpen || recent) && !force)
       return Response.json(
         {
-          ...(await personalized(user, previous.cache, previous.fetchedAt)),
+          ...(await marketView(user, previous.cache, previous.fetchedAt, watch)),
           skipped: recent ? 'Up to date' : market.label,
         },
         { headers: { 'Cache-Control': 'no-store' } },
@@ -254,7 +247,7 @@ export async function POST(req: Request) {
     if (indexResult.status === 'rejected')
       return Response.json(
         {
-          ...(await personalized(user, previous.cache, previous.fetchedAt)),
+          ...(await marketView(user, previous.cache, previous.fetchedAt, watch)),
           skipped: 'PSX unavailable; showing the last saved update',
         },
         { headers: { 'Cache-Control': 'no-store' } },
@@ -275,7 +268,7 @@ export async function POST(req: Request) {
           .bind(JSON.stringify(cache), now, now)
           .run();
     const current = written.meta.changes ? { cache, fetchedAt: now } : await cachedSummary();
-    return Response.json(await personalized(user, current.cache, current.fetchedAt), {
+    return Response.json(await marketView(user, current.cache, current.fetchedAt, watch), {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {
