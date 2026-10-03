@@ -42,3 +42,11 @@ declare namespace Cloudflare {
     APP_ENV?: string;
   }
 }
+declare namespace Cloudflare {
+  interface Env {
+    /** "false" switches AI Lab research off (API refuses requests, tab shows it is off); unset = on. */
+    AI_LAB_ENABLED?: string;
+    /** Monthly cap in USD shown in AI Lab; the research job enforces it (default 5). */
+    AI_RESEARCH_MONTHLY_CAP_USD?: string;
+  }
+}

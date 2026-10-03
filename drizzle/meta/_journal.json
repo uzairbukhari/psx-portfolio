@@ -183,6 +183,13 @@
       "when": 1791019152250,
       "tag": "0025_research_job_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1791069302483,
+      "tag": "0026_ai_lab",
+      "breakpoints": true
     }
   ]
 }

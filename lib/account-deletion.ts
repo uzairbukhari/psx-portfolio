@@ -37,6 +37,14 @@ export const SHARED_TABLES: readonly string[] = [
   'security_face_values',
   'refresh_requests',
   'ipo_offers',
+  'ai_research_runs',
+  'ai_macro_briefs',
+  'ai_company_profiles',
+  'ai_financial_extracts',
+  'ai_news_items',
+  'ai_company_research',
+  'ai_rankings',
+  'ai_research_requests',
 ];
 
 /** SQL statements (child rows first) with the single bound email each one takes. */

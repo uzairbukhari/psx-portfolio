@@ -213,6 +213,8 @@ export type Portfolio = {
   monthlyPicksShortlist?: string[];
   /** Finished Monthly Picks runs, computed on the device and kept only inside the encrypted portfolio. */
   monthlyPicksRuns?: import('./picks-local.ts').StoredPicksRun[];
+  /** Experimental AI Lab runs (super admin), kept apart from Monthly Picks and stored only in the encrypted portfolio. */
+  aiLabRuns?: import('./ai-lab-types.ts').AiLabRun[];
   dividends?: Dividend[];
   /**
    * First book-closure date for which PSX announcements become expected dividends. Set once
@@ -1266,6 +1268,28 @@ export function validate(p: Portfolio) {
       )
     )
       throw new UserError('Invalid Monthly Picks history.');
+  }
+  if (p.aiLabRuns !== undefined) {
+    const runs = p.aiLabRuns;
+    if (
+      !Array.isArray(runs) ||
+      runs.length > 12 ||
+      runs.some(
+        (run) =>
+          !run ||
+          typeof run !== 'object' ||
+          typeof run.id !== 'string' ||
+          run.id.length > 80 ||
+          !/^\d{4}-(0[1-9]|1[0-2])$/.test(run.month) ||
+          !Number.isFinite(run.amount) ||
+          !Array.isArray(run.shortlist) ||
+          run.shortlist.length > 15 ||
+          !run.result ||
+          !Array.isArray(run.result.picks) ||
+          JSON.stringify(run).length > 150000,
+      )
+    )
+      throw new UserError('Invalid AI Lab history.');
   }
   if (
     p.aiReview &&
