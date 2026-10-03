@@ -264,10 +264,16 @@ export class VaultSession {
     return result;
   }
 
+  /** Throws if the session locked since `epoch` was read, so a late callback can never write state. */
+  private assertCurrent(epoch: number) {
+    if (this.epoch !== epoch || !this.key) throw new VaultLockedError();
+  }
+
   /** Re-reads and decrypts the stored portfolio (a reload). Never merges with local state. */
   async reload(): Promise<{ portfolio: Portfolio; revision: number }> {
     return this.guarded(async () => {
       const key = this.requireKey();
+      const epoch = this.epoch;
       let stored: EncryptedPortfolioResponse;
       try {
         stored = await this.transport.getPortfolio();
@@ -279,6 +285,7 @@ export class VaultSession {
       }
       const plain = await decryptPortfolio(key, stored.envelope, { vaultId: this.material.vaultId, keyVersion: this.material.keyVersion, revision: stored.revision });
       const portfolio = parsePortfolio(plain);
+      this.assertCurrent(epoch);
       this.offline = false;
       this.portfolio = portfolio;
       this.revision = stored.revision;
@@ -294,9 +301,11 @@ export class VaultSession {
   async save(next: Portfolio, expectedRevision: number): Promise<number> {
     return this.guarded(async () => {
       const key = this.requireKey();
+      const epoch = this.epoch;
       const envelope = await encryptPortfolio(key, this.material.vaultId, this.material.keyVersion, expectedRevision + 1, JSON.stringify(next));
       try {
         const saved = await this.transport.putPortfolio({ envelope, expectedRevision });
+        this.assertCurrent(epoch);
         this.portfolio = next;
         this.revision = saved.revision;
         await this.cache.write({ vault: this.material, portfolio: { vaultId: this.material.vaultId, revision: saved.revision, envelope, updatedAt: new Date().toISOString() } });
@@ -309,7 +318,9 @@ export class VaultSession {
   }
 
   private async putWrappers(update: { password?: VaultKeyMaterial['password']; recovery?: RecoveryWrapper }) {
+    const epoch = this.epoch;
     const { wrapperVersion } = await this.transport.putWrappers({ expectedWrapperVersion: this.material.wrapperVersion, ...update });
+    this.assertCurrent(epoch);
     this.material = {
       ...this.material,
       wrapperVersion,
