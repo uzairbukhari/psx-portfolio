@@ -63,6 +63,7 @@ import {
   taxSummary,
   dateOK,
   DEFAULT_RESEARCH_SETTINGS,
+  blankPortfolio,
   type ResearchSettings,
   type Portfolio,
   type Trade,
@@ -1955,6 +1956,7 @@ function DashboardContent({
             onResearchSettings={saveResearchSettings}
             onExport={exportBackup}
             onExportEncrypted={exportEncryptedBackup}
+            onClearLedger={() => save(blankPortfolio(), 'Your portfolio data was cleared.')}
             onRestore={restoreBackup}
             security={vault ? <VaultSecurity session={vault.session} onLock={vault.lock} /> : undefined}
             onImportCdc={importCdc}

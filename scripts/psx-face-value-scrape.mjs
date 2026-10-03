@@ -5,12 +5,12 @@
 //   --evidence=FILE   JSON array of curated entries from official documents:
 //                     [{ticker, faceValue, effectiveFrom ('' or YYYY-MM-DD), sourceUrl, sourceLabel?, evidence?}]
 //   --dry-run         read and extract, write nothing
-// Default targets: open `facevalue` requests, plus held tickers with no evidence that were not tried this week.
+// Default targets: open `facevalue` requests, plus tracked tickers with no evidence that were not tried this week.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission); D1_DATABASE_ID to target staging.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { d1, heldTickers } from './d1-rest.mjs';
+import { d1, trackedTickers } from './d1-rest.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { documentText } from './pdf-text.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
@@ -25,7 +25,7 @@ async function targets() {
   const explicit = (arg('tickers') ?? '').split(',').map((t) => t.trim().toUpperCase()).filter(valid);
   if (explicit.length) return { tickers: explicit, requested: explicit };
   const requested = (await d1("SELECT ticker FROM refresh_requests WHERE kind='facevalue' AND status IN ('queued','running')").catch(() => [])).map((r) => String(r.ticker)).filter(valid);
-  const held = await heldTickers(undefined);
+  const held = await trackedTickers(undefined);
   const have = new Set((await d1('SELECT DISTINCT ticker FROM security_face_values')).map((r) => String(r.ticker)));
   const tried = new Map((await d1("SELECT key,last_attempt_at FROM refresh_state WHERE kind='face-value'")).map((r) => [String(r.key), String(r.last_attempt_at ?? '')]));
   const stale = held.filter((t) => !have.has(t) && !(tried.get(t) && Date.now() - Date.parse(tried.get(t)) < RETRY_AFTER_MS));

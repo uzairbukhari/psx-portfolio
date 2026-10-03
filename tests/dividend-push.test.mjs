@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { announcementKey, buildPushMessages, isExpoPushToken, newAnnouncements } from '../lib/dividend-push.ts';
+import { announcementKey, buildGenericPush, GENERIC_PUSH, isExpoPushToken, newAnnouncements } from '../lib/dividend-push.ts';
 
 const row = (over = {}) => ({
   ticker: 'MEBL', bookClosureStart: '2026-10-10', bookClosureEnd: '2026-10-12', announcedOn: '2026-10-01',
@@ -23,15 +23,19 @@ test('only announcements that are new for already-seen tickers are pushed', () =
   assert.deepEqual(result, [fresh]);
 });
 
-test('messages go only to phones holding the ticker, once per token', () => {
-  const rows = [row(), row({ kind: 'bonus', percent: 10, perShareRs: null })];
-  const holder = { email: 'a@x.com', token: TOKEN, tickers: new Set(['MEBL']) };
-  const other = { email: 'b@x.com', token: 'ExponentPushToken[zzzzzzzz12345678]', tickers: new Set(['LUCK']) };
-  const bad = { email: 'c@x.com', token: 'nope', tickers: new Set(['MEBL']) };
-  const out = buildPushMessages(rows, [holder, other, bad]);
+test('one generic message per distinct valid device, however many announcements', () => {
+  const rows = [row(), row({ kind: 'bonus', percent: 10, perShareRs: null }), row({ ticker: 'LUCK' })];
+  const out = buildGenericPush(rows, [TOKEN, TOKEN, 'ExponentPushToken[zzzzzzzz12345678]', 'nope']);
   assert.equal(out.length, 2);
-  assert.ok(out.every((m) => m.to === TOKEN && m.data.ticker === 'MEBL'));
-  assert.match(out[0].body, /Rs 2.5 per share/);
-  assert.match(out[1].body, /10% bonus shares/);
-  assert.equal(buildPushMessages(rows, [holder, holder]).length, 2);
+  assert.deepEqual(new Set(out.map((m) => m.to)), new Set([TOKEN, 'ExponentPushToken[zzzzzzzz12345678]']));
+  assert.deepEqual(buildGenericPush([], [TOKEN]), []);
+});
+
+test('push payloads carry no ticker, amount, holding or per-user content', () => {
+  const rows = [row({ ticker: 'SECRETCO', perShareRs: 987.65, percent: 4321 })];
+  const [message] = buildGenericPush(rows, [TOKEN]);
+  const payload = JSON.stringify(message);
+  assert.ok(!/SECRETCO|987|4321|MEBL/.test(payload));
+  assert.equal(message.title, GENERIC_PUSH.title);
+  assert.deepEqual(message.data, { kind: 'market-update' });
 });

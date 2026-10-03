@@ -180,6 +180,7 @@ export default function SettingsView({
   onResearchSettings,
   onExport,
   onExportEncrypted,
+  onClearLedger,
   onRestore,
   onImportCdc,
   onImportFinqalab,
@@ -200,6 +201,8 @@ export default function SettingsView({
   onResearchSettings: (patch: Partial<ResearchSettings>) => void;
   onExport: () => void;
   onExportEncrypted: () => void;
+  /** Saves a blank, freshly encrypted portfolio from this device. */
+  onClearLedger: () => Promise<void>;
   onRestore: (file: File) => void;
   onImportCdc: (file: File) => void;
   onImportFinqalab: (file: File) => void;
@@ -225,6 +228,9 @@ export default function SettingsView({
     setClearBusy(true);
     setClearError(null);
     try {
+      // The ledger exists only as ciphertext, so it is cleared here: a blank portfolio is encrypted and saved.
+      await onClearLedger();
+      // Then the server removes anything else it holds for the account (research jobs, legacy rows).
       const res = await fetch('/api/me/data', {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },

@@ -1,7 +1,8 @@
 import type { DeleteAccountRequest, DeleteAccountResponse, MeResponse } from '@/lib/api-types';
 import { getViewer } from '@/lib/auth';
 import { accountDeletionStatements, confirmationMatches } from '@/lib/account-deletion';
-import { db, failure, identity } from '@/lib/server';
+import { db, failure, identity, vaultDb } from '@/lib/server';
+import { deleteVault } from '@/lib/vault-store';
 import { serializeExpiredCookie } from '@/lib/session';
 import { UserError } from '@/lib/user-error';
 
@@ -24,7 +25,7 @@ export async function GET() {
 }
 
 /**
- * Permanently deletes the signed-in user's data from every per-user table (see lib/account-deletion.ts).
+ * Permanently deletes the signed-in user's encrypted vault and every per-user row (see lib/account-deletion.ts).
  * Shared caches are untouched. The body must carry `{ confirm: "<your email>" }`.
  */
 export async function DELETE(req: Request) {
@@ -33,6 +34,9 @@ export async function DELETE(req: Request) {
     const body = (await req.json().catch(() => null)) as Partial<DeleteAccountRequest> | null;
     if (!confirmationMatches(body?.confirm, email))
       throw new UserError('Type your email address to confirm deleting your account.', 400);
+    // The encrypted vault goes first: it is the data that matters most, and the deletion is idempotent so a
+    // failed second step can simply be retried.
+    await deleteVault(vaultDb(), email);
     const database = db();
     await database.batch(accountDeletionStatements().map((sql) => database.prepare(sql).bind(email)));
     const headers = new Headers({ 'Cache-Control': 'no-store' });

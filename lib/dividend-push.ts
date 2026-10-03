@@ -1,8 +1,18 @@
-// Pure helpers for the dividend push notifier (scripts/psx-payout-scrape.mjs).
+// Pure helpers for the payout push notifier (scripts/psx-payout-scrape.mjs).
+//
+// Privacy: portfolios are end-to-end encrypted, so the scraper cannot know who holds what and never tries to.
+// A batch of newly seen PSX announcements produces ONE generic message per registered device. It names no
+// ticker, amount or holding; the app opens, unlocks its vault, and decides locally what is relevant.
 import type { PayoutAnnouncement } from './psx-payouts.ts';
 
-export type PushRecipient = { email: string; token: string; tickers: Set<string> };
-export type PushMessage = { to: string; title: string; body: string; data: { ticker: string }; channelId: string; sound: 'default' };
+export type PushMessage = {
+  to: string;
+  title: string;
+  body: string;
+  data: { kind: 'market-update' };
+  channelId: string;
+  sound: 'default';
+};
 
 const TOKEN = /^(Expo|Exponent)PushToken\[[A-Za-z0-9_-]{8,}\]$/;
 export const isExpoPushToken = (value: unknown): value is string => typeof value === 'string' && TOKEN.test(value);
@@ -18,29 +28,20 @@ export function newAnnouncements(rows: PayoutAnnouncement[], knownKeys: Set<stri
   return rows.filter((r) => knownTickers.has(r.ticker) && !knownKeys.has(announcementKey(r)));
 }
 
-const describe = (r: PayoutAnnouncement) => {
-  if (r.kind === 'cash') return r.perShareRs !== null ? `Rs ${r.perShareRs} per share` : r.percent !== null ? `${r.percent}% cash dividend` : 'cash dividend';
-  if (r.kind === 'bonus') return r.percent !== null ? `${r.percent}% bonus shares` : 'bonus shares';
-  return r.percent !== null ? `${r.percent}% right shares` : 'right shares';
-};
+export const GENERIC_PUSH = {
+  title: 'PSX market update',
+  body: 'New payout announcements are available. Open Sipwise to see what applies to you.',
+} as const;
 
-export function buildPushMessages(announcements: PayoutAnnouncement[], recipients: PushRecipient[]): PushMessage[] {
-  const messages: PushMessage[] = [];
+/** One identical, content-free message per distinct valid token, or none when nothing is new. */
+export function buildGenericPush(announcements: PayoutAnnouncement[], tokens: Iterable<string>): PushMessage[] {
+  if (!announcements.length) return [];
   const seen = new Set<string>();
-  for (const r of announcements) {
-    for (const who of recipients) {
-      const dedupe = `${who.token}|${announcementKey(r)}`;
-      if (!who.tickers.has(r.ticker) || !isExpoPushToken(who.token) || seen.has(dedupe)) continue;
-      seen.add(dedupe);
-      messages.push({
-        to: who.token,
-        title: `${r.ticker} announced a payout`,
-        body: `${describe(r)}. Book closure starts ${r.bookClosureStart}.`,
-        data: { ticker: r.ticker },
-        channelId: 'dividends',
-        sound: 'default',
-      });
-    }
+  const messages: PushMessage[] = [];
+  for (const token of tokens) {
+    if (!isExpoPushToken(token) || seen.has(token)) continue;
+    seen.add(token);
+    messages.push({ to: token, ...GENERIC_PUSH, data: { kind: 'market-update' }, channelId: 'dividends', sound: 'default' });
   }
   return messages;
 }

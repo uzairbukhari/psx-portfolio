@@ -1,17 +1,17 @@
 // Refreshes the shared `dividend_announcements` table from outside Cloudflare
-// (PSX drops Cloudflare egress; see psx-quote-scrape.mjs). For every ticker held
-// in some portfolio it reads the company Payouts table and upserts each cash,
-// bonus and right announcement. Portfolios turn cash rows into dividends.
+// (PSX drops Cloudflare egress; see psx-quote-scrape.mjs). For every tracked ticker
+// (the public set clients have named) it reads the company Payouts table and upserts each cash,
+// bonus and right announcement. Each device decrypts its own vault and turns cash rows into dividends locally.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-payout-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
-import { d1, heldTickers } from './d1-rest.mjs';
+import { d1, trackedTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { fetchPsxPayoutsHtml } from '../lib/psx-fetch.ts';
 import { parsePayouts } from '../lib/psx-payouts.ts';
-import { announcementKey, buildPushMessages, newAnnouncements } from '../lib/dividend-push.ts';
+import { announcementKey, buildGenericPush, newAnnouncements } from '../lib/dividend-push.ts';
 
 // D1 allows 100 bound parameters per statement; 10 per row.
 const ROWS_PER_STATEMENT = 9;
@@ -39,23 +39,15 @@ async function upsert(rows, fetchedAt) {
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
-/** Tells phones that hold a company about its newly seen announcements. Never fails the scrape. */
+/**
+ * Sends one generic "market update" push per registered device when announcements are new. The scraper cannot
+ * (and must not) work out who holds what: portfolios are encrypted, and the message names no company.
+ */
 async function notifyPhones(rows, before) {
   const fresh = newAnnouncements(rows, before.keys, before.tickers);
   if (!fresh.length) return;
-  const sessions = await d1(
-    `SELECT s.email AS email, s.push_token AS token, p.payload AS payload
-     FROM mobile_sessions s JOIN portfolios p ON lower(p.user_id)=lower(s.email)
-     WHERE s.revoked_at IS NULL AND s.push_token IS NOT NULL`,
-  );
-  const recipients = sessions.map((row) => ({
-    email: row.email,
-    token: row.token,
-    tickers: new Set(
-      (JSON.parse(row.payload).companies ?? []).map((c) => String(c.ticker).toUpperCase()),
-    ),
-  }));
-  const messages = buildPushMessages(fresh, recipients);
+  const sessions = await d1('SELECT DISTINCT push_token AS token FROM mobile_sessions WHERE revoked_at IS NULL AND push_token IS NOT NULL');
+  const messages = buildGenericPush(fresh, sessions.map((row) => row.token));
   console.log(`Push: ${fresh.length} new announcements, ${messages.length} notifications.`);
   for (let i = 0; i < messages.length; i += 100) {
     const batch = messages.slice(i, i + 100);
@@ -74,7 +66,7 @@ async function notifyPhones(rows, before) {
 }
 
 async function main() {
-  const tickers = await heldTickers(tickerArg);
+  const tickers = await trackedTickers(tickerArg);
   const rows = [];
   const failed = [];
   const results = [];

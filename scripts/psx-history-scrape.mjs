@@ -1,12 +1,12 @@
 // Refreshes the shared `price_history` table (company-page chart) from outside
 // Cloudflare (PSX drops Cloudflare egress; see psx-quote-scrape.mjs). For every
-// ticker held in some portfolio it stores today's intraday ticks (every run) and
+// tracked ticker it stores today's intraday ticks (every run) and
 // daily closes (when the stored copy is over 12 hours old). Companies keep 420 trading days; the KSE100 index
 // row (used by the mobile benchmark) keeps 2,500 (lib/price-history.ts#eodKeep).
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-history-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
-import { d1, heldTickers } from './d1-rest.mjs';
+import { d1, trackedTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsxToken, fetchPsxTimeseries } from '../lib/psx-fetch.ts';
 import { eodKeep, parseEod, parseIntraday } from '../lib/price-history.ts';
@@ -22,7 +22,7 @@ async function storedAges() {
 }
 
 async function main() {
-  const tickers = await heldTickers(tickerArg);
+  const tickers = await trackedTickers(tickerArg);
   const ages = await storedAges();
   const now = new Date();
   const failed = [];

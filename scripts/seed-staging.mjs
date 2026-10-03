@@ -1,13 +1,10 @@
-// Seeds the STAGING D1 database with a small fictional portfolio so every tab has
-// something to show. Never touches production: it refuses to run unless
-// D1_DATABASE_ID is set and is not the production database id.
+// Writes a small FICTIONAL ledger to a local file so a staging tester can restore it through the app and see
+// every tab populated. It touches no database at all: portfolios are encrypted on the device, so the server can
+// neither be seeded with one nor read one.
 //
-// Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, D1_DATABASE_ID (staging).
-// Usage: D1_DATABASE_ID=<staging id> node scripts/seed-staging.mjs [--dry-run] [--email=you@example.com]
+// Usage: node scripts/seed-staging.mjs [--out=staging-seed-ledger.json] [--dry-run]
+import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { assertStagingDatabase, d1 } from './d1-rest.mjs';
-
-export const DEFAULT_SEED_EMAIL = 'suzairbukhari@gmail.com';
 
 const COMPANIES = [
   ['MEBL', 'Meezan Bank', 'Bank', 15],
@@ -120,17 +117,13 @@ export function buildSeedPortfolio(today, now = new Date()) {
   };
 }
 
-/** SQL + params for the upsert; fails the staging guard before building anything. */
-export function buildSeedStatement({ databaseId, email, today, now = new Date() }) {
-  assertStagingDatabase(databaseId);
-  const normalized = String(email || DEFAULT_SEED_EMAIL).trim().toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+$/.test(normalized)) throw Error(`Invalid email: ${email}`);
-  return {
-    sql:
-      'INSERT INTO portfolios (user_id,payload,revision,updated_at) VALUES (?,?,1,?) ' +
-      'ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload, revision=revision+1, updated_at=excluded.updated_at',
-    params: [normalized, JSON.stringify(buildSeedPortfolio(today, now)), now.toISOString()],
-  };
+/**
+ * The fictional ledger as a plain backup file a tester restores through the app (Settings > Restore a backup),
+ * which encrypts it under their own vault. Nothing here is written to any database: portfolios are end-to-end
+ * encrypted, so the server cannot be seeded with one and there is no private data to seed it with.
+ */
+export function buildSeedBackup(today, now = new Date()) {
+  return { kind: 'psx-portfolio-ledger', schemaVersion: 1, portfolio: buildSeedPortfolio(today, now) };
 }
 
 const pktToday = () =>
@@ -138,26 +131,15 @@ const pktToday = () =>
     new Date(),
   );
 
-async function main() {
-  const dryRun = process.argv.includes('--dry-run');
-  const emailArg = process.argv.find((arg) => arg.startsWith('--email='));
-  const statement = buildSeedStatement({
-    databaseId: process.env.D1_DATABASE_ID,
-    email: emailArg?.slice('--email='.length),
-    today: pktToday(),
-  });
-  if (dryRun) {
-    console.log(statement.sql);
-    console.log(JSON.stringify(statement.params.map((p, i) => (i === 1 ? JSON.parse(p) : p)), null, 2));
+function main() {
+  const out = process.argv.find((arg) => arg.startsWith('--out='))?.slice('--out='.length) || 'staging-seed-ledger.json';
+  const backup = buildSeedBackup(pktToday());
+  if (process.argv.includes('--dry-run')) {
+    console.log(JSON.stringify(backup, null, 2));
     return;
   }
-  await d1(statement.sql, statement.params);
-  console.log(`Seeded staging portfolio for ${statement.params[0]}.`);
+  writeFileSync(out, JSON.stringify(backup, null, 2));
+  console.log(`Wrote the fictional staging ledger to ${out}. Restore it in the staging app; it is encrypted on your device.`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
-}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

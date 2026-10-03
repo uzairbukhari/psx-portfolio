@@ -1,10 +1,10 @@
 name: Seed staging
 
 # Fills the STAGING D1 database with public PSX market data for a few tickers (using
-# the same scrapers as production, aimed at the staging DB) plus a small fictional
-# portfolio. Never reads or writes the production database: scripts refuse to run
-# the seed against the production id, and D1_DATABASE_ID is read from env.staging in
-# wrangler.jsonc.
+# the same scrapers as production, aimed at the staging DB). It seeds no portfolio:
+# portfolios are end-to-end encrypted, so staging holds none until a tester restores
+# the fictional file from `node scripts/seed-staging.mjs`. Never reads or writes the
+# production database; D1_DATABASE_ID is read from env.staging in wrangler.jsonc.
 on:
   workflow_dispatch:
     inputs:
@@ -53,8 +53,6 @@ jobs:
             echo "::error::tickers must be a comma-separated list like MEBL,LUCK."
             exit 1
           fi
-      - name: Seed fictional portfolio
-        run: node scripts/seed-staging.mjs
       - name: Scrape quotes
         run: node scripts/psx-quote-scrape.mjs "--tickers=$TICKERS"
       - name: Scrape company facts

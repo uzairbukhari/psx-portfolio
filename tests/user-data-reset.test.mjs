@@ -8,7 +8,7 @@ test('clearing needs an explicit confirmation from the client', () => {
   assert.throws(() => assertClearConfirmed('true'), /Confirm/);
   assert.doesNotThrow(() => assertClearConfirmed(true));
 });
-test('clearing removes only the caller\'s portfolio and runs', async () => {
+test('clearing removes only the caller\'s legacy rows, research jobs and runs', async () => {
   const db = createD1();
   const now = new Date().toISOString();
   for (const user of ['me@x.com', 'other@x.com']) {
