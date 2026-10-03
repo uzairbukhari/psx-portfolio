@@ -57,6 +57,10 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
       - if: steps.token.outputs.present == 'true'
         run: npm ci
+      # Shared modules in ../lib import @noble/*; give them the app's copy (the root node_modules is not installed here).
+      - if: steps.token.outputs.present == 'true'
+        working-directory: .
+        run: ln -s "$PWD/mobile/node_modules" node_modules
       # Same gates as the PR check, so a bad merge never reaches phones.
       - if: steps.token.outputs.present == 'true'
         run: npm run typecheck
