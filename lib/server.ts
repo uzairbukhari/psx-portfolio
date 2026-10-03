@@ -15,6 +15,14 @@ export async function requireSuperAdmin(req: Request, write = false) {
   if (!isSuperAdmin(await getUserRole(email))) throw new UserError('Not authorized.', 403);
   return email;
 }
+/**
+ * The private vault database: ciphertext only. A separate D1 database from `db()`, which holds public market
+ * caches and account/operational data. Scrapers and the market Workers have no binding or credential for it.
+ */
+export function vaultDb() {
+  if (!env.VAULT_DB) throw new UserError('Encrypted portfolio storage is not available.', 503);
+  return env.VAULT_DB;
+}
 export function db() {
   if (!env.DB) throw new UserError('Portfolio storage is not available.', 503);
   return env.DB;
@@ -27,7 +35,7 @@ export function failure(e: unknown, status?: number) {
   const out = publicError(e, status);
   if (out.status >= 500 && !(e instanceof UserError)) console.error(e);
   return Response.json(
-    { error: out.message },
+    out.code ? { error: out.message, code: out.code } : { error: out.message },
     { status: out.status, headers: { 'Cache-Control': 'no-store' } },
   );
 }

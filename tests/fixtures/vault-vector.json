@@ -1,0 +1,37 @@
+{
+  "password": "vector passphrase for interop",
+  "recoverySecret": "SIPW-MYZX-FVR7-3WVM-YSVZ-JYQW-FQZQ-1WKK-YNVF-GYFV-FKZ7-ZWBJ-YHTZ-EY7G-G7TN",
+  "dataKeyHex": "abc3dbf30b233b536b839bb3cbe3fb132b435b738ba3bbd3eb031b334b637b93",
+  "material": {
+    "vaultId": "m7PL4_sTK0Nbc4uju9PrAw",
+    "formatVersion": 1,
+    "keyVersion": 1,
+    "wrapperVersion": 1,
+    "password": {
+      "kdf": {
+        "alg": "argon2id",
+        "v": 19,
+        "m": 65536,
+        "t": 3,
+        "p": 1
+      },
+      "salt": "y-P7EytDW3OLo7vT6wMbMw",
+      "nonce": "2_MLIztTa4Obs8vj",
+      "ct": "PGyUSsEXF-PCb_KUMvSHJLOtufCi4EAMVZIDeWRLh0R_U5l2uGsDWqV07Kv78Pf4"
+    },
+    "recovery": {
+      "nonce": "x9_3Dyc_V2-Hn7fP",
+      "ct": "eJmy1FwH6rdBKl7HiGLWD3TkhESCFDJVtotV4joIY9Ps8usnE5NkZo0iU5JtyDkt"
+    }
+  },
+  "envelope": {
+    "v": 1,
+    "alg": "A256GCM",
+    "vaultId": "m7PL4_sTK0Nbc4uju9PrAw",
+    "keyVersion": 1,
+    "revision": 7,
+    "nonce": "k6vD2_MLIztTa4Ob",
+    "ct": "p4BcuWaeg_0-Yg4-Z-cOOCGmi-qn0gg8PVsOq7Lnwin_tGCvtbW3j62iKOdebhI"
+  },
+  "plaintext": "{\"synthetic\":\"portfolio\",\"n\":1}"
+}

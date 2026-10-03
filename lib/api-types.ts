@@ -277,3 +277,27 @@ export type FaceValuesResponse = {
   queued?: string[];
   message?: string;
 };
+
+// ---- Private vault (client-side encrypted portfolio) -----------------------------------------------
+// The server stores ciphertext only. Types come from the shared crypto module (types only, no runtime).
+import type { PasswordWrapper, PortfolioEnvelope, RecoveryWrapper, VaultKeyMaterial } from './vault-crypto.ts';
+export type { PasswordWrapper, PortfolioEnvelope, RecoveryWrapper, VaultKeyMaterial };
+
+/** GET /api/vault: `vault` is null until the person sets one up. Authentication alone never opens a vault. */
+export type VaultResponse = { vault: (VaultKeyMaterial & { createdAt: string }) | null };
+/** POST /api/vault: creates the vault and its encrypted blank portfolio (revision 1) atomically. */
+export type VaultSetupRequest = { material: VaultKeyMaterial; envelope: PortfolioEnvelope };
+export type VaultSetupResponse = { vault: VaultKeyMaterial & { createdAt: string }; revision: 1 };
+/** PUT /api/vault: conditional wrapper replacement (password change, recovery-key replacement). */
+export type VaultWrappersRequest = { expectedWrapperVersion: number; password?: PasswordWrapper; recovery?: RecoveryWrapper };
+export type VaultWrappersResponse = { wrapperVersion: number };
+/** DELETE /api/vault: permanently erases the vault and its ciphertext. Needed only when both secrets are lost. */
+export type VaultDeleteRequest = { confirm: true };
+
+/** GET /api/v2/portfolio */
+export type EncryptedPortfolioResponse = { vaultId: string; revision: number; envelope: PortfolioEnvelope; updatedAt: string };
+/** PUT /api/v2/portfolio: `envelope.revision` must equal `expectedRevision + 1`. A stale revision is answered with 409. */
+export type SaveEncryptedPortfolioRequest = { envelope: PortfolioEnvelope; expectedRevision: number };
+export type SaveEncryptedPortfolioResponse = { revision: number };
+/** Machine-readable reasons on error bodies of the vault routes. */
+export type VaultErrorBody = ApiError & { code?: 'upgrade-required' | 'no-vault' | 'vault-exists' | 'conflict' | 'wrapper-conflict' };

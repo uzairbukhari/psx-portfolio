@@ -1,6 +1,8 @@
 declare namespace Cloudflare {
   interface Env {
     DB: D1Database;
+    /** Private vault database (ciphertext only). Never bound to the quote-refresh Worker or any scraper. */
+    VAULT_DB: D1Database;
   }
 }
 declare namespace Cloudflare {

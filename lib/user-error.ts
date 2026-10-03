@@ -5,10 +5,13 @@
  */
 export class UserError extends Error {
   status: number;
-  constructor(message: string, status = 400) {
+  /** Optional machine-readable reason clients can switch on (e.g. 'upgrade-required'). */
+  code?: string;
+  constructor(message: string, status = 400, code?: string) {
     super(message);
     this.name = 'UserError';
     this.status = status;
+    if (code) this.code = code;
   }
 }
 
@@ -16,8 +19,8 @@ export const GENERIC_ERROR = 'Something went wrong. Try again.';
 
 export function publicError(e: unknown, status?: number) {
   if (e instanceof UserError)
-    return { message: e.message, status: status ?? e.status };
+    return { message: e.message, status: status ?? e.status, code: e.code };
   if (e instanceof SyntaxError)
-    return { message: 'Invalid request body.', status: 400 };
-  return { message: GENERIC_ERROR, status: 500 };
+    return { message: 'Invalid request body.', status: 400, code: undefined };
+  return { message: GENERIC_ERROR, status: 500, code: undefined };
 }

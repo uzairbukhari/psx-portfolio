@@ -4,10 +4,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const dir = fileURLToPath(new URL('../../drizzle/', import.meta.url));
+const defaultDir = fileURLToPath(new URL('../../drizzle/', import.meta.url));
+export const vaultMigrationsDir = fileURLToPath(new URL('../../drizzle-vault/', import.meta.url));
 const norm = (v) => (v === undefined ? null : v);
 
-export function createD1() {
+export function createD1(dir = defaultDir) {
   const sqlite = new DatabaseSync(':memory:');
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort())
     for (const statement of readFileSync(dir + file, 'utf8').split('--> statement-breakpoint'))
