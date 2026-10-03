@@ -45,6 +45,7 @@ import {
   ScrollText,
   Sparkles,
   FlaskConical,
+  Microscope,
   LockKeyhole,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
@@ -88,6 +89,7 @@ import CompanyDetail from './company-detail';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
 import { CompanyNavProvider } from './ticker-link';
 import ResearchDesk from './research-desk';
+import AiLab from './ai-lab';
 import { SignIn, LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import NotificationsView from './notifications-view';
@@ -122,6 +124,7 @@ const TAB_PATHS: Record<string, string> = {
   sip: '/sip',
   history: '/activity',
   'research-desk': '/research-desk',
+  'ai-lab': '/ai-lab',
   settings: '/settings',
   notifications: '/notifications',
 };
@@ -140,7 +143,7 @@ function companyFromPathname(pathname: string): string {
 }
 /** Non-admins never land on the Research desk, even via a direct URL or history entry. */
 function allowTab(tab: string, isAdmin: boolean): string {
-  return tab === 'research-desk' && !isAdmin ? 'holdings' : tab;
+  return (tab === 'research-desk' || tab === 'ai-lab') && !isAdmin ? 'holdings' : tab;
 }
 function tabFromPathname(pathname: string): string {
   return companyFromPathname(pathname) ? 'company' : (PATH_TABS[pathname] ?? 'holdings');
@@ -1544,6 +1547,13 @@ function DashboardContent({
                 <span className="tab-short">Research</span>
               </TabsTrigger>
             )}
+            {isAdmin && (
+              <TabsTrigger value="ai-lab">
+                <Microscope className="tab-icon" aria-hidden="true" />
+                <span className="tab-long">AI Lab</span>
+                <span className="tab-short">AI Lab</span>
+              </TabsTrigger>
+            )}
           </TabsList>
         )}
       </header>
@@ -1939,6 +1949,11 @@ function DashboardContent({
               onSave={save}
               onOpenSettings={() => setTab('settings')}
             />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="ai-lab">
+            <AiLab portfolio={p} busy={busy} onSave={save} onOpenCompany={openCompany} />
           </TabsContent>
         )}
         <TabsContent value="settings">

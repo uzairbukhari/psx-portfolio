@@ -1,0 +1,36 @@
+.ai-lab { display: grid; gap: 16px; }
+.ai-lab__hero { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.ai-lab__spend { font-size: 13px; color: var(--muted-foreground); }
+.ai-lab__tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ai-lab__tabs button { border: 1px solid var(--border); background: transparent; color: var(--muted-foreground); border-radius: 999px; padding: 6px 14px; font: inherit; cursor: pointer; }
+.ai-lab__tabs .ai-lab__tab--on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ai-lab__panel { background: var(--card); border: 1px solid var(--card-border, var(--border)); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; }
+.ai-lab__fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.ai-lab__fields label { display: grid; gap: 4px; font-size: 13px; }
+.ai-lab__picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-lab__option { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; background: transparent; cursor: pointer; color: inherit; }
+.ai-lab__option--on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent); }
+.ai-lab__state { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.ai-lab__state--ready, .ai-lab__state--done { color: var(--success); border-color: var(--success); }
+.ai-lab__state--failed { color: var(--danger); border-color: var(--danger); }
+.ai-lab__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ai-lab__small { font-size: 12px; }
+.ai-lab__runs, .ai-lab__results, .ai-lab__list, .ai-lab__holdings { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ai-lab__summary { display: flex; flex-wrap: wrap; gap: 14px; font-size: 14px; }
+.ai-lab__limits { font-size: 13px; color: var(--muted-foreground); }
+.ai-lab__pick, .ai-lab__holding { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; display: grid; gap: 8px; }
+.ai-lab__pick-head, .ai-lab__holding-top, .ai-lab__holdings-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ai-lab__pick-money { font-variant-numeric: tabular-nums; text-align: right; }
+.ai-lab__metrics, .ai-lab__facts { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted-foreground); }
+.ai-lab__cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.ai-lab__risks li { color: var(--danger); }
+.ai-lab__excluded, .ai-lab__watch { font-size: 13px; color: var(--muted-foreground); }
+.ai-lab__compare { display: grid; gap: 8px; }
+.ai-lab__compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.ai-lab__both { font-weight: 600; }
+.ai-lab__action { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); text-transform: uppercase; }
+.ai-lab__action--keep { color: var(--muted-foreground); }
+.ai-lab__action--add { color: var(--success); border-color: var(--success); }
+.ai-lab__action--trim, .ai-lab__action--review { color: #b7791f; border-color: #b7791f; }
+.ai-lab__action--sell { color: var(--danger); border-color: var(--danger); }
+.ai-lab__holding--sell { border-color: var(--danger); }

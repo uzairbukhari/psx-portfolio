@@ -241,7 +241,7 @@ test('a database operator swapping or rolling an envelope into another slot is d
   const status = await c.loadVaultStatus(server.as('a@example.com'));
   await assert.rejects(c.unlockVault(server.as('a@example.com'), status, { password: PASSWORD }), (e) => e.code === 'tampered');
   // Flipping a ciphertext byte is caught too.
-  server.db.sqlite.prepare("UPDATE vault_portfolios SET envelope=? WHERE vault_id=(SELECT vault_id FROM vaults WHERE owner='b@example.com')").run(JSON.stringify({ ...JSON.parse(rowB.e), ct: 'A' + JSON.parse(rowB.e).ct.slice(1) }));
+  server.db.sqlite.prepare("UPDATE vault_portfolios SET envelope=? WHERE vault_id=(SELECT vault_id FROM vaults WHERE owner='b@example.com')").run(JSON.stringify({ ...JSON.parse(rowB.e), ct: (JSON.parse(rowB.e).ct[0] === 'A' ? 'B' : 'A') + JSON.parse(rowB.e).ct.slice(1) }));
   const sb = await c.loadVaultStatus(server.as('b@example.com'));
   await assert.rejects(c.unlockVault(server.as('b@example.com'), sb, { password: PASSWORD }), (e) => e.code === 'tampered');
 });

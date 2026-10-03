@@ -354,3 +354,80 @@ export const ipoOffers = sqliteTable('ipo_offers', {
   error: text('error'),
   checkedAt: text('checked_at').notNull(),
 });
+
+// AI Lab (experimental, super admin): public AI research keyed by ticker. Nothing here refers to an account,
+// holding or amount; the job that writes it (scripts/ai-research.mjs) never sees any private data.
+export const aiResearchRuns = sqliteTable('ai_research_runs', {
+  id: text('id').primaryKey(),
+  startedAt: text('started_at').notNull(),
+  finishedAt: text('finished_at'),
+  status: text('status').notNull(),
+  provider: text('provider').notNull(),
+  models: text('models').notNull(),
+  costUsd: real('cost_usd').notNull().default(0),
+  stats: text('stats'),
+  error: text('error'),
+}, (t) => [index('idx_ai_research_runs_started').on(t.startedAt)]);
+
+export const aiMacroBriefs = sqliteTable('ai_macro_briefs', {
+  month: text('month').primaryKey(),
+  payload: text('payload').notNull(),
+  model: text('model').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const aiCompanyProfiles = sqliteTable('ai_company_profiles', {
+  ticker: text('ticker').primaryKey(),
+  payload: text('payload').notNull(),
+  model: text('model').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const aiFinancialExtracts = sqliteTable('ai_financial_extracts', {
+  ticker: text('ticker').notNull(),
+  docKey: text('doc_key').notNull(),
+  period: text('period'),
+  payload: text('payload').notNull(),
+  model: text('model').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (t) => [primaryKey({ columns: [t.ticker, t.docKey] })]);
+
+export const aiNewsItems = sqliteTable('ai_news_items', {
+  url: text('url').primaryKey(),
+  ticker: text('ticker').notNull(),
+  publishedOn: text('published_on'),
+  title: text('title').notNull(),
+  summary: text('summary').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (t) => [index('idx_ai_news_ticker').on(t.ticker, t.publishedOn)]);
+
+export const aiCompanyResearch = sqliteTable('ai_company_research', {
+  ticker: text('ticker').primaryKey(),
+  payload: text('payload').notNull(),
+  inputsHash: text('inputs_hash').notNull(),
+  priceAtReport: real('price_at_report'),
+  researchedAt: text('researched_at').notNull(),
+  checkedAt: text('checked_at').notNull(),
+  carriedForward: integer('carried_forward').notNull().default(0),
+  model: text('model').notNull(),
+});
+
+export const aiRankings = sqliteTable('ai_rankings', {
+  id: text('id').primaryKey(),
+  month: text('month').notNull(),
+  tickersHash: text('tickers_hash').notNull(),
+  payload: text('payload').notNull(),
+  prices: text('prices').notNull(),
+  model: text('model').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (t) => [index('idx_ai_rankings_month').on(t.month, t.createdAt)]);
+
+// Ticker-only research requests (no account id). `status`: queued | researching | ready | failed.
+export const aiResearchRequests = sqliteTable('ai_research_requests', {
+  ticker: text('ticker').primaryKey(),
+  requestedAt: text('requested_at').notNull(),
+  status: text('status').notNull().default('queued'),
+  startedAt: text('started_at'),
+  finishedAt: text('finished_at'),
+  error: text('error'),
+});

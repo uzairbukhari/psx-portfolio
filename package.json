@@ -25,6 +25,7 @@
     "db:migrate:staging": "wrangler d1 migrations apply DB --remote --env staging"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
     "@base-ui/react": "1.7.0",
     "@noble/ciphers": "2.4.0",
     "@noble/hashes": "2.4.0",
