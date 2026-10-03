@@ -7,6 +7,7 @@ import {
   Cpu,
   Database,
   Download,
+  KeyRound,
   LogOut,
   Receipt,
   RefreshCw,
@@ -178,11 +179,13 @@ export default function SettingsView({
   onFilerStatus,
   onResearchSettings,
   onExport,
+  onExportEncrypted,
   onRestore,
   onImportCdc,
   onImportFinqalab,
   onImportAhl,
   dividendSync,
+  security,
 }: {
   name: string | null;
   email: string;
@@ -196,11 +199,14 @@ export default function SettingsView({
   onFilerStatus: (v: 'filer' | 'non-filer') => void;
   onResearchSettings: (patch: Partial<ResearchSettings>) => void;
   onExport: () => void;
+  onExportEncrypted: () => void;
   onRestore: (file: File) => void;
   onImportCdc: (file: File) => void;
   onImportFinqalab: (file: File) => void;
   onImportAhl: (file: File) => void;
   dividendSync?: ReactNode;
+  /** The vault security card (lock, change password, recovery key). */
+  security?: ReactNode;
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
@@ -261,6 +267,7 @@ export default function SettingsView({
   const [active, setActive] = useState('account');
   const sections = [
     { id: 'account', label: 'Account', icon: UserRound },
+    ...(security ? [{ id: 'security', label: 'Security', icon: KeyRound }] : []),
     { id: 'data', label: 'Data & imports', icon: Database },
     ...(dividendSync ? [{ id: 'sync-dividends', label: 'Sync dividends', icon: RefreshCw }] : []),
     ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }, { id: 'health', label: 'System health', icon: Activity }] : []),
@@ -429,6 +436,17 @@ export default function SettingsView({
             </>
           )}
 
+          {current === 'security' && security && (
+            <Section
+              id="security"
+              icon={<KeyRound size={18} />}
+              title="Security"
+              description="Your vault password, recovery key and locking."
+            >
+              {security}
+            </Section>
+          )}
+
           {current === 'data' && (
             <Section
               id="data"
@@ -454,16 +472,27 @@ export default function SettingsView({
             >
               <UploadButton accept="application/pdf,.pdf,application/json,.json" disabled={busy} onFile={onImportAhl} />
             </Row>
-            <Row label="Backup" hint="Download your whole ledger as a JSON file.">
+            <Row
+              label="Encrypted backup"
+              hint="Download your ledger as an encrypted file. It opens only with your vault password or recovery key, so it is safe to store anywhere."
+            >
+              <button className="secondary compact" onClick={onExportEncrypted}>
+                <Download size={14} /> Export encrypted backup
+              </button>
+            </Row>
+            <Row
+              label="Readable export"
+              hint="Not encrypted: anyone who gets this file can read every holding and trade in it. Keep it private and delete it when you are done."
+            >
               <button className="secondary compact" onClick={onExport}>
-                <Download size={14} /> Export backup
+                <Download size={14} /> Export readable file
               </button>
             </Row>
             <div className="danger-zone">
               <div className="set-row-text">
                 <strong>Restore from backup</strong>
                 <span>
-                  Replaces your entire portfolio with the backup file. Export a backup first.
+                  Replaces your entire portfolio with the backup file (an encrypted backup, or a readable ledger file from an older version). Export a backup first.
                 </span>
               </div>
               <UploadButton

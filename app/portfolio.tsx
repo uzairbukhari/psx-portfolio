@@ -45,6 +45,7 @@ import {
   ScrollText,
   Sparkles,
   FlaskConical,
+  LockKeyhole,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
 import {
@@ -101,6 +102,12 @@ import { extractPdfText } from './research-pdf';
 import { importAhlTrades, parseAhlHistory } from './ahl-import';
 import { importCdcDividends } from '@/lib/cdc-import';
 import type { PortfolioResponse } from '@/lib/api-types';
+import { ConflictError, VaultLockedError, type VaultSession } from '@/lib/vault-client';
+import { loadPortfolioView, savePortfolioView } from '@/lib/portfolio-view';
+import { parseBackup, type BackupPackage } from '@/lib/vault-backup';
+import { EncryptedRestoreDialog, VaultSecurity } from './vault-security';
+import VaultGate from './vault-gate';
+import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
 import { canSaveCompany } from '@/lib/company-lookup-client';
 import { followQuoteJob, isPending, isProblem, jobMessage } from '@/lib/quote-refresh-client';
@@ -320,17 +327,32 @@ function TickerPicker({
     </div>
   );
 }
-export default function Dashboard({
-  email,
-  name,
-  picture,
-  role,
-}: {
+type VaultContext = { session: VaultSession; lock: () => void };
+type DashboardProps = {
   email: string | null;
   name: string | null;
   picture: string | null;
   role: 'super_admin' | 'user';
-}) {
+};
+/**
+ * Signed in is not enough: the dashboard only mounts once the vault is unlocked. Locking (or signing out) unmounts
+ * it, which drops every decrypted value held in its state.
+ */
+export default function Dashboard(props: DashboardProps) {
+  if (!props.email) return <DashboardContent {...props} vault={null} />;
+  return (
+    <VaultGate email={props.email}>
+      {(session, lock) => <DashboardContent {...props} vault={{ session, lock }} />}
+    </VaultGate>
+  );
+}
+function DashboardContent({
+  email,
+  name,
+  picture,
+  role,
+  vault,
+}: DashboardProps & { vault: VaultContext | null }) {
   const isAdmin = role === 'super_admin';
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
   // From 1100px the market pulse sits beside the value card's chart; below it stays under the table.
@@ -400,7 +422,8 @@ export default function Dashboard({
       outputTokens: number;
       costUsd: number;
     } | null>(null),
-    [pendingCompanies, setPendingCompanies] = useState<string[]>([]);
+    [pendingCompanies, setPendingCompanies] = useState<string[]>([]),
+    [encryptedRestore, setEncryptedRestore] = useState<BackupPackage | null>(null);
   // Add Company: the ticker is the only typed identity field; name and sector come from the shared directory.
   const txNewTicker =
     !p || !trade || editing || editingDividend || editingStockSplit || txType === 'sell' || txType === 'dividend' || txType === 'split' ||
@@ -530,16 +553,16 @@ export default function Dashboard({
   async function load() {
     setBusy(true);
     try {
-      const r = await fetch('/api/portfolio');
-      const d = (await r.json()) as ApiResponse;
-      if (!r.ok) throw Error(d.error);
+      // Decrypts locally, then overlays the shared public caches (quotes, announcements, face values).
+      const d = await loadPortfolioView(vault!.session, webPublicData);
       setP(d.portfolio);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
       void resumeRefresh(d.portfolio.companies.map((c) => c.ticker));
       await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
     } catch (e) {
-      notify(String(e), true);
+      // A lock mid-load is not an error to show: the unlock screen takes over.
+      if (!(e instanceof VaultLockedError)) notify(String(e), true);
     } finally {
       setBusy(false);
     }
@@ -561,21 +584,20 @@ export default function Dashboard({
       announcements,
       {
         save: async (next, revision) => {
-          const r = await fetch('/api/portfolio', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ portfolio: next, revision }),
-          });
-          if (r.status === 409) return { conflict: true };
-          const saved = (await r.json()) as ApiResponse;
-          if (!r.ok) throw Error(saved.error);
-          return { revision: saved.revision };
+          try {
+            return { revision: await vault!.session.save(next, revision) };
+          } catch (e) {
+            if (e instanceof ConflictError) return { conflict: true };
+            throw e;
+          }
         },
         reload: async () => {
-          const fresh = await fetch('/api/portfolio');
-          if (!fresh.ok) return null;
-          const d = (await fresh.json()) as ApiResponse;
-          return d.portfolio ? { portfolio: d.portfolio, revision: d.revision } : null;
+          try {
+            const d = await loadPortfolioView(vault!.session, webPublicData);
+            return { portfolio: d.portfolio, revision: d.revision };
+          } catch {
+            return null;
+          }
         },
       },
       { faceValues },
@@ -635,14 +657,9 @@ export default function Dashboard({
     validate(next);
     setBusy(true);
     try {
-      const r = await fetch('/api/portfolio', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolio: next, revision, ...(options.createCompanies ? { createCompanies: options.createCompanies } : {}) }),
-      });
-      const d = (await r.json()) as ApiResponse;
-      if (!r.ok) throw Error(d.error);
-      // Show the name and sector the server filled in from the company directory.
+      // Validates, fills company details from the public directory, encrypts here and stores ciphertext only.
+      const d = await savePortfolioView(vault!.session, webPublicData, next, revision, options.createCompanies);
+      // Show the name and sector filled in from the company directory.
       for (const detail of d.details ?? []) {
         const company = next.companies.find((c) => c.ticker === detail.ticker);
         if (company) {
@@ -659,7 +676,7 @@ export default function Dashboard({
           : success,
       );
     } catch (e) {
-      notify(String(e), true);
+      if (!(e instanceof VaultLockedError)) notify(e instanceof Error ? e.message : String(e), true);
       throw e;
     } finally {
       setBusy(false);
@@ -732,19 +749,11 @@ export default function Dashboard({
     return <LoadError message={message} busy={busy} onRetry={load} />;
   const restoreBackup = (f: File) => {
     attempt(async () => {
-    const data = JSON.parse(await f.text());
-    if (
-      data.kind !== 'psx-portfolio-ledger' ||
-      data.schemaVersion !== 1
-    )
-      throw Error(
-        'Choose a portfolio-ledger backup, not a company research file.',
-      );
-    validate(data.portfolio);
-    await save(
-      data.portfolio,
-      'Portfolio backup restored.',
-    );
+      // Either an encrypted package (asks for its password) or a readable ledger from an older version. Both are
+      // decrypted/validated here and re-encrypted into the current vault; nothing readable is uploaded.
+      const parsed = parseBackup(await f.text());
+      if (parsed.type === 'encrypted') return setEncryptedRestore(parsed.backup);
+      await save(parsed.portfolio, 'Portfolio backup restored.');
     });
   };
   const importCdc = (f: File) => {
@@ -853,7 +862,22 @@ export default function Dashboard({
     );
     });
   };
+  const exportEncryptedBackup = () =>
+    attempt(async () => {
+      const pkg = await vault!.session.backupPackage();
+      download(`sipwise-backup-${today()}.encrypted.json`, JSON.stringify(pkg, null, 2));
+      notify('Encrypted backup downloaded. It opens only with your vault password or recovery key.');
+    });
   const exportBackup = () =>
+    void confirm({
+      title: 'Export a readable file?',
+      description:
+        'This file is NOT encrypted. Anyone who gets it can read every holding and trade in it. Choose the encrypted backup if you only need a safe copy.',
+      confirmLabel: 'Export readable file',
+    }).then((ok) => {
+      if (ok) exportReadable();
+    });
+  const exportReadable = () =>
     download(
       `psx-portfolio-${today()}.json`,
       JSON.stringify(
@@ -1465,6 +1489,11 @@ export default function Dashboard({
                 <DropdownMenuItem onClick={() => setTab('settings')}>
                   <Settings size={15} /> Settings
                 </DropdownMenuItem>
+                {vault && (
+                  <DropdownMenuItem onClick={vault.lock}>
+                    <LockKeyhole size={15} /> Lock vault
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
@@ -1918,7 +1947,9 @@ export default function Dashboard({
             onFilerStatus={saveFilerStatus}
             onResearchSettings={saveResearchSettings}
             onExport={exportBackup}
+            onExportEncrypted={exportEncryptedBackup}
             onRestore={restoreBackup}
+            security={vault ? <VaultSecurity session={vault.session} onLock={vault.lock} /> : undefined}
             onImportCdc={importCdc}
             onImportFinqalab={importFinqalab}
             onImportAhl={importAhl}
@@ -1947,6 +1978,14 @@ export default function Dashboard({
         </div>
       </footer>
       {confirmDialog}
+      <EncryptedRestoreDialog
+        backup={encryptedRestore}
+        onCancel={() => setEncryptedRestore(null)}
+        onRestore={async (portfolio) => {
+          await save(portfolio, 'Encrypted backup restored.');
+          setEncryptedRestore(null);
+        }}
+      />
       {ahlStatement && (
         <AhlImportDialog
           statement={ahlStatement.statement}

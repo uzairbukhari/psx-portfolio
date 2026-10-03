@@ -1,0 +1,15 @@
+.vault-card{max-width:460px}
+.vault-card h2{margin-bottom:8px}
+.vault-card form{display:grid;gap:4px}
+.vault-card label{margin:10px 0}
+.vault-hint{font-size:13px;line-height:1.55;margin:4px 0 0}
+.vault-card .secondary{width:100%}
+.vault-recovery{font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:15px;line-height:1.9;letter-spacing:.5px;word-break:break-word;padding:16px;border:1px dashed var(--border);border-radius:10px;background:#0b1526;color:var(--foreground);user-select:all;margin:12px 0}
+.vault-actions{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.vault-actions button{flex:1 1 140px}
+.vault-links{display:grid;gap:2px;margin-top:6px}
+.vault-warning{font-size:13px}
+.vault-lock-note{font-size:12px;color:var(--muted-foreground);margin-top:14px;line-height:1.5}
+.vault-progress{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted-foreground);margin-top:10px}
+.set-vault-grid{display:grid;gap:10px;max-width:420px}
+.set-vault-grid label{margin:6px 0}
