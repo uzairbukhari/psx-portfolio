@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Portfolio } from '@/lib/portfolio';
 import type { PublicAnalysisResponse } from '@/lib/api-types';
 import { parsePublicAnalysis, pollIntervalMs } from '@/lib/api-validate';
-import { GATHER_TIMEOUT_MS, needsScrape, classifyFacts } from '@/lib/monthly-picks-flow';
-import { newProgress, withStep, type RunProgress } from '@/lib/monthly-picks-progress';
-import { heldValues, recordRun, runLocalPicks, type StoredPicksRun } from '@/lib/picks-local';
+import type { RunProgress } from '@/lib/monthly-picks-progress';
+import { heldValues, recordRun, type StoredPicksRun } from '@/lib/picks-local';
+import { executePicksRun } from '@/lib/picks-run';
 import { watchQuery } from '@/lib/market-watch';
 
 /** Runs are computed on this device and live in the encrypted portfolio, so every saved run is finished. */
@@ -114,44 +114,21 @@ export function useRecommendations({ portfolio, tickers, onSave }: Options) {
   /** Gathers public data (asking for a fresh scrape when needed), then ranks and sizes entirely on this device. */
   const start = useCallback(async (input: RunInput) => {
     setError(null);
-    const startedAt = new Date().toISOString();
-    let state = newProgress(input.shortlist.length, startedAt);
-    const set = (next: RunProgress) => { state = next; setProgress(next); };
-    set(state);
     try {
-      set(withStep(state, 'gathering', new Date().toISOString(), { message: 'Checking which company data is up to date.' }));
-      let analysis = await fetchAnalysis(input.shortlist);
-      const day = analysis.dataAsOf;
-      const stale = analysis.facts.filter((info) => needsScrape(classifyFacts(info.ticker, info.fetchedOn, null, day))).map((info) => info.ticker);
-      if (stale.length && analysis.dispatchEnabled) {
-        const requested = await requestFacts(stale).catch(() => null);
-        if (requested?.waiting) {
-          const began = Date.now();
-          for (;;) {
-            set(withStep(state, 'gathering', new Date().toISOString(), {
-              pending: stale, completed: input.shortlist.length - stale.length, total: input.shortlist.length,
-              message: `Waiting for PSX company data for ${stale.length} of ${input.shortlist.length} companies.`,
-            }));
-            await new Promise((resolve) => window.setTimeout(resolve, pollIntervalMs(Date.now() - began)));
-            analysis = await fetchAnalysis(input.shortlist);
-            const waiting = analysis.facts.filter((info) => stale.includes(info.ticker) && info.state !== 'fresh');
-            if (!waiting.length) break;
-            if (Date.now() - began > GATHER_TIMEOUT_MS) {
-              set(withStep(state, 'gathering', new Date().toISOString(), { degraded: true, message: 'The company data fetch timed out; continuing with the evidence available.' }));
-              break;
-            }
-          }
-        }
-      }
-      set(withStep(state, 'metrics', new Date().toISOString(), { pending: [], completed: input.shortlist.length, total: input.shortlist.length }));
-      set(withStep(state, 'allocating', new Date().toISOString()));
       const latest = portfolioRef.current;
-      const run = runLocalPicks({
-        analysis, month: input.month, amount: input.amount, feePct: input.feePct, shortlist: input.shortlist,
-        holdings: heldValues(latest),
-      });
-      await onSaveRef.current({ ...latest, monthlyPicksRuns: recordRun(latest.monthlyPicksRuns, run) }, 'Monthly Picks run saved.');
-      set(withStep(state, 'saved', new Date().toISOString()));
+      const { run, analysis } = await executePicksRun(
+        {
+          analysis: fetchAnalysis,
+          requestFacts,
+          sleep: (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
+          now: () => Date.now(),
+          pollMs: pollIntervalMs,
+          onProgress: setProgress,
+        },
+        { month: input.month, amount: input.amount, feePct: input.feePct, shortlist: input.shortlist, holdings: heldValues(latest) },
+      );
+      const current = portfolioRef.current;
+      await onSaveRef.current({ ...current, monthlyPicksRuns: recordRun(current.monthlyPicksRuns, run) }, 'Monthly Picks run saved.');
       setSelectedId(run.id);
       setFacts(Object.fromEntries(analysis.facts.map((info) => [info.ticker, info as FactsInfo])));
       return run;

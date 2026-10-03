@@ -1,36 +1,50 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PortfolioResponse, QuotesResponse, SavePortfolioRequest, SavePortfolioResponse } from '@shared/api-types.ts';
+import type { PortfolioResponse, QuotesResponse } from '@shared/api-types.ts';
 import { notificationCounts } from '@shared/notification-actions.ts';
+import { loadPortfolioView, savePortfolioView } from '@shared/portfolio-view.ts';
 import { validate, type Portfolio } from '@shared/portfolio.ts';
-import { ApiRequestError } from '@/api/client';
+import { ConflictError } from '@shared/vault-client.ts';
 import { useAuth } from '@/auth/AuthProvider';
+import { useVault } from '@/vault/VaultProvider';
 import { syncAnnouncementsOnLoad } from './auto-dividends';
 import { openPositions, priceTickers, safeHoldings, totals } from './derive';
-import { useCachedPortfolio, useCachedSavedAt } from './PortfolioCacheProvider';
-import { writePortfolioCache } from './portfolio-cache';
 
 export function usePortfolio() {
   const { api, state } = useAuth();
+  const { session, publicData } = useVault();
   const queryClient = useQueryClient();
   const email = state.status === 'signedIn' ? state.user.email : '';
-  const cached = useCachedPortfolio();
-  const cachedSavedAt = useCachedSavedAt();
 
   const query = useQuery({
     queryKey: ['portfolio', email],
     enabled: Boolean(email),
     queryFn: async () => {
-      const loaded = await api.get<PortfolioResponse>('/api/portfolio');
+      // Decrypts on this phone and overlays public quotes, announcements and company names for the tickers held.
+      const loaded = await loadPortfolioView(session, publicData);
       // Same as the web on load: book PSX announcements as expected dividends and alerts (saves only when
       // something is new), so the phone alone keeps them current.
-      const data = await syncAnnouncementsOnLoad(api, loaded);
-      writePortfolioCache(email, data);
-      return data;
+      return syncAnnouncementsOnLoad(
+        {
+          save: async (portfolio, revision) => {
+            try {
+              return { revision: (await savePortfolioView(session, publicData, portfolio, revision)).revision };
+            } catch (e) {
+              if (e instanceof ConflictError) return { conflict: true as const };
+              throw e;
+            }
+          },
+          reload: async () => {
+            const fresh = await loadPortfolioView(session, publicData);
+            return { portfolio: fresh.portfolio, revision: fresh.revision };
+          },
+        },
+        loaded,
+      );
     },
   });
 
-  const data = query.data ?? cached;
+  const data = query.data ?? null;
   const view = useMemo(() => {
     if (!data) return null;
     const { held, error } = safeHoldings(data.portfolio);
@@ -60,15 +74,12 @@ export function usePortfolio() {
     // A refetch that started before this save must not land afterwards and overwrite the new data.
     await queryClient.cancelQueries({ queryKey: ['portfolio', email] });
     try {
-      const saved = await api.put<SavePortfolioResponse>('/api/portfolio', {
-        portfolio: next,
-        revision: current.revision,
-      } satisfies SavePortfolioRequest);
+      // Validates, fills company details from the public directory, encrypts here and stores ciphertext only.
+      const saved = await savePortfolioView(session, publicData, next, current.revision);
       const updated: PortfolioResponse = { ...current, portfolio: next, revision: saved.revision };
       queryClient.setQueryData(['portfolio', email], updated);
-      writePortfolioCache(email, updated);
     } catch (e) {
-      if (e instanceof ApiRequestError && e.status === 409) {
+      if (e instanceof ConflictError) {
         await queryClient.invalidateQueries({ queryKey: ['portfolio', email] });
         throw new Error('Your portfolio changed (on another device, or this save did not reach us). It has been reloaded. Check Activity before entering the change again.');
       }
@@ -84,9 +95,9 @@ export function usePortfolio() {
     isLoading: query.isPending && !data,
     isRefetching: query.isRefetching,
     error: query.error,
-    offline: Boolean(query.error) && Boolean(data),
+    offline: session.offline || (Boolean(query.error) && Boolean(data)),
     /** When the data on screen was last fetched or saved (ms since epoch); null if unknown. */
-    savedAt: query.dataUpdatedAt || cachedSavedAt,
+    savedAt: query.dataUpdatedAt || null,
     refetch: query.refetch,
     refreshPrices,
   };
@@ -100,11 +111,10 @@ export function useUnreadAlerts(): number {
   const { state } = useAuth();
   const email = state.status === 'signedIn' ? state.user.email : '';
   const queryClient = useQueryClient();
-  const cached = useCachedPortfolio();
   const live = useSyncExternalStore(
     (notify) => queryClient.getQueryCache().subscribe(notify),
     () => queryClient.getQueryData<PortfolioResponse>(['portfolio', email]),
   );
-  const data = live ?? cached;
+  const data = live ?? null;
   return useMemo(() => (data ? notificationCounts(data.portfolio.notifications ?? []).unread : 0), [data]);
 }

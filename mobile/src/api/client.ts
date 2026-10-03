@@ -4,10 +4,13 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 export class ApiRequestError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** Machine-readable reason from the server (for example 'upgrade-required'), when it sent one. */
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
+    if (code) this.code = code;
   }
 }
 
@@ -33,10 +36,10 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized, fetcher = f
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let response: Response;
-    let body: (T & Partial<ApiError>) | null;
+    let body: (T & Partial<ApiError> & { code?: string }) | null;
     try {
       response = await fetcher(`${baseUrl}${path}`, { ...init, headers, signal: init.signal ?? controller.signal });
-      body = (await response.json().catch(() => null)) as (T & Partial<ApiError>) | null;
+      body = (await response.json().catch(() => null)) as (T & Partial<ApiError> & { code?: string }) | null;
     } catch {
       throw new ApiRequestError('Could not reach Sipwise. Check your connection.', 0);
     } finally {
@@ -44,7 +47,7 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized, fetcher = f
     }
     if (!response.ok) {
       if (response.status === 401 && authed) onUnauthorized?.();
-      throw new ApiRequestError(body?.error ?? `Request failed (${response.status}).`, response.status);
+      throw new ApiRequestError(body?.error ?? `Request failed (${response.status}).`, response.status, body?.code);
     }
     return body as T;
   }

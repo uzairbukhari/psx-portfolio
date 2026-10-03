@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { BiometricLockProvider } from '@/auth/BiometricLock';
-import { PortfolioCacheProvider } from '@/data/PortfolioCacheProvider';
 import { PushBridge } from '@/push/PushBridge';
 import { SignIn } from '@/screens/SignIn';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { ToastProvider } from '@/ui/Toast';
+import { VaultGate } from '@/vault/VaultProvider';
 
 function Root() {
   const { state } = useAuth();
@@ -21,8 +21,8 @@ function Root() {
     );
   if (state.status === 'signedOut') return <SignIn />;
   return (
-    <PortfolioCacheProvider email={state.user.email}>
-      <ToastProvider>
+    <ToastProvider>
+      <VaultGate>
         <PushBridge />
         <Stack
           screenOptions={{
@@ -48,8 +48,8 @@ function Root() {
           <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
           <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
         </Stack>
-      </ToastProvider>
-    </PortfolioCacheProvider>
+      </VaultGate>
+    </ToastProvider>
   );
 }
 

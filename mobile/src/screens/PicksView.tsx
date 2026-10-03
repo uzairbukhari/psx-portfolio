@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Linking, Pressable, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { money } from '@shared/portfolio.ts';
-import type { RecommendationRun } from '@shared/api-types.ts';
-import { pollIntervalMs } from '@shared/api-validate.ts';
+import type { PublicAnalysisResponse } from '@shared/api-types.ts';
+import { parsePublicAnalysis, pollIntervalMs } from '@shared/api-validate.ts';
+import { watchQuery } from '@shared/market-watch.ts';
+import { heldValues, recordRun, type StoredPicksRun } from '@shared/picks-local.ts';
+import { executePicksRun } from '@shared/picks-run.ts';
+import type { RunProgress } from '@shared/monthly-picks-progress.ts';
 import { portfolioCounts } from '@shared/portfolio-counts.ts';
 import { explainSizing } from '@shared/monthly-picks-allocation.ts';
 import { PROGRESS_STEPS } from '@shared/monthly-picks-progress.ts';
 import { estimateMonthlyPicks, type MonthlyPicksResearch } from '@shared/monthly-picks.ts';
-import { useAuth, useEmail } from '@/auth/AuthProvider';
+import { useAuth } from '@/auth/AuthProvider';
 import { parseNumber } from '@/data/mutations';
 import { MAX_SHORTLIST, initialShortlist, pickSources, searchCompanies, withPicksInputs } from '@/data/picks';
 import { usePortfolio } from '@/data/usePortfolio';
@@ -18,8 +21,7 @@ import { ReviewBuysSheet } from '@/ui/ReviewBuysSheet';
 import { Icon } from '@/ui/Icon';
 import { Avatar, Button, Card, Chip, Input, Loading, Muted, Notice, SectionLabel, StatusChip, useKitStyles } from '@/ui/kit';
 
-type Run = RecommendationRun;
-const ACTIVE = ['queued', 'gathering', 'in_progress'];
+type Run = StoredPicksRun;
 const MAX = MAX_SHORTLIST;
 
 /** Where a pick's numbers and thesis came from; each opens in the browser. */
@@ -55,14 +57,12 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
   const styles = useKitStyles();
   const { colors } = useTheme();
   const { api } = useAuth();
-  const email = useEmail();
   const p = usePortfolio();
-  const qc = useQueryClient();
   const [reviewing, setReviewing] = useState(false);
   const [shortlist, setShortlist] = useState<string[] | null>(null);
   const [amount, setAmount] = useState('');
   const [query, setQuery] = useState('');
-  const [runId, setRunId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<RunProgress | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const estimateError = useRef<string | null>(null);
@@ -70,28 +70,8 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
   const portfolio = p.portfolio;
   const selected = shortlist ?? (portfolio ? initialShortlist(portfolio) : []);
 
-  // Resume the latest run (or pick up one that's still going) when the screen opens.
-  const latest = useQuery({
-    queryKey: ['recommendations', email],
-    queryFn: () => api.get<{ recommendations: Run[] }>('/api/recommendations'),
-  });
-  useEffect(() => {
-    if (runId || !latest.data) return;
-    const first = latest.data.recommendations[0];
-    if (first && first.month === month) setRunId(first.id);
-  }, [latest.data, runId, month]);
-
-  const run = useQuery({
-    queryKey: ['recommendation', email, runId],
-    enabled: Boolean(runId),
-    queryFn: () => api.get<Run>(`/api/recommendations?id=${runId}`),
-    // 5 s for the first minute, then 15 s; stops when the run ends or the app is backgrounded.
-    refetchInterval: (q) => {
-      if (!q.state.data || !ACTIVE.includes(q.state.data.status) || AppState.currentState !== 'active') return false;
-      return pollIntervalMs(Date.now() - Date.parse(q.state.data.createdAt));
-    },
-  });
-  const current = run.data ?? null;
+  // Runs are computed on this phone and kept in the encrypted portfolio; show the newest one for this month.
+  const current: Run | null = portfolio?.monthlyPicksRuns?.find((r) => r.month === month) ?? null;
 
   const rows = useMemo(() => {
     if (!portfolio || !current?.result || current.status !== 'completed') return [];
@@ -109,35 +89,49 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
   const savedBudget = portfolio.budgets[month];
   const budget = amount || (savedBudget === undefined ? '' : String(savedBudget));
 
-  async function start(rerun: boolean) {
+  async function start() {
+    if (!portfolio) return;
     setError(null);
     setStarting(true);
     try {
       const amt = parseNumber(budget);
       if (amt === null) throw new Error('Enter the amount to invest.');
       if (!selected.length) throw new Error('Choose at least one company.');
-      // Remember the shortlist and this month's amount, as the web does, so they are here next time (and on the web).
-      const withInputs = portfolio ? withPicksInputs(portfolio, month, selected, amt) : null;
-      if (withInputs) await p.save(withInputs);
-      const started = await api.post<Run>('/api/recommendations', {
-        month,
-        amount: amt,
-        feePct: parseNumber(fee) ?? 0,
-        shortlist: selected,
-        rerun,
-      });
-      qc.setQueryData(['recommendation', email, started.id], started);
-      setRunId(started.id);
+      // Remember the shortlist and this month's amount (encrypted, like everything else) so they are here next time.
+      const withInputs = withPicksInputs(portfolio, month, selected, amt) ?? portfolio;
+      if (withInputs !== portfolio) await p.save(withInputs);
+      const { run } = await executePicksRun(
+        {
+          // Only the tickers go to the server, to read public company data.
+          analysis: async (tickers) => {
+            const data = await api.get<PublicAnalysisResponse & { dispatchEnabled: boolean }>(`/api/recommendations?${watchQuery(tickers)}`);
+            const parsed = parsePublicAnalysis(data);
+            if (!parsed) throw new Error('The company data response was not understood.');
+            return { ...parsed, dispatchEnabled: Boolean(data.dispatchEnabled) };
+          },
+          requestFacts: async (tickers) => {
+            const out = await api.post<{ waiting: boolean }>('/api/recommendations', { action: 'refresh-facts', tickers });
+            return { waiting: Boolean(out.waiting) };
+          },
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+          now: () => Date.now(),
+          pollMs: pollIntervalMs,
+          onProgress: setProgress,
+        },
+        { month, amount: amt, feePct: parseNumber(fee) ?? 0, shortlist: selected, holdings: heldValues(withInputs) },
+      );
+      await p.save({ ...withInputs, monthlyPicksRuns: recordRun(withInputs.monthlyPicksRuns, run) });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start the research.');
+      setError(e instanceof Error ? e.message : 'Could not get the picks.');
     } finally {
+      setProgress(null);
       setStarting(false);
     }
   }
 
   const targeted = portfolio.companies.filter((c) => c.target > 0).map((c) => c.ticker);
   const shown = searchCompanies(portfolio.companies, query);
-  const active = current !== null && ACTIVE.includes(current.status);
+  const active = progress !== null;
   const toggle = (t: string) =>
     setShortlist(selected.includes(t) ? selected.filter((x) => x !== t) : selected.length < MAX ? [...selected, t] : selected);
 
@@ -178,36 +172,27 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
             <Input label="Fee estimate (%)" value={fee} onChangeText={onFee} keyboardType="decimal-pad" />
           </View>
         </View>
-        <Muted>Method: your chosen companies are ranked from PSX company data, prices and, when your monthly AI budget allows, an AI review with sources. Uses your AI budget (see More › AI usage); if it is used up or unavailable, picks fall back to numbers-only ranking.</Muted>
+        <Muted>Method: your chosen companies are ranked from public PSX company data and prices, and sized against your holdings, all on this phone. Only the company symbols are sent to look up public data; your amount, holdings and results stay encrypted.</Muted>
         <Button
           label={current?.status === 'completed' ? 'Update picks' : 'Get picks'}
           icon="sparkle"
           loading={starting}
           disabled={active || readOnly}
-          onPress={() => void start(false)}
+          onPress={() => void start()}
         />
-        {current?.status === 'completed' ? (
-          <>
-            <Button label="Run fresh research" variant="outline" icon="refresh" disabled={starting || active} onPress={() => void start(true)} />
-            <Muted>Same amount, fee and companies reuse the saved result. Fresh research ignores it and uses AI budget.</Muted>
-          </>
-        ) : null}
       </Card>
 
-      {active ? (
+      {progress ? (
         <Card>
           <ActivityIndicator color={colors.primary} />
           <Text style={[styles.strong, { textAlign: 'center' }]}>
-            {PROGRESS_STEPS.find((s) => s.key === current.progress?.step)?.label ?? (current.status === 'gathering' ? 'Gathering company data' : 'Ranking your shortlist')}
-            {current.progress?.percent !== undefined && !current.progress.indeterminate ? ` · ${current.progress.percent}%` : ''}
+            {PROGRESS_STEPS.find((s) => s.key === progress.step)?.label ?? 'Working'} · {progress.percent}%
           </Text>
           <Text style={[styles.muted, { textAlign: 'center' }]}>
-            {current.progress?.total ? `${current.progress.completed ?? 0} of ${current.progress.total} companies gathered. ` : ''}
-            {current.progress?.pending?.length ? `Waiting on ${current.progress.pending.join(', ')}. ` : ''}
-            {current.progress?.retries ? `Retried ${current.progress.retries} time${current.progress.retries === 1 ? '' : 's'}. ` : ''}
-            {current.progress?.degraded ? 'Continuing with partial evidence. ' : ''}
-            {current.progress?.message ? `${current.progress.message} ` : ''}
-            The run continues on the server, so you can leave this screen and come back.
+            {progress.total ? `${progress.completed} of ${progress.total} companies gathered. ` : ''}
+            {progress.pending.length ? `Waiting on ${progress.pending.join(', ')}. ` : ''}
+            {progress.degraded ? 'Continuing with partial evidence. ' : ''}
+            {progress.message ? progress.message : ''}
           </Text>
         </Card>
       ) : null}
@@ -217,7 +202,7 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
       {current?.status === 'completed' && current.result ? (
         <>
           {explainSizing(current.result.sizing).map((line) => <Notice key={line}>{line}</Notice>)}
-          {current.method === 'quant' ? <Notice>{current.result.fallbackReason ?? 'Ranked by the numbers only (no AI commentary).'}</Notice> : null}
+          <Notice>{current.result.fallbackReason ?? 'Ranked by the numbers only, on this phone (no AI).'}</Notice>
           <Card>
             <Text style={styles.strong}>Market outlook</Text>
             <Text style={styles.text}>{current.result.marketOutlook}</Text>

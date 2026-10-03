@@ -7,7 +7,7 @@ import { createApiClient, ApiRequestError, type ApiClient } from '@/api/client';
 import { config } from '@/config';
 import * as SecureStore from 'expo-secure-store';
 import { useQueryClient } from '@tanstack/react-query';
-import { clearPortfolioCache } from '@/data/portfolio-cache';
+import { clearVaultCache, purgeLegacyPlaintextCache } from '@/vault/file-cache';
 import { pushPreference } from '@/push/push';
 import { clearLocalState, retryPendingSignOut, signOutRemote } from './session-cleanup';
 import { pendingSignOut, tokenStore } from './token-store';
@@ -74,7 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearProfile: () => SecureStore.deleteItemAsync(ME_KEY),
       googleSignOut: () => GoogleSignin.signOut(),
       clearQueries: () => queryClient.clear(),
-      clearPortfolioCache,
+      clearPortfolioCache: (account) => {
+        clearVaultCache(account);
+        purgeLegacyPlaintextCache();
+      },
       clearPushPreference: pushPreference.clear,
     });
     setState({ status: 'signedOut' });

@@ -4,6 +4,7 @@ import { useIsFocused } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import type { IndexPoint, IndexSummary, MarketState } from '@shared/psx-market.ts';
 import type { MarketBreadthView, MarketIndexView } from '@shared/api-types.ts';
+import { watchQuery } from '@shared/market-watch.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
 import { signedPercent } from '@/data/format';
@@ -25,15 +26,16 @@ const number = (n: number) => n.toLocaleString('en-PK', { minimumFractionDigits:
  * KSE-100 snapshot from the shared market cache. It loads when its screen is focused (stale data only) and
  * refreshes every minute only while the screen is focused and the PSX session is open; no requests otherwise.
  */
-export function MarketPulse() {
+export function MarketPulse({ tickers }: { tickers: string[] }) {
   const styles = useKitStyles();
   const { colors } = useTheme();
   const { api } = useAuth();
   const email = useEmail();
   const focused = useIsFocused();
   const q = useQuery({
-    queryKey: ['market-summary', email],
-    queryFn: () => api.get<Response>('/api/market-summary'),
+    // The server is only told which tickers to follow (public symbols); names and saved prices stay on the phone.
+    queryKey: ['market-summary', email, tickers.join(',')],
+    queryFn: () => api.get<Response>(`/api/market-summary${tickers.length ? `?${watchQuery(tickers)}` : ''}`),
     enabled: focused,
     staleTime: MARKET_POLL_MS,
   });
@@ -55,7 +57,7 @@ export function MarketPulse() {
     const timer = setInterval(() => setOpen(marketOpen()), 30_000);
     return () => clearInterval(timer);
   }, [focused]);
-  const { live, status } = useLiveMarket(shouldStream({ focused, appActive: true, marketOpen: open, available: summary?.live?.available === true }));
+  const { live, status } = useLiveMarket(shouldStream({ focused, appActive: true, marketOpen: open, available: summary?.live?.available === true && tickers.length > 0 }), tickers);
   const rows = status === 'live' ? liveRows(live) : [];
   // The market card is a nicety: stay silent rather than adding an error to the Holdings screen.
   if (!summary || !index) return null;

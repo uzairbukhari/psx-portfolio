@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { assertSecureApiUrl } from './vault/https';
 
 type Extra = {
   variant?: string;
@@ -8,9 +9,10 @@ type Extra = {
 };
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
 
+const variant = extra.variant ?? 'development';
 export const config = {
-  variant: extra.variant ?? 'development',
-  apiBaseUrl: (extra.apiBaseUrl ?? '').replace(/\/$/, ''),
+  variant,
+  apiBaseUrl: assertSecureApiUrl((extra.apiBaseUrl ?? '').replace(/\/$/, ''), variant),
   googleWebClientId: extra.googleWebClientId ?? '',
   googleIosClientId: extra.googleIosClientId ?? '',
 };

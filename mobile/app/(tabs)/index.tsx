@@ -11,6 +11,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { type } from '@/theme/tokens';
 import { AppBar } from '@/ui/AppBar';
 import { Icon, type IconName } from '@/ui/Icon';
+import { watchTickers } from '@shared/market-watch.ts';
 import { MarketPulse } from '@/ui/MarketPulse';
 import { ValueVsMoneyInCard } from '@/ui/TrackRecordCards';
 import { Amount, Button, Card, EmptyState, ListRow, Loading, Notice, Screen, SectionLabel, Stat, StatusChip, StepsBar, useKitStyles } from '@/ui/kit';
@@ -199,7 +200,7 @@ export default function Today() {
 
       {open.length > 0 || totals.heldCount > 0 ? <ValueVsMoneyInCard collapsible /> : null}
 
-      <MarketPulse />
+      <MarketPulse tickers={watchTickers(p.portfolio)} />
     </Screen>
   );
 }
