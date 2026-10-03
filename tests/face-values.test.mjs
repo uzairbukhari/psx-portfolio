@@ -248,7 +248,7 @@ test('evidence gathering reads disclosures, records conflicts, updates the catal
   assert.equal(curated.perTicker[0].unclear.length, 2);
 });
 
-test('face value requests: ledger scope, one dispatch under concurrency, staging never dispatches, honest status', async () => {
+test('face value requests: client-named tickers, one dispatch under concurrency, staging never dispatches, honest status', async () => {
   const db = createD1();
   const p = base({}, [buy('b1', 'AAAA', '2025-01-10', 10)]);
   p.companies.push(company('BBBB'));
@@ -257,15 +257,15 @@ test('face value requests: ledger scope, one dispatch under concurrency, staging
   const calls = [];
   const fetcher = async (url, init) => { calls.push(JSON.parse(init.body)); return { ok: true, status: 204 }; };
   await db.sqlite.prepare("INSERT INTO security_face_values (ticker,effective_from,face_value,source_url,verified_at,status) VALUES ('BBBB','',10,'https://x/y','2026-10-01','verified')").run();
-  const results = await Promise.all(Array.from({ length: 4 }, (_, i) => requestFaceValues(db, `u${i}@x`, p, config, ['AAAA', 'BBBB', 'ZZZZ', 'OUTSIDE'], fetcher)));
+  const results = await Promise.all(Array.from({ length: 4 }, (_, i) => requestFaceValues(db, `u${i}@x`, ['AAAA', 'BBBB'], config, fetcher)));
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0].inputs, { tickers: 'AAAA' }, 'only the ledger company without evidence is looked up');
-  assert.deepEqual(results[0].tickers, ['AAAA', 'BBBB'].filter((t) => p.companies.some((c) => c.ticker === t)));
-  const status = await faceValueStatus(db, p, config);
+  assert.deepEqual(calls[0].inputs, { tickers: 'AAAA' }, 'only the named company without evidence is looked up');
+  assert.deepEqual(results[0].tickers, ['AAAA', 'BBBB']);
+  const status = await faceValueStatus(db, ['AAAA', 'BBBB'], config);
   assert.equal(status.evidence.BBBB[0].faceValue, 10);
   assert.equal(status.states.find((s) => s.ticker === 'AAAA').state, 'queued');
-  const staging = await requestFaceValues(createD1(), 'u@x', p, { ...config, appEnv: 'staging' }, undefined, fetcher);
+  const staging = await requestFaceValues(createD1(), 'u@x', ['AAAA'], { ...config, appEnv: 'staging' }, fetcher);
   assert.equal(calls.length, 1);
   assert.match(staging.message, /not available/);
-  await assert.rejects(requestFaceValues(createD1(), 'u@x', blankPortfolio(), config, undefined, fetcher), /no companies/);
+  await assert.rejects(requestFaceValues(createD1(), 'u@x', [], config, fetcher), /no companies/);
 });

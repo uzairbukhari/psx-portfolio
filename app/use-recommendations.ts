@@ -1,47 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import type { MonthlyPicksResearch } from '@/lib/monthly-picks';
-import type { RecommendationProgress } from '@/lib/api-types';
-import { pollIntervalMs } from '@/lib/api-validate';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Portfolio } from '@/lib/portfolio';
+import type { PublicAnalysisResponse } from '@/lib/api-types';
+import { parsePublicAnalysis, pollIntervalMs } from '@/lib/api-validate';
+import type { RunProgress } from '@/lib/monthly-picks-progress';
+import { heldValues, recordRun, type StoredPicksRun } from '@/lib/picks-local';
+import { executePicksRun } from '@/lib/picks-run';
+import { watchQuery } from '@/lib/market-watch';
 
-export type RunStatus =
-  | 'queued' | 'gathering' | 'in_progress' | 'completed' | 'failed'
-  // Only on rows saved by earlier workflows; shown read-only.
-  | 'completed_partial' | 'needs_evidence' | 'needs_attention';
-
-export type Recommendation = {
-  id: string;
-  month: string;
-  amount: number;
-  feePct: number;
-  shortlist: string[];
-  status: RunStatus;
-  result: MonthlyPicksResearch | null;
-  error: string | null;
-  model: string;
-  estimatedCostUsd: number | null;
-  createdAt: string;
-  updatedAt: string;
-  workflowVersion?: number;
-  method?: 'ai' | 'quant';
-  dataAsOf?: string;
-  progress?: RecommendationProgress;
-};
-
+/** Runs are computed on this device and live in the encrypted portfolio, so every saved run is finished. */
+export type RunStatus = 'completed' | 'failed';
+export type Recommendation = StoredPicksRun;
 export type FactsState = 'fresh' | 'stale' | 'missing' | 'failed';
 export type FactsInfo = { ticker: string; state: FactsState; fetchedOn: string | null; ageDays: number | null; error: string | null };
-
 export type RunInput = { month: string; amount: number; feePct: number; shortlist: string[]; rerun: boolean };
-
-export const isActive = (status?: string) => status === 'queued' || status === 'gathering' || status === 'in_progress';
-
-type ListResponse = {
-  recommendations?: Recommendation[];
-  facts?: FactsInfo[];
-  dispatchEnabled?: boolean;
-  error?: string;
-};
 
 async function json<T>(response: Response): Promise<T & { error?: string }> {
   try {
@@ -51,86 +24,59 @@ async function json<T>(response: Response): Promise<T & { error?: string }> {
   }
 }
 
-export function useRecommendations() {
-  const [history, setHistory] = useState<Recommendation[]>([]);
-  const [current, setCurrent] = useState<Recommendation | null>(null);
+async function fetchAnalysis(tickers: string[], signal?: AbortSignal): Promise<PublicAnalysisResponse> {
+  const response = await fetch(`/api/recommendations?${watchQuery(tickers)}`, { cache: 'no-store', signal });
+  const data = await json<PublicAnalysisResponse>(response);
+  if (!response.ok) throw Error(data.error ?? 'Could not load company data.');
+  const parsed = parsePublicAnalysis(data);
+  if (!parsed) throw Error('The company data response was not understood.');
+  return parsed;
+}
+
+type Options = {
+  portfolio: Portfolio;
+  /** The shortlist currently chosen in the form: the only thing the server is told, and only as tickers. */
+  tickers: string[];
+  onSave: (next: Portfolio, message?: string) => Promise<void>;
+};
+
+export function useRecommendations({ portfolio, tickers, onSave }: Options) {
+  const history = portfolio.monthlyPicksRuns ?? [];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [facts, setFacts] = useState<Record<string, FactsInfo>>({});
   const [dispatchEnabled, setDispatchEnabled] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watch, setWatch] = useState<string[]>([]);
+  const [progress, setProgress] = useState<RunProgress | null>(null);
+  const portfolioRef = useRef(portfolio);
+  portfolioRef.current = portfolio;
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const tickerKey = useMemo(() => [...tickers].sort().join(','), [tickers]);
+  const current = history.find((run) => run.id === selectedId) ?? history[0] ?? null;
 
-  const load = useCallback(async () => {
-    const response = await fetch('/api/recommendations', { cache: 'no-store' });
-    const data = await json<ListResponse>(response);
-    if (!response.ok) throw Error(data.error ?? 'Could not load recommendations.');
-    const rows = data.recommendations ?? [];
-    const byTicker = Object.fromEntries((data.facts ?? []).map((info) => [info.ticker, info]));
-    setHistory(rows);
+  const load = useCallback(async (list: string[]) => {
+    if (!list.length) {
+      setFacts({});
+      return {} as Record<string, FactsInfo>;
+    }
+    const analysis = await fetchAnalysis(list);
+    const byTicker = Object.fromEntries(analysis.facts.map((info) => [info.ticker, info as FactsInfo]));
     setFacts(byTicker);
-    setDispatchEnabled(Boolean(data.dispatchEnabled));
-    setCurrent((value) => value ?? rows[0] ?? null);
-    const running = rows.find((row) => isActive(row.status));
-    if (running) setActiveId(running.id);
-    setLoaded(true);
+    setDispatchEnabled(analysis.dispatchEnabled);
     return byTicker;
   }, []);
 
   useEffect(() => {
+    const list = tickerKey ? tickerKey.split(',') : [];
     const timer = window.setTimeout(() => {
-      void load().catch((cause) => {
-        setLoaded(true);
-        setError(cause instanceof Error ? cause.message : String(cause));
-      });
-    }, 0);
+      void load(list)
+        .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
+        .finally(() => setLoaded(true));
+    }, 250);
     return () => window.clearTimeout(timer);
-  }, [load]);
-
-  // Poll the active run: fast while it is moving, slower after a while, paused while the tab is hidden.
-  useEffect(() => {
-    if (!activeId) return;
-    let cancelled = false;
-    let timer: number | undefined;
-    const startedPolling = Date.now();
-    let failures = 0;
-    const controller = new AbortController();
-    const tick = async () => {
-      if (cancelled) return;
-      if (document.hidden) {
-        timer = window.setTimeout(() => void tick(), 3000);
-        return;
-      }
-      try {
-        const response = await fetch(`/api/recommendations?id=${encodeURIComponent(activeId)}`, { cache: 'no-store', signal: controller.signal });
-        const data = await json<Recommendation>(response);
-        if (!response.ok) throw Error(data.error ?? 'Could not read the run.');
-        if (cancelled) return;
-        failures = 0;
-        setCurrent(data);
-        if (!isActive(data.status)) {
-          setActiveId(null);
-          await load().catch(() => {});
-          return;
-        }
-      } catch (cause) {
-        if (cancelled || controller.signal.aborted) return;
-        failures += 1;
-        if (failures >= 5) {
-          setActiveId(null);
-          setError(cause instanceof Error ? cause.message : String(cause));
-          return;
-        }
-      }
-      timer = window.setTimeout(() => void tick(), pollIntervalMs(Date.now() - startedPolling));
-    };
-    void tick();
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [activeId, load]);
+  }, [load, tickerKey]);
 
   // After an on-demand fetch, re-read facts until the requested tickers are fresh (max ~3 minutes).
   useEffect(() => {
@@ -138,46 +84,62 @@ export function useRecommendations() {
     let rounds = 0;
     const timer = window.setInterval(() => {
       rounds += 1;
-      void load()
+      void load(tickerKey ? tickerKey.split(',') : [])
         .then((latest) => {
           if (watch.every((ticker) => latest[ticker]?.state === 'fresh') || rounds >= 18) setWatch([]);
         })
         .catch(() => { if (rounds >= 18) setWatch([]); });
     }, 10_000);
     return () => window.clearInterval(timer);
-  }, [watch, load]);
+  }, [watch, load, tickerKey]);
 
-  const start = useCallback(async (input: RunInput) => {
-    setError(null);
+  const requestFacts = useCallback(async (list: string[]) => {
     const response = await fetch('/api/recommendations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    const data = await json<Recommendation>(response);
-    if (!response.ok) throw Error(data.error ?? 'Could not start the run.');
-    setCurrent(data);
-    if (isActive(data.status)) setActiveId(data.id);
-    else await load().catch(() => {});
-    return data;
-  }, [load]);
-
-  const refreshFacts = useCallback(async (tickers: string[]) => {
-    const response = await fetch('/api/recommendations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'refresh-facts', tickers }),
+      body: JSON.stringify({ action: 'refresh-facts', tickers: list }),
     });
     const data = await json<{ dispatched: boolean; waiting: boolean; reason: string | null }>(response);
     if (!response.ok) throw Error(data.error ?? 'Could not request fresh data.');
-    if (data.waiting) setWatch(tickers);
-    await load().catch(() => {});
     return data;
-  }, [load]);
+  }, []);
+
+  const refreshFacts = useCallback(async (list: string[]) => {
+    const data = await requestFacts(list);
+    if (data.waiting) setWatch(list);
+    await load(list).catch(() => {});
+    return data;
+  }, [load, requestFacts]);
+
+  /** Gathers public data (asking for a fresh scrape when needed), then ranks and sizes entirely on this device. */
+  const start = useCallback(async (input: RunInput) => {
+    setError(null);
+    try {
+      const latest = portfolioRef.current;
+      const { run, analysis } = await executePicksRun(
+        {
+          analysis: fetchAnalysis,
+          requestFacts,
+          sleep: (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
+          now: () => Date.now(),
+          pollMs: pollIntervalMs,
+          onProgress: setProgress,
+        },
+        { month: input.month, amount: input.amount, feePct: input.feePct, shortlist: input.shortlist, holdings: heldValues(latest) },
+      );
+      const current = portfolioRef.current;
+      await onSaveRef.current({ ...current, monthlyPicksRuns: recordRun(current.monthlyPicksRuns, run) }, 'Monthly Picks run saved.');
+      setSelectedId(run.id);
+      setFacts(Object.fromEntries(analysis.facts.map((info) => [info.ticker, info as FactsInfo])));
+      return run;
+    } finally {
+      setProgress(null);
+    }
+  }, [requestFacts]);
 
   return {
     history, current, facts, dispatchEnabled, loaded, error, setError,
-    running: activeId !== null, refreshing: watch.length > 0,
-    select: setCurrent, start, refreshFacts,
+    running: progress !== null, progress, refreshing: watch.length > 0,
+    select: (run: Recommendation) => setSelectedId(run.id), start, refreshFacts,
   };
 }

@@ -9,6 +9,8 @@ import type {
 } from '@/lib/psx-market';
 import type { PypsxLiveQuote } from '@/lib/pypsx-market';
 import type { MarketBreadthView, MarketIndexView } from '@/lib/api-types';
+import type { Portfolio, Quote } from '@/lib/portfolio';
+import { applyLocalWatch, watchQuery } from '@/lib/market-watch';
 import { TabLoader } from './tab-loader';
 import { TickerLink } from './ticker-link';
 
@@ -22,6 +24,8 @@ interface MarketSummary {
   breadth?: MarketBreadthView | null;
   series: IndexPoint[];
   companies: ShortlistPerformance[];
+  /** Cached quotes behind `companies` (public); used to tell whether a saved quote is newer. */
+  quotes?: Record<string, Quote>;
   market: MarketState;
   source: {
     name: string;
@@ -34,6 +38,10 @@ interface MarketSummary {
 
 interface Props {
   onOpenShortlist: () => void;
+  /** The companies to follow. Only these tickers are sent to the server; names and saved quotes stay local. */
+  tickers: string[];
+  names: Record<string, string>;
+  saved: Portfolio['quotes'];
 }
 
 function Sparkline({ points, up }: { points: IndexPoint[]; up: boolean }) {
@@ -79,9 +87,12 @@ function sourceTime(value: string) {
 }
 
 export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
-  { onOpenShortlist },
+  { onOpenShortlist, tickers, names, saved },
   ref,
 ) {
+  const watch = useRef({ tickers, names, saved });
+  watch.current = { tickers, names, saved };
+  const tickerList = tickers.join(',');
   const [summary, setSummary] = useState<MarketSummary | null>(null);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,7 +106,8 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   const sessionOpen = useRef(false);
 
   const request = useCallback(async (refresh = false, force = false) => {
-    const res = await fetch(`/api/market-summary${force ? '?force=1' : ''}`, {
+    const query = [force ? 'force=1' : '', watchQuery(watch.current.tickers)].filter(Boolean).join('&');
+    const res = await fetch(`/api/market-summary${query ? `?${query}` : ''}`, {
       method: refresh ? 'POST' : 'GET',
     });
     const body = (await res.json()) as {
@@ -104,7 +116,10 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       error?: string;
     };
     if (!res.ok || !body.summary) throw Error(body.error || 'Market update failed.');
-    setSummary(body.summary);
+    setSummary({
+      ...body.summary,
+      companies: applyLocalWatch(body.summary.companies, watch.current.names, watch.current.saved, body.summary.quotes),
+    });
     sessionOpen.current = body.summary.market.isOpen;
     setFetchedAt(body.fetchedAt ?? null);
     setError('');
@@ -124,7 +139,8 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       window.clearTimeout(initial);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [request]);
+    // A different watch list needs a fresh answer for exactly those tickers.
+  }, [request, tickerList]);
 
   const liveAvailable = summary?.live.available ?? false;
   const intradayAvailable = summary?.live.intradayAvailable ?? false;
@@ -142,7 +158,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     let retryTimer: number | undefined;
     const connect = () => {
       if (document.hidden || source) return;
-      source = new EventSource('/api/market-stream');
+      source = new EventSource(`/api/market-stream?${watchQuery(watch.current.tickers)}`);
       source.addEventListener('status', (event) => {
         const status = JSON.parse((event as MessageEvent<string>).data) as { connected?: boolean; reason?: string };
         liveActive.current = status.connected === true;

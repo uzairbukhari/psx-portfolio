@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { PROGRESS_STEPS } from '@/lib/monthly-picks-progress';
-import type { Recommendation } from './use-recommendations';
+import type { RunProgress } from '@/lib/monthly-picks-progress';
 
 function elapsed(startedAt: string, now: number) {
   const seconds = Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000));
@@ -11,38 +11,27 @@ function elapsed(startedAt: string, now: number) {
 }
 
 /**
- * Shows the run's persisted progress. Every number comes from the server (a phase milestone plus real
- * company counts); the clock below only reports elapsed time and never moves the bar.
+ * Shows the run's progress. Every number is a phase milestone plus real company counts; the clock below only
+ * reports elapsed time and never moves the bar.
  */
-export default function PicksProgress({ run }: { run: Recommendation }) {
+export default function PicksProgress({ progress }: { progress: RunProgress }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-  const progress = run.progress;
-  // Runs from before persisted progress only know gathering vs ranking.
-  const step = progress?.step ?? (progress?.phase === 'gathering' ? 'gathering' : 'ai');
-  const activeIndex = Math.max(0, PROGRESS_STEPS.findIndex((s) => s.key === step));
-  const pending = progress?.pending ?? [];
-  const percent = progress?.percent;
+  const activeIndex = Math.max(0, PROGRESS_STEPS.findIndex((s) => s.key === progress.step));
+  const pending = progress.pending;
 
   return (
     <section className="mp-progress" aria-live="polite" aria-busy="true">
-      {percent !== undefined && (
-        <progress
-          className="mp-bar"
-          max={100}
-          value={progress?.indeterminate ? undefined : percent}
-          aria-label="Monthly Picks progress"
-        />
-      )}
+      <progress className="mp-bar" max={100} value={progress.percent} aria-label="Monthly Picks progress" />
       <ol className="mp-steps">
         {PROGRESS_STEPS.map((s, index) => {
           const state = index < activeIndex ? 'done' : index === activeIndex ? 'active' : 'todo';
-          const detail = s.key === 'gathering' && progress?.total
-            ? `${progress.completed ?? 0} of ${progress.total} companies`
-            : s.key === 'ai' && state === 'active' ? 'Waiting for the AI provider' : '';
+          const detail = s.key === 'gathering' && progress.total
+            ? `${progress.completed} of ${progress.total} companies`
+            : '';
           return (
             <li key={s.key} className={`mp-step mp-step--${state}`}>
               <span className="mp-step__dot">
@@ -54,12 +43,11 @@ export default function PicksProgress({ run }: { run: Recommendation }) {
         })}
       </ol>
       <div className="mp-progress__meta">
-        <span>Elapsed {elapsed(progress?.startedAt ?? run.createdAt, now)}</span>
+        <span>Elapsed {elapsed(progress.startedAt, now)}</span>
         {pending.length > 0 && <span>Waiting on {pending.join(', ')}</span>}
-        {!!progress?.retries && <span>Retried {progress.retries} time{progress.retries === 1 ? '' : 's'}</span>}
-        {progress?.degraded && <span>Continuing with partial evidence</span>}
-        {progress?.message && <span>{progress.message}</span>}
-        <span>Safe to leave this page: the run continues on the server and the result is saved.</span>
+        {progress.degraded && <span>Continuing with partial evidence</span>}
+        {progress.message && <span>{progress.message}</span>}
+        <span>Keep this page open: the ranking is calculated and saved on this device.</span>
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { PicksHealthResponse } from '@/lib/api-types';
+import type { DataHealthResponse } from '@/lib/api-types';
 
 const ago = (iso: string | null, now: string) => {
   if (!iso) return 'never';
@@ -12,9 +12,9 @@ const ago = (iso: string | null, now: string) => {
   return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
 };
 
-/** Super-admin view of GET /api/admin/health: run processor, data freshness, recent scrape failures. */
+/** Super-admin view of GET /api/admin/health: data freshness and recent scrape failures. */
 export default function SystemHealth() {
-  const [health, setHealth] = useState<PicksHealthResponse | null>(null);
+  const [health, setHealth] = useState<DataHealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +23,7 @@ export default function SystemHealth() {
     setError(null);
     try {
       const res = await fetch('/api/admin/health', { cache: 'no-store' });
-      const body = (await res.json()) as PicksHealthResponse & { error?: string };
+      const body = (await res.json()) as DataHealthResponse & { error?: string };
       if (!res.ok) throw new Error(body.error ?? 'Could not load system health.');
       setHealth(body);
     } catch (e) {
@@ -42,16 +42,10 @@ export default function SystemHealth() {
   if (!health) return <p className="muted">Loading…</p>;
 
   const rows: [string, string][] = [
-    ['Run processor', health.backgroundProcessing ? 'Background (cron owns runs)' : 'Legacy (page requests advance runs)'],
     ['Market', health.marketOpen ? 'Open' : 'Closed'],
-    ['Active runs', `${health.activeRuns}${health.oldestActiveRunAgeSec !== null ? ` (oldest ${Math.round(health.oldestActiveRunAgeSec / 60)} min)` : ''}`],
-    ['Stuck runs (no progress for 10+ min)', String(health.stuckRuns)],
-    ['Completed / failed in 24 h', `${health.completedLast24h} / ${health.failedLast24h}`],
-    ['Last completed run', ago(health.lastCompletedAt, health.now)],
     ['Newest quote fetched', `${ago(health.lastQuoteFetchedAt, health.now)}${health.quoteLagMinutes !== null ? ` (${health.quoteLagMinutes} min)` : ''}`],
     ['Newest company facts', ago(health.lastFactsFetchedAt, health.now)],
     ['Unsettled company-data requests', String(health.unsettledFactsRequests)],
-    ['AI requests in 24 h', String(health.providerRequests24h)],
   ];
 
   return (

@@ -14,8 +14,10 @@ const base = new URL('../', import.meta.url);
 
 // Load the route with its server imports replaced by fakes.
 const source = readFileSync(new URL('app/api/me/route.ts', base), 'utf8')
-  .replace("import { db, failure, identity } from '@/lib/server';", `
+  .replace("import { deleteVault } from '@/lib/vault-store';", "const deleteVault = async (_db, owner) => { globalThis.__vaultDeleted.push(owner); };")
+  .replace("import { db, failure, identity, vaultDb } from '@/lib/server';", `
 const db = () => globalThis.__meDB;
+const vaultDb = () => ({ vault: true });
 const identity = async (req, write) => {
   globalThis.__identityCalls.push(write);
   if (globalThis.__meUser === null) { const e = new Error('Sign in to access your portfolio.'); e.status = 401; throw e; }
@@ -54,6 +56,7 @@ function setup(user = 'owner@example.com') {
   globalThis.__meDB = fakeDb();
   globalThis.__meUser = user;
   globalThis.__identityCalls = [];
+  globalThis.__vaultDeleted = [];
   return globalThis.__meDB;
 }
 
@@ -107,6 +110,7 @@ test('DELETE /api/me clears only the signed-in user in one batch and expires the
   assert.match(res.headers.get('set-cookie') ?? '', /session=;.*Max-Age=0/);
   assert.deepEqual(globalThis.__identityCalls, [true], 'must go through identity(req, true)');
   assert.equal(database.batches, 1);
+  assert.deepEqual(globalThis.__vaultDeleted, ['owner@example.com'], 'the encrypted vault is deleted too');
   assert.equal(database.ran.length, accountDeletionStatements().length);
   for (const { args } of database.ran) assert.deepEqual(args, ['owner@example.com']);
   const tables = database.ran.map((s) => s.sql);
@@ -121,6 +125,7 @@ test('DELETE /api/me refuses without the right confirmation and touches nothing'
     assert.equal(res.status, 400);
   }
   assert.equal(database.batches, 0);
+  assert.deepEqual(globalThis.__vaultDeleted, [], 'nothing is deleted without the confirmation');
 });
 
 test('DELETE /api/me rejects a cross-origin cookie request and an unsigned-in caller', async () => {

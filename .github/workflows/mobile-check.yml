@@ -22,6 +22,11 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
+      # Shared modules in ../lib import @noble/*; give them the same copy the app uses (the web app's root
+      # node_modules is not installed in this job).
+      - name: Link app dependencies for shared modules
+        working-directory: .
+        run: ln -s "$PWD/mobile/node_modules" node_modules
       - run: npm run typecheck
       - run: npm test
       - name: Bundle for Android and iOS

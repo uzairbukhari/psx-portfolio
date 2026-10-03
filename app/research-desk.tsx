@@ -41,6 +41,7 @@ import DossierExperience from './dossier-experience';
 import { TickerLink } from './ticker-link';
 import { onRunnerEvent, startResearchRunner, getRunArchive } from './research-runner';
 import { downloadRunSources } from './research-zip';
+import { applyResearchResult, unappliedJobs } from '@/lib/research-apply';
 
 type Props = {
   portfolio: Portfolio;
@@ -149,6 +150,11 @@ export default function ResearchDesk({
       dir: 'asc' | 'desc';
     } | null>(null);
   const eventListRef = useRef<HTMLDivElement | null>(null);
+  const applying = useRef(new Set<string>());
+  const portfolioRef = useRef(portfolio);
+  portfolioRef.current = portfolio;
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
   const settings = useMemo(
     () => portfolio.researchSettings ?? DEFAULT_RESEARCH_SETTINGS,
     [portfolio.researchSettings],
@@ -182,19 +188,28 @@ export default function ResearchDesk({
         throw Error(data.error || 'Research progress is unavailable.');
       setJobs(data.jobs);
       if (jobId) setEvents(data.events || []);
-      const completed = data.jobs.find(
-        (job) =>
-          job.status === 'complete' &&
-          research.find((item) => item.ticker === job.ticker)?.status !==
-            'Complete',
-      );
-      if (completed) {
-        sessionStorage.setItem('open-completed-dossier', completed.ticker);
-        window.location.reload();
+      // A finished job's dossier is public company research held on the job. The server cannot write it into an
+      // encrypted portfolio, so this unlocked tab applies it and saves the ciphertext, once per job.
+      for (const completed of unappliedJobs(portfolioRef.current, data.jobs)) {
+        if (applying.current.has(completed.id)) continue;
+        applying.current.add(completed.id);
+        void (async () => {
+          try {
+            const result = await fetch(`/api/research/jobs?result=${encodeURIComponent(completed.id)}`, { cache: 'no-store' });
+            const body = (await result.json()) as { error?: string; result?: Record<string, unknown> };
+            if (!result.ok || !body.result) throw Error(body.error || 'The research result could not be loaded.');
+            const next = applyResearchResult(portfolioRef.current, completed, body.result);
+            await onSaveRef.current(next, `${completed.ticker} research dossier saved.`);
+            sessionStorage.setItem('open-completed-dossier', completed.ticker);
+          } catch {
+            // Retried on the next poll (for example after a revision conflict).
+            applying.current.delete(completed.id);
+          }
+        })();
       }
       if (jobId) setJobOpen(data.jobs.find((job) => job.id === jobId) || null);
     },
-    [research],
+    [],
   );
   useEffect(() => {
     const first = window.setTimeout(() => void loadJobs().catch(() => {}), 0);
@@ -323,7 +338,13 @@ export default function ResearchDesk({
       const response = await fetch('/api/research/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticker: value }),
+          // Public company facts and the AI settings only: never holdings, targets or notes.
+          body: JSON.stringify({
+            ticker: value,
+            name: portfolio.companies.find((item) => item.ticker === value)?.name,
+            sector: portfolio.companies.find((item) => item.ticker === value)?.sector,
+            settings,
+          }),
         }),
         data = (await response.json()) as { error?: string; job: Job };
       if (!response.ok)

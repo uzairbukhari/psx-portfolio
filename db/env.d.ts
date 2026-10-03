@@ -1,6 +1,8 @@
 declare namespace Cloudflare {
   interface Env {
     DB: D1Database;
+    /** Private vault database (ciphertext only). Never bound to the quote-refresh Worker or any scraper. */
+    VAULT_DB: D1Database;
   }
 }
 declare namespace Cloudflare {
@@ -10,9 +12,7 @@ declare namespace Cloudflare {
     GITHUB_REPO?: string;
     OPENAI_MODEL?: string;
     /** Per-user AI spend cap per PKT month in USD (Monthly Picks); defaults to 1. */
-    AI_MONTHLY_CAP_USD?: string;
     /** "true" when the per-minute cron Worker owns Monthly Picks execution (GET becomes read-only). */
-    PICKS_BACKGROUND?: string;
   }
 }
 declare namespace Cloudflare {

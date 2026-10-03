@@ -2,7 +2,11 @@
 // check the table list against db/schema.ts: a new per-user table must be added here or to
 // SHARED_TABLES, and tests/account-deletion.test.mjs fails until it is.
 
-/** Per-user tables and the column holding the user's email (lower-case). */
+/**
+ * Per-user tables and the column holding the user's email (lower-case). The encrypted vault lives in the separate
+ * VAULT_DB and is removed by deleteVault (lib/vault-store.ts); `portfolios`, `ai_reviews` and `monthly_recommendations`
+ * are legacy plaintext tables that nothing writes any more but that older deployments may still hold.
+ */
 export const USER_TABLES: readonly { table: string; column: string }[] = [
   { table: 'portfolios', column: 'user_id' },
   { table: 'ai_reviews', column: 'user_id' },

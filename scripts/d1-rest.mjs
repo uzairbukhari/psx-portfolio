@@ -31,17 +31,24 @@ export async function d1(sql, params = []) {
   return body.result[0].results;
 }
 
-/** Every ticker in any user's portfolio, or the `--tickers=A,B` override. */
-export async function heldTickers(tickerArg) {
+const TICKER = /^[A-Z0-9]{2,12}$/;
+
+/**
+ * The tickers worth scraping: the `--tickers=A,B` override, else the public set clients have already named
+ * (cached quotes, scraped company facts, price history, requested lookups). Portfolios are end-to-end encrypted
+ * and the scrapers hold no key and no private database id, so what anyone holds is unknowable here by design.
+ */
+export async function trackedTickers(tickerArg) {
   if (tickerArg)
     return tickerArg
       .slice('--tickers='.length)
       .split(',')
       .map((ticker) => ticker.trim().toUpperCase())
-      .filter((ticker) => /^[A-Z0-9]{2,12}$/.test(ticker));
-  const rows = await d1(
-    `SELECT DISTINCT upper(json_extract(c.value, '$.ticker')) AS ticker
-     FROM portfolios, json_each(portfolios.payload, '$.companies') AS c`,
-  );
-  return rows.map((row) => row.ticker).filter((ticker) => /^[A-Z0-9]{2,12}$/.test(ticker ?? ''));
+      .filter((ticker) => TICKER.test(ticker));
+  const found = new Set();
+  for (const table of ['quote_refreshes', 'company_facts', 'price_history', 'facts_requests', 'refresh_requests']) {
+    const rows = await d1(`SELECT DISTINCT upper(ticker) AS ticker FROM ${table}`).catch(() => []);
+    for (const row of rows) if (TICKER.test(row.ticker ?? '')) found.add(row.ticker);
+  }
+  return [...found].sort();
 }

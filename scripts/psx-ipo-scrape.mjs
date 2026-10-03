@@ -9,7 +9,7 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-ipo-scrape.mjs [--dry-run] --tickers=JSRR,ABCD
 import { pathToFileURL } from 'node:url';
-import { d1, heldTickers } from './d1-rest.mjs';
+import { d1, trackedTickers } from './d1-rest.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { extractListingNotice, extractOfferPrice, lookupFromEvidence } from '../lib/ipo-evidence.ts';
 
@@ -111,7 +111,7 @@ async function store(result) {
 
 async function main() {
   if (!tickerArg) throw Error('Pass --tickers=A,B (the lookup is per symbol).');
-  const tickers = (await heldTickers(tickerArg)).slice(0, 40);
+  const tickers = (await trackedTickers(tickerArg)).slice(0, 40);
   if (!dryRun) await markRunning('ipo', tickers).catch((e) => console.log(`Request state not updated: ${e.message}`));
   const finished = [];
   let pages = [];

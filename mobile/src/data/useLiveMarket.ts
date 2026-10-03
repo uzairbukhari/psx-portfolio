@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { fetch as streamFetch } from 'expo/fetch';
+import { watchQuery } from '@shared/market-watch.ts';
 import { tokenStore } from '@/auth/token-store';
 import { config } from '@/config';
 import { emptyLive, MAX_STREAM_RETRIES, readLiveStream, reduceLive, retryDelayMs, StreamRejected, type LiveState } from './live-market';
@@ -21,7 +22,7 @@ const sleep = (ms: number, signal: AbortSignal) =>
  * and the app is in the foreground. Reconnects up to three times with backoff; a 4xx (feed not set up for this
  * account) or exhausted retries leave status `fallback`, and the caller's polling carries on as before.
  */
-export function useLiveMarket(enabled: boolean): { live: LiveState; status: LiveStatus } {
+export function useLiveMarket(enabled: boolean, tickers: string[]): { live: LiveState; status: LiveStatus } {
   const [live, setLive] = useState<LiveState>(emptyLive);
   const [status, setStatus] = useState<LiveStatus>('off');
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
@@ -31,6 +32,7 @@ export function useLiveMarket(enabled: boolean): { live: LiveState; status: Live
     return () => sub.remove();
   }, []);
 
+  const tickerKey = tickers.join(',');
   useEffect(() => {
     if (!enabled || !appActive) {
       setLive(emptyLive);
@@ -46,7 +48,7 @@ export function useLiveMarket(enabled: boolean): { live: LiveState; status: Live
         try {
           await readLiveStream({
             fetcher: streamFetch as unknown as Parameters<typeof readLiveStream>[0]['fetcher'],
-            url: `${config.apiBaseUrl}/api/market-stream`,
+            url: `${config.apiBaseUrl}/api/market-stream?${watchQuery(tickerKey ? tickerKey.split(',') : [])}`,
             token: await tokenStore.get(),
             signal,
             onEvent: (event) => {
@@ -73,7 +75,7 @@ export function useLiveMarket(enabled: boolean): { live: LiveState; status: Live
       }
     })();
     return () => controller.abort();
-  }, [enabled, appActive]);
+  }, [enabled, appActive, tickerKey]);
 
   return { live, status };
 }

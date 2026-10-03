@@ -8,8 +8,7 @@
 // D1-backed fact lookup itself lives in company-facts-store.ts and is called by
 // app/api/portfolio/route.ts.
 import type { Company, Portfolio } from './portfolio.ts';
-import type { FactsResult } from './company-facts-store.ts';
-import type { CompanyFacts } from './company-facts.ts';
+import type { CompanyFacts, FactsResult } from './company-facts.ts';
 import type { CompanyLookup } from './api-types.ts';
 import { isPlaceholderName } from './company-directory.ts';
 

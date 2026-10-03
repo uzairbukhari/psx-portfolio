@@ -77,10 +77,9 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
             <p className="eyebrow">{run.month} RECOMMENDATION</p>
             <h2>{estimates.length ? `${estimates.length} ${estimates.length === 1 ? 'pick' : 'picks'} for ${money(run.amount)}` : 'No pick this month'}</h2>
             <p className="mp-summary__meta">
-              <span className={`mp-badge mp-badge--${run.method === 'quant' ? 'neutral' : 'primary'}`}>{run.method === 'quant' ? 'Quant ranking' : run.method === 'ai' ? 'AI-ranked' : 'Saved run'}</span>
+              <span className="mp-badge mp-badge--neutral">Quant ranking · calculated on this device</span>
               {run.dataAsOf && <span>PSX data as of {run.dataAsOf}</span>}
               <span>{new Date(run.createdAt).toLocaleDateString()}</span>
-              {run.estimatedCostUsd !== null && <span>API ${run.estimatedCostUsd.toFixed(4)}</span>}
             </p>
           </div>
           <button type="button" className="secondary compact" onClick={onRefreshPrices}><RefreshCw size={14} /> Refresh prices</button>

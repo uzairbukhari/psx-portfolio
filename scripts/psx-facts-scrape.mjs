@@ -1,13 +1,13 @@
 // Refreshes the shared `company_facts` cache from outside Cloudflare (PSX drops
 // Cloudflare egress; see psx-quote-scrape.mjs). Monthly Picks reads these rows
-// instead of fetching PSX from the Worker. Tickers = every ticker held in some
+// instead of fetching PSX from the Worker. Tickers = every tracked (publicly requested) ticker, not held in a
 // portfolio plus any ticker with an open `facts_requests` row (an on-demand
 // dispatch from the Worker), or the `--tickers=A,B` override.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-facts-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
-import { d1, heldTickers } from './d1-rest.mjs';
+import { d1, trackedTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchCompanyFacts } from '../lib/company-facts.ts';
 
@@ -15,10 +15,10 @@ const CONCURRENCY = 3;
 const dryRun = process.argv.includes('--dry-run');
 const tickerArg = process.argv.find((arg) => arg.startsWith('--tickers='));
 
-/** Tickers to scrape: the explicit override, else held tickers plus open on-demand requests. */
+/** Tickers to scrape: the explicit override, else tracked tickers plus open on-demand requests. */
 async function targetTickers() {
-  if (tickerArg) return heldTickers(tickerArg);
-  const held = await heldTickers(undefined);
+  if (tickerArg) return trackedTickers(tickerArg);
+  const held = await trackedTickers(undefined);
   const requested = await d1(
     'SELECT ticker FROM facts_requests WHERE attempted_at IS NULL OR attempted_at < requested_at',
   );

@@ -17,12 +17,17 @@
     "quote-refresh:dev": "wrangler dev --config workers/quote-refresh/wrangler.jsonc --test-scheduled --persist-to ../../.wrangler/state",
     "quote-refresh:deploy": "wrangler deploy --config workers/quote-refresh/wrangler.jsonc",
     "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:vault:local": "WRANGLER_LOG_PATH=.wrangler/logs wrangler d1 migrations apply VAULT_DB --local --persist-to .wrangler/state",
+    "db:migrate:vault:prod": "wrangler d1 migrations apply VAULT_DB --remote",
+    "db:migrate:vault:staging": "wrangler d1 migrations apply VAULT_DB --remote --env staging",
     "build:staging": "CLOUDFLARE_ENV=staging vinext build",
     "deploy:staging": "npm run build:staging && wrangler deploy --config dist/server/wrangler.json",
     "db:migrate:staging": "wrangler d1 migrations apply DB --remote --env staging"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
+    "@noble/ciphers": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "@shadcn/react": "0.3.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",

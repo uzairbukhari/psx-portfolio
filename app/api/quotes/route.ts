@@ -9,6 +9,7 @@ import { takeRateLimit, waitText } from '@/lib/rate-limit';
 import { UserError } from '@/lib/user-error';
 
 const FORCE_COOLDOWN = { windowMs: 5 * 60_000, max: 1 };
+const MAX_FORCE_TICKERS = 50;
 
 function cleanTickers(value: unknown): string[] {
   const tickers = Array.isArray(value)
@@ -59,18 +60,9 @@ export async function POST(req: Request) {
     const tickers = cleanTickers(((await req.json()) as { tickers?: unknown }).tickers);
     const force = new URL(req.url).searchParams.get('force') === '1';
     if (force) {
-      // A forced refresh bypasses the shared cache, so it is limited to the
-      // caller's own companies and to one call per cooldown window.
-      const row = await db()
-        .prepare('SELECT payload FROM portfolios WHERE user_id=?')
-        .bind(user)
-        .first<{ payload: string }>();
-      const held = new Set(
-        (JSON.parse(row?.payload ?? '{}') as { companies?: { ticker: string }[] })
-          .companies?.map((company) => company.ticker) ?? [],
-      );
-      if (tickers.some((ticker) => !held.has(ticker)))
-        throw new UserError('A forced refresh only covers companies in your portfolio.');
+      // A forced refresh bypasses the shared cache, so it is limited to one call per cooldown window and a
+      // small ticker list. The server cannot (and does not try to) check the tickers against a portfolio.
+      if (tickers.length > MAX_FORCE_TICKERS) throw new UserError(`A forced refresh covers at most ${MAX_FORCE_TICKERS} companies.`);
       const limit = await takeRateLimit(db(), user, 'quote-force', FORCE_COOLDOWN);
       if (!limit.allowed)
         throw new UserError(

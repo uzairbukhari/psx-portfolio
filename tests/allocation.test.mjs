@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { constrainAllocations } from '../lib/allocation.ts';
 import { quantAllocation } from '../lib/company-facts.ts';
-import { sanitizePicks, quantResult } from '../lib/monthly-picks-ai.ts';
+import { quantResult } from '../lib/monthly-picks-ai.ts';
 
 const total = (r) => Math.round((r.allocations.reduce((a, x) => a + x.allocationPct, 0) + r.cashPct) * 100) / 100;
 const pct = (r, t) => r.allocations.find((x) => x.ticker === t)?.allocationPct;
@@ -78,29 +78,10 @@ const snapshot = (tickers) => ({
   generatedOn: '2026-09-30', contributionMonth: '2026-10', freshMoneyPkr: 100000, shortlist: tickers, dataAsOf: '2026-09-30',
   companies: tickers.map(company), scores: tickers.map((t, i) => ({ ticker: t, score: 80 - i * 5, confidence: 'High', evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics() })),
 });
-const aiPick = (ticker, allocationPct) => ({ ticker, allocationPct, confidence: 'High', thesis: 't', evidence: ['peTtm'], catalysts: [], risks: [] });
-const aiOut = (picks, unallocatedPct) => ({ marketOutlook: 'x', picks, coverage: [], unallocatedPct });
-
-test('AI output with one surviving company cannot reach 100%', () => {
-  const r = sanitizePicks(aiOut([aiPick('A', 35), aiPick('ZZZ', 35), aiPick('A', 30)], 0), snapshot(['A', 'B']));
-  assert.equal(r.picks.length, 1);
-  assert.equal(r.picks[0].allocationPct, 35);
-  assert.equal(r.unallocatedPct, 65);
-});
-
-test('AI output renormalising upward is re-capped and sums to 100', () => {
-  const r = sanitizePicks(aiOut([aiPick('A', 30), aiPick('B', 5)], 5), snapshot(['A', 'B', 'C']));
-  // 30/40 scaled to 100 would be 75%; the cap holds and the rest is cash.
-  for (const p of r.picks) assert.ok(p.allocationPct <= 35);
-  assert.ok(Math.abs(r.picks.reduce((a, p) => a + p.allocationPct, 0) + r.unallocatedPct - 100) <= 0.011);
-  assert.equal(r.picks.find((p) => p.ticker === 'A').allocationPct, 35);
-});
-
-test('AI and quant results obey the same cap and totals', () => {
+test('quant results obey the cap and totals', () => {
   const s = snapshot(['A', 'B', 'C', 'D', 'E', 'F']);
-  const ai = sanitizePicks(aiOut([aiPick('A', 90), aiPick('B', 10)], 0), s);
   const quant = quantResult(s);
-  for (const r of [ai, quant]) {
+  for (const r of [quant]) {
     for (const p of r.picks) assert.ok(p.allocationPct <= 35 + 1e-9);
     assert.ok(Math.abs(r.picks.reduce((a, p) => a + p.allocationPct, 0) + r.unallocatedPct - 100) <= 0.011);
   }
@@ -110,8 +91,4 @@ test('quantAllocation still water-fills and leaves cash when everything is cappe
   const one = quantAllocation([{ ticker: 'A', score: 90, confidence: 'High', evidence: { completeness: 1, metricCount: 4, missing: [] }, metrics: metrics() }]);
   assert.deepEqual(one.picks.map((p) => p.allocationPct), [35]);
   assert.equal(one.unallocatedPct, 65);
-});
-
-test('AI output with only unusable picks falls back (null)', () => {
-  assert.equal(sanitizePicks(aiOut([aiPick('ZZZ', 50)], 50), snapshot(['A'])), null);
 });

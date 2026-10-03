@@ -1,8 +1,8 @@
-import { type Portfolio } from '@/lib/portfolio';
+import { cleanWatchTickers } from '@/lib/market-watch';
 import { parsePypsxMessage } from '@/lib/pypsx-market';
 import { pypsxCredentialsFor } from '@/lib/pypsx-server';
 import { createStreamGate, STREAM_CONNECT_TIMEOUT_MS } from '@/lib/pypsx-stream';
-import { db, failure, identity } from '@/lib/server';
+import { failure, identity } from '@/lib/server';
 import { UserError } from '@/lib/user-error';
 
 const encoder = new TextEncoder();
@@ -14,16 +14,8 @@ export async function GET(req: Request) {
     const user = await identity(req);
     const credentials = pypsxCredentialsFor(user);
     if (!credentials) throw new UserError('The pyPSX live feed is not configured for this account.');
-    const row = await db()
-      .prepare('SELECT payload FROM portfolios WHERE user_id=?')
-      .bind(user)
-      .first<{ payload: string }>();
-    const portfolio = row ? (JSON.parse(row.payload) as Portfolio) : null;
-    const shortlist = portfolio?.monthlyPicksShortlist?.length
-      ? portfolio.monthlyPicksShortlist
-      : (portfolio?.companies ?? [])
-          .filter((company) => company.target > 0)
-          .map((company) => company.ticker);
+    // The client names the tickers it wants ticks for; the server never opens a portfolio to find them.
+    const shortlist = cleanWatchTickers(new URL(req.url).searchParams.get('tickers'));
     const allowed = new Set(shortlist);
     if (!allowed.size) throw new UserError('Choose at least one company in Monthly Picks.');
 

@@ -4,11 +4,11 @@
 // and `facts_requests` (last attempt/error per ticker). Everything here is read-only
 // except the best-effort dispatch in `gatherFacts`.
 import { today } from './portfolio.ts';
-import type { CompanyFacts } from './company-facts.ts';
+import type { CompanyFacts, FactsResult } from './company-facts.ts';
 import { classifyFacts, type FactsStatus } from './monthly-picks-flow.ts';
 import { requestFacts, type DispatchConfig } from './github-dispatch.ts';
 
-export type FactsResult = CompanyFacts | { ticker: string; unavailable: string };
+export type { FactsResult };
 export type FactsEntry = { status: FactsStatus; facts: CompanyFacts | null };
 
 // D1 allows 100 bound parameters per statement.

@@ -211,6 +211,8 @@ export type Portfolio = {
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
+  /** Finished Monthly Picks runs, computed on the device and kept only inside the encrypted portfolio. */
+  monthlyPicksRuns?: import('./picks-local.ts').StoredPicksRun[];
   dividends?: Dividend[];
   /**
    * First book-closure date for which PSX announcements become expected dividends. Set once
@@ -250,6 +252,8 @@ export type ResearchCompany = {
   }[];
   updatedAt: string;
   details?: Record<string, unknown>;
+  /** The research job whose result this dossier holds, so the client applies each completed job exactly once. */
+  jobId?: string;
 };
 export const today = () =>
   new Intl.DateTimeFormat('en-CA', {
@@ -1241,6 +1245,27 @@ export function validate(p: Portfolio) {
       p.monthlyPicksShortlist.some((ticker) => !tickers.has(ticker))
     )
       throw new UserError('Invalid Monthly Picks shortlist.');
+  }
+  if (p.monthlyPicksRuns !== undefined) {
+    const runs = p.monthlyPicksRuns;
+    if (
+      !Array.isArray(runs) ||
+      runs.length > 12 ||
+      runs.some(
+        (run) =>
+          !run ||
+          typeof run !== 'object' ||
+          typeof run.id !== 'string' ||
+          run.id.length > 80 ||
+          !/^\d{4}-(0[1-9]|1[0-2])$/.test(run.month) ||
+          !Number.isFinite(run.amount) ||
+          !Array.isArray(run.shortlist) ||
+          run.shortlist.length > 15 ||
+          (run.status !== 'completed' && run.status !== 'failed') ||
+          JSON.stringify(run).length > 150000,
+      )
+    )
+      throw new UserError('Invalid Monthly Picks history.');
   }
   if (
     p.aiReview &&

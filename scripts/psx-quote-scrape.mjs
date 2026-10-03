@@ -4,16 +4,16 @@
 // 520 on every page except the homepage), so the Workers can no longer fetch
 // prices themselves. This script runs on GitHub Actions (see
 // .github/workflows/psx-quotes.yml): one request to /indices/ALLSHR prices every
-// All-Share stock, the homepage supplies the market timestamp, and any held
+// All-Share stock, the homepage supplies the market timestamp, and any tracked
 // ticker missing from ALLSHR (e.g. ETFs) falls back to its company page. Only
-// tickers held in some portfolio go into `quote_refreshes`; the KSE100 summary,
+// tracked tickers go into `quote_refreshes`; the KSE100 summary,
 // a per-day KSE100 chart and the whole ALLSHR table go into
 // `market_summary_refreshes` for the market pulse. Writes use the D1 REST API.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-quote-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
-import { d1, heldTickers as sharedHeldTickers } from './d1-rest.mjs';
+import { d1, trackedTickers as sharedTrackedTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents } from '../lib/psx-market.ts';
@@ -29,7 +29,7 @@ const SOURCE = 'https://dps.psx.com.pk/indices/ALLSHR';
 const dryRun = process.argv.includes('--dry-run');
 const tickerArg = process.argv.find((arg) => arg.startsWith('--tickers='));
 
-const heldTickers = () => sharedHeldTickers(tickerArg);
+const trackedTickers = () => sharedTrackedTickers(tickerArg);
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -104,7 +104,7 @@ async function writeMarketSummary(index, constituents, retrievedAt, parsedIndice
   return payload.series.length;
 }
 
-// Serves every held ticker plus every ticker a user queued with "Refresh prices" (`quotes` requests in D1),
+// Serves every tracked ticker plus every ticker a user queued with "Refresh prices" (`quotes` requests in D1),
 // then completes those requests with a verified per-ticker result. A request queued while this run is
 // already going is left for the next run (see completeRequests).
 async function main() {
@@ -121,7 +121,7 @@ async function main() {
 }
 
 async function scrape(snapshot) {
-  const tickers = [...new Set([...(await heldTickers()), ...snapshot.keys()])];
+  const tickers = [...new Set([...(await trackedTickers()), ...snapshot.keys()])];
   const [home, allshr] = await Promise.all([
     fetchPsx('https://dps.psx.com.pk/').then((response) => response.text()),
     fetchPsx(SOURCE).then((response) => response.text()),
@@ -146,7 +146,7 @@ async function scrape(snapshot) {
   }
   const failed = [];
   const fallback = new Set();
-  // Requested tickers go first so a user's click is never starved by a long list of held ETFs.
+  // Requested tickers go first so a user's click is never starved by a long list of tracked ETFs.
   missing.sort((a, b) => Number(snapshot.has(b)) - Number(snapshot.has(a)));
   for (const ticker of missing.slice(0, MAX_FALLBACK)) {
     try {
@@ -159,7 +159,7 @@ async function scrape(snapshot) {
 
   const entries = Object.entries(quotes);
   console.log(
-    `PSX ${asOf}: ${entries.length}/${tickers.length} held tickers priced` +
+    `PSX ${asOf}: ${entries.length}/${tickers.length} tracked tickers priced` +
       (missing.length ? ` (${missing.length} via company page)` : '') +
       (failed.length ? `. Failed: ${failed.join('; ')}` : '.'),
   );
