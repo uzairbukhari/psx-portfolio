@@ -7,7 +7,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { useBiometricLock } from '@/auth/BiometricLock';
-import { backupShare } from '@/data/backup';
+import { backupShare, encryptedBackupShare } from '@/data/backup';
+import { useVault } from '@/vault/VaultProvider';
 import { setFilerStatus, type FilerStatus } from '@/data/mutations';
 import { usePortfolio } from '@/data/usePortfolio';
 import { pushAvailable, pushPreference, registerForPush, unregisterPush } from '@/push/push';
@@ -24,6 +25,7 @@ export default function More() {
   const { colors, appearance, setAppearance } = useTheme();
   const { state, api, signOut, deleteAccount } = useAuth();
   const p = usePortfolio();
+  const vault = useVault();
   const [taxBusy, setTaxBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const queryClient = useQueryClient();
@@ -81,10 +83,7 @@ export default function More() {
     }
   }
 
-  async function exportBackup() {
-    if (!p.portfolio) return;
-    setError(null);
-    const result = backupShare(p.portfolio);
+  async function shareText(result: { ok: true; text: string; title: string } | { ok: false; reason: string }) {
     if (!result.ok) return setError(result.reason);
     try {
       // Share sheet with the JSON as text: save it to Files, Drive or email it to yourself.
@@ -92,6 +91,29 @@ export default function More() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not open the share sheet.');
     }
+  }
+
+  /** Encrypted by default: the package is useless without the vault password or recovery key. */
+  async function exportBackup() {
+    setError(null);
+    try {
+      await shareText(encryptedBackupShare(await vault.session.backupPackage()));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not create the backup.');
+    }
+  }
+
+  function exportReadable() {
+    if (!p.portfolio) return;
+    const portfolio = p.portfolio;
+    Alert.alert(
+      'Share a readable copy?',
+      'This file is NOT encrypted. Anyone who gets it can read every holding, trade and note. Prefer the encrypted backup.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Share unencrypted', style: 'destructive', onPress: () => void shareText(backupShare(portfolio)) },
+      ],
+    );
   }
   const [error, setError] = useState<string | null>(null);
   const devices = useQuery({
@@ -254,7 +276,9 @@ export default function More() {
       <SectionLabel>Data</SectionLabel>
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
         <ListRow left={iconBox('upload')} title="Import" subtitle="AHL trades and CDC dividends, with a preview first" onPress={() => router.push('/import')} />
-        <ListRow left={iconBox('file')} title="Export backup" subtitle="Share your whole ledger as a JSON file. The website’s Settings can restore it." onPress={() => void exportBackup()} last />
+        <ListRow left={iconBox('file')} title="Encrypted backup" subtitle="Share your whole ledger as an encrypted file. Restore it on the website with your vault password or recovery key." onPress={() => void exportBackup()} />
+        <ListRow left={iconBox('file')} title="Readable export (not encrypted)" subtitle="Plain JSON anyone can read. Asks you to confirm first." onPress={exportReadable} />
+        <ListRow left={iconBox('lock')} title="Lock Sipwise now" subtitle="Forget the vault key on this phone until you unlock it again." onPress={vault.lock} last />
       </View>
       <Card>
         <Muted>Permanently delete your account and everything stored for it on Sipwise.</Muted>

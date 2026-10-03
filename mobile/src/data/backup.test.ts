@@ -27,3 +27,13 @@ test('an oversized ledger is refused with a pointer to the website', () => {
   assert.equal(result.ok, false);
   assert.match(!result.ok ? result.reason : '', /website/);
 });
+
+test('the encrypted backup is shared as the package itself, never as readable JSON', async () => {
+  const { encryptedBackupShare } = await import('./backup.ts');
+  const pkg = { kind: 'sipwise-encrypted-backup', version: 1, vault: {}, portfolio: { revision: 1, envelope: { ct: 'x' } } } as never;
+  const out = encryptedBackupShare(pkg, new Date('2026-10-03T00:00:00Z'));
+  assert.ok(out.ok);
+  assert.equal(out.title, 'sipwise-encrypted-backup-2026-10-03.json');
+  assert.equal(JSON.parse(out.text).kind, 'sipwise-encrypted-backup');
+  assert.equal(encryptedBackupShare({ big: 'x'.repeat(BACKUP_SHARE_LIMIT_CHARS) } as never).ok, false);
+});
