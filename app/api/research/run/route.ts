@@ -1,14 +1,6 @@
 import { db, failure, requireSuperAdmin } from '@/lib/server';
 import { validateInvestmentDossier } from '@/lib/research-policy.mjs';
 import {
-  blankPortfolio,
-  round,
-  today,
-  validate,
-  type Portfolio,
-  type ResearchCompany,
-} from '@/lib/portfolio';
-import {
   addEvent,
   publicJob,
   RESEARCH_STAGES,
@@ -48,90 +40,18 @@ function dossierResult(value: unknown, ticker: string) {
   return details;
 }
 
-async function completeJob(
-  row: ResearchJobRow,
-  details: Record<string, unknown>,
-) {
-  const portfolioRow = await db()
-    .prepare('SELECT payload,revision FROM portfolios WHERE user_id=?')
-    .bind(row.user_id)
-    .first<{ payload: string; revision: number }>();
-  const portfolio: Portfolio = portfolioRow
-    ? JSON.parse(portfolioRow.payload)
-    : blankPortfolio();
-  const scores = details.scores as Array<number | null>;
-  const scenarios = details.scenarios as Array<{
-    eps: number;
-    multiple: number;
-  }>;
-  const [fairValueLow, fairValue, fairValueHigh] = scenarios.map((s) =>
-    round(s.eps * s.multiple),
-  );
-  const research: ResearchCompany = {
-    ticker: row.ticker,
-    status: 'Complete',
-    score: scores.every((score) => score !== null)
-      ? scores.reduce<number>((sum, score) => sum + (score ?? 0), 0)
-      : null,
-    fairValue,
-    fairValueLow,
-    fairValueHigh,
-    thesis: textValue(details.thesis).slice(0, 5000),
-    risks: textValue(details.risk).slice(0, 5000),
-    catalysts: textValue(details.catalyst).slice(0, 5000),
-    conversationUrl: '',
-    sources: (details.documents as Array<Record<string, unknown>>).map(
-      (document) => textValue(document.url),
-    ),
-    financials: (details.financials as Array<Record<string, unknown>>).map(
-      (item) => ({
-        year: textValue(item.year),
-        revenue: typeof item.revenue === 'number' ? item.revenue : null,
-        profit: typeof item.profit === 'number' ? item.profit : null,
-        eps: typeof item.eps === 'number' ? item.eps : null,
-        roe: null,
-        debt: typeof item.debt === 'number' ? item.debt : null,
-      }),
-    ),
-    updatedAt: today(),
-    details,
-  };
-  if (!portfolio.companies.some((company) => company.ticker === row.ticker))
-    portfolio.companies.push({
-      ticker: row.ticker,
-      name: row.company_name,
-      sector: '',
-      target: 0,
-      approved: false,
-      screenDate: '',
-      note: 'Added by automatic company research. Portfolio eligibility remains unset.',
-    });
-  portfolio.research = [
-    ...(portfolio.research ?? []).filter(
-      (company) => company.ticker !== row.ticker,
-    ),
-    research,
-  ];
-  validate(portfolio);
+/**
+ * Marks the job complete with its validated dossier. Nothing here touches a portfolio: the dossier is public
+ * company research, stored on the job, and the unlocked client applies it to its own encrypted portfolio.
+ */
+async function completeJob(row: ResearchJobRow, details: Record<string, unknown>) {
   const now = new Date().toISOString();
-  const payload = JSON.stringify(portfolio);
-  const active = "EXISTS (SELECT 1 FROM research_jobs WHERE id=? AND status='researching' AND cancel_requested=0 AND lease_owner=?)";
-  const savePortfolio = portfolioRow
-    ? db().prepare(`UPDATE portfolios SET payload=?,revision=revision+1,updated_at=? WHERE user_id=? AND revision=? AND ${active}`)
-      .bind(payload, now, row.user_id, portfolioRow.revision, row.id, row.lease_owner)
-    : db().prepare(`INSERT INTO portfolios (user_id,payload,revision,updated_at) SELECT ?,?,1,? WHERE ${active} ON CONFLICT(user_id) DO NOTHING`)
-      .bind(row.user_id, payload, now, row.id, row.lease_owner);
-  const results = await db().batch([
-    savePortfolio,
-    db().prepare("UPDATE research_jobs SET status='complete',stage='complete',message='Research complete',result=?,checkpoint=NULL,lease_owner=NULL,lease_until=NULL,completed_at=?,updated_at=? WHERE id=? AND status='researching' AND cancel_requested=0 AND lease_owner=? AND EXISTS (SELECT 1 FROM portfolios WHERE user_id=? AND payload=?)")
-      .bind(JSON.stringify(details), now, now, row.id, row.lease_owner, row.user_id, payload),
-  ]);
-  if (!results[1].meta.changes) throw new UserError('The portfolio changed or research was cancelled while saving. The saved analysis can be uploaded again without another AI call.');
-  await addEvent(
-    row.id,
-    'complete',
-    'Research complete. The dossier is ready to read.',
-  );
+  const done = await db()
+    .prepare("UPDATE research_jobs SET status='complete',stage='complete',message='Research complete',result=?,checkpoint=NULL,lease_owner=NULL,lease_until=NULL,completed_at=?,updated_at=? WHERE id=? AND status='researching' AND cancel_requested=0 AND lease_owner=?")
+    .bind(JSON.stringify(details), now, now, row.id, row.lease_owner)
+    .run();
+  if (!done.meta.changes) throw new UserError('Research was cancelled or claimed by another tab while saving. The saved analysis can be uploaded again without another AI call.');
+  await addEvent(row.id, 'complete', 'Research complete. The dossier is ready to read.');
 }
 
 // Claims the next queued/stale-leased job for the signed-in user's browser

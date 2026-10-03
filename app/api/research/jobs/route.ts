@@ -1,35 +1,21 @@
 import { db, failure, requireSuperAdmin } from '@/lib/server';
 import { initialPortfolio } from '@/lib/portfolio';
-import {
-  addEvent,
-  publicJob,
-  resolveResearchSettings,
-  type ResearchJobRow,
-  tickerOK,
-} from '@/lib/research-jobs';
+import { addEvent, publicJob, type ResearchJobRow, tickerOK } from '@/lib/research-jobs';
+import { sanitizeResearchSettings } from '@/lib/research-settings';
 import { UserError } from '@/lib/user-error';
 
-async function resolveCompany(ticker: string, userId: string) {
-  const saved = await db()
-    .prepare('SELECT payload FROM portfolios WHERE user_id=?')
-    .bind(userId)
-    .first<{ payload: string }>();
-  if (saved) {
-    const company = JSON.parse(saved.payload).companies?.find(
-      (item: { ticker?: string }) => item.ticker === ticker,
-    );
-    if (company)
-      return {
-        name: String(company.name || ticker),
-        sector: String(company.sector || 'Unknown'),
-      };
-  }
-  const seeded = initialPortfolio().companies.find(
-    (company) => company.ticker === ticker,
-  );
-  // The browser-side research runner verifies unknown symbols against PSX
-  // itself and sends the authoritative company name when it completes.
-  return { name: seeded?.name || ticker, sector: seeded?.sector || 'Unknown' };
+/**
+ * Public company details only. The client may name the company (a public fact, sent with the ticker it already
+ * sends); otherwise the app's seed list, then the ticker. The server never opens a portfolio to find them, and the
+ * browser-side runner verifies the symbol against PSX and sends the authoritative name when it completes.
+ */
+function resolveCompany(ticker: string, named: { name?: unknown; sector?: unknown }) {
+  const clean = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+  const seeded = initialPortfolio().companies.find((company) => company.ticker === ticker);
+  return {
+    name: clean(named.name, 150) || seeded?.name || ticker,
+    sector: clean(named.sector, 100) || seeded?.sector || 'Unknown',
+  };
 }
 
 export async function GET(req: Request) {
@@ -41,7 +27,16 @@ export async function GET(req: Request) {
       )
       .bind(userId)
       .all<ResearchJobRow>();
-    const selected = new URL(req.url).searchParams.get('job');
+    const url = new URL(req.url);
+    // The finished dossier (public company research) for one of this admin's own jobs; the client applies it to
+    // its encrypted portfolio. Never returned in the list, which stays small.
+    const resultFor = url.searchParams.get('result');
+    if (resultFor) {
+      const row = rows.results.find((item) => item.id === resultFor);
+      if (!row || row.status !== 'complete' || !row.result) throw new UserError('That research result is not available.', 404);
+      return Response.json({ result: JSON.parse(row.result) }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+    const selected = url.searchParams.get('job');
     let events: unknown[] = [];
     if (selected) {
       const owns = rows.results.some((row) => row.id === selected);
@@ -67,7 +62,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const userId = await requireSuperAdmin(req, true);
-    const input = (await req.json()) as { ticker?: string };
+    const input = (await req.json()) as { ticker?: string; name?: unknown; sector?: unknown; settings?: unknown };
     const ticker = String(input.ticker ?? '')
       .trim()
       .toUpperCase();
@@ -81,14 +76,14 @@ export async function POST(req: Request) {
       .first<ResearchJobRow>();
     if (existing)
       return Response.json({ job: publicJob(existing), existing: true });
-    const company = await resolveCompany(ticker, userId);
-    const settings = await resolveResearchSettings(userId);
+    const company = resolveCompany(ticker, input);
+    const settings = sanitizeResearchSettings(input.settings);
     const budgetMicros = Math.round(settings.budgetUsd * 1_000_000);
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     await db()
       .prepare(
-        "INSERT INTO research_jobs (id,user_id,ticker,company_name,sector,status,stage,message,budget_micros,created_at,updated_at) VALUES (?,?,?,?,?,'queued','waiting','Queued',?,?,?)",
+        "INSERT INTO research_jobs (id,user_id,ticker,company_name,sector,status,stage,message,budget_micros,settings,created_at,updated_at) VALUES (?,?,?,?,?,'queued','waiting','Queued',?,?,?,?)",
       )
       .bind(
         id,
@@ -97,6 +92,7 @@ export async function POST(req: Request) {
         company.name,
         company.sector,
         budgetMicros,
+        JSON.stringify(settings),
         now,
         now,
       )

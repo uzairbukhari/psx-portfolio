@@ -3,7 +3,6 @@ import { db, failure, requireSuperAdmin } from '@/lib/server';
 import researchContext from '@/lib/research-context.json';
 import {
   addEvent,
-  resolveResearchSettings,
   type ResearchJobRow,
 } from '@/lib/research-jobs';
 import {
@@ -16,6 +15,7 @@ import {
   researchReserveMicros,
   validateInvestmentDossier,
 } from '@/lib/research-policy.mjs';
+import { settingsFromJob } from '@/lib/research-settings';
 import { UserError } from '@/lib/user-error';
 
 const SCORE_RUBRIC = [
@@ -189,7 +189,7 @@ export async function POST(req: Request) {
     if (!row || row.status !== 'researching' || row.cancel_requested || row.lease_owner !== runnerId || !row.lease_until || row.lease_until < new Date().toISOString())
       throw new UserError('The active research lease was not found.');
     authorizedJob = true;
-    const settings = await resolveResearchSettings(row.user_id);
+    const settings = settingsFromJob(row.settings);
     if (row.result) {
       const cached = JSON.parse(row.result);
       if (cached.status === 'Complete') return Response.json({ dossier: cached, costUsd: 0, cached: true });

@@ -81,6 +81,8 @@ export const researchJobs = sqliteTable(
     reportsFound: integer('reports_found').notNull().default(0),
     checkpoint: text('checkpoint'),
     result: text('result'),
+    // AI settings (model, budget, ...) the client chose when it queued the job. Never holdings or notes.
+    settings: text('settings'),
     error: text('error'),
     leaseOwner: text('lease_owner'),
     leaseUntil: text('lease_until'),

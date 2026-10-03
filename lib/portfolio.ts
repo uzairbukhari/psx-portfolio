@@ -250,6 +250,8 @@ export type ResearchCompany = {
   }[];
   updatedAt: string;
   details?: Record<string, unknown>;
+  /** The research job whose result this dossier holds, so the client applies each completed job exactly once. */
+  jobId?: string;
 };
 export const today = () =>
   new Intl.DateTimeFormat('en-CA', {
