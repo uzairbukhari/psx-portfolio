@@ -6,7 +6,7 @@ import PicksProgress from './picks-progress';
 import PicksResults from './picks-results';
 import PicksSetup, { MAX_SHORTLIST } from './picks-setup';
 import { TabLoader } from './tab-loader';
-import { isActive, useRecommendations, type Recommendation } from './use-recommendations';
+import { useRecommendations, type Recommendation } from './use-recommendations';
 import { inputDifferences } from '@/lib/monthly-picks-flow';
 
 type Props = {
@@ -23,10 +23,7 @@ type Props = {
   onOpenCompany: (ticker: string) => void;
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  queued: 'Running', gathering: 'Gathering data', in_progress: 'Ranking', completed: 'Done', failed: 'Failed',
-  completed_partial: 'Legacy', needs_evidence: 'Legacy', needs_attention: 'Legacy',
-};
+const STATUS_LABEL: Record<string, string> = { completed: 'Done', failed: 'Failed' };
 
 export default function MonthlyPicks({
   portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys,
@@ -38,7 +35,7 @@ export default function MonthlyPicks({
   const [amount, setAmount] = useState(portfolio.budgets[month] ?? 100000);
   const [starting, setStarting] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const recs = useRecommendations();
+  const recs = useRecommendations({ portfolio, tickers: shortlist, onSave });
   const { current } = recs;
 
   const currentMatches =
@@ -60,6 +57,7 @@ export default function MonthlyPicks({
           'Monthly Picks inputs saved.',
         );
       }
+      // The saved inputs are now part of `portfolio`; the run itself is computed locally from them.
       await recs.start({ month, amount, feePct, shortlist, rerun: currentMatches });
     } catch (error) {
       recs.setError(error instanceof Error ? error.message : String(error));
@@ -88,8 +86,7 @@ export default function MonthlyPicks({
     setShortlist(item.shortlist.slice(0, MAX_SHORTLIST));
   }
 
-  const active = current !== null && isActive(current.status);
-  const legacy = current !== null && ['needs_evidence', 'needs_attention', 'completed_partial'].includes(current.status);
+  const active = recs.running;
 
   if (!recs.loaded)
     return (
@@ -107,7 +104,7 @@ export default function MonthlyPicks({
         feePct={feePct} setFeePct={setFeePct}
         shortlist={shortlist} setShortlist={setShortlist}
         facts={recs.facts} dispatchEnabled={recs.dispatchEnabled}
-        running={recs.running || active} refreshing={recs.refreshing}
+        running={recs.running} refreshing={recs.refreshing}
         busy={busy || starting} rerun={currentMatches}
         onGenerate={() => void generate()}
         onRefreshFacts={(tickers) => void refreshFacts(tickers)}
@@ -123,21 +120,13 @@ export default function MonthlyPicks({
         </div>
       )}
 
-      {active && current && <PicksProgress run={current} />}
+      {recs.progress && <PicksProgress progress={recs.progress} />}
 
       {current?.status === 'failed' && (
         <section className="mp-empty-state" aria-live="polite">
           <h3>No recommendation for this run</h3>
           <p>{current.error ?? 'The run did not finish.'}</p>
-          <p className="muted">Nothing was charged for a failed data step. Adjust the shortlist or try again.</p>
-        </section>
-      )}
-
-      {legacy && current && (
-        <section className="mp-empty-state" aria-live="polite">
-          <h3>Legacy run</h3>
-          <p>This run was saved by an earlier version of Monthly Picks and is shown read-only. Generate a new run for the current workflow.</p>
-          {current.error && <p className="muted">{current.error}</p>}
+          <p className="muted">Adjust the shortlist or try again once company data is available.</p>
         </section>
       )}
 

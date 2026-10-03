@@ -412,3 +412,6 @@ export function quantAllocation(scores: CompanyScore[], threshold = 55, maxPicks
   const picks = constrained.allocations.map((a) => ({ ticker: a.ticker, score: scoreOf.get(a.ticker)!, allocationPct: a.allocationPct }));
   return { picks, unallocatedPct: constrained.cashPct };
 }
+
+/** A scraped company page, or the reason there is none. */
+export type FactsResult = CompanyFacts | { ticker: string; unavailable: string };

@@ -7,7 +7,7 @@
 // SavePortfolioResponse shapes the screens already use.
 import type { CompanyLookup, PortfolioResponse, PublicDataResponse, SavePortfolioResponse } from './api-types.ts';
 import { applyLookups, hasPlaceholderDetails, newTickers } from './company-enrichment.ts';
-import { mergeQuotes } from './quote-cache.ts';
+import { mergeQuotes } from './quote-merge.ts';
 import { validate, type Portfolio } from './portfolio.ts';
 import { ConflictError, type VaultSession } from './vault-client.ts';
 

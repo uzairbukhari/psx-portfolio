@@ -30,6 +30,21 @@ const SHARED = [
   'face-values',
   'ipo-offers',
   'quote-job-types',
+  'picks-local',
+  'public-analysis-types',
+  'monthly-picks-ai',
+  'company-facts',
+  'market-watch',
+  'vault-crypto',
+  'vault-client',
+  'vault-backup',
+  'portfolio-view',
+  'psx-market',
+  'psx-quotes',
+  'psx-fetch',
+  'company-enrichment',
+  'company-directory',
+  'quote-merge',
 ];
 const FORBIDDEN = /from\s+['"](cloudflare:|next\/|@\/|react-dom|node:)/;
 

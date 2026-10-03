@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { computeMetrics, quantScore } from '../lib/company-facts.ts';
-import { sanitizePicks } from '../lib/monthly-picks-ai.ts';
 
 const ASOF = '2026-09-25';
 const q = (period, eps) => ({ period, revenue: null, pat: null, eps });
@@ -79,29 +78,6 @@ test('cumulative-looking quarters are not summed', () => {
   // Q1<Q2<Q3 strictly cumulative pattern with identical period prefixes is ambiguous only when periods are labelled 6M/9M.
   const facts = baseFacts({ quarterly: [q('9M 2026', 9), q('6M 2026', 6), q('3M 2026', 3), q('Q4 2025', 2)] });
   assert.equal(computeMetrics(facts, ASOF).epsTtm, null);
-});
-
-function snap() {
-  const metrics = m({ ticker: 'AAA', name: 'Alpha', mostRecentAnnouncement: { date: 'Sep 1, 2026', title: 'x', category: 'Others', url: 'https://dps.psx.com.pk/a.pdf', ageDays: 3 }, recentAnnouncements: [] });
-  return {
-    generatedOn: ASOF, contributionMonth: '2026-10', freshMoneyPkr: 1e5, shortlist: ['AAA'], dataAsOf: ASOF,
-    companies: [{ ticker: 'AAA', name: 'Alpha', sector: 'X', source: 'https://dps.psx.com.pk/company/AAA', price: 100, priceDate: ASOF, metrics }],
-    scores: [{ ticker: 'AAA', score: 70, confidence: 'Medium', components: {}, metrics }],
-  };
-}
-
-test('a valid 100%-cash AI answer is a successful result, not a rejection', () => {
-  const raw = { marketOutlook: 'Hold cash.', picks: [], coverage: [{ ticker: 'AAA', outlook: 'Neutral', summary: 'Fair.' }], unallocatedPct: 100 };
-  const result = sanitizePicks(raw, snap());
-  assert.ok(result, 'cash-only result must survive');
-  assert.equal(result.picks.length, 0);
-  assert.equal(result.unallocatedPct, 100);
-  assert.equal(result.method, 'ai');
-});
-
-test('an AI answer whose picks are all invalid is still rejected', () => {
-  const raw = { marketOutlook: 'x', picks: [{ ticker: 'NOPE', allocationPct: 50, confidence: 'High', thesis: 'x' }], coverage: [], unallocatedPct: 50 };
-  assert.equal(sanitizePicks(raw, snap()), null);
 });
 
 test('share estimates need a price from the latest completed session, not any price under 7 days old', async () => {

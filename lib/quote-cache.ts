@@ -1,4 +1,7 @@
 import { isValidQuote, quoteSupersedes, type Quote } from './portfolio.ts';
+import { mergeQuotes, rowToQuote, type QuoteRow } from './quote-merge.ts';
+export { mergeQuotes, rowToQuote };
+export type { QuoteRow };
 import { fetchBudget, type FetchBudget } from './psx-fetch.ts';
 import { pakistanMarketState } from './psx-market.ts';
 import { fetchPsxQuote } from './psx-quotes.ts';
@@ -10,14 +13,6 @@ import { QUOTE_ROWS_PER_STATEMENT, quoteRowParams, quoteUpsertSql, refreshStateS
  * Worker, manual "Refresh prices", and the market pulse all read and write it,
  * so a ticker fetched for one user is reused by everyone until it goes stale.
  */
-export interface QuoteRow {
-  ticker: string;
-  price: number;
-  as_of: string;
-  quote_date: string;
-  source: string;
-  fetched_at: string;
-}
 
 /**
  * While PSX is trading, a cached quote older than this is refetched. The
@@ -33,13 +28,6 @@ const PKT_OFFSET_MS = 5 * 60 * 60_000; // Asia/Karachi is UTC+5, no DST.
 const CONCURRENCY = 3;
 const MAX_JITTER_MS = 150;
 
-export const rowToQuote = (row: QuoteRow): Quote => ({
-  price: row.price,
-  asOf: row.as_of,
-  date: row.quote_date,
-  source: row.source,
-  fetchedAt: row.fetched_at,
-});
 
 /** Most recent regular-session close (plus grace) at or before `now`, skipping weekends and PSX holidays. */
 export function lastSessionClose(now: Date): Date {
@@ -66,27 +54,6 @@ export function isFresh(fetchedAt: string | undefined, now = new Date()): boolea
   if (!Number.isFinite(fetched)) return false;
   if (pakistanMarketState(now).isOpen) return now.getTime() - fetched < OPEN_TTL_MS;
   return fetched >= lastSessionClose(now).getTime();
-}
-
-/**
- * Overlays cached rows onto a portfolio's own quotes for the given tickers,
- * never replacing a newer saved quote (see `quoteSupersedes`).
- */
-export function mergeQuotes(
-  quotes: Record<string, Quote>,
-  rows: QuoteRow[],
-  tickers: Iterable<string>,
-): Record<string, Quote> {
-  const wanted = new Set(tickers);
-  const merged = { ...quotes };
-  for (const row of rows) {
-    if (!wanted.has(row.ticker)) continue;
-    const cached = rowToQuote(row);
-    // A malformed cache row must never reach a portfolio, where it would fail every save.
-    if (isValidQuote(cached) && quoteSupersedes(cached, merged[row.ticker]))
-      merged[row.ticker] = cached;
-  }
-  return merged;
 }
 
 /**

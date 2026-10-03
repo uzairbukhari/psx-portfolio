@@ -5,6 +5,8 @@
 export const FACTS_MAX_AGE_DAYS = 7;
 export const GATHER_TIMEOUT_MS = 6 * 60_000;
 export const DISPATCH_DEDUPE_MS = 10 * 60_000;
+/** Daily cap on on-demand company-data scrapes per account (only tickers are involved). */
+export const FACTS_DISPATCH_LIMIT = { windowMs: 86_400_000, max: 10 };
 
 export type FactsState = 'fresh' | 'stale' | 'missing' | 'failed';
 export type FactsStatus = {
@@ -66,34 +68,6 @@ type ReusableRow = {
 export function canReuseRun(row: ReusableRow, shortlist: string[], today: string, currentVersion: number): boolean {
   return row.status === 'completed' && row.workflowVersion >= currentVersion && row.dataAsOf === today &&
     JSON.stringify([...row.shortlist].sort()) === JSON.stringify([...shortlist].sort());
-}
-
-// Per-user monthly AI spend cap (Worker var AI_MONTHLY_CAP_USD). Sign-up is open,
-// so every AI call is checked against what the user already spent this PKT month.
-export const DEFAULT_AI_MONTHLY_CAP_USD = 1;
-
-export function parseAiCap(raw: unknown): number {
-  if (raw === undefined || raw === null || raw === '') return DEFAULT_AI_MONTHLY_CAP_USD;
-  const value = Number(raw);
-  return Number.isFinite(value) && value >= 0 ? value : DEFAULT_AI_MONTHLY_CAP_USD;
-}
-
-const PKT_OFFSET_MS = 5 * 3_600_000; // Asia/Karachi is UTC+5, no DST.
-
-/** Start of the current PKT calendar month, as an ISO UTC timestamp comparable with `created_at`. */
-export function pktMonthStartIso(now: Date): string {
-  const pkt = new Date(now.getTime() + PKT_OFFSET_MS);
-  return new Date(Date.UTC(pkt.getUTCFullYear(), pkt.getUTCMonth(), 1) - PKT_OFFSET_MS).toISOString();
-}
-
-export function aiCapCheck(spentUsd: number, reserveUsd: number, capUsd: number) {
-  const allowed = spentUsd + reserveUsd <= capUsd;
-  return {
-    allowed,
-    message: allowed
-      ? ''
-      : `AI ranking skipped: this account has used $${spentUsd.toFixed(2)} of its $${capUsd.toFixed(2)} monthly AI limit, so this run used the quantitative ranking instead. The limit resets at the start of next month.`,
-  };
 }
 
 export type RunInputs = { month: string; amount: number; feePct: number; shortlist: string[] };

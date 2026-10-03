@@ -19,8 +19,7 @@ export const GENERIC_ERROR = 'Something went wrong. Try again.';
 
 export function publicError(e: unknown, status?: number) {
   if (e instanceof UserError)
-    return { message: e.message, status: status ?? e.status, code: e.code };
-  if (e instanceof SyntaxError)
-    return { message: 'Invalid request body.', status: 400, code: undefined };
-  return { message: GENERIC_ERROR, status: 500, code: undefined };
+    return { message: e.message, status: status ?? e.status, ...(e.code ? { code: e.code } : {}) };
+  if (e instanceof SyntaxError) return { message: 'Invalid request body.', status: 400 };
+  return { message: GENERIC_ERROR, status: 500 };
 }

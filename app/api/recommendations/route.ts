@@ -1,50 +1,40 @@
-import { env } from 'cloudflare:workers';
 import { db, failure, identity } from '@/lib/server';
-import { readFactsStatus } from '@/lib/company-facts-store';
 import { dispatchConfig } from '@/lib/dispatch-config';
-import { dispatchEnabled } from '@/lib/github-dispatch';
-import { FACTS_MAX_AGE_DAYS } from '@/lib/monthly-picks-flow';
-import { advanceRun, listRuns, readPortfolio, readRow, refreshFacts, startRun, viewOne, type RunEnv, type StartInput } from '@/lib/recommendation-service';
+import { dispatchEnabled, requestFacts } from '@/lib/github-dispatch';
+import { cleanWatchTickers } from '@/lib/market-watch';
+import { buildPublicAnalysis } from '@/lib/public-analysis';
+import { FACTS_DISPATCH_LIMIT } from '@/lib/monthly-picks-flow';
+import { takeRateLimit, waitText } from '@/lib/rate-limit';
 import { UserError } from '@/lib/user-error';
 
-const privateJson = (body: unknown) => Response.json(body, { headers: { 'Cache-Control': 'no-store' } });
-const runEnv = (): RunEnv => ({ db: db(), openaiKey: env.OPENAI_API_KEY, aiCapUsd: env.AI_MONTHLY_CAP_USD, dispatch: dispatchConfig() });
-/**
- * With PICKS_BACKGROUND=true the quote-refresh Worker's per-minute cron owns run execution and
- * GET is read-only. Without it (cron not deployed yet) GET still nudges a run forward, under the
- * same lease, so nothing stalls during the rollout.
- */
-const backgroundOwnsRuns = () => String(env.PICKS_BACKGROUND ?? '') === 'true';
+const publicJson = (body: unknown) => Response.json(body, { headers: { 'Cache-Control': 'no-store' } });
 
+/**
+ * Public analysis only. The client names the tickers (a public fact it already sends for quotes) and ranks and
+ * sizes them itself, so the server never receives or stores an amount, a shortlist, holdings or a result.
+ * `?tickers=` returns PSX facts, quotes and quant scores; `refresh-facts` asks GitHub Actions to scrape
+ * company pages and carries only the tickers.
+ */
 export async function GET(req: Request) {
   try {
-    const owner = await identity(req);
-    const context = runEnv();
-    const id = new URL(req.url).searchParams.get('id');
-    if (!id) {
-      const portfolio = await readPortfolio(context, owner);
-      const statuses = await readFactsStatus(context.db, portfolio.companies.map((company) => company.ticker)).catch(() => []);
-      return privateJson({
-        recommendations: await listRuns(context, owner),
-        facts: statuses.map(({ ticker, state, fetchedOn, ageDays, error }) => ({ ticker, state, fetchedOn, ageDays, error })),
-        dispatchEnabled: dispatchEnabled(context.dispatch),
-        factsMaxAgeDays: FACTS_MAX_AGE_DAYS,
-        backgroundProcessing: backgroundOwnsRuns(),
-      });
-    }
-    let row = await readRow(context, id, owner);
-    if (!row) return failure(new UserError('Recommendation not found.'), 404);
-    if (!backgroundOwnsRuns()) row = (await advanceRun(context, row.id)) ?? row;
-    return privateJson(await viewOne(context, row));
+    await identity(req);
+    const tickers = cleanWatchTickers(new URL(req.url).searchParams.get('tickers'));
+    if (!tickers.length) throw new UserError('Choose at least one company.');
+    return publicJson({ ...(await buildPublicAnalysis(db(), tickers)), dispatchEnabled: dispatchEnabled(dispatchConfig()) });
   } catch (error) { return failure(error); }
 }
 
 export async function POST(req: Request) {
   try {
     const owner = await identity(req, true);
-    const body = await req.json() as Record<string, unknown>;
-    const context = runEnv();
-    if (body.action === 'refresh-facts') return privateJson(await refreshFacts(context, owner, body.tickers));
-    return privateJson(await startRun(context, owner, body as StartInput));
+    const body = (await req.json()) as { action?: unknown; tickers?: unknown };
+    if (body.action !== 'refresh-facts') throw new UserError('Unknown request.', 400);
+    const tickers = cleanWatchTickers(Array.isArray(body.tickers) ? body.tickers.join(',') : null).slice(0, 40);
+    if (!tickers.length) throw new UserError('Choose companies to refresh.');
+    const limit = await takeRateLimit(db(), owner, 'facts-dispatch', FACTS_DISPATCH_LIMIT);
+    if (!limit.allowed)
+      throw new UserError(`Company data refreshes are limited to ${FACTS_DISPATCH_LIMIT.max} a day. Try again in ${waitText(limit.retryAfterMs)}.`, 429);
+    const result = await requestFacts(db(), dispatchConfig(), tickers);
+    return publicJson({ dispatched: result.dispatched, waiting: result.waiting, reason: result.reason ?? null });
   } catch (error) { return failure(error); }
 }

@@ -205,7 +205,7 @@ export default function PicksSetup(props: Props) {
             </p>
           )}
           {disabledReason && <p className="mp-hint mp-hint--warn">{disabledReason}</p>}
-          {!notFresh.length && !disabledReason && <p className="mp-hint">Data is current. Ranking uses one small AI call (≈ $0.01–0.02).</p>}
+          {!notFresh.length && !disabledReason && <p className="mp-hint">Data is current. Only the company symbols are sent to fetch public data; your amount, holdings and result stay on this device.</p>}
         </div>
         <div className="mp-actionbar__buttons">
           {dispatchEnabled && !!notFresh.length && (
