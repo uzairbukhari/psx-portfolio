@@ -234,7 +234,7 @@ test('a database operator swapping or rolling an envelope into another slot is d
   const server = createVaultServer();
   const { session } = await setup(server, 'a@example.com');
   await session.save(withMarker(session.portfolio), 1);
-  const b = await setup(server, 'b@example.com');
+  await setup(server, 'b@example.com');
   // Copy B's envelope over A's row (same revision number would even match).
   const rowB = server.db.sqlite.prepare("SELECT p.envelope AS e FROM vault_portfolios p JOIN vaults v ON v.vault_id=p.vault_id WHERE v.owner='b@example.com'").get();
   server.db.sqlite.prepare("UPDATE vault_portfolios SET envelope=?, revision=2 WHERE vault_id=(SELECT vault_id FROM vaults WHERE owner='a@example.com')").run(rowB.e);

@@ -1,4 +1,4 @@
-import { isValidQuote, quoteSupersedes, type Quote } from './portfolio.ts';
+import type { Quote } from './portfolio.ts';
 import { mergeQuotes, rowToQuote, type QuoteRow } from './quote-merge.ts';
 export { mergeQuotes, rowToQuote };
 export type { QuoteRow };
