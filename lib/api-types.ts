@@ -301,3 +301,17 @@ export type SaveEncryptedPortfolioRequest = { envelope: PortfolioEnvelope; expec
 export type SaveEncryptedPortfolioResponse = { revision: number };
 /** Machine-readable reasons on error bodies of the vault routes. */
 export type VaultErrorBody = ApiError & { code?: 'upgrade-required' | 'no-vault' | 'vault-exists' | 'conflict' | 'wrapper-conflict' };
+
+// ---- Public market data for explicit tickers (GET /api/public-data) --------------------------------
+/**
+ * Shared market caches for the tickers the CLIENT names: cached quotes, PSX payout announcements and verified
+ * face values. The server never loads a portfolio to infer the list, and makes no claim of ticker-access privacy:
+ * the request itself shows which companies were asked about. Clients merge the answer into the decrypted portfolio.
+ */
+export type PublicDataResponse = {
+  tickers: string[];
+  /** Raw cache rows: the client merges them with its own saved quotes (newest wins, manual quotes keep precedence). */
+  quoteRows: { ticker: string; price: number; as_of: string; quote_date: string; source: string; fetched_at: string }[];
+  announcements: PayoutAnnouncement[];
+  faceValues: Record<string, FaceValueEvidence[]>;
+};

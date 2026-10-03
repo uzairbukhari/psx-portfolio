@@ -19,6 +19,7 @@ import type {
   VaultWrappersResponse,
 } from './api-types.ts';
 import { blankPortfolio, type Portfolio } from './portfolio.ts';
+import { createBackupPackage, type BackupPackage } from './vault-backup.ts';
 import {
   VaultError,
   createVaultKeys,
@@ -350,6 +351,24 @@ export class VaultSession {
     return this.guarded(async () => {
       const wrapper = await wrapWithPassword(this.requireKey(), this.material.vaultId, this.material.keyVersion, newPassword);
       await this.putWrappers({ password: wrapper });
+    });
+  }
+
+  /**
+   * The encrypted backup package: the vault's wrapped keys and the stored ciphertext, readable without the server
+   * by anyone holding the password or recovery key. Falls back to the device's cached ciphertext when offline.
+   */
+  async backupPackage(): Promise<BackupPackage> {
+    return this.guarded(async () => {
+      let stored: EncryptedPortfolioResponse | null = null;
+      try {
+        stored = await this.transport.getPortfolio();
+      } catch (error) {
+        if (!isOffline(error)) throw error;
+        stored = (await this.cache.read())?.portfolio ?? null;
+      }
+      if (!stored) throw new Error('No encrypted portfolio is available to back up yet.');
+      return createBackupPackage(this.material, stored);
     });
   }
 
