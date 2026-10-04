@@ -13,11 +13,14 @@ export function publicHttpsUrl(value: string): URL | null {
   } catch { return null; }
 }
 
+// Decoded in a single pass so '&amp;lt;' becomes the text '&lt;', never '<'.
+const ENTITIES: Record<string, string> = { nbsp: ' ', amp: '&', quot: '"', apos: "'", '#39': "'", '#039': "'", lt: '<', gt: '>' };
+
 export function htmlToText(html: string): string {
   return html
     .replace(/<(script|style|noscript)[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&(nbsp|amp|quot|apos|lt|gt|#0?39);/g, (_, name: string) => ENTITIES[name] ?? ' ')
     .replace(/\s+/g, ' ').trim();
 }
 
