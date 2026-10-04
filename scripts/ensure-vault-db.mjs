@@ -5,6 +5,7 @@
 // Needs CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN (D1 edit) for the wrangler calls.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 export const VAULT_DB_NAMES = { staging: 'psx_portfolio_sip_staging_vault', production: 'psx-portfolio-sip-vault' };
 export const PLACEHOLDER_ID = '00000000-0000-0000-0000-000000000000';
@@ -66,7 +67,7 @@ export function main(argv = process.argv.slice(2)) {
   return { name, id, configured };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     main();
   } catch (error) {
