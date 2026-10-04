@@ -13,6 +13,10 @@ on:
         description: 'Type "spend-one-build" to start one Android staging build'
         required: true
 
+# The job only reads the repository; the Expo build uses EXPO_TOKEN, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
 concurrency:
   group: mobile-build
   cancel-in-progress: false
