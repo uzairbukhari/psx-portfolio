@@ -11,12 +11,15 @@ import {
   loadVaultStatus,
   prepareVault,
   recoverWithKey,
+  openWithKey,
   unlockVault,
   type PreparedVault,
   type VaultSession,
   type VaultStatus,
 } from '@/lib/vault-client';
 import { MIN_PASSWORD_CHARS, VaultError, decodeRecoverySecret } from '@/lib/vault-crypto';
+import { forgetTabKey, keepTabKey, recallTabKey } from '@/lib/vault-tab-keep';
+import { browserTabKeepStore } from './vault-tab-store';
 import { webVaultTransport } from './vault-transport';
 import './vault.css';
 
@@ -52,7 +55,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 
 function SignOut() {
   return (
-    <button type="button" className="signin-link" onClick={() => void (window.location.href = '/api/auth/logout')}>
+    <button type="button" className="signin-link" onClick={() => void forgetTabKey(browserTabKeepStore()).finally(() => void (window.location.href = '/api/auth/logout'))}>
       Sign out
     </button>
   );
@@ -68,6 +71,7 @@ export default function VaultGate({ email, children }: { email: string; children
     const session = sessionRef.current;
     sessionRef.current = null;
     session?.lock();
+    await forgetTabKey(browserTabKeepStore());
     // Re-read the (ciphertext) vault state so the unlock screen is current; never reuses decrypted state.
     try {
       const status = await loadVaultStatus(webVaultTransport);
@@ -81,7 +85,24 @@ export default function VaultGate({ email, children }: { email: string; children
     let alive = true;
     setView({ kind: 'loading' });
     loadVaultStatus(webVaultTransport)
-      .then((status) => alive && setView(status.state === 'none' ? { kind: 'setup' } : { kind: 'locked', status, mode: 'password' }))
+      .then(async (status) => {
+        if (!alive) return;
+        if (status.state === 'none') return setView({ kind: 'setup' });
+        // Opt-in "stay unlocked in this tab": a reload reopens the vault without the password.
+        const store = browserTabKeepStore();
+        const key = await recallTabKey(store, email, status.vault.vaultId);
+        if (key) {
+          try {
+            const session = await openWithKey(webVaultTransport, status, key);
+            if (!alive) return session.lock();
+            sessionRef.current = session;
+            return setView({ kind: 'unlocked', session });
+          } catch {
+            await forgetTabKey(store);
+          }
+        }
+        if (alive) setView({ kind: 'locked', status, mode: 'password' });
+      })
       .catch((e) => alive && setView({ kind: 'error', message: message(e), upgrade: e instanceof TransportError && e.status === 426 }));
     return () => {
       alive = false;
@@ -284,6 +305,7 @@ function Unlock({
   const [recovery, setRecovery] = useState('');
   const [again, setAgain] = useState('');
   const [typed, setTyped] = useState('');
+  const [keep, setKeep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function run(work: () => Promise<VaultSession | void>) {
@@ -363,12 +385,23 @@ function Unlock({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void run(() => unlockVault(webVaultTransport, status, { password }));
+          void run(async () => {
+            const session = await unlockVault(webVaultTransport, status, { password });
+            if (keep) {
+              const key = session.exportKey();
+              try { await keepTabKey(browserTabKeepStore(), email, status.vault.vaultId, key); } finally { key.fill(0); }
+            }
+            return session;
+          });
         }}
       >
         <label>
           Vault password
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={busy} autoFocus required />
+        </label>
+        <label className="vault-keep">
+          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} disabled={busy} />
+          <span>Keep me unlocked in this tab. Reloading won’t ask again until I close the tab, lock, or go idle for 15 minutes. Don’t use this on a shared computer.</span>
         </label>
         {error && (
           <p role="alert" className="notice error">

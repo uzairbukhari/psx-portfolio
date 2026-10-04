@@ -13,3 +13,5 @@
 .vault-progress{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted-foreground);margin-top:10px}
 .set-vault-grid{display:grid;gap:10px;max-width:420px}
 .set-vault-grid label{margin:6px 0}
+.vault-keep{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.4;color:var(--muted-foreground);margin:10px 0}
+.vault-keep input{margin-top:3px;flex:none}
