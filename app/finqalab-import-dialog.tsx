@@ -85,15 +85,15 @@ export function FinqalabImportDialog({
             {shown.length === 0 && <tr><td colSpan={9} className="muted">No rows to show.</td></tr>}
             {shown.map((row) => (
               <tr key={row.externalId} className={`ir-${row.status}`}>
-                <td>{row.trade.date}<small>Trade No. {row.trade.tradeNo}</small></td>
-                <td>{row.trade.kind}</td>
-                <td><b>{row.trade.ticker}</b></td>
-                <td className="num">{row.trade.shares}</td>
-                <td className="num">{row.trade.price}</td>
-                <td className="num">{row.trade.fees.toFixed(2)}</td>
-                <td className="num">{money(row.trade.shares * row.trade.price)}</td>
-                <td>{STATUS_LABEL[row.status]}{row.candidates.map((c) => <small key={c.id}>{c.reason}</small>)}</td>
-                <td>
+                <td data-label="Trade date">{row.trade.date}<small>Trade No. {row.trade.tradeNo}</small></td>
+                <td data-label="Side">{row.trade.kind}</td>
+                <td data-label="Symbol"><b>{row.trade.ticker}</b></td>
+                <td data-label="Qty" className="num">{row.trade.shares}</td>
+                <td data-label="Price" className="num">{row.trade.price}</td>
+                <td data-label="Fees" className="num">{row.trade.fees.toFixed(2)}</td>
+                <td data-label="Value" className="num">{money(row.trade.shares * row.trade.price)}</td>
+                <td data-label="Status">{STATUS_LABEL[row.status]}{row.candidates.map((c) => <small key={c.id}>{c.reason}</small>)}</td>
+                <td data-label="Decision">
                   {row.status === 'new' && (
                     <label className="ir-toggle"><input type="checkbox" checked={row.action === 'import'} onChange={(e) => resolve(row.externalId, { action: e.target.checked ? 'import' : 'skip' })} /> Import</label>
                   )}

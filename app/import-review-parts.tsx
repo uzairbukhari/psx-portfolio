@@ -22,7 +22,7 @@ export function ReviewShell({
 }) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !busy) onCancel(); }}>
-      <DialogContent className="import-review import-fullscreen">
+      <DialogContent className="import-review import-fullscreen top-0 left-0 translate-x-0 translate-y-0 sm:max-w-none">
         <div className="ir-head">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -116,15 +116,15 @@ export function HoldingsAfter({
           <tbody>
             {changes.map((c) => (
               <tr key={c.ticker}>
-                <td>
+                <td data-label="Symbol">
                   <b>{c.ticker}</b>
                   {newCompanies.includes(c.ticker) ? <small>new, not approved, 0% target</small> : null}
                   {newCompanies.includes(c.ticker) && companyState[c.ticker] !== 'resolved' ? (
                     <small>{companyState[c.ticker] === 'pending' ? 'company details being looked up' : companyState[c.ticker] === 'unresolved' ? 'company details pending: trades are kept' : 'checking company details…'}</small>
                   ) : null}
                 </td>
-                <td className="num">{c.beforeShares}</td><td className="num">{c.afterShares}</td>
-                <td>{c.afterCostKnown ? 'known' : 'unknown (no cost for some shares)'}</td>
+                <td data-label="Shares before" className="num">{c.beforeShares}</td><td data-label="Shares after" className="num">{c.afterShares}</td>
+                <td data-label="Cost basis">{c.afterCostKnown ? 'known' : 'unknown (no cost for some shares)'}</td>
               </tr>
             ))}
           </tbody>

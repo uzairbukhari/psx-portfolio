@@ -106,31 +106,31 @@ export function IpoImportDialog({
               const editable = row.status === 'new' || row.status === 'ambiguous' || row.status === 'previously-removed';
               return (
                 <tr key={row.externalId} className={`ir-${row.status}`}>
-                  <td><b>{row.item.ticker}</b><small>{row.item.name}{row.item.offerType ? ` · ${row.item.offerType}` : ''}</small></td>
-                  <td className="num">{row.item.applied}</td>
-                  <td className="num">
+                  <td data-label="Company"><b>{row.item.ticker}</b><small>{row.item.name}{row.item.offerType ? ` · ${row.item.offerType}` : ''}</small></td>
+                  <td data-label="Applied" className="num">{row.item.applied}</td>
+                  <td data-label="Allotted" className="num">
                     {editable ? (
                       <input type="number" min="1" step="1" aria-label={`Allotted shares for ${row.item.ticker}`} value={row.shares}
                         onChange={(e) => resolve(row.externalId, { shares: Number(e.target.value) })} />
                     ) : row.item.allotted}
                   </td>
-                  <td className="num">{money(row.item.amountPaid)}</td>
-                  <td className="num">{row.item.refund ? money(row.item.refund) : '–'}</td>
-                  <td className="num">{row.price > 0 && editable ? row.price.toFixed(2) : '–'}</td>
-                  <td>
+                  <td data-label="Paid" className="num">{money(row.item.amountPaid)}</td>
+                  <td data-label="Refund" className="num">{row.item.refund ? money(row.item.refund) : '–'}</td>
+                  <td data-label="Price paid" className="num">{row.price > 0 && editable ? row.price.toFixed(2) : '–'}</td>
+                  <td data-label="Date">
                     {editable ? (
                       <input type="date" aria-label={`Allotment date for ${row.item.ticker}`} value={row.date}
                         onChange={(e) => resolve(row.externalId, { date: e.target.value })} />
                     ) : row.item.endDate}
                     {editable && row.dateInferred && <small>subscription end date; edit if you know the allotment day</small>}
                   </td>
-                  <td>
+                  <td data-label="Status">
                     {STATUS_LABEL[row.status]}
                     {row.flags.map((f, i) => <small key={i}>{f}</small>)}
                     {row.candidates.map((c) => <small key={c.id}>{c.reason}</small>)}
                     {row.supersedes.length > 0 && <small>Replaces {row.supersedes.map((s) => `an assumed acquisition of ${s.shares}`).join(', ')} from an earlier import.</small>}
                   </td>
-                  <td>
+                  <td data-label="Decision">
                     {row.status === 'new' && (
                       <label className="ir-toggle"><input type="checkbox" checked={row.action === 'import'} onChange={(e) => resolve(row.externalId, { action: e.target.checked ? 'import' : 'skip' })} /> Import</label>
                     )}
