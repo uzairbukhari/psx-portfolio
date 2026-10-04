@@ -150,6 +150,7 @@ export default function SettingsView({
   importSummary,
   dividendSync,
   security,
+  initialSection,
 }: {
   name: string | null;
   email: string;
@@ -173,6 +174,7 @@ export default function SettingsView({
   dividendSync?: ReactNode;
   /** The vault security card (lock, change password, recovery key). */
   security?: ReactNode;
+  initialSection?: string;
 }) {
   const isAdmin = role === 'super_admin';
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
@@ -233,7 +235,7 @@ export default function SettingsView({
       setDeleteBusy(false);
     }
   }
-  const [active, setActive] = useState('account');
+  const [active, setActive] = useState(initialSection ?? 'account');
   const sections = [
     { id: 'account', label: 'Account', icon: UserRound },
     ...(security ? [{ id: 'security', label: 'Security', icon: KeyRound }] : []),

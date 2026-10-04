@@ -35,6 +35,8 @@ import {
 import {
   RefreshCw,
   Plus,
+  Briefcase,
+  Upload,
   Wallet,
   LogOut,
   Settings,
@@ -374,6 +376,7 @@ function DashboardContent({
   );
   const initialPathname = usePathname();
   const [bellOpen, setBellOpen] = useState(false);
+  const [settingsEntry, setSettingsEntry] = useState({ n: 0, section: 'account' });
   const [tab, setTabState] = useState(() =>
     allowTab(tabFromPathname(initialPathname), isAdmin),
   );
@@ -1564,11 +1567,30 @@ function DashboardContent({
         <TabsContent value="holdings">
           {p.companies.length === 0 ? (
             <div className="panel empty-holdings">
+              <span className="empty-holdings-icon" aria-hidden="true">
+                <Briefcase size={26} />
+              </span>
               <h2>No holdings yet</h2>
-              <p>Record your first purchase to start tracking your portfolio.</p>
-              <button disabled={busy} onClick={() => openTx('buy')}>
-                <Plus size={16} /> Add your first transaction
-              </button>
+              <p>Record your first purchase, or import your broker history, to start tracking your portfolio.</p>
+              <div className="empty-holdings-actions">
+                <button disabled={busy} onClick={() => openTx('buy')}>
+                  <Plus size={16} /> Add your first transaction
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    setSettingsEntry((e) => ({ n: e.n + 1, section: 'data' }));
+                    setTab('settings');
+                  }}
+                >
+                  <Upload size={16} /> Import from your broker
+                </button>
+              </div>
+              <small className="empty-holdings-hint">
+                Already have a statement or backup? Import it and your history fills in at once.
+              </small>
             </div>
           ) : (
           <>
@@ -1962,6 +1984,8 @@ function DashboardContent({
         )}
         <TabsContent value="settings">
           <SettingsView
+            key={settingsEntry.n}
+            initialSection={settingsEntry.section}
             name={name}
             email={email!}
             picture={picture}

@@ -197,7 +197,11 @@
 .mp-record{grid-column:1/-1;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.mp-record small{display:inline}
 @media(max-width:560px){.mp-kpis,.mp-kpi-details .mp-kpis{grid-template-columns:1fr}}
 @media(max-width:760px){.mp-actionbar{bottom:calc(var(--bar-h,60px) + env(safe-area-inset-bottom))}.monthly-picks{padding-bottom:24px}.mp-shortlist{scroll-margin-bottom:140px}}
-.empty-holdings{text-align:center;padding:48px 24px!important}.empty-holdings h2{margin-top:0}
+.empty-holdings{display:flex;flex-direction:column;align-items:center;text-align:center;padding:56px 24px!important;border-style:dashed}.empty-holdings h2{margin:16px 0 0}.empty-holdings p{max-width:46ch;margin:8px 0 22px}
+.empty-holdings-icon{display:grid;place-items:center;width:56px;height:56px;border-radius:999px;background:rgba(59,130,246,.12);color:var(--primary);box-shadow:0 0 0 1px var(--border) inset}
+.empty-holdings-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}.empty-holdings-actions button{display:inline-flex;align-items:center;gap:8px}
+.empty-holdings-hint{margin-top:16px;max-width:46ch}
+@media(max-width:560px){.empty-holdings{padding:36px 18px!important}.empty-holdings-actions{width:100%;flex-direction:column}.empty-holdings-actions button{width:100%;justify-content:center}}
 .mp-bar{display:block;width:100%;height:6px;margin-bottom:12px;border:0;border-radius:999px;overflow:hidden;appearance:none;background:var(--border)}
 .mp-bar::-webkit-progress-bar{background:var(--border)}
 .mp-bar::-webkit-progress-value{background:var(--primary);border-radius:999px;transition:width .4s ease}
