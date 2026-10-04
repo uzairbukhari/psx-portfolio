@@ -21,6 +21,8 @@ export type AiLabPick = {
   risks: string[];
   evidence: ReportEvidence[];
   note: string;
+  /** Below the usual bar but still positive: included so the month is not empty, and sized down. */
+  lowConviction?: boolean;
   thesisState: ThesisState;
   researchedAt: string;
   carriedForward: boolean;

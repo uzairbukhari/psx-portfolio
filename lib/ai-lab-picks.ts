@@ -12,6 +12,14 @@ import type { Portfolio } from './portfolio.ts';
 /** 50 is a neutral expectation versus the KSE-100, so anything at or above it is not a negative view. */
 export const MIN_CONVICTION = 50;
 export const MAX_PICKS = 5;
+/**
+ * A monthly plan should not come back empty. When fewer than MIN_STRONG_PICKS companies clear MIN_CONVICTION, the best
+ * of the rest (positive expected return, thesis not broken, conviction at least LOW_CONVICTION) fill the list, marked
+ * as lower conviction and sized down so some of the money stays in cash.
+ */
+export const LOW_CONVICTION = 35;
+export const MIN_STRONG_PICKS = 3;
+const LOW_TIER_WEIGHT = 0.6;
 
 export type AiLabInput = {
   shortlist: string[];
@@ -24,15 +32,15 @@ export type AiLabInput = {
 };
 
 /** Why a researched company is not eligible for new money, or null when it is. */
-export function ineligibleReason(stored: StoredReport | undefined, now: Date): string | null {
+export function ineligibleReason(stored: StoredReport | undefined, now: Date, floor = MIN_CONVICTION): string | null {
   if (!stored) return 'No AI research yet. Prepare research for this company.';
   if (!reportUsable(stored, now)) return 'The research is out of date or its sources did not check out. Prepare research again.';
   const c = stored.report;
   if (c.holdingView.thesisState === 'broken') return 'The case for owning this company looks broken, so it is not a candidate for new money.';
   const conviction = effectiveConviction(c.conviction, stored.verification);
-  if (conviction < MIN_CONVICTION) {
+  if (conviction < floor) {
     const ai = aiConviction(c.conviction, stored.verification);
-    return `Conviction ${conviction} is below ${MIN_CONVICTION}${ai > conviction ? ` (the AI scored it ${ai}; unverified claims and the bear review took off ${ai - conviction})` : ''}.`;
+    return `Conviction ${conviction} is below ${floor}${ai > conviction ? ` (the AI scored it ${ai}; unverified claims and the bear review took off ${ai - conviction})` : ''}.`;
   }
   if (!(c.expectedReturn.basePct > 0)) return 'The expected 3-month return is not positive.';
   return null;
@@ -44,31 +52,43 @@ export function buildAiLabResult(input: AiLabInput): AiLabResult {
   const ranking = input.research.ranking;
   const rankOf = new Map((ranking?.entries ?? []).map((e) => [e.ticker, e]));
   const excluded: AiLabResult['excluded'] = [];
-  const eligible: StoredReport[] = [];
+  const strong: StoredReport[] = [];
+  const lower: StoredReport[] = [];
+  const whyNot = new Map<string, string>();
   for (const ticker of input.shortlist) {
-    const reason = ineligibleReason(byTicker.get(ticker), now);
     const stored = byTicker.get(ticker);
-    if (reason) {
+    const reason = ineligibleReason(stored, now);
+    if (!reason) strong.push(stored!);
+    else if (ineligibleReason(stored, now, LOW_CONVICTION) === null) { lower.push(stored!); whyNot.set(ticker, reason); }
+    else {
       const r = stored?.report;
       excluded.push(r
         ? { ticker, reason, view: { thesis: r.thesis, valuation: r.valuationView, expectedReturnPct: r.expectedReturn.basePct, risks: r.risks.slice(0, 3) } }
         : { ticker, reason });
     }
-    else eligible.push(byTicker.get(ticker)!);
   }
   // Order by the model's ranking when it covers the company, otherwise by conviction; keep the best five.
-  const ordered = [...eligible].sort((a, b) => {
+  const byRank = (a: StoredReport, b: StoredReport) => {
     const ra = rankOf.get(a.ticker)?.rank ?? Infinity;
     const rb = rankOf.get(b.ticker)?.rank ?? Infinity;
     return ra !== rb ? ra - rb : effectiveConviction(b.report.conviction, b.verification) - effectiveConviction(a.report.conviction, a.verification);
-  });
+  };
+  // Lower-conviction names only come in while there are too few strong ones.
+  const fill = strong.length < MIN_STRONG_PICKS ? [...lower].sort(byRank) : [];
+  for (const left of fill.length ? [] : lower) {
+    const r = left.report;
+    excluded.push({ ticker: left.ticker, reason: whyNot.get(left.ticker) ?? '', view: { thesis: r.thesis, valuation: r.valuationView, expectedReturnPct: r.expectedReturn.basePct, risks: r.risks.slice(0, 3) } });
+  }
+  const lowTickers = new Set(fill.map((r) => r.ticker));
+  const ordered = [...[...strong].sort(byRank), ...fill];
   for (const dropped of ordered.slice(MAX_PICKS)) excluded.push({ ticker: dropped.ticker, reason: `Ranked below the top ${MAX_PICKS} of your shortlist.` });
   const top = ordered.slice(0, MAX_PICKS);
   // Model weight when the ranking has one; otherwise a share of 100 proportional to conviction.
   const convictionTotal = top.reduce((s, r) => s + effectiveConviction(r.report.conviction, r.verification), 0) || 1;
   const weights = top.map((r) => {
     const w = rankOf.get(r.ticker)?.modelWeightPct;
-    return w && w > 0 ? w : Math.round((effectiveConviction(r.report.conviction, r.verification) / convictionTotal) * 1000) / 10;
+    const base = w && w > 0 ? w : Math.round((effectiveConviction(r.report.conviction, r.verification) / convictionTotal) * 1000) / 10;
+    return lowTickers.has(r.ticker) ? Math.round(base * LOW_TIER_WEIGHT * 10) / 10 : base;
   });
   const picks: AiLabPick[] = top.map((r, i) => ({
     ticker: r.ticker, name: input.names[r.ticker] ?? r.ticker, rank: i + 1,
@@ -77,6 +97,7 @@ export function buildAiLabResult(input: AiLabInput): AiLabResult {
     expectedReturn: r.report.expectedReturn, thesis: r.report.thesis, bullCase: r.report.bullCase, bearCase: r.report.bearCase,
     bearReviewNote: r.report.bearReviewNote, catalysts: r.report.catalysts, risks: r.report.risks, evidence: r.report.evidence,
     note: rankOf.get(r.ticker)?.note ?? '', thesisState: r.report.holdingView.thesisState,
+    lowConviction: lowTickers.has(r.ticker) || undefined,
     researchedAt: r.researchedAt, carriedForward: r.carriedForward, quantScore: input.quantScores?.[r.ticker] ?? null,
   }));
   const allocated = picks.reduce((s, p) => s + p.allocationPct, 0);
