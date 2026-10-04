@@ -4,6 +4,7 @@
 // Not yet covered: market-summary and research/* (added with the screens that use them).
 import type { PayoutAnnouncement } from './psx-payouts.ts';
 import type { FaceValueEvidence } from './face-values.ts';
+import type { CorporateAction } from './import-splits.ts';
 import type { Portfolio, Quote } from './portfolio.ts';
 import type { PricePoint } from './price-history.ts';
 import type { IpoLookup } from './ipo-offers.ts';
@@ -268,4 +269,6 @@ export type PublicDataResponse = {
   quoteRows: { ticker: string; price: number; as_of: string; quote_date: string; source: string; fetched_at: string }[];
   announcements: PayoutAnnouncement[];
   faceValues: Record<string, FaceValueEvidence[]>;
+  /** Curated public splits; the import dialogs propose the ones a ledger is missing. */
+  corporateActions: CorporateAction[];
 };

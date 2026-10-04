@@ -101,7 +101,12 @@ import { parseAhlLedgerText, type AhlLedgerStatement } from '@/lib/ahl-ledger-pd
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import { watchTickers } from '@/lib/market-watch';
 import MonthlyPicks from './monthly-picks';
-import { importFinqalabTrades, parseFinqalabReport } from './finqalab-import';
+import { parseFinqalabReport } from './finqalab-import';
+import { FinqalabImportDialog } from './finqalab-import-dialog';
+import { IpoImportDialog } from './ipo-import-dialog';
+import { parseIpoList, type IpoAllotment } from '@/lib/ipo-list-import';
+import { detectJsonImport, detectPdfImport, summarizeImports, IMPORT_LABEL, UNSUPPORTED_FILE, type ImportKind } from '@/lib/import-detect';
+import type { FinqalabTrade } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
 import { importAhlTrades, parseAhlHistory } from './ahl-import';
 import { importCdcDividends } from '@/lib/cdc-import';
@@ -405,6 +410,8 @@ function DashboardContent({
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
     [ahlStatement, setAhlStatement] = useState<{ statement: AhlLedgerStatement; fileName: string } | null>(null),
+    [finqalabReview, setFinqalabReview] = useState<{ rows: FinqalabTrade[]; fileName: string } | null>(null),
+    [ipoReview, setIpoReview] = useState<{ items: IpoAllotment[]; fileName: string } | null>(null),
     [editing, setEditing] = useState<string | null>(null),
     [stockSplit, setStockSplit] = useState<StockSplit | null>(null),
     [editingStockSplit, setEditingStockSplit] = useState<string | null>(null),
@@ -768,9 +775,7 @@ function DashboardContent({
       await save(parsed.portfolio, 'Portfolio backup restored.');
     });
   };
-  const importCdc = (f: File) => {
-    attempt(async () => {
-    const raw = JSON.parse(await f.text());
+  const runCdc = async (raw: unknown) => {
     const result = importCdcDividends(
       raw,
       p.companies,
@@ -817,42 +822,13 @@ function DashboardContent({
       next,
       `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
     );
-    });
   };
-  const importFinqalab = (f: File) => {
-    attempt(async () => {
-    if (f.type && f.type !== 'application/pdf')
-      throw Error('Choose a PDF report from Finqalab.');
-    const { text } = await extractPdfText(
-      new Uint8Array(await f.arrayBuffer()),
-    );
-    const rows = parseFinqalabReport(text);
-    const result = importFinqalabTrades(p, rows);
-    if (!result.imported) {
-      notify(
-        `No Finqalab trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
-        true,
-      );
-      return;
-    }
-    const next = clone(p);
-    next.companies = result.companies;
-    next.trades = [...next.trades, ...result.trades];
-    await save(
-      next,
-      `${result.imported} Finqalab trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
-    );
-    });
+  const runFinqalab = (text: string, fileName: string) => {
+    // Read locally, then review: nothing is saved until the preview is confirmed.
+    setFinqalabReview({ rows: parseFinqalabReport(text), fileName });
   };
-  const importAhl = (f: File) => {
-    attempt(async () => {
-    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
-      // Read locally, then review: nothing is saved until the preview is confirmed.
-      const { text, pages } = await extractPdfText(new Uint8Array(await f.arrayBuffer()));
-      setAhlStatement({ statement: await parseAhlLedgerText(text, pages), fileName: f.name });
-      return;
-    }
-    const rows = parseAhlHistory(JSON.parse(await f.text()));
+  const runAhlJson = async (raw: unknown) => {
+    const rows = parseAhlHistory(raw);
     const result = importAhlTrades(p, rows);
     if (!result.imported) {
       notify(
@@ -872,6 +848,33 @@ function DashboardContent({
       next,
       `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
     );
+  };
+  /** One entry point for every import file: works out what it is, then opens that import's review. */
+  const importFile = (f: File, expected?: ImportKind) => {
+    attempt(async () => {
+      let kind: ImportKind | null;
+      let pdf: { text: string; pages: number } | null = null;
+      let raw: unknown;
+      if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+        // Read locally, then review: nothing is saved until the preview is confirmed.
+        pdf = await extractPdfText(new Uint8Array(await f.arrayBuffer()));
+        kind = detectPdfImport(pdf.text);
+      } else {
+        try {
+          raw = JSON.parse(await f.text());
+        } catch {
+          throw Error(UNSUPPORTED_FILE);
+        }
+        kind = detectJsonImport(raw);
+      }
+      if (!kind) throw Error(UNSUPPORTED_FILE);
+      if (expected && kind !== expected)
+        throw Error(`That looks like a ${IMPORT_LABEL[kind]} file, not ${IMPORT_LABEL[expected]}. Use the matching card, or the drop box, which picks the right import itself.`);
+      if (kind === 'finqalab') runFinqalab(pdf!.text, f.name);
+      else if (kind === 'ahl' && pdf) setAhlStatement({ statement: await parseAhlLedgerText(pdf.text, pdf.pages), fileName: f.name });
+      else if (kind === 'ahl') await runAhlJson(raw);
+      else if (kind === 'cdc') await runCdc(raw);
+      else setIpoReview({ items: parseIpoList(raw), fileName: f.name });
     });
   };
   const exportEncryptedBackup = () =>
@@ -1975,9 +1978,8 @@ function DashboardContent({
             onClearLedger={() => save(blankPortfolio(), 'Your portfolio data was cleared.')}
             onRestore={restoreBackup}
             security={vault ? <VaultSecurity session={vault.session} onLock={vault.lock} /> : undefined}
-            onImportCdc={importCdc}
-            onImportFinqalab={importFinqalab}
-            onImportAhl={importAhl}
+            onImportFile={importFile}
+            importSummary={summarizeImports(p)}
             dividendSync={
               <DividendSyncView
                 portfolio={p}
@@ -2022,6 +2024,34 @@ function DashboardContent({
           onCommit={async (next, message) => {
             await save(next, message + unknownCostWarning(next));
             setAhlStatement(null);
+          }}
+        />
+      )}
+      {finqalabReview && (
+        <FinqalabImportDialog
+          rows={finqalabReview.rows}
+          fileName={finqalabReview.fileName}
+          portfolio={p}
+          revision={revision}
+          busy={busy}
+          onCancel={() => setFinqalabReview(null)}
+          onCommit={async (next, message) => {
+            await save(next, message + unknownCostWarning(next));
+            setFinqalabReview(null);
+          }}
+        />
+      )}
+      {ipoReview && (
+        <IpoImportDialog
+          items={ipoReview.items}
+          fileName={ipoReview.fileName}
+          portfolio={p}
+          revision={revision}
+          busy={busy}
+          onCancel={() => setIpoReview(null)}
+          onCommit={async (next, message) => {
+            await save(next, message + unknownCostWarning(next));
+            setIpoReview(null);
           }}
         />
       )}

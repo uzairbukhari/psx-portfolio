@@ -4,7 +4,8 @@
 // resolution, so the preview always shows exactly what applyAhlLedgerPlan() would write. Nothing here
 // merges another broker's trades, and no statement row is dropped as a "duplicate" on equal cash or a
 // shared voucher alone.
-import { dateOK, holdings, saleShortfalls, validate, type Company, type Portfolio, type Trade } from './portfolio.ts';
+import { dateOK, holdings, saleShortfalls, validate, type Company, type Portfolio, type StockSplit, type Trade } from './portfolio.ts';
+import { withSplits } from './import-splits.ts';
 import type { StatementTrade, AhlLedgerStatement } from './ahl-ledger-pdf.ts';
 import { priceAssumedAcquisition, type IpoLookup, type IpoPricing } from './ipo-offers.ts';
 
@@ -69,6 +70,8 @@ export type PlanOptions = {
   inferredEdits?: Record<string, { price?: number; date?: string }>;
   /** Opening-balance ids the user chose to keep even though the statement reproduces them. */
   keepOpenings?: Record<string, boolean>;
+  /** Splits the user accepted in the review; planned and applied as if already in the ledger. */
+  splits?: StockSplit[];
   newId?: () => string;
 };
 
@@ -90,6 +93,8 @@ export type AhlImportPlan = {
   /** Existing assumed acquisitions voided because later real purchases cover them. */
   voidedInferred: { id: string; ticker: string; shares: number; reason: string }[];
   newCompanies: string[];
+  /** Splits that will be added with the import. */
+  splits: StockSplit[];
   excluded: AhlLedgerStatement['excluded'];
   holdingChanges: HoldingChange[];
   warnings: string[];
@@ -166,10 +171,11 @@ function findLookalikes(row: StatementTrade, date: string, pool: Trade[], consum
 }
 
 export function planAhlLedgerImport(
-  portfolio: Portfolio,
+  original: Portfolio,
   statement: Pick<AhlLedgerStatement, 'trades' | 'accountFingerprint' | 'from' | 'to' | 'excluded' | 'warnings'>,
   options: PlanOptions = {},
 ): AhlImportPlan {
+  const portfolio = withSplits(original, options.splits);
   const resolutions = options.resolutions ?? {};
   const newId = options.newId ?? (() => crypto.randomUUID());
   const active = portfolio.trades.filter((t) => !t.voided);
@@ -321,7 +327,7 @@ export function planAhlLedgerImport(
   const after = materialize(portfolio, { additions: additions.map((a) => a.trade), inferred, replacedIds, voided: new Set(voidedInferred.map((v) => v.id)), newCompanies, newId });
   try {
     validate(after);
-    const before = holdings(portfolio);
+    const before = holdings(original);
     const now = holdings(after);
     holdingChanges = tickers
       .map((ticker) => {
@@ -351,7 +357,7 @@ export function planAhlLedgerImport(
     warnings.push('Some sales have no purchase history. Their cost basis is a user-requested estimate, not broker data (see the assumed acquisitions).');
   return {
     accountFingerprint: statement.accountFingerprint, range: { from: statement.from, to: statement.to },
-    rows, inferred, replacedOpenings, voidedInferred, newCompanies, excluded: statement.excluded,
+    rows, inferred, replacedOpenings, voidedInferred, newCompanies, splits: options.splits ?? [], excluded: statement.excluded,
     holdingChanges, warnings, blockers, counts,
   };
 }
@@ -438,7 +444,7 @@ export function applyAhlLedgerPlan(portfolio: Portfolio, plan: AhlImportPlan, ne
       settlementDate: row.trade.settlementDate, dateCertainty: row.dateCertainty,
       statementRef: row.trade.statementRef, netCash: row.trade.netCash,
     }));
-  const next = materialize(portfolio, {
+  const next = materialize(withSplits(portfolio, plan.splits), {
     additions, inferred: plan.inferred,
     replacedIds: new Set(plan.replacedOpenings.map((o) => o.id)),
     voided: new Set(plan.voidedInferred.map((v) => v.id)),
@@ -454,4 +460,5 @@ export const planIsNoop = (plan: AhlImportPlan) =>
   plan.inferred.every((i) => i.change === 'keep') &&
   !plan.replacedOpenings.length &&
   !plan.voidedInferred.length &&
+  !plan.splits.length &&
   !plan.newCompanies.length;

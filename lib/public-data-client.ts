@@ -17,6 +17,7 @@ export function createPublicData(call: PublicCall): PublicData {
         quoteRows: parts.flatMap((p) => p.quoteRows),
         announcements: parts.flatMap((p) => p.announcements),
         faceValues: Object.assign({}, ...parts.map((p) => p.faceValues)),
+        corporateActions: parts.flatMap((p) => p.corporateActions ?? []),
       };
     },
     async companies(tickers): Promise<CompanyLookup[]> {

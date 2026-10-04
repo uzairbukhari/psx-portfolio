@@ -3,6 +3,7 @@
 import type { PublicDataResponse } from './api-types.ts';
 import { readAnnouncements } from './dividend-announcements.ts';
 import { readFaceValues } from './face-values.ts';
+import { readCorporateActions } from './import-splits.ts';
 import { cleanLookupTickers } from './company-resolver.ts';
 import { readQuoteRows } from './quote-cache.ts';
 import { UserError } from './user-error.ts';
@@ -12,12 +13,13 @@ export const MAX_PUBLIC_TICKERS = 150;
 export async function readPublicData(db: D1Database, tickersInput: unknown): Promise<PublicDataResponse> {
   const tickers = cleanLookupTickers(tickersInput, MAX_PUBLIC_TICKERS + 1);
   if (tickers.length > MAX_PUBLIC_TICKERS) throw new UserError(`Ask for at most ${MAX_PUBLIC_TICKERS} companies at a time.`);
-  if (!tickers.length) return { tickers: [], quoteRows: [], announcements: [], faceValues: {} };
+  if (!tickers.length) return { tickers: [], quoteRows: [], announcements: [], faceValues: {}, corporateActions: [] };
   const wanted = new Set(tickers);
-  const [rows, announcements, faceValues] = await Promise.all([
+  const [rows, announcements, faceValues, corporateActions] = await Promise.all([
     readQuoteRows(db).catch(() => []),
     readAnnouncements(db, tickers).catch(() => []),
     readFaceValues(db, tickers).catch(() => ({})),
+    readCorporateActions(db, tickers).catch(() => []),
   ]);
-  return { tickers, quoteRows: rows.filter((row) => wanted.has(row.ticker)), announcements, faceValues };
+  return { tickers, quoteRows: rows.filter((row) => wanted.has(row.ticker)), announcements, faceValues, corporateActions };
 }

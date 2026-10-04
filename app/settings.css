@@ -117,3 +117,32 @@
 .bell-trigger.hdr-btn{width:auto;display:inline-flex!important}
 .hdr-btn:hover:not(:disabled),.hdr-btn:focus-visible,.hdr-btn[data-popup-open]{background:var(--primary)!important;border-color:var(--primary)!important;color:#fff!important}
 .hdr-btn .bell-badge{background:#fff;color:var(--primary)}
+/* Data & imports: one drop box, a grid of source cards, then backup tiles and a collapsed danger zone. */
+.imp{padding:16px 0 4px}
+.imp-drop{display:flex;align-items:center;gap:16px;padding:18px 20px;border:1.5px dashed var(--border);border-radius:12px;background:rgba(59,130,246,.05)}
+.imp-drop.over{border-color:var(--primary);background:rgba(59,130,246,.14)}
+.imp-drop>svg{flex-shrink:0;color:#7ea6e6}
+.imp-drop>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.imp-drop strong{font-size:15px}
+.imp-drop span{font-size:13px;line-height:1.5;color:var(--muted-foreground)}
+.imp-note{margin:10px 2px 16px;font-size:13px;color:var(--muted-foreground)}
+.imp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.imp-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:14px 16px;border:1px solid var(--border);border-radius:10px}
+.imp-card header{display:flex;align-items:center;gap:10px;width:100%}
+.imp-card header strong{font-size:14px}
+.imp-card header em{font-style:normal;margin-left:auto;font-size:11px;font-weight:600;color:var(--muted-foreground);background:rgba(255,255,255,.07);border-radius:20px;padding:2px 9px}
+.imp-card p{margin:0;font-size:13px;line-height:1.5}
+.imp-card small{font-size:12px;color:var(--muted-foreground)}
+.imp-card details{font-size:12px;color:var(--muted-foreground);width:100%}
+.imp-card summary{cursor:pointer}
+.imp-card details p{margin-top:6px;color:var(--muted-foreground)}
+.imp-card>button{margin-top:auto}
+.set-group-title{margin:26px 0 10px;font-size:15px}
+.set-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:8px}
+.set-tile{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:14px 16px;border:1px solid var(--border);border-radius:10px}
+.set-tile strong{font-size:14px}
+.set-tile span{font-size:13px;line-height:1.5;color:var(--muted-foreground)}
+.set-tile button{margin-top:auto}
+.set-danger{margin:22px 0 12px}
+.set-danger>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--muted-foreground);padding:6px 0}
+@media(max-width:760px){.imp-drop{flex-wrap:wrap}.imp-grid,.set-split{grid-template-columns:1fr}}

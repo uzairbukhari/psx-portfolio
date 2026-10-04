@@ -43,7 +43,7 @@ export type Trade = {
   month: string;
   note: string;
   /** Undefined is a legacy/manual entry; broker imports carry a stable key. */
-  source?: 'manual' | 'finqalab' | 'ahl';
+  source?: 'manual' | 'finqalab' | 'ahl' | 'ipo';
   externalId?: string;
   voided?: boolean;
   /** Broker/NCCPL capital-gains-tax deduction recorded for a sale; an actual figure, never re-estimated. */
@@ -80,6 +80,11 @@ export type StockSplit = {
   newShares: number;
   note: string;
   voided?: boolean;
+  /** 'import' = proposed from public corporate-action evidence while importing a broker file. */
+  source?: 'manual' | 'import';
+  sourceUrl?: string;
+  /** Stable key (`split:SYS:2025-06-02:1:5`) so the same split is never added twice. */
+  externalId?: string;
 };
 export type Dividend = {
   id: string;
@@ -1145,10 +1150,10 @@ export function validate(p: Portfolio) {
       typeof t.note !== 'string' ||
       t.note.length > 2000 ||
       (t.source !== undefined &&
-        !['manual', 'finqalab', 'ahl'].includes(t.source)) ||
+        !['manual', 'finqalab', 'ahl', 'ipo'].includes(t.source)) ||
       (t.externalId !== undefined &&
         (typeof t.externalId !== 'string' || t.externalId.length > 120)) ||
-      (['finqalab', 'ahl'].includes(t.source ?? '') && !t.externalId) ||
+      (['finqalab', 'ahl', 'ipo'].includes(t.source ?? '') && !t.externalId) ||
       ((t.source === undefined || t.source === 'manual') &&
         t.externalId !== undefined) ||
       (t.month !== '' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(t.month)) ||
@@ -1178,6 +1183,7 @@ export function validate(p: Portfolio) {
       t.kind !== 'opening' &&
       t.source !== 'finqalab' &&
       t.source !== 'ahl' &&
+      t.source !== 'ipo' &&
       openings.has(t.ticker) &&
       t.date < openings.get(t.ticker)!
     )
@@ -1185,10 +1191,10 @@ export function validate(p: Portfolio) {
         'Transaction predates the opening balance. Correct or void that opening balance before importing earlier history.',
       );
     ids.add(t.id);
-    if (!t.voided && (t.source === 'finqalab' || t.source === 'ahl')) {
+    if (!t.voided && (t.source === 'finqalab' || t.source === 'ahl' || t.source === 'ipo')) {
       const brokerKey = `${t.source}:${t.externalId}`;
       if (brokerImportIds.has(brokerKey))
-        throw new UserError(`Duplicate ${t.source === 'ahl' ? 'AHL' : 'Finqalab'} trade import.`);
+        throw new UserError(`Duplicate ${t.source === 'ahl' ? 'AHL' : t.source === 'ipo' ? 'IPO' : 'Finqalab'} trade import.`);
       brokerImportIds.add(brokerKey);
     }
   }
@@ -1211,7 +1217,10 @@ export function validate(p: Portfolio) {
         s.newShares > 1e9 ||
         typeof s.note !== 'string' ||
         s.note.length > 2000 ||
-        (s.voided !== undefined && typeof s.voided !== 'boolean')
+        (s.voided !== undefined && typeof s.voided !== 'boolean') ||
+        (s.source !== undefined && !['manual', 'import'].includes(s.source)) ||
+        (s.sourceUrl !== undefined && (typeof s.sourceUrl !== 'string' || s.sourceUrl.length > 500)) ||
+        (s.externalId !== undefined && (typeof s.externalId !== 'string' || s.externalId.length > 120))
       )
         throw new UserError('Invalid stock split. Use a forward split with whole-share ratios.');
       splitIds.add(s.id);
