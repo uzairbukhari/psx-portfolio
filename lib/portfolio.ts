@@ -1739,3 +1739,44 @@ export function researchWeightProfile(
   });
   return capAndNormalize(tickers, units);
 }
+
+const TICKER_FORMAT = /^[A-Z0-9]{2,12}$/;
+
+/**
+ * Pure: returns a copy of `p` with every record of company `from` moved to `to`, for when PSX renames a
+ * symbol after an IPO (WPFL became WAHDAT). The ledger, splits, dividends (including the stable ids that
+ * stop PSX auto dividends being added twice), and shortlist all follow; the old symbol's quote is dropped. Finished picks and
+ * AI Lab runs are historical snapshots and keep the symbol they were run with.
+ */
+export function renameTicker(p: Portfolio, from: string, to: string): Portfolio {
+  if (!TICKER_FORMAT.test(to)) throw new UserError('Enter the new PSX symbol using 2-12 letters or digits.');
+  if (from === to) throw new UserError('The new symbol is the same as the current one.');
+  if (!p.companies.some((c) => c.ticker === from)) throw new UserError(`${from} is not in your portfolio.`);
+  if (p.companies.some((c) => c.ticker === to)) {
+    throw new UserError(`${to} is already in your portfolio, so ${from} can't be renamed to it.`);
+  }
+  const next: Portfolio = JSON.parse(JSON.stringify(p));
+  const move = <T extends { ticker?: string }>(rows: T[] | undefined) =>
+    rows?.forEach((row) => {
+      if (row.ticker === from) row.ticker = to;
+    });
+  move(next.companies);
+  move(next.trades);
+  move(next.stockSplits);
+  move(next.dividends);
+  move(next.notifications);
+  move(next.research);
+  const key = `psx:${from}:`;
+  const rekey = (id: string) => id.replace(key, `psx:${to}:`);
+  for (const d of next.dividends ?? []) {
+    d.id = rekey(d.id);
+    if (d.externalId) d.externalId = rekey(d.externalId);
+  }
+  for (const n of next.notifications ?? []) n.id = rekey(n.id);
+  // The old quote's source URL names the old symbol, so drop it; the next price refresh fills the new one.
+  if (next.quotes) delete next.quotes[from];
+  if (next.monthlyPicksShortlist) {
+    next.monthlyPicksShortlist = next.monthlyPicksShortlist.map((t) => (t === from ? to : t));
+  }
+  return next;
+}

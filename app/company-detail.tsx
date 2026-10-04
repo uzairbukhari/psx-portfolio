@@ -295,6 +295,7 @@ export default function CompanyDetail({
   onDividend,
   onSplit,
   onEdit,
+  onChangeTicker,
   onCorrectTrade,
   onCorrectDividend,
   onCorrectSplit,
@@ -312,6 +313,7 @@ export default function CompanyDetail({
   onDividend: () => void;
   onSplit: () => void;
   onEdit: () => void;
+  onChangeTicker: () => void;
   onCorrectTrade: (t: Trade) => void;
   onCorrectDividend: (d: Dividend) => void;
   onCorrectSplit: (s: StockSplit) => void;
@@ -400,6 +402,9 @@ export default function CompanyDetail({
               </DropdownMenuItem>
               <DropdownMenuItem disabled={busy || !known} onClick={onEdit}>
                 Edit company
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={busy || !known} onClick={onChangeTicker}>
+                Change symbol
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -35,6 +35,8 @@ import {
 import {
   RefreshCw,
   Plus,
+  Briefcase,
+  Upload,
   Wallet,
   LogOut,
   Settings,
@@ -65,6 +67,7 @@ import {
   dateOK,
   DEFAULT_RESEARCH_SETTINGS,
   blankPortfolio,
+  renameTicker,
   type ResearchSettings,
   type Portfolio,
   type Trade,
@@ -374,6 +377,8 @@ function DashboardContent({
   );
   const initialPathname = usePathname();
   const [bellOpen, setBellOpen] = useState(false);
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
+  const [settingsEntry, setSettingsEntry] = useState({ n: 0, section: 'account' });
   const [tab, setTabState] = useState(() =>
     allowTab(tabFromPathname(initialPathname), isAdmin),
   );
@@ -1315,6 +1320,17 @@ function DashboardContent({
     );
     closeTx();
   }
+  async function saveTickerRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (!renaming) return;
+    const { from } = renaming;
+    const to = renaming.to.trim().toUpperCase();
+    // Strict create: the new symbol must exist in the PSX directory, so a typo can't be saved.
+    await save(renameTicker(p!, from, to), `${from} is now ${to}.`, { createCompanies: [to] });
+    void queueQuoteRefresh([to]);
+    setRenaming(null);
+    if (companyTicker === from) openCompany(to);
+  }
   async function saveCompany(e: React.FormEvent) {
     e.preventDefault();
     if (!company) return;
@@ -1564,18 +1580,49 @@ function DashboardContent({
         <TabsContent value="holdings">
           {p.companies.length === 0 ? (
             <div className="panel empty-holdings">
+              <span className="empty-holdings-icon" aria-hidden="true">
+                <Briefcase size={26} />
+              </span>
               <h2>No holdings yet</h2>
-              <p>Record your first purchase to start tracking your portfolio.</p>
-              <button disabled={busy} onClick={() => openTx('buy')}>
-                <Plus size={16} /> Add your first transaction
-              </button>
+              <p>Record your first purchase, or import your broker history, to start tracking your portfolio.</p>
+              <div className="empty-holdings-actions">
+                <button disabled={busy} onClick={() => openTx('buy')}>
+                  <Plus size={16} /> Add your first transaction
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    setSettingsEntry((e) => ({ n: e.n + 1, section: 'data' }));
+                    setTab('settings');
+                  }}
+                >
+                  <Upload size={16} /> Import from your broker
+                </button>
+              </div>
+              <small className="empty-holdings-hint">
+                Already have a statement or backup? Import it and your history fills in at once.
+              </small>
             </div>
           ) : (
           <>
           {pendingCompanies.length > 0 && (
             <p className="notice" role="status">
               Company details for {pendingCompanies.join(', ')} are still being looked up. Your transactions are saved;
-              names and sectors fill in automatically once PSX details are found.{' '}
+              names and sectors fill in automatically once PSX details are found. If PSX renamed a symbol since you
+              bought it, change it here:{' '}
+              {pendingCompanies.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className="secondary compact"
+                  disabled={busy}
+                  onClick={() => setRenaming({ from: t, to: '' })}
+                >
+                  Change {t}
+                </button>
+              ))}{' '}
               <button type="button" className="secondary compact" disabled={busy} onClick={() => void load()}>
                 Check again
               </button>
@@ -1939,6 +1986,7 @@ function DashboardContent({
                 setCreatingCompany(false);
                 setCompany({ ...c });
               }}
+              onChangeTicker={() => setRenaming({ from: companyTicker, to: '' })}
               onCorrectTrade={correctTrade}
               onCorrectDividend={correctDividend}
               onCorrectSplit={correctStockSplit}
@@ -1962,6 +2010,8 @@ function DashboardContent({
         )}
         <TabsContent value="settings">
           <SettingsView
+            key={settingsEntry.n}
+            initialSection={settingsEntry.section}
             name={name}
             email={email!}
             picture={picture}
@@ -2650,6 +2700,35 @@ function DashboardContent({
                 company.
               </p>
               <button disabled={busy || (creatingCompany && !lookupReady(companyLookup, company.ticker))}>Save company</button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!renaming} onOpenChange={(open) => { if (!open) setRenaming(null); }}>
+        <DialogContent className="form-dialog">
+          <DialogTitle>Change PSX symbol</DialogTitle>
+          <DialogDescription>
+            Use this when a company is listed under a new symbol, for example WPFL became WAHDAT after its IPO. All
+            of its trades, splits and dividends move to the new symbol.
+          </DialogDescription>
+          {renaming && (
+            <form onSubmit={(e) => attempt(() => saveTickerRename(e))}>
+              <label>
+                Current symbol
+                <input readOnly value={renaming.from} />
+              </label>
+              <label>
+                New symbol
+                <input
+                  required
+                  autoFocus
+                  pattern="[A-Z0-9]{2,12}"
+                  value={renaming.to}
+                  onChange={(e) => setRenaming({ ...renaming, to: e.target.value.toUpperCase() })}
+                />
+              </label>
+              <p className="muted">The new symbol must exist in the PSX company directory.</p>
+              <button disabled={busy || !renaming.to}>Change symbol</button>
             </form>
           )}
         </DialogContent>
