@@ -8,7 +8,6 @@ import type { DispatchConfig } from './github-dispatch.ts';
 
 type Env = { AI_LAB_ENABLED?: string; AI_RESEARCH_MONTHLY_CAP_USD?: string };
 const TICKER = /^[A-Z0-9]{2,12}$/;
-export const RESEARCH_REQUEST_LIMIT = { windowMs: 86_400_000, max: 6 };
 /** A "researching" request older than this is treated as dead so it can be requested again. */
 const STALE_RESEARCHING_MS = 90 * 60_000;
 

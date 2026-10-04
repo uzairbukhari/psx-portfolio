@@ -18,7 +18,8 @@ export type AiConfig = {
   provider: Provider;
   models: Record<ModelRole, string>;
   effort: Record<ModelRole, 'low' | 'medium' | 'high'>;
-  monthlyCapUsd: number;
+  /** null = no limit (the default); a positive AI_RESEARCH_MONTHLY_CAP_USD turns the cap back on. */
+  monthlyCapUsd: number | null;
   enabled: boolean;
 };
 
@@ -41,7 +42,7 @@ export function resolveConfig(env: Env): AiConfig {
       rank: env.AI_RESEARCH_MODEL_RANK?.trim() || base.models.rank,
     },
     effort: base.effort,
-    monthlyCapUsd: Number.isFinite(cap) && cap > 0 ? cap : 5,
+    monthlyCapUsd: Number.isFinite(cap) && cap > 0 ? cap : null,
     enabled: env.AI_LAB_ENABLED?.trim().toLowerCase() !== 'false',
   };
 }

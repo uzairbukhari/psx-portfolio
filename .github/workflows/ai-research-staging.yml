@@ -1,16 +1,16 @@
 name: AI Lab research (staging)
 
 # Staging copy of ai-research.yml: same job, aimed at the STAGING D1 database (read from env.staging in
-# wrangler.jsonc) with its own $1 cap. Manual only. Never touches production data.
+# wrangler.jsonc) Manual only. Never touches production data.
 # Monthly AI research for the experimental AI Lab tab (super admin only). Researches the public tickers that were
 # requested in the app; sees no portfolio, holding, amount or account. Stored work is reused, so a run only pays for
-# what changed, and spend is capped per calendar month (AI_RESEARCH_MONTHLY_CAP_USD, default 5).
+# what changed, and spend has no cap unless AI_RESEARCH_MONTHLY_CAP_USD is set.
 #
 # Settings (repository or `prod` environment variables, all optional):
 #   AI_LAB_ENABLED=false            turns the job off without a redeploy
 #   AI_RESEARCH_PROVIDER            openai (default) or anthropic
 #   AI_RESEARCH_MODEL_READ / _RANK  model names for reading and for the final ranking
-#   AI_RESEARCH_MONTHLY_CAP_USD     monthly cap in USD
+#   AI_RESEARCH_MONTHLY_CAP_USD     optional monthly cap in USD (unset = no cap)
 # Secrets (`prod` environment): OPENAI_API_KEY (ANTHROPIC_API_KEY only when switching to Claude),
 # CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN.
 on:
@@ -46,7 +46,7 @@ jobs:
       AI_RESEARCH_PROVIDER: ${{ vars.AI_RESEARCH_PROVIDER }}
       AI_RESEARCH_MODEL_READ: ${{ vars.AI_RESEARCH_MODEL_READ }}
       AI_RESEARCH_MODEL_RANK: ${{ vars.AI_RESEARCH_MODEL_RANK }}
-      AI_RESEARCH_MONTHLY_CAP_USD: ${{ vars.AI_RESEARCH_MONTHLY_CAP_USD || '1' }}
+      AI_RESEARCH_MONTHLY_CAP_USD: ${{ vars.AI_RESEARCH_MONTHLY_CAP_USD }}
       TICKERS: ${{ inputs.tickers }}
     steps:
       - name: Gate

@@ -97,10 +97,10 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
           </p>
         </div>
         {lab.data && (
-          <div className="ai-lab__spend" title="AI spend this month against the cap">
+          <div className="ai-lab__spend" title="AI spend this month">
             <small>AI spend, {lab.data.spend.month}</small>
-            <b>${lab.data.spend.usd.toFixed(2)} <span>of ${lab.data.spend.capUsd.toFixed(2)}</span></b>
-            <div className="bar"><i style={{ width: `${Math.min(100, (lab.data.spend.usd / lab.data.spend.capUsd) * 100)}%` }} /></div>
+            <b>${lab.data.spend.usd.toFixed(2)}</b>
+            {lab.data.spend.capUsd !== null && <small>Limit ${lab.data.spend.capUsd.toFixed(2)}</small>}
           </div>
         )}
       </section>

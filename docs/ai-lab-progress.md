@@ -2,7 +2,7 @@
 
 Status: first version built (web, super admin only).
 
-Done: schema (migration 0026), research pipeline with $5 monthly cap and reuse, OpenAI and Claude adapters, GitHub workflows (prod monthly, staging manual), research API, AI picks, holdings review, tests.
+Done: schema (migration 0026), research pipeline with an optional monthly cap (none by default, removed 2026-10-04) and reuse, OpenAI and Claude adapters, GitHub workflows (prod monthly, staging manual), research API, AI picks, holdings review, tests.
 
 Open items:
 - First staging run must measure real cost per company before the prod schedule is trusted.
