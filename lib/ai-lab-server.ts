@@ -5,9 +5,15 @@ import { monthKey } from './ai-research/ledger.ts';
 import { createStore, type Query } from './ai-research/store.ts';
 import type { PublicResearch, Ranking } from './ai-research/types.ts';
 import type { DispatchConfig } from './github-dispatch.ts';
+import { AI_LAB_MAX_TICKERS } from './market-watch.ts';
 
 type Env = { AI_LAB_ENABLED?: string; AI_RESEARCH_MONTHLY_CAP_USD?: string };
 const TICKER = /^[A-Z0-9]{2,12}$/;
+/** A distinct, well-formed ticker list from `?tickers=A,B` or a JSON array, capped at AI_LAB_MAX_TICKERS. */
+export function cleanAiLabTickers(input: unknown): string[] {
+  const raw = Array.isArray(input) ? input : typeof input === 'string' ? input.split(',') : [];
+  return [...new Set(raw.map((t) => String(t).trim().toUpperCase()).filter((t) => TICKER.test(t)))].slice(0, AI_LAB_MAX_TICKERS);
+}
 /** A "researching" request older than this is treated as dead so it can be requested again. */
 const STALE_RESEARCHING_MS = 90 * 60_000;
 
@@ -49,7 +55,7 @@ export const workflowFor = (appEnv?: string) => (appEnv === 'staging' ? 'ai-rese
 
 export async function requestResearch(db: D1Database, config: DispatchConfig, tickers: string[], env: Env, now = new Date()): Promise<RequestOutcome> {
   if (!resolveConfig(env).enabled) return { queued: [], dispatched: false, reason: 'AI Lab research is switched off.' };
-  const clean = [...new Set(tickers)].filter((t) => TICKER.test(t)).slice(0, 40);
+  const clean = [...new Set(tickers)].filter((t) => TICKER.test(t)).slice(0, AI_LAB_MAX_TICKERS);
   if (!clean.length) return { queued: [], dispatched: false, reason: 'Choose at least one company.' };
   const store = createStore(d1Query(db));
   const current = await store.requestsFor(clean);

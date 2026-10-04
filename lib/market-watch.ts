@@ -5,6 +5,8 @@ import { isValidQuote, quoteSupersedes } from './portfolio.ts';
 import type { ShortlistPerformance } from './psx-market.ts';
 
 export const MAX_WATCH_TICKERS = 25;
+/** AI Lab covers every company in the portfolio, not just the 25 the market pulse follows (D1 allows ~100 bound values). */
+export const AI_LAB_MAX_TICKERS = 80;
 const TICKER = /^[A-Z0-9]{2,12}$/;
 
 /** Tickers the pulse follows: the saved Monthly Picks shortlist, else every company with a target. */
