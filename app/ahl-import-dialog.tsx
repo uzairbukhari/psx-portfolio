@@ -155,21 +155,21 @@ export function AhlImportDialog({
               {shown.length === 0 && <tr><td colSpan={9} className="muted">No rows to show.</td></tr>}
               {shown.map((row) => (
                 <tr key={row.trade.identity} className={`ir-${row.status}`}>
-                  <td>
+                  <td data-label="Trade date">
                     {row.date}
                     <small>settled {row.trade.settlementDate} · {row.trade.settlement}{row.dateCertainty === 'inferred' ? ' · date unconfirmed' : ''}</small>
                   </td>
-                  <td>{row.trade.kind}</td>
-                  <td><b>{row.trade.ticker}</b></td>
-                  <td className="num">{row.trade.shares}</td>
-                  <td className="num">{row.trade.priceSnapped ? row.trade.price.toFixed(2) : row.trade.price.toFixed(4)}{!row.trade.priceSnapped && <small>average of fills</small>}</td>
-                  <td className="num">{row.trade.fees.toFixed(2)}</td>
-                  <td className="num">{money(row.trade.netCash)}</td>
-                  <td>
+                  <td data-label="Side">{row.trade.kind}</td>
+                  <td data-label="Symbol"><b>{row.trade.ticker}</b></td>
+                  <td data-label="Qty" className="num">{row.trade.shares}</td>
+                  <td data-label="Price" className="num">{row.trade.priceSnapped ? row.trade.price.toFixed(2) : row.trade.price.toFixed(4)}{!row.trade.priceSnapped && <small>average of fills</small>}</td>
+                  <td data-label="Fees" className="num">{row.trade.fees.toFixed(2)}</td>
+                  <td data-label="Net cash" className="num">{money(row.trade.netCash)}</td>
+                  <td data-label="Status">
                     {STATUS_LABEL[row.status]}
                     {row.candidates.map((c) => <small key={c.id}>{c.reason}</small>)}
                   </td>
-                  <td>
+                  <td data-label="Decision">
                     {row.status === 'new' && row.needsResolution && (
                       <span className="ir-date">
                         <input type="date" aria-label={`Execution date for ${row.trade.ticker}`} defaultValue={row.trade.executionDate} max={row.trade.settlementDate}

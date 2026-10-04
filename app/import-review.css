@@ -50,3 +50,15 @@
 .import-fullscreen .ir-table th{top:0}
 @media(max-width:760px){.import-fullscreen .ir-head{padding:16px 52px 4px 16px}.import-fullscreen .ir-body{padding:4px 16px 20px}.import-fullscreen .ir-foot{padding:12px 16px}}
 .ir-table input[type=number]{padding:6px 8px!important;font-size:13px!important;width:90px}
+/* Phones: each table row becomes a stacked card so nothing runs off the screen sideways. */
+@media(max-width:760px){
+.import-fullscreen .ir-table-wrap{overflow:visible;border:0}
+.import-fullscreen .ir-table,.import-fullscreen .ir-table tbody,.import-fullscreen .ir-table tr,.import-fullscreen .ir-table td{display:block;width:100%}
+.import-fullscreen .ir-table thead{display:none}
+.import-fullscreen .ir-table tr{border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:6px 12px}
+.import-fullscreen .ir-table td{display:flex!important;justify-content:space-between;align-items:flex-start;gap:14px;border-bottom:0;padding:5px 0!important;text-align:right}
+.import-fullscreen .ir-table td[data-label]::before{content:attr(data-label);flex:none;color:var(--muted-foreground);font-size:12px;text-align:left}
+.import-fullscreen .ir-table td>small{max-width:none}
+.import-fullscreen .ir-table .num{text-align:right}
+.import-fullscreen .ir-table td[colspan]{display:block}
+}
