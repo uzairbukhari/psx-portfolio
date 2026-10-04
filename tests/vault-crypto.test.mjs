@@ -203,3 +203,19 @@ test('one Argon2id derivation stays within the runtime budget on this machine', 
   console.log(`# argon2id 64MiB t=3 p=1: ${ms.toFixed(0)} ms (Node ${process.version})`);
   assert.ok(ms < 15_000);
 });
+
+test('onKdfProgress reports the Argon2 derivation and unsubscribes cleanly', async () => {
+  v.setCryptoAdapter(web);
+  const vault = await v.createVaultKeys(PASSWORD);
+  const material = { ...vault.material, wrapperVersion: 1 };
+  const seen = [];
+  const stop = v.onKdfProgress((f) => seen.push(f));
+  await v.unwrapWithPassword(material, PASSWORD);
+  stop();
+  assert.ok(seen.length > 1, 'progress is reported while deriving');
+  assert.ok(seen.every((f, i) => f >= 0 && f <= 1 && (i === 0 || f >= seen[i - 1])), 'values rise from 0 to 1');
+  assert.equal(seen.at(-1), 1);
+  const before = seen.length;
+  await v.unwrapWithPassword(material, PASSWORD);
+  assert.equal(seen.length, before, 'no reports after unsubscribing');
+});
