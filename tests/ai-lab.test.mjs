@@ -151,3 +151,11 @@ test('privacy: research code and the AI Lab route never touch portfolios, holdin
     assert.ok(!/vaultDb|VAULT_DB|vault_portfolios|\bportfolios\b|monthlyPicks|aiLabRuns|holdings\(/i.test(text), `${file} must not reference private data`);
   }
 });
+
+test('OpenAI output ceiling leaves room for reasoning tokens; Anthropic does not', async () => {
+  const { resolveConfig, outputCeiling } = await import('../lib/ai-research/models.ts');
+  const openai = resolveConfig({});
+  assert.ok(outputCeiling(openai, 'read', 2500) >= 2500 + 2000);
+  assert.ok(outputCeiling(openai, 'rank', 6000) > outputCeiling(openai, 'read', 6000));
+  assert.equal(outputCeiling(resolveConfig({ AI_RESEARCH_PROVIDER: 'anthropic' }), 'read', 2500), 2500);
+});

@@ -3,7 +3,7 @@
 // and company report only when needed), bear review for the top names, and one ranking pass. Every model call is
 // reserved against the monthly cap before it is made.
 import { CapReachedError, Ledger, monthKey } from './ledger.ts';
-import { costOf, estimateTokens, resolveConfig, worstCaseCost, type AiConfig } from './models.ts';
+import { costOf, estimateTokens, outputCeiling, resolveConfig, worstCaseCost, type AiConfig } from './models.ts';
 import { PROMPTS, SCHEMAS, SOURCE_ALLOWLIST } from './prompts.ts';
 import { buildFactPack, median, stableFactsKey } from './factpack.ts';
 import { decideReuse, reportUsable, sha256Hex } from './reuse.ts';
@@ -60,7 +60,7 @@ export async function runResearch(input: PipelineInput): Promise<PipelineResult>
   /** One model call under the cap. Returns null when the cap blocks it; throws other errors. */
   async function call(request: AiRequest, ignoreHold = false) {
     const model = config.models[request.role];
-    const worst = worstCaseCost(model, estimateTokens(request.system + request.input), request.maxOutputTokens, request.webSearch?.maxUses ?? 0);
+    const worst = worstCaseCost(model, estimateTokens(request.system + request.input), outputCeiling(config, request.role, request.maxOutputTokens), request.webSearch?.maxUses ?? 0);
     let settle: (usd: number | null) => void;
     try { settle = ledger.reserve(worst, ignoreHold); } catch (error) {
       if (error instanceof CapReachedError) { capped = true; io.log(`cap: skipping ${request.stage} ($${worst.toFixed(3)} would exceed the monthly cap)`); return null; }
@@ -79,7 +79,7 @@ export async function runResearch(input: PipelineInput): Promise<PipelineResult>
   }
 
   // Keep money back for the ranking so company reports cannot use the whole budget.
-  ledger.setHold(worstCaseCost(config.models.rank, 6000 + input.tickers.length * 900, RANK_MAX_OUTPUT, 0));
+  ledger.setHold(worstCaseCost(config.models.rank, 6000 + input.tickers.length * 900, outputCeiling(config, 'rank', RANK_MAX_OUTPUT), 0));
 
   // 1. Macro brief: once a month, reused by every company call.
   let macro = await store.getMacro(month);
