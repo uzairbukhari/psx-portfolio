@@ -43,6 +43,7 @@ import {
   type PricePoint,
 } from '@/lib/price-history';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
+import { readJson } from '@/lib/safe-json';
 
 type Holding = {
   ticker: string;
@@ -126,7 +127,7 @@ function PriceChart({
     let live = true;
     fetch(`/api/price-history?ticker=${encodeURIComponent(ticker)}`)
       .then(async (r) => {
-        const d = (await r.json()) as History & { error?: string };
+        const d = (await readJson(r)) as History & { error?: string };
         if (!r.ok) throw Error(d.error ?? 'Could not load price history.');
         if (live) setLoaded({ key: requestKey, history: { eod: d.eod, intraday: d.intraday } });
       })

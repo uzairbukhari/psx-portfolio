@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { DataHealthResponse } from '@/lib/api-types';
+import { readJson } from '@/lib/safe-json';
 
 const ago = (iso: string | null, now: string) => {
   if (!iso) return 'never';
@@ -23,7 +24,7 @@ export default function SystemHealth() {
     setError(null);
     try {
       const res = await fetch('/api/admin/health', { cache: 'no-store' });
-      const body = (await res.json()) as DataHealthResponse & { error?: string };
+      const body = (await readJson(res)) as DataHealthResponse & { error?: string };
       if (!res.ok) throw new Error(body.error ?? 'Could not load system health.');
       setHealth(body);
     } catch (e) {

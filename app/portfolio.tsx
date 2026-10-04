@@ -115,6 +115,7 @@ import { canSaveCompany } from '@/lib/company-lookup-client';
 import { followQuoteJob, isPending, isProblem, jobMessage } from '@/lib/quote-refresh-client';
 import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
+import { readJson } from '@/lib/safe-json';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -505,7 +506,7 @@ function DashboardContent({
             body: JSON.stringify({ tickers }),
           })
         : await fetch(`/api/quotes?tickers=${tickers.join(',')}${since ? `&since=${encodeURIComponent(since)}` : ''}`);
-    const d = (await r.json()) as QuotesResponse & { error?: string };
+    const d = (await readJson(r)) as QuotesResponse & { error?: string };
     if (!r.ok) throw Error(d.error);
     return d;
   }

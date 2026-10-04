@@ -13,6 +13,7 @@ import type { Portfolio, Quote } from '@/lib/portfolio';
 import { applyLocalWatch, watchQuery } from '@/lib/market-watch';
 import { TabLoader } from './tab-loader';
 import { TickerLink } from './ticker-link';
+import { readJson } from '@/lib/safe-json';
 
 export interface PsxMarketPulseHandle {
   refresh: () => Promise<void>;
@@ -110,7 +111,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
     const res = await fetch(`/api/market-summary${query ? `?${query}` : ''}`, {
       method: refresh ? 'POST' : 'GET',
     });
-    const body = (await res.json()) as {
+    const body = (await readJson(res)) as {
       summary?: MarketSummary;
       fetchedAt?: string | null;
       error?: string;
@@ -327,7 +328,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
           </button>
         </div>
       </div>
-      {error && <p role="alert" className="notice error pulse-error">{error}</p>}
+      {error && !summary && <p className="notice pulse-error">Market data is unavailable right now. It will retry automatically.</p>}
       {summary?.breadth && summary.breadth.covered > 0 && (
         <p className="muted pulse-breadth">
           {summary.breadth.advances.toLocaleString()} up · {summary.breadth.declines.toLocaleString()} down · {summary.breadth.unchanged.toLocaleString()} unchanged

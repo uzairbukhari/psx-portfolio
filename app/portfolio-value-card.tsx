@@ -16,6 +16,7 @@ import {
   type ValuePoint,
   type ValueRange,
 } from '@/lib/price-history';
+import { readJson } from '@/lib/safe-json';
 
 const RANGES: [ValueRange, string][] = [
   ['1m', '1M'],
@@ -83,7 +84,7 @@ export default function PortfolioValueCard({
     let live = true;
     fetch(`/api/price-history?tickers=${encodeURIComponent(tickerKey)}`)
       .then(async (r) => {
-        const d = (await r.json()) as {
+        const d = (await readJson(r)) as {
           histories?: Record<string, { eod: number[][] }>;
           error?: string;
         };

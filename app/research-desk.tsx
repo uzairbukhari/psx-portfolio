@@ -42,6 +42,7 @@ import { TickerLink } from './ticker-link';
 import { onRunnerEvent, startResearchRunner, getRunArchive } from './research-runner';
 import { downloadRunSources } from './research-zip';
 import { applyResearchResult, unappliedJobs } from '@/lib/research-apply';
+import { readJson } from '@/lib/safe-json';
 
 type Props = {
   portfolio: Portfolio;
@@ -179,7 +180,7 @@ export default function ResearchDesk({
             (jobId ? `?job=${encodeURIComponent(jobId)}` : ''),
           { cache: 'no-store' },
         ),
-        data = (await response.json()) as {
+        data = (await readJson(response)) as {
           error?: string;
           jobs: Job[];
           events?: Event[];
@@ -196,7 +197,7 @@ export default function ResearchDesk({
         void (async () => {
           try {
             const result = await fetch(`/api/research/jobs?result=${encodeURIComponent(completed.id)}`, { cache: 'no-store' });
-            const body = (await result.json()) as { error?: string; result?: Record<string, unknown> };
+            const body = (await readJson(result)) as { error?: string; result?: Record<string, unknown> };
             if (!result.ok || !body.result) throw Error(body.error || 'The research result could not be loaded.');
             const next = applyResearchResult(portfolioRef.current, completed, body.result);
             await onSaveRef.current(next, `${completed.ticker} research dossier saved.`);
@@ -346,7 +347,7 @@ export default function ResearchDesk({
             settings,
           }),
         }),
-        data = (await response.json()) as { error?: string; job: Job };
+        data = (await readJson(response)) as { error?: string; job: Job };
       if (!response.ok)
         throw Error(data.error || 'Research could not be started.');
       setTicker('');
@@ -372,7 +373,7 @@ export default function ResearchDesk({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: job.id, action: name }),
         }),
-        data = (await response.json()) as { error?: string; job: Job };
+        data = (await readJson(response)) as { error?: string; job: Job };
       if (!response.ok)
         throw Error(data.error || 'Research could not be updated.');
       setJobOpen(data.job);
@@ -404,7 +405,7 @@ export default function ResearchDesk({
           `/api/research/jobs?ticker=${encodeURIComponent(value)}`,
           { method: 'DELETE' },
         ),
-        data = (await response.json()) as { error?: string };
+        data = (await readJson(response)) as { error?: string };
       if (!response.ok)
         throw Error(data.error || 'Research could not be deleted.');
       setJobs((prev) => prev.filter((job) => job.ticker !== value));

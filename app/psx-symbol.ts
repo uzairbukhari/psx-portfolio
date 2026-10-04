@@ -14,7 +14,7 @@ export async function verifyPsxSymbol(ticker: string): Promise<Quote> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tickers: [ticker] }),
   });
-  const data = (await response.json()) as QuoteResponse;
+  const data = ((await response.json().catch(() => ({ error: 'Price check is temporarily unavailable.' }))) as QuoteResponse);
   const quote = data.quotes?.[ticker];
   if (response.ok && quote) return quote;
   const reason = data.reasons?.[ticker] || data.error;
