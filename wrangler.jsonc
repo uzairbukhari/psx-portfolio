@@ -1,72 +1,78 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "psx-portfolio-sip",
-  "compatibility_date": "2026-05-22",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "psx-portfolio-sip",
-      "database_id": "f72a6264-371b-49ff-89e3-20eef1ce2b19",
-      "migrations_dir": "drizzle"
-    },
-    // PRIVATE vault database: ciphertext only (client-side encrypted portfolios and wrapped keys).
-    // Bound to this web Worker alone: never to workers/quote-refresh, scrapers or CI credentials.
-    // Create with `node scripts/ensure-vault-db.mjs --env production --create`, then migrate with
-    // `npx wrangler d1 migrations apply VAULT_DB --remote` (see docs/private-portfolio-release-runbook.md).
-    // While the id is the all-zeros placeholder, deploy.yml refuses to deploy production.
-    {
-      "binding": "VAULT_DB",
-      "database_name": "psx-portfolio-sip-vault",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "drizzle-vault"
-    }
-  ],
-  "vars": {
-    // Comma-separated list of Google account emails allowed to sign in.
-    // Empty (default) allows any verified Google account to sign up.
-    "ALLOWED_EMAILS": "",
-    // Public OAuth client ID from Google Cloud Console (not a secret).
-    "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
-    // Comma-separated iOS + Android OAuth client IDs (public, not secrets) whose Google
-    // ID tokens the native apps may exchange at /api/auth/mobile/google. Empty = off.
-    "GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
-    // Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
-    // data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
-    "GITHUB_REPO": "uzairbukhari/psx-portfolio",
-    // Deployment label; the staging Worker sets "staging", which shows a STAGING badge.
-    "APP_ENV": "production"
-  },
-  // Staging: a separate Worker + D1 database (see CLAUDE.md "Staging"). Wrangler
-  // environments do not inherit vars or bindings, so everything is repeated here.
-  // Selected with `CLOUDFLARE_ENV=staging` at build time / `--env staging`.
-  // Not deployed: the quote-refresh cron Worker, and no GITHUB_DISPATCH_TOKEN secret.
-  "env": {
-    "staging": {
-      "name": "psx-portfolio-sip-staging",
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "psx_portfolio_sip_staging",
-          // Created by the owner with `npx wrangler d1 create`. If this is ever reset
-          // to all zeros, the deploy-staging workflow skips deploying.
-          "database_id": "f4ee7f4b-bfe7-4dc3-95ab-475917aee59b",
-          "migrations_dir": "drizzle"
-        },
-        {
-          "binding": "VAULT_DB",
-          "database_name": "psx_portfolio_sip_staging_vault",
-          // Created by the deploy-staging workflow (scripts/ensure-vault-db.mjs) on first run.
-          "database_id": "00000000-0000-0000-0000-000000000000",
-          "migrations_dir": "drizzle-vault"
-        }
-      ],
-      "vars": {
-        "ALLOWED_EMAILS": "suzairbukhari@gmail.com",
-        "GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
-        "GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
-        "GITHUB_REPO": "uzairbukhari/psx-portfolio",
-        "APP_ENV": "staging"
-      }
-    }
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "psx-portfolio-sip",
+	"compatibility_date": "2026-05-22",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "psx-portfolio-sip",
+			"database_id": "f72a6264-371b-49ff-89e3-20eef1ce2b19",
+			"migrations_dir": "drizzle"
+		},
+		// PRIVATE vault database: ciphertext only (client-side encrypted portfolios and wrapped keys).
+		// Bound to this web Worker alone: never to workers/quote-refresh, scrapers or CI credentials.
+		// Create with `node scripts/ensure-vault-db.mjs --env production --create`, then migrate with
+		// `npx wrangler d1 migrations apply VAULT_DB --remote` (see docs/private-portfolio-release-runbook.md).
+		// While the id is the all-zeros placeholder, deploy.yml refuses to deploy production.
+		{
+			"binding": "VAULT_DB",
+			"database_name": "psx-portfolio-sip-vault",
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "drizzle-vault"
+		},
+		{
+			"binding": "psx_portfolio_sip_vault",
+			"database_name": "psx-portfolio-sip-vault",
+			"database_id": "17588802-cb21-4647-a639-568b210d6395",
+			"remote": true
+		}
+	],
+	"vars": {
+		// Comma-separated list of Google account emails allowed to sign in.
+		// Empty (default) allows any verified Google account to sign up.
+		"ALLOWED_EMAILS": "",
+		// Public OAuth client ID from Google Cloud Console (not a secret).
+		"GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+		// Comma-separated iOS + Android OAuth client IDs (public, not secrets) whose Google
+		// ID tokens the native apps may exchange at /api/auth/mobile/google. Empty = off.
+		"GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+		// Repo whose psx-facts.yml workflow the Worker dispatches to scrape PSX company
+		// data on demand (needs the GITHUB_DISPATCH_TOKEN secret; see CLAUDE.md).
+		"GITHUB_REPO": "uzairbukhari/psx-portfolio",
+		// Deployment label; the staging Worker sets "staging", which shows a STAGING badge.
+		"APP_ENV": "production"
+	},
+	// Staging: a separate Worker + D1 database (see CLAUDE.md "Staging"). Wrangler
+	// environments do not inherit vars or bindings, so everything is repeated here.
+	// Selected with `CLOUDFLARE_ENV=staging` at build time / `--env staging`.
+	// Not deployed: the quote-refresh cron Worker, and no GITHUB_DISPATCH_TOKEN secret.
+	"env": {
+		"staging": {
+			"name": "psx-portfolio-sip-staging",
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "psx_portfolio_sip_staging",
+					// Created by the owner with `npx wrangler d1 create`. If this is ever reset
+					// to all zeros, the deploy-staging workflow skips deploying.
+					"database_id": "f4ee7f4b-bfe7-4dc3-95ab-475917aee59b",
+					"migrations_dir": "drizzle"
+				},
+				{
+					"binding": "VAULT_DB",
+					"database_name": "psx_portfolio_sip_staging_vault",
+					// Created by the deploy-staging workflow (scripts/ensure-vault-db.mjs) on first run.
+					"database_id": "00000000-0000-0000-0000-000000000000",
+					"migrations_dir": "drizzle-vault"
+				}
+			],
+			"vars": {
+				"ALLOWED_EMAILS": "suzairbukhari@gmail.com",
+				"GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+				"GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+				"GITHUB_REPO": "uzairbukhari/psx-portfolio",
+				"APP_ENV": "staging"
+			}
+		}
+	}
 }
