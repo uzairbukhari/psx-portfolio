@@ -13,6 +13,7 @@ import { TabLoader } from './tab-loader';
 import { STATE_LABEL, useAiLabResearch } from './use-ai-lab';
 
 const MAX_SHORTLIST = 15;
+const NOT_PICKED = '__not_picked__';
 type Section = 'picks' | 'holdings' | 'log';
 const pct = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
 
@@ -52,10 +53,11 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
   // The results sit below the long company list, so bring a freshly generated run into view.
   const resultsRef = useRef<HTMLDivElement>(null);
   const [justRan, setJustRan] = useState<string | null>(null);
+  const scrolledTo = useRef<string | null>(null);
   useEffect(() => {
-    if (justRan && run?.id === justRan) {
+    if (justRan && run?.id === justRan && scrolledTo.current !== justRan) {
+      scrolledTo.current = justRan;
       resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setJustRan(null);
     }
   }, [justRan, run?.id]);
   const monthlyRun = run ? portfolio.monthlyPicksRuns?.find((r) => r.month === run.month && r.status === 'completed' && r.result) : undefined;
@@ -198,7 +200,7 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
             </label>
           )}
           <div ref={resultsRef}>
-            {run ? <AiLabRunView run={run} portfolio={portfolio} monthlyRun={monthlyRun} onOpenCompany={onOpenCompany} /> : <p className="muted">No AI Lab run yet. Prepare research, then generate picks.</p>}
+            {run ? <AiLabRunView key={run.id} run={run} portfolio={portfolio} monthlyRun={monthlyRun} onOpenCompany={onOpenCompany} /> : <p className="muted">No AI Lab run yet. Prepare research, then generate picks.</p>}
           </div>
         </>
       )}
@@ -248,6 +250,9 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
   const summary = useMemo(() => summarizeEstimates(estimates, run.amount), [estimates, run.amount]);
   const estimateOf = new Map(estimates.map((e) => [e.ticker, e]));
   const limits = explainSizing(result.sizing);
+  // One tab per pick (and one for the companies that were not picked), so the page stays short.
+  const [active, setActive] = useState<string>(result.picks[0]?.ticker ?? (result.excluded.length ? NOT_PICKED : ''));
+  const showPick = (ticker: string) => active === ticker;
   return (
     <section className="ai-lab__results">
       <div className="ai-lab__summary">
@@ -264,10 +269,27 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
       </div>
       {limits.length > 0 && <ul className="ai-lab__limits">{limits.map((line) => <li key={line}>{line}</li>)}</ul>}
 
-      {result.picks.map((pick) => {
+      {(result.picks.length > 0 || result.excluded.length > 0) && (
+        <div className="ai-lab__tabs" role="tablist" aria-label="Picks">
+          {result.picks.map((pick) => (
+            <button key={pick.ticker} type="button" role="tab" aria-selected={showPick(pick.ticker)}
+              className={`secondary compact${showPick(pick.ticker) ? ' ai-lab__tab--on' : ''}`} onClick={() => setActive(pick.ticker)}>
+              {pick.ticker} <span className="ai-lab__tab-pct">{pick.allocationPct}%</span>
+            </button>
+          ))}
+          {result.excluded.length > 0 && (
+            <button type="button" role="tab" aria-selected={active === NOT_PICKED}
+              className={`secondary compact${active === NOT_PICKED ? ' ai-lab__tab--on' : ''}`} onClick={() => setActive(NOT_PICKED)}>
+              Not picked ({result.excluded.length})
+            </button>
+          )}
+        </div>
+      )}
+
+      {result.picks.filter((pick) => showPick(pick.ticker)).map((pick) => {
         const est = estimateOf.get(pick.ticker);
         return (
-          <article key={pick.ticker} className="ai-lab__pick">
+          <article key={pick.ticker} className="ai-lab__pick" role="tabpanel">
             <div className="ai-lab__pick-head">
               <div>
                 <button type="button" className="link-button ticker" onClick={() => onOpenCompany(pick.ticker)}>{pick.ticker}</button>
@@ -299,8 +321,8 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
         );
       })}
 
-      {result.excluded.length > 0 && (
-        <details className="ai-lab__excluded" open={!result.picks.length}><summary>{result.excluded.length} shortlisted {result.excluded.length === 1 ? 'company was' : 'companies were'} not picked</summary>
+      {result.excluded.length > 0 && active === NOT_PICKED && (
+        <div className="ai-lab__excluded" role="tabpanel"><p className="muted">{result.excluded.length} shortlisted {result.excluded.length === 1 ? 'company was' : 'companies were'} not picked.</p>
           <ul className="ai-lab__list">{result.excluded.map((e) => <li key={e.ticker}><b>{e.ticker}</b> {e.reason}
             {e.view && (
               <details><summary>What the AI thinks</summary>
@@ -311,7 +333,7 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
               </details>
             )}
           </li>)}</ul>
-        </details>
+        </div>
       )}
 
       {monthlyRun?.result && (
