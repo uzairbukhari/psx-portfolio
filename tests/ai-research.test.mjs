@@ -166,7 +166,7 @@ test('verifier drops unsupported evidence, penalises conviction and blocks unver
   const { report, stats } = verifyReport(body, pack, seen);
   assert.equal(report.evidence.length, 2);
   assert.equal(stats.dropped, 3);
-  assert.equal(report.conviction, 25);
+  assert.equal(report.conviction, 34); // 40 minus 2 per dropped claim (3 dropped)
   assert.equal(report.holdingView.thesisState, 'weakened');
   assert.equal(report.holdingView.redFlags.length, 0);
   const verifiedSell = verifyReport({ ...body, holdingView: { ...body.holdingView, redFlags: [{ text: 'Qualified opinion', sourceUrl: 'https://www.brecorder.com/a', quote: 'auditor issued a qualified opinion' }] } }, pack, seen);
@@ -277,4 +277,14 @@ test('pdfToText reads text from a synthetic PDF in Node (the job runs on a GitHu
   const text = await pdfToText(bytes);
   assert.ok(text.length > 100);
   assert.match(text, /Account Opening Fee/);
+});
+
+test('older reports are rescored under the softer penalty, and the AI score is recoverable', async () => {
+  const { effectiveConviction, aiConviction, MAX_PENALTY } = await import('../lib/ai-research/verify.ts');
+  // Stored under the old rule: AI said 60, 6 claims dropped (-30), so 30 was saved.
+  const old = { claims: 10, verified: 4, dropped: 6, convictionPenalty: 30 };
+  assert.equal(effectiveConviction(30, old), 30 + 30 - MAX_PENALTY);
+  assert.equal(aiConviction(30, old), 60);
+  assert.equal(aiConviction(20, { ...old, bearAdjustment: -10 }), 60);
+  assert.equal(effectiveConviction(55, { claims: 4, verified: 4, dropped: 0, convictionPenalty: 0 }), 55);
 });

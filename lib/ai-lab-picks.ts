@@ -4,11 +4,13 @@
 import { applySizing, type HoldingValue } from './monthly-picks-allocation.ts';
 import { estimateMonthlyPicks, type MonthlyPick, type MonthlyPickEstimate, type MonthlyPicksResearch } from './monthly-picks.ts';
 import { reportUsable } from './ai-research/reuse.ts';
+import { aiConviction, effectiveConviction } from './ai-research/verify.ts';
 import type { PublicResearch, StoredReport } from './ai-research/types.ts';
 import { AI_LAB_VERSION, type AiLabPick, type AiLabResult } from './ai-lab-types.ts';
 import type { Portfolio } from './portfolio.ts';
 
-export const MIN_CONVICTION = 55;
+/** 50 is a neutral expectation versus the KSE-100, so anything at or above it is not a negative view. */
+export const MIN_CONVICTION = 50;
 export const MAX_PICKS = 5;
 
 export type AiLabInput = {
@@ -27,7 +29,11 @@ export function ineligibleReason(stored: StoredReport | undefined, now: Date): s
   if (!reportUsable(stored, now)) return 'The research is out of date or its sources did not check out. Prepare research again.';
   const c = stored.report;
   if (c.holdingView.thesisState === 'broken') return 'The case for owning this company looks broken, so it is not a candidate for new money.';
-  if (c.conviction < MIN_CONVICTION) return `Conviction ${c.conviction} is below ${MIN_CONVICTION}.`;
+  const conviction = effectiveConviction(c.conviction, stored.verification);
+  if (conviction < MIN_CONVICTION) {
+    const ai = aiConviction(c.conviction, stored.verification);
+    return `Conviction ${conviction} is below ${MIN_CONVICTION}${ai > conviction ? ` (the AI scored it ${ai}; unverified claims and the bear review took off ${ai - conviction})` : ''}.`;
+  }
   if (!(c.expectedReturn.basePct > 0)) return 'The expected 3-month return is not positive.';
   return null;
 }
@@ -48,20 +54,20 @@ export function buildAiLabResult(input: AiLabInput): AiLabResult {
   const ordered = [...eligible].sort((a, b) => {
     const ra = rankOf.get(a.ticker)?.rank ?? Infinity;
     const rb = rankOf.get(b.ticker)?.rank ?? Infinity;
-    return ra !== rb ? ra - rb : b.report.conviction - a.report.conviction;
+    return ra !== rb ? ra - rb : effectiveConviction(b.report.conviction, b.verification) - effectiveConviction(a.report.conviction, a.verification);
   });
   for (const dropped of ordered.slice(MAX_PICKS)) excluded.push({ ticker: dropped.ticker, reason: `Ranked below the top ${MAX_PICKS} of your shortlist.` });
   const top = ordered.slice(0, MAX_PICKS);
   // Model weight when the ranking has one; otherwise a share of 100 proportional to conviction.
-  const convictionTotal = top.reduce((s, r) => s + r.report.conviction, 0) || 1;
+  const convictionTotal = top.reduce((s, r) => s + effectiveConviction(r.report.conviction, r.verification), 0) || 1;
   const weights = top.map((r) => {
     const w = rankOf.get(r.ticker)?.modelWeightPct;
-    return w && w > 0 ? w : Math.round((r.report.conviction / convictionTotal) * 1000) / 10;
+    return w && w > 0 ? w : Math.round((effectiveConviction(r.report.conviction, r.verification) / convictionTotal) * 1000) / 10;
   });
   const picks: AiLabPick[] = top.map((r, i) => ({
     ticker: r.ticker, name: input.names[r.ticker] ?? r.ticker, rank: i + 1,
     allocationPct: Math.min(35, weights[i]),
-    conviction: rankOf.get(r.ticker)?.conviction ?? r.report.conviction,
+    conviction: rankOf.get(r.ticker)?.conviction ?? effectiveConviction(r.report.conviction, r.verification),
     expectedReturn: r.report.expectedReturn, thesis: r.report.thesis, bullCase: r.report.bullCase, bearCase: r.report.bearCase,
     bearReviewNote: r.report.bearReviewNote, catalysts: r.report.catalysts, risks: r.report.risks, evidence: r.report.evidence,
     note: rankOf.get(r.ticker)?.note ?? '', thesisState: r.report.holdingView.thesisState,

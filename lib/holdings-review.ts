@@ -3,6 +3,7 @@
 // never leaves the device. Advice only: nothing here places or schedules a trade.
 import { CONCENTRATION_CAP_PCT } from './monthly-picks-allocation.ts';
 import { reportUsable } from './ai-research/reuse.ts';
+import { effectiveConviction } from './ai-research/verify.ts';
 import type { PublicResearch } from './ai-research/types.ts';
 import type { HoldingSuggestion } from './ai-lab-types.ts';
 
@@ -43,16 +44,17 @@ export function reviewHoldings(positions: HeldPosition[], research: PublicResear
       };
     }
     const c = stored.report;
+    const conviction = effectiveConviction(c.conviction, stored.verification);
     const view = c.holdingView;
     const sources = [
       ...view.redFlags.map((f) => ({ label: f.text, url: f.sourceUrl })),
       ...c.evidence.filter((e) => e.sourceUrl).slice(0, 3).map((e) => ({ label: e.claim, url: e.sourceUrl })),
     ];
-    const common = { ...base, conviction: c.conviction, thesisState: view.thesisState, sources, researchedAt: stored.researchedAt, carriedForward: stored.carriedForward, watch: view.whatWouldMakeItASell };
+    const common = { ...base, conviction, thesisState: view.thesisState, sources, researchedAt: stored.researchedAt, carriedForward: stored.carriedForward, watch: view.whatWouldMakeItASell };
     const overweight = weightPct !== null && weightPct > CONCENTRATION_CAP_PCT;
 
     // Sell needs verified evidence: the research job already removed red flags it could not check.
-    if (view.redFlags.length > 0 && (view.thesisState === 'broken' || c.conviction < SELL_CONVICTION))
+    if (view.redFlags.length > 0 && (view.thesisState === 'broken' || conviction < SELL_CONVICTION))
       return { ...common, action: 'sell' as const, reasons: [c.thesis, ...view.redFlags.map((f) => `Red flag: ${f.text}`)] };
 
     if (overweight && p.value !== null && p.price && p.price > 0) {
@@ -62,10 +64,10 @@ export function reviewHoldings(positions: HeldPosition[], research: PublicResear
         reasons: [`This is ${weightPct}% of your portfolio, above the ${CONCENTRATION_CAP_PCT}% limit. Selling about ${Math.min(p.shares, Math.ceil(excess / p.price))} shares brings it back under.`, c.thesis],
       };
     }
-    if (view.stretchedValuation && c.conviction < TRIM_CONVICTION)
+    if (view.stretchedValuation && conviction < TRIM_CONVICTION)
       return { ...common, action: 'trim' as const, reasons: ['The price looks stretched against its own range and sector, and conviction is low.', c.valuationView] };
 
-    if (c.conviction >= ADD_CONVICTION && view.thesisState === 'intact' && !view.stretchedValuation &&
+    if (conviction >= ADD_CONVICTION && view.thesisState === 'intact' && !view.stretchedValuation &&
         c.expectedReturn.basePct >= ADD_MIN_EXPECTED_PCT && (weightPct === null || weightPct < ADD_MAX_WEIGHT_PCT))
       return { ...common, action: 'add' as const, reasons: [c.thesis, `Expected 3-month return about ${c.expectedReturn.basePct}% (range ${c.expectedReturn.lowPct}% to ${c.expectedReturn.highPct}%).`] };
 
