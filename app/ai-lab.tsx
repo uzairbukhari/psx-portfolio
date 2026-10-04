@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FlaskConical, Loader2, Microscope } from 'lucide-react';
 import { holdings, money, today, type Portfolio } from '@/lib/portfolio';
 import { buildAiLabResult, estimateAiLabBuys, recordAiLabRun } from '@/lib/ai-lab-picks';
@@ -48,6 +48,15 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
   const names = useMemo(() => Object.fromEntries(portfolio.companies.map((c) => [c.ticker, c.name])), [portfolio.companies]);
   const runs = portfolio.aiLabRuns ?? [];
   const run = runs.find((r) => r.id === selectedId) ?? runs[0] ?? null;
+  // The results sit below the long company list, so bring a freshly generated run into view.
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const [justRan, setJustRan] = useState<string | null>(null);
+  useEffect(() => {
+    if (justRan && run?.id === justRan) {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setJustRan(null);
+    }
+  }, [justRan, run?.id]);
   const monthlyRun = run ? portfolio.monthlyPicksRuns?.find((r) => r.month === run.month && r.status === 'completed' && r.result) : undefined;
 
   if (!lab.loaded) return <div className="ai-lab"><TabLoader label="Loading AI Lab…" /></div>;
@@ -72,8 +81,13 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
         holdings: positions.map((h) => ({ ticker: h.ticker, valuePkr: h.value })),
       });
       const next: AiLabRun = { id: crypto.randomUUID(), month, amount, feePct, shortlist: [...shortlist], createdAt: new Date().toISOString(), result };
-      await onSave({ ...portfolio, aiLabRuns: recordAiLabRun(portfolio.aiLabRuns, next) }, 'AI Lab run saved.');
+      const count = result.picks.length;
+      await onSave(
+        { ...portfolio, aiLabRuns: recordAiLabRun(portfolio.aiLabRuns, next) },
+        count ? `AI Lab run saved: ${count} ${count === 1 ? 'pick' : 'picks'}, shown below.` : 'AI Lab run saved: no company qualified, see the reasons below.',
+      );
       setSelectedId(next.id);
+      setJustRan(next.id);
     } catch (cause) {
       lab.setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -182,7 +196,9 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
               </select>
             </label>
           )}
-          {run ? <AiLabRunView run={run} portfolio={portfolio} monthlyRun={monthlyRun} onOpenCompany={onOpenCompany} /> : <p className="muted">No AI Lab run yet. Prepare research, then generate picks.</p>}
+          <div ref={resultsRef}>
+            {run ? <AiLabRunView run={run} portfolio={portfolio} monthlyRun={monthlyRun} onOpenCompany={onOpenCompany} /> : <p className="muted">No AI Lab run yet. Prepare research, then generate picks.</p>}
+          </div>
         </>
       )}
 
@@ -282,7 +298,7 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
       })}
 
       {result.excluded.length > 0 && (
-        <details className="ai-lab__excluded"><summary>{result.excluded.length} shortlisted {result.excluded.length === 1 ? 'company was' : 'companies were'} not picked</summary>
+        <details className="ai-lab__excluded" open={!result.picks.length}><summary>{result.excluded.length} shortlisted {result.excluded.length === 1 ? 'company was' : 'companies were'} not picked</summary>
           <ul className="ai-lab__list">{result.excluded.map((e) => <li key={e.ticker}><b>{e.ticker}</b> {e.reason}</li>)}</ul>
         </details>
       )}
