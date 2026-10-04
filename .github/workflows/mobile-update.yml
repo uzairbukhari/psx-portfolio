@@ -18,6 +18,11 @@ on:
         description: 'Update message (default: the commit subject)'
         required: false
         default: ''
+      channel:
+        description: 'Channel to publish to (merges to main always publish to staging)'
+        type: choice
+        options: [staging, production]
+        default: staging
 
 # Updates must land in merge order, and a started publish should finish rather than be cut off.
 concurrency:
@@ -66,10 +71,11 @@ jobs:
         run: npm run typecheck
       - if: steps.token.outputs.present == 'true'
         run: npm test
-      - name: Publish to the staging channel
+      - name: Publish over the air
         if: steps.token.outputs.present == 'true'
         env:
           MESSAGE: ${{ inputs.message || github.event.head_commit.message }}
+          CHANNEL: ${{ inputs.channel || 'staging' }}
         run: |
           subject="$(printf '%s' "$MESSAGE" | head -n1 | cut -c1-100)"
-          npm run update:staging -- --non-interactive --message "${subject:-Update from main} (${GITHUB_SHA::7})"
+          npm run "update:$CHANNEL" -- --non-interactive --message "${subject:-Update from main} (${GITHUB_SHA::7})"
