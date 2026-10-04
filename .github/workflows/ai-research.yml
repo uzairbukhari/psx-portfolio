@@ -25,6 +25,10 @@ on:
         description: 'Rewrite reports even when nothing changed'
         type: boolean
         default: false
+      no_cap:
+        description: 'Manual runs only: ignore the monthly cap, to measure the full cost. Spend is still recorded.'
+        type: boolean
+        default: false
 
 concurrency:
   group: ai-research
@@ -47,7 +51,7 @@ jobs:
       AI_RESEARCH_PROVIDER: ${{ vars.AI_RESEARCH_PROVIDER }}
       AI_RESEARCH_MODEL_READ: ${{ vars.AI_RESEARCH_MODEL_READ }}
       AI_RESEARCH_MODEL_RANK: ${{ vars.AI_RESEARCH_MODEL_RANK }}
-      AI_RESEARCH_MONTHLY_CAP_USD: ${{ vars.AI_RESEARCH_MONTHLY_CAP_USD }}
+      AI_RESEARCH_MONTHLY_CAP_USD: ${{ inputs.no_cap && '1000' || vars.AI_RESEARCH_MONTHLY_CAP_USD }}
       TICKERS: ${{ inputs.tickers }}
     steps:
       - name: Only the first Saturday of the month on schedule
