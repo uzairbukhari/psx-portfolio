@@ -87,6 +87,23 @@ function sourceTime(value: string) {
     : value;
 }
 
+// The server answer for a watch list is public market data, so the device keeps the last one (not the private
+// names/saved quotes the client folds in afterwards) to show instantly and to survive a Worker outage.
+const SAVED_KEY = 'sipwise:market-summary:v1';
+function loadSummary(tickers: string[]): { summary: MarketSummary; fetchedAt: string | null } | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`${SAVED_KEY}:${tickers.join(',')}`) ?? 'null');
+    return saved?.summary?.companies ? saved : null;
+  } catch {
+    return null;
+  }
+}
+function saveSummary(tickers: string[], summary: MarketSummary, fetchedAt: string | null) {
+  try {
+    localStorage.setItem(`${SAVED_KEY}:${tickers.join(',')}`, JSON.stringify({ summary, fetchedAt }));
+  } catch {}
+}
+
 export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   { onOpenShortlist, tickers, names, saved },
   ref,
@@ -106,7 +123,13 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   // Outside a session the saved closing values are shown and no refresh is requested.
   const sessionOpen = useRef(false);
 
+  // The Worker only does real refresh work on a POST, and the scraper keeps data current every ~10 minutes, so
+  // everything else is a cheap conditional GET and a POST is sent at most this often.
+  const lastPost = useRef(0);
+  const postDue = () => Date.now() - lastPost.current > 10 * 60_000;
+
   const request = useCallback(async (refresh = false, force = false) => {
+    if (refresh) lastPost.current = Date.now();
     const query = [force ? 'force=1' : '', watchQuery(watch.current.tickers)].filter(Boolean).join('&');
     const res = await fetch(`/api/market-summary${query ? `?${query}` : ''}`, {
       method: refresh ? 'POST' : 'GET',
@@ -117,6 +140,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
       error?: string;
     };
     if (!res.ok || !body.summary) throw Error(body.error || 'Market update failed.');
+    saveSummary(watch.current.tickers, body.summary, body.fetchedAt ?? null);
     setSummary({
       ...body.summary,
       companies: applyLocalWatch(body.summary.companies, watch.current.names, watch.current.saved, body.summary.quotes),
@@ -127,12 +151,22 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
   }, []);
 
   useEffect(() => {
+    // Paint the last answer saved on this device straight away; the request below only replaces it with newer data.
+    const saved = loadSummary(watch.current.tickers);
+    if (saved)
+      queueMicrotask(() => {
+        setSummary((current) => current ?? {
+          ...saved.summary,
+          companies: applyLocalWatch(saved.summary.companies, watch.current.names, watch.current.saved, saved.summary.quotes),
+        });
+        setFetchedAt((current) => current ?? saved.fetchedAt);
+      });
     const initial = window.setTimeout(() => void request().catch(() => {}), 0);
     const timer = window.setInterval(() => {
-      if (!document.hidden && !liveActive.current && sessionOpen.current) void request(true).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
-    }, 60_000);
+      if (!document.hidden && !liveActive.current && sessionOpen.current) void request(postDue()).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+    }, 120_000);
     const visible = () => {
-      if (!document.hidden) void request(sessionOpen.current).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
+      if (!document.hidden) void request(sessionOpen.current && postDue()).catch((reason) => setError(reason instanceof Error ? reason.message : 'Market update failed.'));
     };
     document.addEventListener('visibilitychange', visible);
     return () => {
