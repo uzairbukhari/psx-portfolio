@@ -51,6 +51,7 @@ test variable). Others in new files (`app/vault-gate.tsx` react-compiler notes, 
   forbids. Monthly Picks is the deterministic quant score plus local sizing.
 - `monthlyPicksRuns` lives inside the encrypted portfolio (newest 12), so history follows the user across devices.
 - Scrapers track tickers clients have already named (quotes, facts, history, lookups) instead of tickers users hold.
+- Mobile can unlock with fingerprint/face (opt-in): after a password unlock the data key is stored in the secure store with `requireAuthentication` (`mobile/src/vault/biometric-key*.ts`); the vault password stays the fallback and setup path. The key is removed on sign-out, erase, a failed decrypt, or when the OS invalidates it after a biometric change. No new native module, so it ships over the air. Unverified on a device.
 - Mobile has Lock now, backup and delete account. Change password and replace recovery key are web-only for now.
 - Staging seed writes a fictional plain ledger file to import through the app; it no longer writes a portfolio row.
 

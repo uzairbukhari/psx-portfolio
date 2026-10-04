@@ -1,7 +1,7 @@
 // Screens of the vault gate on the phone: create, save the recovery key, unlock, recover, erase. They only call into
 // the shared vault client; passwords and the recovery key are handled in component state and never persisted.
-import { useState } from 'react';
-import { Share, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, Share, Text, View } from 'react-native';
 import { prepareVault, TransportError, type PreparedVault, type VaultCache, type VaultSession, type VaultStatus, type VaultTransport } from '../../../lib/vault-client.ts';
 import { MIN_PASSWORD_CHARS, VaultError, decodeRecoverySecret } from '../../../lib/vault-crypto.ts';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -123,7 +123,7 @@ export function RecoveryKeyScreen({
 }
 
 export function UnlockScreen({
-  status, mode, setMode, transport, cache, email, onOpen, onErased, onSignOut, unlock, recover,
+  status, mode, setMode, transport, cache, email, onOpen, biometric, onErased, onSignOut, unlock, recover,
 }: {
   status: Extract<VaultStatus, { state: 'locked' }>;
   mode: 'password' | 'recover' | 'reset';
@@ -131,7 +131,9 @@ export function UnlockScreen({
   transport: VaultTransport;
   cache: VaultCache;
   email: string;
-  onOpen: (session: VaultSession) => void;
+  onOpen: (session: VaultSession, options?: { rememberBiometric?: boolean }) => void;
+  /** Fingerprint / face unlock: whether this phone can offer it, whether a key is stored, and how to use it. */
+  biometric: { canOffer: boolean; has: boolean; unlock: () => Promise<string | null> };
   onErased: () => void;
   onSignOut: () => void;
   unlock: (transport: VaultTransport, status: Extract<VaultStatus, { state: 'locked' }>, secret: { password: string } | { recovery: string }, cache: VaultCache) => Promise<VaultSession>;
@@ -143,12 +145,28 @@ export function UnlockScreen({
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [remember, setRemember] = useState(false);
+  async function useBiometric() {
+    setBusy(true);
+    setError('');
+    const problem = await biometric.unlock();
+    if (problem) { setError(problem); setBusy(false); }
+  }
+  // Offer the fingerprint prompt straight away, once per time the lock screen appears; Cancel falls back to the password.
+  const autoTried = useRef(false);
+  useEffect(() => {
+    if (mode === 'password' && biometric.has && !autoTried.current) {
+      autoTried.current = true;
+      void useBiometric();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [biometric.has, mode]);
   async function run(work: () => Promise<VaultSession | void>) {
     setBusy(true);
     setError('');
     try {
       const session = await work();
-      if (session) onOpen(session);
+      if (session) onOpen(session, { rememberBiometric: remember });
     } catch (e) {
       setError(messageOf(e));
       setBusy(false);
@@ -192,7 +210,14 @@ export function UnlockScreen({
     <Screen>
       <Header title="Unlock your vault" subtitle="Your portfolio is encrypted. Enter your vault password to open it. This is separate from your Google sign-in." />
       {status.offline ? <Notice tone="offline">You are offline. Your last saved copy can be opened, but changes cannot be saved until you reconnect.</Notice> : null}
+      {biometric.has ? <Button label="Unlock with fingerprint or face" disabled={busy} onPress={() => void useBiometric()} /> : null}
       <Input label="Vault password" {...passwordProps('current')} value={password} onChangeText={setPassword} editable={!busy} />
+      {biometric.canOffer && !biometric.has ? (
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: remember }} disabled={busy} onPress={() => setRemember(!remember)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ fontSize: 18 }}>{remember ? '☑' : '☐'}</Text>
+          <View style={{ flex: 1 }}><Muted>Unlock with fingerprint or face next time. The key stays on this phone, protected by your biometrics.</Muted></View>
+        </Pressable>
+      ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       <Button label={busy ? 'Unlocking…' : 'Unlock'} loading={busy} disabled={!password} onPress={() => void run(() => unlock(transport, status, { password }, cache))} />
       {busy ? <Muted>Deriving your key. This takes a few seconds.</Muted> : null}

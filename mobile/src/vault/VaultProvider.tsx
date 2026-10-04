@@ -5,11 +5,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, StyleSheet, Text, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PublicData } from '../../../lib/portfolio-view.ts';
-import { loadVaultStatus, recoverWithKey, unlockVault, TransportError, type PreparedVault, type VaultSession, type VaultStatus } from '../../../lib/vault-client.ts';
+import { loadVaultStatus, openWithKey, recoverWithKey, unlockVault, TransportError, type PreparedVault, type VaultSession, type VaultStatus } from '../../../lib/vault-client.ts';
 import { VaultError } from '../../../lib/vault-crypto.ts';
 import { useAuth } from '@/auth/AuthProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 import { type } from '@/theme/tokens';
+import { forgetBiometricKey, hasBiometricKey, recallBiometricKey, saveBiometricKey } from './biometric-key';
+import { nativeBiometricKeyStore } from './biometric-key-native';
 import { installMobileCrypto, type CryptoSetup } from './crypto-setup';
 import { createFileVaultCache, clearVaultCache, purgeLegacyPlaintextCache } from './file-cache';
 import { coversVault, shouldLockVault } from './lock-policy';
@@ -20,6 +22,8 @@ type VaultContextValue = {
   session: VaultSession;
   publicData: PublicData;
   lock: () => void;
+  /** Fingerprint / face unlock: whether this phone can do it, whether it is on, and a switch (returns a problem message or null). */
+  biometric: { supported: boolean; enabled: boolean; set: (on: boolean) => Promise<string | null> };
 };
 const VaultContext = createContext<VaultContextValue | null>(null);
 
@@ -50,6 +54,8 @@ export function VaultGate({ children }: { children: ReactNode }) {
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const sessionRef = useRef<VaultSession | null>(null);
   const backgroundedAt = useRef<number | null>(null);
+  const [bioOn, setBioOn] = useState(false);
+  const bioStore = nativeBiometricKeyStore;
 
   const transport = useMemo(() => mobileVaultTransport(api), [api]);
   const publicData = useMemo(() => mobilePublicData(api), [api]);
@@ -96,6 +102,14 @@ export function VaultGate({ children }: { children: ReactNode }) {
     };
   }, [transport, cache, email]);
 
+  const vaultId = view.kind === 'locked' ? view.status.vault.vaultId : view.kind === 'unlocked' ? view.session.vaultId : null;
+  useEffect(() => {
+    let alive = true;
+    if (!vaultId || !email) return setBioOn(false);
+    void hasBiometricKey(bioStore, email, vaultId).then((on) => alive && setBioOn(on));
+    return () => { alive = false; };
+  }, [vaultId, email, bioStore]);
+
   const unlocked = view.kind === 'unlocked';
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
@@ -109,14 +123,54 @@ export function VaultGate({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [lockNow]);
 
-  const open = useCallback((session: VaultSession) => {
+  const open = useCallback((session: VaultSession, options?: { rememberBiometric?: boolean }) => {
     sessionRef.current = session;
     setView({ kind: 'unlocked', session });
-  }, []);
+    // Opt-in from the unlock screen: only after the password (or recovery key) has just opened the vault.
+    if (options?.rememberBiometric) void saveBiometricKey(bioStore, email, session.vaultId, session.exportKey()).then(setBioOn);
+  }, [bioStore, email]);
+
+  /** Opens the vault with the biometric-protected key. Returns a message for the unlock screen, or null once open. */
+  const unlockWithBiometric = useCallback(
+    async (status: Extract<VaultStatus, { state: 'locked' }>): Promise<string | null> => {
+      const key = await recallBiometricKey(bioStore, email, status.vault.vaultId);
+      if (!key) return 'Fingerprint unlock was cancelled. Enter your vault password instead.';
+      try {
+        open(await openWithKey(transport, status, key, cache));
+        return null;
+      } catch (e) {
+        if (e instanceof VaultError) {
+          // The stored key no longer opens this vault (key rotated, vault replaced): drop it and use the password.
+          await forgetBiometricKey(bioStore, email);
+          setBioOn(false);
+          return 'Fingerprint unlock is no longer valid. Enter your vault password.';
+        }
+        return messageOf(e);
+      }
+    },
+    [bioStore, email, open, transport, cache],
+  );
+
+  const setBiometric = useCallback(
+    async (on: boolean): Promise<string | null> => {
+      const session = sessionRef.current;
+      if (!on) {
+        await forgetBiometricKey(bioStore, email);
+        setBioOn(false);
+        return null;
+      }
+      if (!session) return 'Unlock the vault first.';
+      if (!bioStore.available()) return 'Set up a fingerprint or face unlock on this phone first.';
+      const saved = await saveBiometricKey(bioStore, email, session.vaultId, session.exportKey());
+      setBioOn(saved);
+      return saved ? null : 'Fingerprint unlock was not turned on.';
+    },
+    [bioStore, email],
+  );
 
   const ctx = useMemo<VaultContextValue | null>(
-    () => (view.kind === 'unlocked' ? { session: view.session, publicData, lock: () => void lockNow() } : null),
-    [view, publicData, lockNow],
+    () => (view.kind === 'unlocked' ? { session: view.session, publicData, lock: () => void lockNow(), biometric: { supported: bioStore.available(), enabled: bioOn, set: setBiometric } } : null),
+    [view, publicData, lockNow, bioStore, bioOn, setBiometric],
   );
 
   let body: ReactNode;
@@ -146,7 +200,8 @@ export function VaultGate({ children }: { children: ReactNode }) {
         cache={cache}
         email={email}
         onOpen={open}
-        onErased={() => { clearVaultCache(email); void refresh(); }}
+        biometric={{ canOffer: bioStore.available(), has: bioOn, unlock: () => unlockWithBiometric(view.status) }}
+        onErased={() => { void forgetBiometricKey(bioStore, email); setBioOn(false); clearVaultCache(email); void refresh(); }}
         onSignOut={() => void signOut()}
         unlock={unlockVault}
         recover={recoverWithKey}
