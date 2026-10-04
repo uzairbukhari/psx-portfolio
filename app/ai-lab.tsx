@@ -34,6 +34,8 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
   const [saving, setSaving] = useState(false);
   // Companies the user ticked for research. Nothing is researched (or paid for) unless it is ticked here.
   const [chosen, setChosen] = useState<string[]>([]);
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
 
   const positions = useMemo(() => holdings(portfolio).filter((h) => h.shares > 0), [portfolio]);
   // One ticker list is sent for both features, so the server cannot tell the shortlist from what you hold.
@@ -41,6 +43,7 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
     () => [...new Set([...shortlist, ...positions.map((h) => h.ticker)])].slice(0, MAX_WATCH_TICKERS),
     [shortlist, positions],
   );
+  const heldSet = useMemo(() => new Set(positions.map((h) => h.ticker)), [positions]);
   const lab = useAiLabResearch(researchTickers);
   const names = useMemo(() => Object.fromEntries(portfolio.companies.map((c) => [c.ticker, c.name])), [portfolio.companies]);
   const runs = portfolio.aiLabRuns ?? [];
@@ -127,36 +130,37 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
                 <input type="number" inputMode="decimal" min="0" max="10" step="0.01" value={Number.isFinite(feePct) ? feePct : ''} onChange={(e) => setFeePct(Number(e.target.value))} />
               </label>
             </div>
-            <h3>Shortlist <span className="mp-count">{shortlist.length}/{MAX_SHORTLIST}</span></h3>
-            <div className="ai-lab__picker">
-              {portfolio.companies.map((c) => {
-                const state = lab.stateOf(c.ticker);
-                const on = shortlist.includes(c.ticker);
-                return (
-                  <label key={c.ticker} className={`ai-lab__option${on ? ' ai-lab__option--on' : ''}`}>
-                    <input type="checkbox" checked={on} onChange={() => toggle(c.ticker)} disabled={!on && shortlist.length >= MAX_SHORTLIST} />
-                    <span><b>{c.ticker}</b><small>{c.name}</small></span>
-                    <em className={`ai-lab__state ai-lab__state--${state}`}>{STATE_LABEL[state]}</em>
-                  </label>
-                );
-              })}
+            <div className="ai-lab__list-head">
+              <h3>Companies <span className="mp-count">{shortlist.length}/{MAX_SHORTLIST} shortlisted</span> <span className="mp-count">{picked.length} to research</span></h3>
+              <input type="search" className="ai-lab__search" placeholder="Filter by ticker or name" aria-label="Filter companies" value={query} onChange={(e) => setQuery(e.target.value)} />
+            </div>
+            <p className="muted ai-lab__small">Shortlist decides what the picks are chosen from. Research is optional and only the ticked companies are sent; anything already researched is reused for free.</p>
+            <div className="ai-lab__table" role="table" aria-label="Companies">
+              <div className="ai-lab__row ai-lab__row--head" role="row">
+                <span role="columnheader">Shortlist</span><span role="columnheader">Company</span><span role="columnheader">Status</span><span role="columnheader">Research</span>
+              </div>
+              <div className="ai-lab__rows">
+                {portfolio.companies.filter((c) => !q || c.ticker.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)).map((c) => {
+                  const state = lab.stateOf(c.ticker);
+                  const on = shortlist.includes(c.ticker);
+                  const researchable = researchTickers.includes(c.ticker);
+                  const busyNow = state === 'queued' || state === 'researching';
+                  return (
+                    <div key={c.ticker} role="row" className={`ai-lab__row${on ? ' ai-lab__row--on' : ''}`}>
+                      <label className="ai-lab__cell-check" aria-label={`Shortlist ${c.ticker}`}>
+                        <input type="checkbox" checked={on} onChange={() => toggle(c.ticker)} disabled={!on && shortlist.length >= MAX_SHORTLIST} />
+                      </label>
+                      <span className="ai-lab__who"><b>{c.ticker}</b><small>{c.name}{heldSet.has(c.ticker) ? ' · held' : ''}</small></span>
+                      <em className={`ai-lab__state ai-lab__state--${state}`}>{STATE_LABEL[state]}</em>
+                      <label className="ai-lab__cell-check" aria-label={`Research ${c.ticker}`}>
+                        <input type="checkbox" checked={chosen.includes(c.ticker)} disabled={!researchable || busyNow || !enabled} onChange={() => toggleChosen(c.ticker)} />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             {overLimit && <p className="mp-hint mp-hint--warn">Research requests cover up to {MAX_WATCH_TICKERS} companies at a time (shortlist first, then holdings).</p>}
-            <h3>Research <span className="mp-count">{picked.length} selected</span></h3>
-            <p className="muted ai-lab__small">Tick only the companies you want researched. Anything already researched is reused and costs nothing. Nothing is researched until you press the button.</p>
-            <div className="ai-lab__picker">
-              {researchTickers.map((t) => {
-                const state = lab.stateOf(t);
-                const busyNow = state === 'queued' || state === 'researching';
-                return (
-                  <label key={t} className={`ai-lab__option${chosen.includes(t) ? ' ai-lab__option--on' : ''}`}>
-                    <input type="checkbox" checked={chosen.includes(t)} disabled={busyNow || !enabled} onChange={() => toggleChosen(t)} />
-                    <span><b>{t}</b><small>{names[t] ?? ''}</small></span>
-                    <em className={`ai-lab__state ai-lab__state--${state}`}>{STATE_LABEL[state]}</em>
-                  </label>
-                );
-              })}
-            </div>
             <div className="ai-lab__actions">
               {needing.length > 0 && <button type="button" className="link-button" onClick={() => setChosen(needing)}>Select all without research ({needing.length})</button>}
               {picked.length > 0 && <button type="button" className="link-button" onClick={() => setChosen([])}>Clear</button>}
@@ -164,9 +168,7 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
                 {lab.requesting ? <Loader2 className="spin" size={16} /> : <Microscope size={16} />}
                 {picked.length ? `Research selected (${picked.length})` : lab.working ? 'Research running…' : 'Select companies to research'}
               </button>
-            </div>
-            <div className="ai-lab__actions">
-              <button type="button" disabled={busy || saving || !enabled || !shortlist.length || !amountValid} onClick={() => void generate()}>
+              <button type="button" className="ai-lab__generate" disabled={busy || saving || !enabled || !shortlist.length || !amountValid} onClick={() => void generate()}>
                 {saving ? <Loader2 className="spin" size={16} /> : <FlaskConical size={16} />} Generate AI picks
               </button>
             </div>

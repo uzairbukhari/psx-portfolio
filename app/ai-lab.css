@@ -97,3 +97,27 @@
 .ai-lab .ai-lab__holding-side { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ai-lab .ai-lab__tick { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; font-size: 13px; font-weight: 500; cursor: pointer; }
 .ai-lab .ai-lab__tick input { width: 16px; height: 16px; padding: 0; accent-color: var(--primary); }
+
+/* One combined company table: shortlist + research ticks */
+.ai-lab .ai-lab__list-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 16px; }
+.ai-lab .ai-lab__list-head h3 { margin: 0; flex-wrap: wrap; }
+.ai-lab .ai-lab__search { width: 240px; max-width: 100%; padding: 8px 12px; font-size: 14px; }
+.ai-lab .ai-lab__table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.ai-lab .ai-lab__rows { max-height: 320px; overflow-y: auto; }
+.ai-lab .ai-lab__row { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto 76px; align-items: center; gap: 10px; padding: 7px 14px; border-top: 1px solid var(--border); }
+.ai-lab .ai-lab__rows .ai-lab__row:first-child { border-top: 0; }
+.ai-lab .ai-lab__row--head { padding: 8px 14px; border-top: 0; border-bottom: 1px solid var(--border); background: rgba(255, 255, 255, .03); font-size: 11.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--muted-foreground); }
+.ai-lab .ai-lab__row--head span:first-child, .ai-lab .ai-lab__row--head span:last-child, .ai-lab .ai-lab__cell-check { justify-self: center; }
+.ai-lab .ai-lab__row--on { background: rgba(59, 130, 246, .07); }
+.ai-lab .ai-lab__cell-check { display: flex; margin: 0; cursor: pointer; }
+.ai-lab .ai-lab__cell-check input { width: 16px; height: 16px; padding: 0; margin: 0; accent-color: var(--primary); }
+.ai-lab .ai-lab__who { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.ai-lab .ai-lab__who b { font-size: 14px; }
+.ai-lab .ai-lab__who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-lab .ai-lab__row .ai-lab__state { grid-area: auto; justify-self: end; white-space: nowrap; }
+.ai-lab .ai-lab__generate { margin-left: auto; }
+@media (max-width: 560px) {
+  .ai-lab .ai-lab__row { grid-template-columns: 56px minmax(0, 1fr) 56px; }
+  .ai-lab .ai-lab__row > .ai-lab__state, .ai-lab .ai-lab__row--head span:nth-child(3) { display: none; }
+  .ai-lab .ai-lab__search { width: 100%; }
+}
