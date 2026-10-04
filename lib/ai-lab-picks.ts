@@ -47,7 +47,13 @@ export function buildAiLabResult(input: AiLabInput): AiLabResult {
   const eligible: StoredReport[] = [];
   for (const ticker of input.shortlist) {
     const reason = ineligibleReason(byTicker.get(ticker), now);
-    if (reason) excluded.push({ ticker, reason });
+    const stored = byTicker.get(ticker);
+    if (reason) {
+      const r = stored?.report;
+      excluded.push(r
+        ? { ticker, reason, view: { thesis: r.thesis, valuation: r.valuationView, expectedReturnPct: r.expectedReturn.basePct, risks: r.risks.slice(0, 3) } }
+        : { ticker, reason });
+    }
     else eligible.push(byTicker.get(ticker)!);
   }
   // Order by the model's ranking when it covers the company, otherwise by conviction; keep the best five.

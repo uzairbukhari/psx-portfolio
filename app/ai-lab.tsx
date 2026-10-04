@@ -300,7 +300,16 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
 
       {result.excluded.length > 0 && (
         <details className="ai-lab__excluded" open={!result.picks.length}><summary>{result.excluded.length} shortlisted {result.excluded.length === 1 ? 'company was' : 'companies were'} not picked</summary>
-          <ul className="ai-lab__list">{result.excluded.map((e) => <li key={e.ticker}><b>{e.ticker}</b> {e.reason}</li>)}</ul>
+          <ul className="ai-lab__list">{result.excluded.map((e) => <li key={e.ticker}><b>{e.ticker}</b> {e.reason}
+            {e.view && (
+              <details><summary>What the AI thinks</summary>
+                <p>{e.view.thesis}</p>
+                <p><b>Valuation.</b> {e.view.valuation}</p>
+                <p><b>Expected 3-month return.</b> {pct(e.view.expectedReturnPct)}</p>
+                {e.view.risks.length > 0 && <ul className="ai-lab__list ai-lab__risks">{e.view.risks.map((risk) => <li key={risk}>{risk}</li>)}</ul>}
+              </details>
+            )}
+          </li>)}</ul>
         </details>
       )}
 

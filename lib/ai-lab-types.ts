@@ -29,7 +29,8 @@ export type AiLabPick = {
 };
 export type AiLabResult = {
   picks: AiLabPick[];
-  excluded: { ticker: string; reason: string }[];
+  /** `view` is the AI's own reading of the company, so you can judge a low score instead of taking it on trust. */
+  excluded: { ticker: string; reason: string; view?: { thesis: string; valuation: string; expectedReturnPct: number; risks: string[] } }[];
   unallocatedPct: number;
   outlook: string;
   macroSummary: string;
