@@ -16,18 +16,20 @@ type Props = {
   stateOf: (ticker: string) => ResearchState;
   requesting: boolean;
   enabled: boolean;
-  onRequest: (tickers: string[]) => void;
+  chosen: string[];
+  onToggle: (ticker: string) => void;
+  picked: string[];
+  onResearchPicked: () => void;
   onOpenCompany: (ticker: string) => void;
 };
 
 /** Combines the public research with the user's own positions. The position data stays on this device. */
-export default function AiLabHoldings({ portfolio, research, stateOf, requesting, enabled, onRequest, onOpenCompany }: Props) {
+export default function AiLabHoldings({ portfolio, research, stateOf, requesting, enabled, chosen, onToggle, picked, onResearchPicked, onOpenCompany }: Props) {
   const suggestions = useMemo(() => {
     const positions = holdings(portfolio).filter((h) => h.shares > 0)
       .map((h) => ({ ticker: h.ticker, name: h.name, shares: h.shares, value: h.value, price: h.quote?.price ?? null, cost: h.cost }));
     return reviewHoldings(positions, research);
   }, [portfolio, research]);
-  const missing = suggestions.filter((s) => s.action === 'review').map((s) => s.ticker).filter((t) => !['queued', 'researching'].includes(stateOf(t)));
 
   if (!suggestions.length) return <section className="ai-lab__panel"><p className="muted">You hold nothing yet, so there is nothing to review.</p></section>;
   return (
@@ -37,9 +39,9 @@ export default function AiLabHoldings({ portfolio, research, stateOf, requesting
           <h3>Holdings review</h3>
           <p className="muted">Keep, add, trim or sell for each company you hold. The AI judges the company from public data; your weight, gain and the 20% limit are applied here on your device. Advice only: nothing is sold for you.</p>
         </div>
-        {missing.length > 0 && (
-          <button type="button" className="secondary" disabled={!enabled || requesting} onClick={() => onRequest(missing)}>
-            {requesting ? <Loader2 className="spin" size={16} /> : <Microscope size={16} />} Prepare research ({missing.length})
+        {picked.length > 0 && (
+          <button type="button" className="secondary" disabled={!enabled || requesting} onClick={onResearchPicked}>
+            {requesting ? <Loader2 className="spin" size={16} /> : <Microscope size={16} />} Research selected ({picked.length})
           </button>
         )}
       </div>
@@ -51,7 +53,12 @@ export default function AiLabHoldings({ portfolio, research, stateOf, requesting
                 <button type="button" className="link-button ticker" onClick={() => onOpenCompany(s.ticker)}>{s.ticker}</button>
                 <small>{s.name}</small>
               </div>
-              <span className={`ai-lab__action ai-lab__action--${s.action}`}>{LABEL[s.action]}</span>
+              <span className="ai-lab__holding-side">
+                {!['queued', 'researching'].includes(stateOf(s.ticker)) && (s.action === 'review' || stateOf(s.ticker) === 'stale') && (
+                  <label className="ai-lab__tick"><input type="checkbox" checked={chosen.includes(s.ticker)} disabled={!enabled} onChange={() => onToggle(s.ticker)} /> Research</label>
+                )}
+                <span className={`ai-lab__action ai-lab__action--${s.action}`}>{LABEL[s.action]}</span>
+              </span>
             </div>
             <div className="ai-lab__facts">
               {s.weightPct !== null && <span>{s.weightPct}% of portfolio</span>}

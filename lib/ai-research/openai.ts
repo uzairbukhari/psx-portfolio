@@ -1,5 +1,5 @@
 // OpenAI Responses API adapter: strict JSON-schema output, optional web search restricted to an allowlist.
-import type { AiConfig } from './models.ts';
+import { outputCeiling, type AiConfig } from './models.ts';
 import { parseJsonOutput, ProviderError, withRetries, type AiProvider, type AiRequest, type AiResponse } from './provider.ts';
 
 type OutputItem = { type?: string; content?: { type?: string; text?: string; annotations?: { type?: string; url?: string; title?: string }[] }[] };
@@ -17,7 +17,7 @@ export function openaiProvider(config: AiConfig, apiKey: string, fetchImpl: type
       instructions: request.system,
       input: request.input,
       store: false,
-      max_output_tokens: request.maxOutputTokens,
+      max_output_tokens: outputCeiling(config, request.role, request.maxOutputTokens),
       reasoning: { effort: config.effort[request.role] },
       text: { format: { type: 'json_schema', name: request.schemaName, schema: request.schema, strict: true } },
     };

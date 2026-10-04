@@ -46,6 +46,12 @@ export function resolveConfig(env: Env): AiConfig {
   };
 }
 
+/** OpenAI counts hidden reasoning tokens against max_output_tokens, so the ceiling needs room beyond the visible JSON. */
+const OPENAI_REASONING_HEADROOM = { low: 2000, medium: 6000, high: 10000 } as const;
+export function outputCeiling(config: AiConfig, role: ModelRole, visibleTokens: number): number {
+  return config.provider === 'openai' ? visibleTokens + OPENAI_REASONING_HEADROOM[config.effort[role]] : visibleTokens;
+}
+
 export const priceOf = (model: string): ModelPrice => MODEL_PRICES[model] ?? UNKNOWN_PRICE;
 
 export type Usage = { inputTokens: number; outputTokens: number; cachedTokens: number; searches: number };

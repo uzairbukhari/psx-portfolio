@@ -32,6 +32,8 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
   const [shortlist, setShortlist] = useState<string[]>(initial.slice(0, MAX_SHORTLIST));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Companies the user ticked for research. Nothing is researched (or paid for) unless it is ticked here.
+  const [chosen, setChosen] = useState<string[]>([]);
 
   const positions = useMemo(() => holdings(portfolio).filter((h) => h.shares > 0), [portfolio]);
   // One ticker list is sent for both features, so the server cannot tell the shortlist from what you hold.
@@ -48,6 +50,12 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
   if (!lab.loaded) return <div className="ai-lab"><TabLoader label="Loading AI Lab…" /></div>;
   const enabled = lab.data?.enabled !== false;
   const needing = researchTickers.filter((t) => !['ready', 'carried', 'queued', 'researching'].includes(lab.stateOf(t)));
+  const picked = chosen.filter((t) => researchTickers.includes(t) && !['queued', 'researching'].includes(lab.stateOf(t)));
+  const toggleChosen = (ticker: string) => setChosen((list) => (list.includes(ticker) ? list.filter((t) => t !== ticker) : [...list, ticker]));
+  async function researchPicked() {
+    await lab.request(picked);
+    setChosen((list) => list.filter((t) => !picked.includes(t)));
+  }
   const overLimit = shortlist.length + positions.filter((h) => !shortlist.includes(h.ticker)).length > MAX_WATCH_TICKERS;
 
   async function generate() {
@@ -134,11 +142,30 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
               })}
             </div>
             {overLimit && <p className="mp-hint mp-hint--warn">Research requests cover up to {MAX_WATCH_TICKERS} companies at a time (shortlist first, then holdings).</p>}
+            <h3>Research <span className="mp-count">{picked.length} selected</span></h3>
+            <p className="muted ai-lab__small">Tick only the companies you want researched. Anything already researched is reused and costs nothing. Nothing is researched until you press the button.</p>
+            <div className="ai-lab__picker">
+              {researchTickers.map((t) => {
+                const state = lab.stateOf(t);
+                const busyNow = state === 'queued' || state === 'researching';
+                return (
+                  <label key={t} className={`ai-lab__option${chosen.includes(t) ? ' ai-lab__option--on' : ''}`}>
+                    <input type="checkbox" checked={chosen.includes(t)} disabled={busyNow || !enabled} onChange={() => toggleChosen(t)} />
+                    <span><b>{t}</b><small>{names[t] ?? ''}</small></span>
+                    <em className={`ai-lab__state ai-lab__state--${state}`}>{STATE_LABEL[state]}</em>
+                  </label>
+                );
+              })}
+            </div>
             <div className="ai-lab__actions">
-              <button type="button" className="secondary" disabled={!enabled || lab.requesting || !needing.length} onClick={() => void lab.request(needing)}>
+              {needing.length > 0 && <button type="button" className="link-button" onClick={() => setChosen(needing)}>Select all without research ({needing.length})</button>}
+              {picked.length > 0 && <button type="button" className="link-button" onClick={() => setChosen([])}>Clear</button>}
+              <button type="button" className="secondary" disabled={!enabled || lab.requesting || !picked.length} onClick={() => void researchPicked()}>
                 {lab.requesting ? <Loader2 className="spin" size={16} /> : <Microscope size={16} />}
-                {needing.length ? `Prepare research (${needing.length})` : lab.working ? 'Research running…' : 'Research is ready'}
+                {picked.length ? `Research selected (${picked.length})` : lab.working ? 'Research running…' : 'Select companies to research'}
               </button>
+            </div>
+            <div className="ai-lab__actions">
               <button type="button" disabled={busy || saving || !enabled || !shortlist.length || !amountValid} onClick={() => void generate()}>
                 {saving ? <Loader2 className="spin" size={16} /> : <FlaskConical size={16} />} Generate AI picks
               </button>
@@ -159,7 +186,7 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
 
       {section === 'holdings' && lab.data && (
         <AiLabHoldings portfolio={portfolio} research={lab.data} stateOf={lab.stateOf} requesting={lab.requesting} enabled={enabled}
-          onRequest={(list) => void lab.request(list)} onOpenCompany={onOpenCompany} />
+          chosen={chosen} onToggle={toggleChosen} picked={picked} onResearchPicked={() => void researchPicked()} onOpenCompany={onOpenCompany} />
       )}
 
       {section === 'log' && lab.data && (
