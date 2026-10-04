@@ -9,6 +9,7 @@ import { applyAhlLedgerPlan, planAhlLedgerImport, planIsNoop, type RowResolution
 import type { IpoLookup } from '@/lib/ipo-offers';
 import { money, type Portfolio } from '@/lib/portfolio';
 import './import-review.css';
+import { readJson } from '@/lib/safe-json';
 
 const STATUS_LABEL = { new: 'New', duplicate: 'Already in ledger', 'previously-removed': 'Removed earlier', ambiguous: 'Needs decision' } as const;
 const CATEGORY_LABEL: Record<string, string> = {
@@ -48,7 +49,7 @@ export function AhlImportDialog({
     if (!tickers) return null;
     const response = await fetch(`/api/ipo-offers?tickers=${tickers}`);
     if (!response.ok) return null;
-    const data = (await response.json()) as IpoOffersResponse;
+    const data = (await readJson(response)) as IpoOffersResponse;
     setIpo((current) => ({ ...current, ...Object.fromEntries(data.lookups.map((l) => [l.ticker, l])) }));
     return data;
   }
@@ -70,7 +71,7 @@ export function AhlImportDialog({
       const response = await fetch('/api/ipo-offers', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: [ticker] }),
       });
-      const data = (await response.json()) as IpoOffersResponse & { error?: string };
+      const data = (await readJson(response)) as IpoOffersResponse & { error?: string };
       if (!response.ok) throw new Error(data.error);
       setIpoNote((n) => ({ ...n, [ticker]: data.message ?? '' }));
       for (let i = 0; i < 40 && data.queued?.length; i++) {

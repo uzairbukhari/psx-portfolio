@@ -15,6 +15,7 @@ import { money, today, type Portfolio } from '@/lib/portfolio';
 import { historicalTickers } from '@/lib/dividend-history';
 import { useConfirm } from '@/components/confirm-dialog';
 import './import-review.css';
+import { readJson } from '@/lib/safe-json';
 
 const OVERALL: Record<DividendRefreshResponse['overall'], { label: string; tone: 'ok' | 'bad' | 'wait' | '' }> = {
   idle: { label: 'Not fetched yet', tone: '' },
@@ -61,7 +62,7 @@ export function DividendSyncView({
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/dividends/refresh?tickers=${encodeURIComponent(tickersRef.current.join(','))}`);
-    const body = (await response.json()) as DividendRefreshResponse & { error?: string };
+    const body = (await readJson(response)) as DividendRefreshResponse & { error?: string };
     if (!response.ok) throw new Error(body.error);
     setData(body);
     return body;
@@ -72,7 +73,7 @@ export function DividendSyncView({
     let live = true;
     void fetch(`/api/dividends/refresh?tickers=${tickerQuery}`)
       .then(async (response) => {
-        const body = (await response.json()) as DividendRefreshResponse & { error?: string };
+        const body = (await readJson(response)) as DividendRefreshResponse & { error?: string };
         if (!response.ok) throw new Error(body.error);
         if (live) setData(body);
       })
@@ -100,7 +101,7 @@ export function DividendSyncView({
     const ticket = ++poll.current;
     try {
       const response = await fetch('/api/dividends/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: tickersRef.current }) });
-      const body = (await response.json()) as DividendRefreshResponse & { error?: string };
+      const body = (await readJson(response)) as DividendRefreshResponse & { error?: string };
       if (!response.ok) throw new Error(body.error);
       setData(body);
       setNote(body.message ?? '');
@@ -133,7 +134,7 @@ export function DividendSyncView({
       try {
         const get = async () => {
           const response = await fetch(`/api/face-values?tickers=${encodeURIComponent(tickersRef.current.join(','))}`);
-          const body = (await response.json()) as FaceValuesResponse & { error?: string };
+          const body = (await readJson(response)) as FaceValuesResponse & { error?: string };
           if (!response.ok) throw new Error(body.error);
           return body;
         };
@@ -144,7 +145,7 @@ export function DividendSyncView({
         if (missing && unresolvedFaceRef.current.length && !fvRequested.current && body.dispatchEnabled && body.overall !== 'queued' && body.overall !== 'running') {
           fvRequested.current = true;
           const response = await fetch('/api/face-values', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: unresolvedFaceRef.current }) });
-          if (response.ok) body = (await response.json()) as FaceValuesResponse;
+          if (response.ok) body = (await readJson(response)) as FaceValuesResponse;
           if (!live) return;
           setFv(body);
         }

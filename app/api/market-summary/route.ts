@@ -35,6 +35,10 @@ const MIN_REFRESH_MS = OPEN_TTL_MS;
 const PSX_BUDGET = 35;
 /** Shortlist tickers refreshed per POST and pyPSX intraday calls per request. */
 const MAX_INTRADAY = 10;
+/** Day-change fallback only needs the latest few closes; D1 trims the rest so the Worker never parses years of history. */
+const RECENT_CLOSES = 5;
+/** Intraday index ticks kept for the chart (newest). */
+const MAX_INDEX_TICKS = 400;
 const FORCE_COOLDOWN = { windowMs: 60_000, max: 1 };
 
 /** PSX prints "2026-10-02 15:11:00" in Pakistan time (UTC+5). */
@@ -81,7 +85,7 @@ async function marketView(
 ) {
   // Priced from the shared per-ticker quote cache the scheduled scraper keeps current; Cloudflare never
   // fetches company prices itself (PSX refuses its network).
-  const quotes: Record<string, Quote> = mergeQuotes({}, await readQuoteRows(db()), shortlist);
+  const quotes: Record<string, Quote> = mergeQuotes({}, await readQuoteRows(db(), shortlist), shortlist);
   const fallback = Object.fromEntries(
     Object.entries(quotes).map(([ticker, quote]) => [
       ticker,
@@ -120,7 +124,7 @@ async function marketView(
   if (needsChange.length) {
     const rows = await db()
       .prepare(
-        `SELECT ticker, eod FROM price_history WHERE ticker IN (${needsChange.map(() => '?').join(',')})`,
+        `SELECT ticker, (SELECT json_group_array(json(value)) FROM (SELECT value FROM json_each(price_history.eod) ORDER BY json_extract(value,'$[0]') DESC LIMIT ${RECENT_CLOSES})) AS eod FROM price_history WHERE ticker IN (${needsChange.map(() => '?').join(',')})`,
       )
       .bind(...needsChange)
       .all<{ ticker: string; eod: string }>()
@@ -138,10 +142,15 @@ async function marketView(
   );
   // The Worker cannot reach PSX's index ticks; the history scraper stores them.
   const indexRow = await db()
-    .prepare("SELECT intraday FROM price_history WHERE ticker='KSE100'")
+    .prepare(
+      `SELECT (SELECT json_group_array(json(value)) FROM (SELECT value FROM json_each(price_history.intraday) ORDER BY json_extract(value,'$[0]') DESC LIMIT ${MAX_INDEX_TICKS})) AS intraday FROM price_history WHERE ticker='KSE100'`,
+    )
     .first<{ intraday: string }>()
     .catch(() => null);
-  const scraped: [number, number][] = indexRow ? JSON.parse(indexRow.intraday) : [];
+  let scraped: [number, number][] = [];
+  try {
+    scraped = indexRow ? (JSON.parse(indexRow.intraday) as [number, number][]).reverse() : [];
+  } catch {}
   const series = scraped.length > 1
     ? scraped.map(([time, value]) => ({ time, value }))
     : (cache.series ?? []);
