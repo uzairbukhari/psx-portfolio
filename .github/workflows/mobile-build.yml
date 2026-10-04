@@ -75,7 +75,7 @@ jobs:
       - name: Check the app config
         env:
           PROFILE: ${{ inputs.profile }}
-        run: APP_VARIANT="$PROFILE" npx expo config --json > /dev/null
+        run: EAS_BUILD=true APP_VARIANT="$PROFILE" npx expo config --json > /dev/null
       - name: Queue the Android build
         env:
           PROFILE: ${{ inputs.profile }}

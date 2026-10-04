@@ -16,7 +16,10 @@ const VARIANTS = {
 const variant = (process.env.APP_VARIANT || 'staging') as keyof typeof VARIANTS;
 const v = VARIANTS[variant] ?? VARIANTS.staging;
 // A production build or update without its environment would ship an app that cannot sign in or load data.
-if (variant === 'production') {
+// `eas build` first reads this file on the runner with only the profile's own env (the EAS environment is attached
+// later, in the cloud), so the check applies where the variables are guaranteed: the cloud build and `npm run update:*`.
+const envComplete = process.env.EAS_BUILD === 'true' || (process.env.npm_lifecycle_event ?? '').startsWith('update:');
+if (variant === 'production' && envComplete) {
   const missing = [!v.api && 'API_BASE_URL', !process.env.GOOGLE_WEB_CLIENT_ID && 'GOOGLE_WEB_CLIENT_ID'].filter(Boolean);
   if (missing.length) throw new Error(`APP_VARIANT=production needs ${missing.join(' and ')}. Use the EAS production environment (npm run update:production) or set them locally.`);
 }
