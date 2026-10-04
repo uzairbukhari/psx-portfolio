@@ -37,7 +37,8 @@ export function findByName(listJson, name) {
 }
 
 function wrangler(args) {
-  return execFileSync('npx', ['wrangler', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  // On Windows npx is npx.cmd, which Node only starts through a shell. The arguments are fixed words and a database name from VAULT_DB_NAMES.
+  return execFileSync('npx', ['wrangler', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32' });
 }
 
 export function main(argv = process.argv.slice(2)) {
