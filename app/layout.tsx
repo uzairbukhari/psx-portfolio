@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import './ledger.css';
 import './picks.css';
+import './ai-lab.css';
 import './reports.css';
 import './settings.css';
 

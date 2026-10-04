@@ -1,0 +1,36 @@
+import { env } from 'cloudflare:workers';
+import { dispatchConfig } from '@/lib/dispatch-config';
+import { readPublicResearch, requestResearch, RESEARCH_REQUEST_LIMIT } from '@/lib/ai-lab-server';
+import { cleanWatchTickers } from '@/lib/market-watch';
+import { takeRateLimit, waitText } from '@/lib/rate-limit';
+import { db, failure, requireSuperAdmin } from '@/lib/server';
+import { UserError } from '@/lib/user-error';
+
+const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+
+/**
+ * AI Lab research for client-named tickers (super admin only). Public analysis only: the client names tickers, the
+ * server returns stored reports, the ranking and this month's spend. No amount, holding or portfolio is involved.
+ */
+export async function GET(req: Request) {
+  try {
+    await requireSuperAdmin(req);
+    const tickers = cleanWatchTickers(new URL(req.url).searchParams.get('tickers'));
+    return json(await readPublicResearch(db(), tickers, env));
+  } catch (error) { return failure(error); }
+}
+
+export async function POST(req: Request) {
+  try {
+    const owner = await requireSuperAdmin(req, true);
+    const body = (await req.json()) as { tickers?: unknown };
+    const tickers = cleanWatchTickers(Array.isArray(body.tickers) ? body.tickers.join(',') : null);
+    if (!tickers.length) throw new UserError('Choose companies to research.');
+    const limit = await takeRateLimit(db(), owner, 'ai-lab-research', RESEARCH_REQUEST_LIMIT);
+    if (!limit.allowed)
+      throw new UserError(`Research requests are limited to ${RESEARCH_REQUEST_LIMIT.max} a day. Try again in ${waitText(limit.retryAfterMs)}.`, 429);
+    const outcome = await requestResearch(db(), dispatchConfig(), tickers, env);
+    if (!outcome.queued.length && outcome.reason) throw new UserError(outcome.reason, 409);
+    return json(outcome);
+  } catch (error) { return failure(error); }
+}

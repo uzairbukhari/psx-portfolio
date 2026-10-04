@@ -54,6 +54,18 @@ Evidence comes from PSX itself, not from an AI web search. For each shortlisted 
 Ranking and sizing run on your device (`lib/picks-run.ts`, `lib/picks-local.ts`). The server only returns public analysis for the tickers the client names (`GET /api/recommendations?tickers=`, built by `lib/public-analysis.ts`: facts, quotes and the quant score) and can dispatch an on-demand facts scrape (`POST {action:'refresh-facts', tickers}`, limited to 10 a day per account, `rate_limits`). There is no AI ranking, because that would send your money and holdings to a provider. The client ranks the shortlist with the deterministic quant score, applies the 35% per-pick and 20% concentration limits against its own decrypted holdings (`lib/monthly-picks-allocation.ts`), and stores the finished run in the encrypted portfolio (`monthlyPicksRuns`, newest 12). A run is `completed`, or `failed` when PSX returned no usable data for any shortlisted company; progress (`lib/monthly-picks-progress.ts`) reflects real gathered-company counts, never elapsed time.
 
 Production for this checkout is `https://psx-portfolio-sip.suzairbukhari.workers.dev`. The older ChatGPT Sites publication is a separate deployment, not proof that this Worker has been updated. 
+## AI Lab (experimental, super admin only)
+
+A separate **AI Lab** tab (web only) offers AI-researched monthly picks and a holdings review. Monthly Picks is untouched.
+
+- **Privacy**: the AI only ever sees public data and tickers. One combined list (shortlist plus holdings, up to 25) goes to the research job, so neither the server nor the provider can tell what you hold. Ranking, sizing (35% per pick, 20% concentration) and the keep/add/trim/sell/review calls are made on the device after decrypting your portfolio.
+- **Research job**: `scripts/ai-research.mjs` runs in GitHub Actions (`ai-research.yml`: first Saturday of the month, or on demand from the tab; `ai-research-staging.yml`: manual, staging DB only, $1 cap). It writes shared public research to the `ai_*` tables.
+- **Budget**: hard cap of $5 per calendar month (`AI_RESEARCH_MONTHLY_CAP_USD`). Worst-case cost is reserved before each call and money is held back for the final ranking. Stored research is reused unless inputs changed, the price moved more than 10%, or it is older than 35 days.
+- **Provider**: OpenAI by default (gpt-5-mini reads, gpt-5 ranks); switch to Claude with the provider env vars (see `lib/ai-research/models.ts`). Kill switch: `AI_LAB_ENABLED=false`.
+- **Verification in code**: every cited fact key must exist in the fact pack, quotes must appear in the source text we hold, and unverified red flags cannot produce a "sell"; dropped claims reduce conviction.
+
+Not built yet: the scorecard / track-record job and an admin run log.
+
 ## Development & deployment
 
 - Node >=22.13; install with npm and preserve package-lock.json.
