@@ -1,3 +1,5 @@
+import { forgetBiometricKey } from '@/vault/biometric-key';
+import { nativeBiometricKeyStore } from '@/vault/biometric-key-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
@@ -76,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearQueries: () => queryClient.clear(),
       clearPortfolioCache: (account) => {
         clearVaultCache(account);
+        // The fingerprint-protected vault key goes with the account.
+        void forgetBiometricKey(nativeBiometricKeyStore, account);
         purgeLegacyPlaintextCache();
       },
       clearPushPreference: pushPreference.clear,

@@ -92,3 +92,57 @@ test('public data requests carry tickers only', async () => {
   await data.requestLookup(['NEWCO']);
   assert.deepEqual(seen, ['/api/public-data?tickers=MEBL%2CLUCK', '/api/companies?tickers=MEBL', '/api/companies {"tickers":["NEWCO"]}']);
 });
+
+test('biometric key: saved behind the biometric, recalled, forgotten, and never stored when unavailable', async () => {
+  const { biometricKeyName, saveBiometricKey, recallBiometricKey, hasBiometricKey, forgetBiometricKey } = await import('./biometric-key.ts');
+  const items = new Map<string, string>();
+  let available = true;
+  const store = {
+    available: () => available,
+    getMarker: async (n: string) => items.get(n) ?? null,
+    setMarker: async (n: string, v: string) => void items.set(n, v),
+    setSecret: async (n: string, v: string) => void items.set(n, v),
+    getSecret: async (n: string) => items.get(n) ?? null,
+    remove: async (n: string) => void items.delete(n),
+  };
+  const key = nodeRandom(32);
+  assert.match(biometricKeyName('Me@Example.com'), /^sipwise\.vaultkey\.[0-9a-f]{16}$/);
+  assert.equal(biometricKeyName('Me@Example.com'), biometricKeyName(' me@example.com '));
+  assert.ok(![...items.keys()].some((k) => k.includes('example')));
+  available = false;
+  assert.equal(await saveBiometricKey(store, 'me@example.com', 'vault-1', key), false);
+  assert.equal(items.size, 0, 'nothing is stored when the phone cannot bind a key to the biometric');
+  available = true;
+  assert.equal(await hasBiometricKey(store, 'me@example.com', 'vault-1'), false);
+  assert.equal(await saveBiometricKey(store, 'me@example.com', 'vault-1', key), true);
+  assert.equal(await hasBiometricKey(store, 'me@example.com', 'vault-1'), true);
+  assert.deepEqual(await recallBiometricKey(store, 'me@example.com', 'vault-1'), key);
+  assert.equal(await recallBiometricKey(store, 'me@example.com', 'vault-2'), null, 'a key for another vault is not offered');
+  assert.equal(await recallBiometricKey(store, 'other@example.com', 'vault-1'), null, 'another account has no key');
+  await forgetBiometricKey(store, 'me@example.com');
+  assert.equal(items.size, 0);
+  assert.equal(await recallBiometricKey(store, 'me@example.com', 'vault-1'), null);
+});
+
+test('biometric key: a cancelled prompt or a failing store yields null, a wrong-length key is rejected', async () => {
+  const { saveBiometricKey, recallBiometricKey } = await import('./biometric-key.ts');
+  const items = new Map<string, string>();
+  let failRead = false;
+  const store = {
+    available: () => true,
+    getMarker: async (n: string) => items.get(n) ?? null,
+    setMarker: async (n: string, v: string) => void items.set(n, v),
+    setSecret: async (n: string, v: string) => void items.set(n, v),
+    getSecret: async (n: string) => { if (failRead) throw new Error('user cancelled'); return items.get(n) ?? null; },
+    remove: async (n: string) => void items.delete(n),
+  };
+  await saveBiometricKey(store, 'me@example.com', 'v', nodeRandom(32));
+  failRead = true;
+  assert.equal(await recallBiometricKey(store, 'me@example.com', 'v'), null);
+  failRead = false;
+  await saveBiometricKey(store, 'me@example.com', 'v', nodeRandom(16));
+  assert.equal(await recallBiometricKey(store, 'me@example.com', 'v'), null);
+  const broken = { ...store, setSecret: async () => { throw new Error('keystore unavailable'); } };
+  assert.equal(await saveBiometricKey(broken, 'me@example.com', 'v', nodeRandom(32)), false);
+  assert.equal(items.size, 0, 'a failed save leaves no marker behind');
+});

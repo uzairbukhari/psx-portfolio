@@ -200,6 +200,26 @@ export default function More() {
           />
         </View>
       </Card>
+      {vault.biometric.supported ? (
+        <Card>
+          <View style={styles.row}>
+            {iconBox('lock')}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.strong}>Unlock vault with fingerprint or face</Text>
+              <Muted>Skip typing the vault password. Your vault password still works, and you need it if your fingerprints change.</Muted>
+            </View>
+            <Switch
+              accessibilityLabel="Unlock vault with fingerprint or face"
+              value={vault.biometric.enabled}
+              trackColor={{ true: colors.primary, false: colors.line }}
+              thumbColor={colors.surface}
+              onValueChange={(on) => {
+                void vault.biometric.set(on).then((problem) => problem && setError(problem));
+              }}
+            />
+          </View>
+        </Card>
+      ) : null}
       <SectionLabel>Signed-in devices</SectionLabel>
       {devices.error ? <Notice tone="error">{devices.error.message}</Notice> : null}
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
