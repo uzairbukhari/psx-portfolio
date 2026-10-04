@@ -7,7 +7,7 @@ import { costOf, estimateTokens, outputCeiling, resolveConfig, worstCaseCost, ty
 import { PROMPTS, SCHEMAS, SOURCE_ALLOWLIST } from './prompts.ts';
 import { buildFactPack, median, stableFactsKey } from './factpack.ts';
 import { decideReuse, reportUsable, sha256Hex } from './reuse.ts';
-import { verifyReport, type SeenSources } from './verify.ts';
+import { MAX_BEAR_ADJUSTMENT, verifyReport, type SeenSources } from './verify.ts';
 import { type AiProvider, type AiRequest } from './provider.ts';
 import type { ResearchStore } from './store.ts';
 import type { CompanyReport, FactPack, MacroBrief, Ranking, RankingEntry, ReuseDecision, StoredReport } from './types.ts';
@@ -217,9 +217,12 @@ export async function runResearch(input: PipelineInput): Promise<PipelineResult>
       });
       if (!response) break;
       const review = asRecord(response.json);
-      const adjust = Math.max(-20, Math.min(0, Math.round(Number(review.convictionAdjustment) || 0)));
+      const adjust = Math.max(-MAX_BEAR_ADJUSTMENT, Math.min(0, Math.round(Number(review.convictionAdjustment) || 0)));
       const note = typeof review.strongestCase === 'string' ? review.strongestCase.slice(0, 1500) : undefined;
-      await store.putReport({ ...candidate, report: { ...candidate.report, conviction: Math.max(0, candidate.report.conviction + adjust), bearReviewNote: note } });
+      await store.putReport({
+        ...candidate, report: { ...candidate.report, conviction: Math.max(0, candidate.report.conviction + adjust), bearReviewNote: note },
+        verification: { ...candidate.verification, bearAdjustment: adjust },
+      });
     } catch (error) { io.log(`${candidate.ticker}: bear review failed - ${error instanceof Error ? error.message : String(error)}`); }
   }
 

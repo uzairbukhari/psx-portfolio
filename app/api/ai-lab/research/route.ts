@@ -1,7 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { dispatchConfig } from '@/lib/dispatch-config';
-import { readPublicResearch, requestResearch } from '@/lib/ai-lab-server';
-import { cleanWatchTickers } from '@/lib/market-watch';
+import { cleanAiLabTickers, readPublicResearch, requestResearch } from '@/lib/ai-lab-server';
 import { db, failure, requireSuperAdmin } from '@/lib/server';
 import { UserError } from '@/lib/user-error';
 
@@ -14,7 +13,7 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 export async function GET(req: Request) {
   try {
     await requireSuperAdmin(req);
-    const tickers = cleanWatchTickers(new URL(req.url).searchParams.get('tickers'));
+    const tickers = cleanAiLabTickers(new URL(req.url).searchParams.get('tickers'));
     return json(await readPublicResearch(db(), tickers, env));
   } catch (error) { return failure(error); }
 }
@@ -23,7 +22,7 @@ export async function POST(req: Request) {
   try {
     await requireSuperAdmin(req, true);
     const body = (await req.json()) as { tickers?: unknown };
-    const tickers = cleanWatchTickers(Array.isArray(body.tickers) ? body.tickers.join(',') : null);
+    const tickers = cleanAiLabTickers(body.tickers);
     if (!tickers.length) throw new UserError('Choose companies to research.');
     const outcome = await requestResearch(db(), dispatchConfig(), tickers, env);
     if (!outcome.queued.length && outcome.reason) throw new UserError(outcome.reason, 409);

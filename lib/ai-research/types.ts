@@ -65,7 +65,7 @@ export type StoredReport = {
   model: string;
   verification: VerificationStats;
 };
-export type VerificationStats = { claims: number; verified: number; dropped: number; convictionPenalty: number };
+export type VerificationStats = { claims: number; verified: number; dropped: number; convictionPenalty: number; bearAdjustment?: number };
 
 export type MacroBrief = {
   month: string;

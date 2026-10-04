@@ -44,8 +44,24 @@ function checkEvidence(item: ReportEvidence, pack: FactPack, seen: SeenSources):
   return sourceHolds(item.sourceUrl, item.quote, seen);
 }
 
-export const PENALTY_PER_DROPPED = 5;
-export const MAX_PENALTY = 30;
+export const PENALTY_PER_DROPPED = 2;
+export const MAX_PENALTY = 10;
+/** The most a bear review may mark a report down. */
+export const MAX_BEAR_ADJUSTMENT = 10;
+
+/**
+ * Conviction under the current, softer penalty rules. Reports stored before the change carry a bigger penalty
+ * (5 per dropped claim, up to 30) inside `conviction`; add that back and apply today's rule instead.
+ */
+export function effectiveConviction(conviction: number, v: VerificationStats): number {
+  const current = Math.min(MAX_PENALTY, v.dropped * PENALTY_PER_DROPPED);
+  return Math.max(0, Math.min(100, Math.round(conviction + v.convictionPenalty - current)));
+}
+
+/** What the AI itself scored before source checks and the bear review marked it down. */
+export function aiConviction(conviction: number, v: VerificationStats): number {
+  return Math.max(0, Math.min(100, Math.round(conviction + v.convictionPenalty - (v.bearAdjustment ?? 0))));
+}
 
 export function verifyReport(report: CompanyReport, pack: FactPack, seen: SeenSources): { report: CompanyReport; stats: VerificationStats } {
   const evidence = report.evidence.map((item) => ({ ...item, verified: checkEvidence(item, pack, seen) }));

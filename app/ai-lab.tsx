@@ -6,7 +6,7 @@ import { holdings, money, today, type Portfolio } from '@/lib/portfolio';
 import { buildAiLabResult, estimateAiLabBuys, recordAiLabRun } from '@/lib/ai-lab-picks';
 import { summarizeEstimates } from '@/lib/monthly-picks';
 import { explainSizing } from '@/lib/monthly-picks-allocation';
-import { MAX_WATCH_TICKERS } from '@/lib/market-watch';
+import { AI_LAB_MAX_TICKERS } from '@/lib/market-watch';
 import type { AiLabRun } from '@/lib/ai-lab-types';
 import AiLabHoldings from './ai-lab-holdings';
 import { TabLoader } from './tab-loader';
@@ -38,10 +38,11 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
   const q = query.trim().toLowerCase();
 
   const positions = useMemo(() => holdings(portfolio).filter((h) => h.shares > 0), [portfolio]);
-  // One ticker list is sent for both features, so the server cannot tell the shortlist from what you hold.
+  // Every company in the portfolio can be researched. One ticker list is sent for all features (shortlist first, then
+  // holdings, then the rest), so the server cannot tell the shortlist from what you hold.
   const researchTickers = useMemo(
-    () => [...new Set([...shortlist, ...positions.map((h) => h.ticker)])].slice(0, MAX_WATCH_TICKERS),
-    [shortlist, positions],
+    () => [...new Set([...shortlist, ...positions.map((h) => h.ticker), ...portfolio.companies.map((c) => c.ticker)])].slice(0, AI_LAB_MAX_TICKERS),
+    [shortlist, positions, portfolio.companies],
   );
   const heldSet = useMemo(() => new Set(positions.map((h) => h.ticker)), [positions]);
   const lab = useAiLabResearch(researchTickers);
@@ -68,7 +69,7 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
     await lab.request(picked);
     setChosen((list) => list.filter((t) => !picked.includes(t)));
   }
-  const overLimit = shortlist.length + positions.filter((h) => !shortlist.includes(h.ticker)).length > MAX_WATCH_TICKERS;
+  const overLimit = new Set([...shortlist, ...portfolio.companies.map((c) => c.ticker)]).size > AI_LAB_MAX_TICKERS;
 
   async function generate() {
     if (!lab.data) return;
@@ -174,7 +175,7 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
                 })}
               </div>
             </div>
-            {overLimit && <p className="mp-hint mp-hint--warn">Research requests cover up to {MAX_WATCH_TICKERS} companies at a time (shortlist first, then holdings).</p>}
+            {overLimit && <p className="mp-hint mp-hint--warn">Research covers up to {AI_LAB_MAX_TICKERS} companies (shortlist first, then holdings).</p>}
             <div className="ai-lab__actions">
               {needing.length > 0 && <button type="button" className="link-button" onClick={() => setChosen(needing)}>Select all without research ({needing.length})</button>}
               {picked.length > 0 && <button type="button" className="link-button" onClick={() => setChosen([])}>Clear</button>}

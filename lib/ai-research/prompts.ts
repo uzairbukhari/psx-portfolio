@@ -27,7 +27,7 @@ Task: update the research report for one company for the next 60-90 days. You ar
 
   bear: `${COMMON}
 
-Task: you are the bear reviewer. You are given a draft research report and the fact pack it was based on. Make the strongest honest case against the report's conclusion, check whether each evidence item really supports its claim, and flag anything stale, unsupported or contradicted by the fact pack. Return issues (each naming the claim and the problem), a one-paragraph strongest case against, and convictionAdjustment: a whole number from -20 to 0 reflecting how much the report should be marked down. Use 0 if the report holds up.`,
+Task: you are the bear reviewer. You are given a draft research report and the fact pack it was based on. Make the strongest honest case against the report's conclusion, check whether each evidence item really supports its claim, and flag anything stale, unsupported or contradicted by the fact pack. Return issues (each naming the claim and the problem), a one-paragraph strongest case against, and convictionAdjustment: a whole number from -10 to 0 reflecting how much the report should be marked down. Use 0 if the report holds up.`,
 
   rank: `${COMMON}
 
