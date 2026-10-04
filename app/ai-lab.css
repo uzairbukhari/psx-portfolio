@@ -93,3 +93,7 @@
   .ai-lab .ai-lab__pick-money { text-align: left; }
   .ai-lab .ai-lab__actions button { flex: 1 1 100%; }
 }
+
+.ai-lab .ai-lab__holding-side { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ai-lab .ai-lab__tick { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; font-size: 13px; font-weight: 500; cursor: pointer; }
+.ai-lab .ai-lab__tick input { width: 16px; height: 16px; padding: 0; accent-color: var(--primary); }
