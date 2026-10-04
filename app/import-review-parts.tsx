@@ -22,7 +22,7 @@ export function ReviewShell({
 }) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !busy) onCancel(); }}>
-      <DialogContent className="import-review import-fullscreen">
+      <DialogContent className="import-review import-fullscreen top-0 left-0 translate-x-0 translate-y-0 sm:max-w-none">
         <div className="ir-head">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
