@@ -204,7 +204,7 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
   const limits = explainSizing(result.sizing);
   return (
     <section className="ai-lab__results">
-      <header className="ai-lab__summary">
+      <div className="ai-lab__summary">
         <div>
           <p className="eyebrow">AI LAB PICKS · {run.month}</p>
           <h3>{result.picks.length ? `${result.picks.length} ${result.picks.length === 1 ? 'pick' : 'picks'} for ${money(run.amount)}` : 'No company qualified this month'}</h3>
@@ -215,7 +215,7 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
           <div><dt>Allocated</dt><dd>{money(summary.allocatedPkr)}</dd></div>
           <div><dt>Cash kept</dt><dd>{money(summary.plannedCashPkr)}</dd></div>
         </dl>
-      </header>
+      </div>
       {limits.length > 0 && <ul className="ai-lab__limits">{limits.map((line) => <li key={line}>{line}</li>)}</ul>}
 
       {result.picks.map((pick) => {

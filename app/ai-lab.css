@@ -1,36 +1,95 @@
-.ai-lab { display: grid; gap: 16px; }
-.ai-lab__hero { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.ai-lab__spend { font-size: 13px; color: var(--muted-foreground); }
-.ai-lab__tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.ai-lab__tabs button { border: 1px solid var(--border); background: transparent; color: var(--muted-foreground); border-radius: 999px; padding: 6px 14px; font: inherit; cursor: pointer; }
-.ai-lab__tabs .ai-lab__tab--on { background: var(--primary); border-color: var(--primary); color: #fff; }
-.ai-lab__panel { background: var(--card); border: 1px solid var(--card-border, var(--border)); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; }
-.ai-lab__fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-.ai-lab__fields label { display: grid; gap: 4px; font-size: 13px; }
-.ai-lab__picker { display: flex; flex-wrap: wrap; gap: 6px; }
-.ai-lab__option { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; background: transparent; cursor: pointer; color: inherit; }
-.ai-lab__option--on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent); }
-.ai-lab__state { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
-.ai-lab__state--ready, .ai-lab__state--done { color: var(--success); border-color: var(--success); }
-.ai-lab__state--failed { color: var(--danger); border-color: var(--danger); }
-.ai-lab__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.ai-lab__small { font-size: 12px; }
-.ai-lab__runs, .ai-lab__results, .ai-lab__list, .ai-lab__holdings { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.ai-lab__summary { display: flex; flex-wrap: wrap; gap: 14px; font-size: 14px; }
-.ai-lab__limits { font-size: 13px; color: var(--muted-foreground); }
-.ai-lab__pick, .ai-lab__holding { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; display: grid; gap: 8px; }
-.ai-lab__pick-head, .ai-lab__holding-top, .ai-lab__holdings-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
-.ai-lab__pick-money { font-variant-numeric: tabular-nums; text-align: right; }
-.ai-lab__metrics, .ai-lab__facts { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted-foreground); }
-.ai-lab__cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-.ai-lab__risks li { color: var(--danger); }
-.ai-lab__excluded, .ai-lab__watch { font-size: 13px; color: var(--muted-foreground); }
-.ai-lab__compare { display: grid; gap: 8px; }
-.ai-lab__compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-.ai-lab__both { font-weight: 600; }
-.ai-lab__action { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); text-transform: uppercase; }
-.ai-lab__action--keep { color: var(--muted-foreground); }
-.ai-lab__action--add { color: var(--success); border-color: var(--success); }
-.ai-lab__action--trim, .ai-lab__action--review { color: #b7791f; border-color: #b7791f; }
-.ai-lab__action--sell { color: var(--danger); border-color: var(--danger); }
-.ai-lab__holding--sell { border-color: var(--danger); }
+/* AI Lab. Every rule is scoped under .ai-lab so it wins over the global button/label/input/small defaults. */
+.ai-lab { display: grid; gap: 18px; margin-top: 24px; }
+.ai-lab h2, .ai-lab h3, .ai-lab h4 { margin: 0; }
+.ai-lab p { margin: 0; }
+.ai-lab small { display: block; font-size: 12.5px; }
+.ai-lab ul { margin: 0; padding: 0; list-style: none; }
+
+.ai-lab .ai-lab__hero { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 18px 32px; padding: 26px 28px; border: 1px solid var(--card-border); border-radius: var(--radius); background: linear-gradient(160deg, #0f1e38, #0a1424); }
+.ai-lab__hero > div:first-child { display: grid; gap: 8px; max-width: 720px; }
+.ai-lab .eyebrow { display: flex; align-items: center; gap: 6px; }
+.ai-lab__spend { display: grid; gap: 4px; min-width: 200px; }
+.ai-lab__spend b { font-size: 20px; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+.ai-lab__spend b span { font-size: 13px; font-weight: 500; color: var(--muted-foreground); }
+
+.ai-lab .ai-lab__tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.ai-lab .ai-lab__tabs button { padding: 8px 16px !important; font-size: 14px !important; border-radius: 999px; }
+.ai-lab .ai-lab__tabs button.ai-lab__tab--on { background: linear-gradient(135deg, #1c3660, #152a4d) !important; color: #fff !important; border-color: rgba(59, 130, 246, .5) !important; }
+
+.ai-lab .ai-lab__panel { display: grid; gap: 18px; padding: 24px; border: 1px solid var(--card-border); border-radius: var(--radius); background: var(--card); }
+.ai-lab__panel h3 { font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.ai-lab .ai-lab__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+.ai-lab .ai-lab__fields label, .ai-lab .ai-lab__runs { margin: 0; gap: 6px; }
+.ai-lab .ai-lab__fields small { margin-top: 2px; }
+
+.ai-lab .ai-lab__picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.ai-lab .ai-lab__option { display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'box name' 'box state'; align-items: center; gap: 2px 12px; margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255, 255, 255, .02); cursor: pointer; font-weight: 400; }
+.ai-lab .ai-lab__option input { grid-area: box; width: 16px; height: 16px; padding: 0; margin: 0; accent-color: var(--primary); }
+.ai-lab .ai-lab__option > span { grid-area: name; min-width: 0; display: grid; }
+.ai-lab .ai-lab__option > span b { font-size: 15px; }
+.ai-lab .ai-lab__option > span small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-lab .ai-lab__option--on { border-color: rgba(59, 130, 246, .6); background: rgba(59, 130, 246, .1); }
+.ai-lab .ai-lab__state { grid-area: state; justify-self: start; font-style: normal; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; color: var(--muted-foreground); background: rgba(255, 255, 255, .06); }
+.ai-lab .ai-lab__state--ready, .ai-lab .ai-lab__state--carried { color: var(--success); background: rgba(34, 224, 160, .12); }
+.ai-lab .ai-lab__state--failed { color: #ffb0b8; background: rgba(255, 93, 108, .14); }
+.ai-lab .ai-lab__state--queued, .ai-lab .ai-lab__state--researching, .ai-lab .ai-lab__state--stale { color: #e8c27a; background: rgba(211, 154, 41, .14); }
+
+.ai-lab .ai-lab__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.ai-lab .ai-lab__small { font-size: 13px; line-height: 1.6; }
+.ai-lab .ai-lab__runs { display: grid; max-width: 420px; }
+
+.ai-lab .ai-lab__results { display: grid; gap: 16px; }
+.ai-lab .ai-lab__summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px 32px; padding: 22px 24px; border: 1px solid var(--card-border); border-radius: var(--radius); background: var(--card); }
+.ai-lab__summary > div { display: grid; gap: 8px; max-width: 760px; }
+.ai-lab__summary h3 { font-size: 22px; letter-spacing: -.4px; }
+.ai-lab__summary details summary { cursor: pointer; font-size: 14px; color: var(--primary); }
+.ai-lab__summary dl { display: flex; gap: 28px; margin: 0; align-self: flex-end; }
+.ai-lab__summary dt { font-size: 12.5px; color: var(--muted-foreground); }
+.ai-lab__summary dd { margin: 4px 0 0; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ai-lab .ai-lab__limits { display: grid; gap: 4px; font-size: 13px; color: var(--muted-foreground); }
+
+.ai-lab .ai-lab__pick, .ai-lab .ai-lab__holding { display: grid; gap: 14px; padding: 20px 22px; border: 1px solid var(--card-border); border-radius: var(--radius); background: var(--card); }
+.ai-lab__pick-head, .ai-lab__holding-top, .ai-lab__holdings-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.ai-lab__pick-head > div:first-child, .ai-lab__holding-top > div:first-child { display: grid; gap: 2px; }
+.ai-lab .ai-lab__pick-money { text-align: right; display: grid; gap: 2px; }
+.ai-lab__pick-money b { font-size: 24px; letter-spacing: -.6px; }
+.ai-lab .link-button, .ai-lab .link-button.ticker { background: none; box-shadow: none; padding: 0; border-radius: 0; color: var(--foreground); font-size: 18px; font-weight: 700; justify-content: flex-start; transform: none; }
+.ai-lab .link-button:hover { color: var(--primary); box-shadow: none; transform: none; }
+.ai-lab .notice .link-button { font-size: 13px; color: inherit; text-decoration: underline; margin-left: 8px; }
+
+.ai-lab .ai-lab__metrics, .ai-lab .ai-lab__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; padding: 14px 16px; border-radius: 10px; background: rgba(255, 255, 255, .03); }
+.ai-lab__metrics > div { display: grid; gap: 4px; align-content: start; }
+.ai-lab__metrics b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.ai-lab .ai-lab__facts { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0; background: none; font-size: 13px; color: var(--muted-foreground); }
+.ai-lab .ai-lab__cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.ai-lab__cases > div { display: grid; gap: 6px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; }
+.ai-lab .ai-lab__list { display: grid; gap: 6px; font-size: 14px; line-height: 1.55; }
+.ai-lab .ai-lab__list li { padding-left: 14px; position: relative; color: var(--muted-foreground); }
+.ai-lab .ai-lab__list li::before { content: ''; position: absolute; left: 0; top: .7em; width: 5px; height: 5px; border-radius: 50%; background: var(--muted-foreground); }
+.ai-lab .ai-lab__risks li::before { background: var(--danger); }
+.ai-lab details summary { cursor: pointer; font-size: 14px; }
+.ai-lab details > p, .ai-lab details > ul { margin-top: 8px; }
+.ai-lab .ai-lab__excluded { padding: 4px 2px; font-size: 14px; }
+
+.ai-lab .ai-lab__compare { display: grid; gap: 10px; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius); }
+.ai-lab .ai-lab__compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.ai-lab__compare-grid > div { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 14px; }
+.ai-lab__compare-grid > div > b { width: 100%; }
+.ai-lab .ai-lab__both { font-weight: 700; color: var(--primary); }
+
+.ai-lab .ai-lab__holdings { display: grid; gap: 14px; }
+.ai-lab__holdings-head { display: grid; gap: 6px; }
+.ai-lab .ai-lab__action { flex: none; font-size: 12px; font-weight: 700; letter-spacing: .6px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border); text-transform: uppercase; color: var(--muted-foreground); }
+.ai-lab .ai-lab__action--add { color: var(--success); border-color: rgba(34, 224, 160, .5); }
+.ai-lab .ai-lab__action--trim, .ai-lab .ai-lab__action--review { color: #e8c27a; border-color: rgba(211, 154, 41, .5); }
+.ai-lab .ai-lab__action--sell { color: #ffb0b8; border-color: rgba(255, 93, 108, .6); }
+.ai-lab .ai-lab__holding--sell { border-color: rgba(255, 93, 108, .5); }
+.ai-lab .ai-lab__watch { font-size: 14px; }
+
+@media (max-width: 760px) {
+  .ai-lab .ai-lab__hero, .ai-lab .ai-lab__summary { padding: 20px; }
+  .ai-lab .ai-lab__panel, .ai-lab .ai-lab__pick, .ai-lab .ai-lab__holding { padding: 18px; }
+  .ai-lab__summary dl { align-self: flex-start; }
+  .ai-lab .ai-lab__pick-money { text-align: left; }
+  .ai-lab .ai-lab__actions button { flex: 1 1 100%; }
+}
