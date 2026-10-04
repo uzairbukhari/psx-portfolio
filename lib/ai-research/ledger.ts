@@ -16,9 +16,10 @@ export class Ledger {
   private runUsd = 0;
   /** Money held back for the final ranking so company research cannot starve it. */
   private holdUsd = 0;
-  readonly capUsd: number;
+  /** null = no cap: spend is recorded but never blocks a call. */
+  readonly capUsd: number | null;
   private spentBeforeUsd: number;
-  constructor(capUsd: number, spentBeforeUsd: number) {
+  constructor(capUsd: number | null, spentBeforeUsd: number) {
     this.capUsd = capUsd;
     this.spentBeforeUsd = spentBeforeUsd;
   }
@@ -27,16 +28,17 @@ export class Ledger {
 
   get spentUsd() { return this.spentBeforeUsd + this.runUsd; }
   get costThisRun() { return this.runUsd; }
-  get remainingUsd() { return Math.max(0, this.capUsd - this.spentUsd - this.reservedUsd); }
+  get remainingUsd() { return this.capUsd === null ? Infinity : Math.max(0, this.capUsd - this.spentUsd - this.reservedUsd); }
 
   /** Whether a call with this worst case still fits under the cap. */
   canAfford(worstCaseUsd: number, ignoreHold = false) {
+    if (this.capUsd === null) return true;
     return this.spentUsd + this.reservedUsd + worstCaseUsd + (ignoreHold ? 0 : this.holdUsd) <= this.capUsd + 1e-9;
   }
 
   /** Holds the worst case; returns a settle function that swaps it for the measured cost (or releases it on failure). */
   reserve(worstCaseUsd: number, ignoreHold = false): (actualUsd: number | null) => void {
-    if (!this.canAfford(worstCaseUsd, ignoreHold)) throw new CapReachedError(this.capUsd, this.spentUsd + this.reservedUsd);
+    if (!this.canAfford(worstCaseUsd, ignoreHold)) throw new CapReachedError(this.capUsd ?? 0, this.spentUsd + this.reservedUsd);
     this.reservedUsd += worstCaseUsd;
     let settled = false;
     return (actualUsd) => {

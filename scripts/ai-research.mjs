@@ -2,7 +2,7 @@
 // shared, public `ai_*` tables. It sees only public tickers and PSX data: no portfolio, holding, amount or account.
 //
 // Tickers: --tickers=A,B, else every ticker with a queued/researching request, else with --monthly every ticker
-// requested in the last 45 days. Cap: AI_RESEARCH_MONTHLY_CAP_USD (default 5). Provider: AI_RESEARCH_PROVIDER
+// requested in the last 45 days. Optional cap: AI_RESEARCH_MONTHLY_CAP_USD (default none). Provider: AI_RESEARCH_PROVIDER
 // (openai by default, anthropic to switch). Kill switch: AI_LAB_ENABLED=false.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, OPENAI_API_KEY (or ANTHROPIC_API_KEY), optional D1_DATABASE_ID.
@@ -38,7 +38,7 @@ async function main() {
   // --list prints the comma-separated tickers on stdout only, so a workflow can scrape their PSX data first.
   if (listOnly) { console.log(tickers.join(',')); return 0; }
   if (!tickers.length) { log('No requested tickers.'); return 0; }
-  log(`provider ${config.provider}; read ${config.models.read}, rank ${config.models.rank}; cap $${config.monthlyCapUsd}; ${tickers.length} tickers: ${tickers.join(', ')}`);
+  log(`provider ${config.provider}; read ${config.models.read}, rank ${config.models.rank}; ${config.monthlyCapUsd === null ? 'no cap' : `cap $${config.monthlyCapUsd}`}; ${tickers.length} tickers: ${tickers.join(', ')}`);
   if (dryRun) {
     const spent = await store.spentSince(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString());
     log(`dry run: spent $${spent.toFixed(2)} this month; no model calls made.`);

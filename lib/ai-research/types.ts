@@ -93,7 +93,7 @@ export type PublicResearch = {
   ranking: Ranking | null;
   macro: MacroBrief | null;
   requests: { ticker: string; status: RequestStatus; error: string | null; requestedAt: string }[];
-  spend: { month: string; usd: number; capUsd: number };
+  spend: { month: string; usd: number; capUsd: number | null };
   enabled: boolean;
 };
 export type RequestStatus = 'queued' | 'researching' | 'ready' | 'failed';

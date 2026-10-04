@@ -77,10 +77,10 @@ const config = (cap = 5) => ({ ...resolveConfig({}), monthlyCapUsd: cap });
 
 test('config defaults to OpenAI with a $5 cap and switches to Claude by setting', () => {
   const base = resolveConfig({});
-  assert.deepEqual([base.provider, base.models.read, base.models.rank, base.monthlyCapUsd, base.enabled], ['openai', 'gpt-5-mini', 'gpt-5', 5, true]);
+  assert.deepEqual([base.provider, base.models.read, base.models.rank, base.monthlyCapUsd, base.enabled], ['openai', 'gpt-5-mini', 'gpt-5', null, true]);
   const claude = resolveConfig({ AI_RESEARCH_PROVIDER: 'Anthropic', AI_RESEARCH_MONTHLY_CAP_USD: '1', AI_LAB_ENABLED: 'false' });
   assert.deepEqual([claude.provider, claude.models.read, claude.models.rank, claude.monthlyCapUsd, claude.enabled], ['anthropic', 'claude-sonnet-5-5', 'claude-opus-5-5', 1, false]);
-  assert.equal(resolveConfig({ AI_RESEARCH_PROVIDER: 'nonsense', AI_RESEARCH_MONTHLY_CAP_USD: '-3' }).monthlyCapUsd, 5);
+  assert.equal(resolveConfig({ AI_RESEARCH_PROVIDER: 'nonsense', AI_RESEARCH_MONTHLY_CAP_USD: '-3' }).monthlyCapUsd, null);
 });
 
 test('costs: cached tokens are cheaper, searches are billed, unknown models are priced pessimistically', () => {
@@ -91,6 +91,14 @@ test('costs: cached tokens are cheaper, searches are billed, unknown models are 
   assert.equal(costOf('gpt-5-mini', { inputTokens: 0, outputTokens: 0, cachedTokens: 0, searches: 3 }), 0.03);
   assert.ok(costOf('mystery-model', { inputTokens: 1_000_000, outputTokens: 0, cachedTokens: 0, searches: 0 }) > 2);
   assert.ok(worstCaseCost('gpt-5', 1000, 1000, 2) > costOf('gpt-5', { inputTokens: 1000, outputTokens: 500, cachedTokens: 0, searches: 1 }));
+});
+
+test('a ledger without a cap never blocks but still records spend', () => {
+  const ledger = new Ledger(null, 100);
+  const settle = ledger.reserve(1000);
+  settle(3);
+  assert.equal(ledger.spentUsd, 103);
+  assert.equal(ledger.remainingUsd, Infinity);
 });
 
 test('ledger blocks a call that would cross the cap and honours the ranking hold', () => {
