@@ -1,6 +1,6 @@
-name: Mobile build (Android staging)
+name: Mobile build (Android)
 
-# Starts ONE `eas build` for the Android staging APK on Expo's servers. This spends one of the free tier's
+# Starts ONE `eas build` for the Android APK (staging or production profile) on Expo's servers. This spends one of the free tier's
 # monthly builds (15 per platform), so it only ever runs by hand and needs a typed confirmation. Use it only when
 # native code changed (a new native module, app.config plugins, permissions); JavaScript-only changes ship through
 # the Mobile OTA update workflow instead. The build is queued with --no-wait: this job finishes in a minute and
@@ -9,8 +9,13 @@ name: Mobile build (Android staging)
 on:
   workflow_dispatch:
     inputs:
+      profile:
+        description: 'Which app to build (eas.json profile)'
+        type: choice
+        options: [production, staging]
+        default: production
       confirm:
-        description: 'Type "spend-one-build" to start one Android staging build'
+        description: 'Type "spend-one-build" to start one Android build'
         required: true
 
 # The job only reads the repository; the Expo build uses EXPO_TOKEN, not GITHUB_TOKEN.
@@ -56,5 +61,7 @@ jobs:
       # Never spend a build on code that does not pass the same gates as a PR.
       - run: npm run typecheck
       - run: npm test
-      - name: Queue the Android staging build
-        run: npx eas-cli build --profile staging --platform android --non-interactive --no-wait
+      - name: Queue the Android build
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: npx eas-cli build --profile "$PROFILE" --platform android --non-interactive --no-wait
