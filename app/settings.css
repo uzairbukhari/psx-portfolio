@@ -128,9 +128,9 @@
 .imp-note{margin:10px 2px 16px;font-size:13px;color:var(--muted-foreground)}
 .imp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .imp-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:14px 16px;border:1px solid var(--border);border-radius:10px}
-.imp-card header{display:flex;align-items:center;gap:10px;width:100%}
-.imp-card header strong{font-size:14px}
-.imp-card header em{font-style:normal;margin-left:auto;font-size:11px;font-weight:600;color:var(--muted-foreground);background:rgba(255,255,255,.07);border-radius:20px;padding:2px 9px}
+.imp-card-head{display:flex;align-items:center;gap:10px;width:100%}
+.imp-card-head strong{font-size:14px}
+.imp-card-head em{font-style:normal;margin-left:auto;font-size:11px;font-weight:600;color:var(--muted-foreground);background:rgba(255,255,255,.07);border-radius:20px;padding:2px 9px}
 .imp-card p{margin:0;font-size:13px;line-height:1.5}
 .imp-card small{font-size:12px;color:var(--muted-foreground)}
 .imp-card details{font-size:12px;color:var(--muted-foreground);width:100%}
@@ -146,3 +146,4 @@
 .set-danger{margin:22px 0 12px}
 .set-danger>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--muted-foreground);padding:6px 0}
 @media(max-width:760px){.imp-drop{flex-wrap:wrap}.imp-grid,.set-split{grid-template-columns:1fr}}
+.imp-drop>div{min-width:200px}

@@ -111,7 +111,7 @@ export function IpoImportDialog({
                   <td className="num">
                     {editable ? (
                       <input type="number" min="1" step="1" aria-label={`Allotted shares for ${row.item.ticker}`} value={row.shares}
-                        onChange={(e) => resolve(row.externalId, { shares: Number(e.target.value) })} style={{ width: 90 }} />
+                        onChange={(e) => resolve(row.externalId, { shares: Number(e.target.value) })} />
                     ) : row.item.allotted}
                   </td>
                   <td className="num">{money(row.item.amountPaid)}</td>

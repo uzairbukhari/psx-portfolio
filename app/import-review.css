@@ -41,7 +41,7 @@
 .ir-issue{color:#e8c27a}
 @media(max-width:760px){.ir-table-wrap{max-height:none}}
 /* Full-screen import review (AHL, Finqalab, IPO): pinned header and footer, the body scrolls. */
-.import-review.import-fullscreen{position:fixed!important;inset:0!important;top:0!important;left:0!important;transform:none!important;width:100dvw!important;max-width:none!important;height:100dvh;max-height:none!important;border-radius:0!important;padding:0!important;display:flex!important;flex-direction:column;gap:0!important;overflow:hidden!important}
+.import-review.import-fullscreen{position:fixed!important;inset:0!important;top:0!important;left:0!important;transform:none!important;translate:none!important;scale:none!important;width:100dvw!important;max-width:none!important;height:100dvh;max-height:none!important;border-radius:0!important;padding:0!important;display:flex!important;flex-direction:column;gap:0!important;overflow:hidden!important}
 .import-fullscreen .ir-head{flex:none;padding:20px 64px 6px 28px;border-bottom:1px solid var(--border)}
 .import-fullscreen .ir-head .ir-summary{margin:10px 0 8px}
 .import-fullscreen .ir-body{flex:1;min-height:0;overflow:auto;padding:6px 28px 28px}
@@ -49,3 +49,4 @@
 .import-fullscreen .ir-table-wrap{max-height:none}
 .import-fullscreen .ir-table th{top:0}
 @media(max-width:760px){.import-fullscreen .ir-head{padding:16px 52px 4px 16px}.import-fullscreen .ir-body{padding:4px 16px 20px}.import-fullscreen .ir-foot{padding:12px 16px}}
+.ir-table input[type=number]{padding:6px 8px!important;font-size:13px!important;width:90px}

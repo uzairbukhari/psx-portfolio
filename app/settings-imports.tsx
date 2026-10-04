@@ -107,10 +107,10 @@ export function ImportPanel({
           const last = summary[s.kind];
           return (
             <article key={s.kind} className="imp-card">
-              <header>
+              <div className="imp-card-head">
                 <strong>{IMPORT_LABEL[s.kind]}</strong>
                 <em>{s.type}</em>
-              </header>
+              </div>
               <p>{s.brings}</p>
               <small>{last ? `${last.count} ${noun[s.kind]}${last.count === 1 ? '' : 's'} imported, latest ${fmtDate(last.latest)}` : 'Nothing imported yet'}</small>
               <details>
