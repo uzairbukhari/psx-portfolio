@@ -71,8 +71,9 @@ test('a 5x price fall with no recorded split is flagged as a possible split, nev
 test('the split lookup sends only ticker symbols off the device', async () => {
   const { readFileSync } = await import('node:fs');
   const source = readFileSync(new URL('../app/use-split-review.ts', import.meta.url), 'utf8');
-  const calls = [...source.matchAll(/fetch\(([^)]*)\)/g)].map((m) => m[1]);
+  const calls = [...source.matchAll(/fetch\(`([^`]*)`\)/g)].map((m) => m[1]);
   assert.equal(calls.length, 1);
-  assert.match(calls[0], /\/api\/public-data\?tickers=\$\{encodeURIComponent\(part\.join\(','\)\)\}/);
+  assert.match(calls[0], /^\/api\/public-data\?tickers=\$\{encodeURIComponent\(part\.join\(','\)\)\}$/);
+  assert.equal([...source.matchAll(/fetch\(/g)].length, 1);
   assert.doesNotMatch(source, /method:\s*'(POST|PUT)'|body:/);
 });
