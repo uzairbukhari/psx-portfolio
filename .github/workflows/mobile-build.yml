@@ -61,6 +61,21 @@ jobs:
       # Never spend a build on code that does not pass the same gates as a PR.
       - run: npm run typecheck
       - run: npm test
+      # eas-cli evaluates app.config.ts on this runner before queueing; production refuses to build without
+      # API_BASE_URL and GOOGLE_WEB_CLIENT_ID. Pull the EAS environment's readable variables (secrets such as the
+      # Firebase file stay on Expo's servers) and run the same evaluation visibly, so a problem shows its real
+      # message here instead of "expo config exited with non-zero code". Neither step spends a build.
+      - name: Load the EAS environment variables
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          eas_env=$([ "$PROFILE" = production ] && echo production || echo preview)
+          npx eas-cli env:pull "$eas_env" --non-interactive --path .env.local
+          echo "Pulled variables (names only):"; cut -d= -f1 .env.local | grep -v '^#' | grep -v '^$' || true
+      - name: Check the app config
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: APP_VARIANT="$PROFILE" npx expo config --json > /dev/null
       - name: Queue the Android build
         env:
           PROFILE: ${{ inputs.profile }}
