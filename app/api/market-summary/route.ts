@@ -56,6 +56,29 @@ interface MarketSummaryCache {
   quotes?: MarketWatchQuote[];
 }
 
+/**
+ * A cheap "has anything changed" fingerprint: the saved summary's time, the newest quote among the named tickers,
+ * the KSE-100 tick blob's length and whether PSX is open. Reading it costs three tiny D1 lookups, so a client that
+ * already holds this version gets a 304 and the Worker never builds the view.
+ */
+async function summaryVersion(shortlist: string[]) {
+  const [summary, quote, index] = await Promise.all([
+    db().prepare("SELECT fetched_at AS v FROM market_summary_refreshes WHERE id='latest'").first<{ v: string }>(),
+    shortlist.length
+      ? db()
+          .prepare(`SELECT MAX(fetched_at) AS v FROM quote_refreshes WHERE ticker IN (${shortlist.map(() => '?').join(',')})`)
+          .bind(...shortlist)
+          .first<{ v: string | null }>()
+      : Promise.resolve(null),
+    db().prepare("SELECT length(intraday) AS v FROM price_history WHERE ticker='KSE100'").first<{ v: number | null }>(),
+  ]);
+  const open = pakistanMarketState().isOpen ? 'o' : 'c';
+  return `W/"${[summary?.v ?? '', quote?.v ?? '', index?.v ?? '', open, shortlist.join('.')].join('|')}"`;
+}
+
+/** Browsers may reuse a GET answer this long without asking; `private` keeps the owner-only live flag out of shared caches. */
+const GET_CACHE = 'private, max-age=30';
+
 async function cachedSummary() {
   const row = await db()
     .prepare('SELECT payload, fetched_at FROM market_summary_refreshes WHERE id=?')
@@ -212,10 +235,15 @@ async function marketView(
 export async function GET(req: Request) {
   try {
     const user = await identity(req);
+    const watch = cleanWatchTickers(new URL(req.url).searchParams.get('tickers'));
+    // The owner's live pyPSX intraday changes every call, so only everyone else gets conditional answers.
+    const version = pypsxCredentialsFor(user) ? null : await summaryVersion(watch).catch(() => null);
+    const headers: Record<string, string> = version
+      ? { 'Cache-Control': GET_CACHE, ETag: version }
+      : { 'Cache-Control': 'no-store' };
+    if (version && req.headers.get('If-None-Match') === version) return new Response(null, { status: 304, headers });
     const { cache, fetchedAt } = await cachedSummary();
-    return Response.json(await marketView(user, cache, fetchedAt, cleanWatchTickers(new URL(req.url).searchParams.get('tickers'))), {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    return Response.json(await marketView(user, cache, fetchedAt, watch), { headers });
   } catch (error) {
     return failure(error);
   }
