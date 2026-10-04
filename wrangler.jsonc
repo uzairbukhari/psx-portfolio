@@ -17,7 +17,7 @@
 		{
 			"binding": "VAULT_DB",
 			"database_name": "psx-portfolio-sip-vault",
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "17588802-cb21-4647-a639-568b210d6395",
 			"migrations_dir": "drizzle-vault"
 		},
 		{
