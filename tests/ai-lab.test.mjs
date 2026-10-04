@@ -28,7 +28,7 @@ const ranking = (entries) => ({ month: '2026-10', tickersHash: 'x', outlook: 'Co
 const entry = (ticker, rank, weight, conviction = 70) => ({ ticker, rank, conviction, modelWeightPct: weight, note: `${ticker} note` });
 
 test('picks: only researched, verified, convincing companies get money, in ranked order', () => {
-  const reports = [report('AAA'), report('BBB', { conviction: 40 }), report('CCC', {}, { thesisState: 'broken' }), report('DDD', { expectedReturn: { lowPct: -9, basePct: -1, highPct: 4, horizonDays: 90 } })];
+  const reports = [report('AAA'), report('BBB', { conviction: 30 }), report('CCC', {}, { thesisState: 'broken' }), report('DDD', { expectedReturn: { lowPct: -9, basePct: -1, highPct: 4, horizonDays: 90 } })];
   const result = buildAiLabResult({
     shortlist: ['AAA', 'BBB', 'CCC', 'DDD', 'EEE'], research: research(reports, ranking([entry('AAA', 1, 30)])),
     names: { AAA: 'Alpha' }, holdings: [], amount: 100_000, now: NOW,
@@ -158,4 +158,18 @@ test('OpenAI output ceiling leaves room for reasoning tokens; Anthropic does not
   assert.ok(outputCeiling(openai, 'read', 2500) >= 2500 + 2000);
   assert.ok(outputCeiling(openai, 'rank', 6000) > outputCeiling(openai, 'read', 6000));
   assert.equal(outputCeiling(resolveConfig({ AI_RESEARCH_PROVIDER: 'anthropic' }), 'read', 2500), 2500);
+});
+
+test('picks: when too few companies clear the bar, the best lower-conviction ones fill in, sized down and labelled', () => {
+  const lowVerification = { claims: 4, verified: 4, dropped: 0, convictionPenalty: 0 };
+  const mk = (t, conviction, basePct) => report(t, { conviction, expectedReturn: { lowPct: -5, basePct, highPct: 12, horizonDays: 90 } }, {});
+  const reports = [mk('S1', 60, 6), mk('L1', 42, 5), mk('L2', 40, 4), mk('L3', 38, 3), mk('BAD', 20, 5), mk('NEG', 45, -1)].map((r) => ({ ...r, verification: lowVerification }));
+  const result = buildAiLabResult({ shortlist: reports.map((r) => r.ticker), research: research(reports), names: {}, holdings: [], amount: 50_000, now: NOW });
+  assert.deepEqual(result.picks.map((p) => p.ticker), ['S1', 'L1', 'L2', 'L3']);
+  assert.deepEqual(result.picks.map((p) => !!p.lowConviction), [false, true, true, true]);
+  assert.ok(result.excluded.some((e) => e.ticker === 'BAD') && result.excluded.some((e) => e.ticker === 'NEG'));
+  // With three strong ones, lower-conviction names stay out.
+  const strong = ['A', 'B', 'C'].map((t) => ({ ...mk(t, 70, 5), verification: lowVerification })).concat(reports.slice(1, 3));
+  const second = buildAiLabResult({ shortlist: strong.map((r) => r.ticker), research: research(strong), names: {}, holdings: [], amount: 50_000, now: NOW });
+  assert.deepEqual(second.picks.map((p) => p.ticker).sort(), ['A', 'B', 'C']);
 });

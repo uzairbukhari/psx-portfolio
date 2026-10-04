@@ -271,6 +271,7 @@ function AiLabRunView({ run, portfolio, monthlyRun, onOpenCompany }: {
             <div className="ai-lab__pick-head">
               <div>
                 <button type="button" className="link-button ticker" onClick={() => onOpenCompany(pick.ticker)}>{pick.ticker}</button>
+                {pick.lowConviction && <em className="ai-lab__state ai-lab__state--stale" title="Below the usual conviction bar; sized down so some money stays in cash">Lower conviction</em>}
                 <small>{pick.name}</small>
               </div>
               <div className="ai-lab__pick-money">
