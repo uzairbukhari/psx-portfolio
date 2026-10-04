@@ -264,6 +264,19 @@ export function assertPasswordAcceptable(password: string) {
   if (length > MAX_PASSWORD_CHARS) throw new VaultError('weak-password', `Use at most ${MAX_PASSWORD_CHARS} characters.`);
 }
 
+let kdfProgressListener: ((fraction: number) => void) | null = null;
+
+/**
+ * Watches the Argon2 derivation in flight (0 to 1) so a screen can show progress; on a phone the pure-JS derivation
+ * takes long enough that an unexplained spinner looks like a hang. Returns the unsubscribe function.
+ */
+export function onKdfProgress(listener: (fraction: number) => void): () => void {
+  kdfProgressListener = listener;
+  return () => {
+    if (kdfProgressListener === listener) kdfProgressListener = null;
+  };
+}
+
 async function passwordKey(password: string, kdf: PasswordKdf, salt: Uint8Array): Promise<Uint8Array> {
   assertKdfAllowed(kdf);
   const raw = await argon2idAsync(utf8(normalizePassword(password)), salt, {
@@ -274,6 +287,8 @@ async function passwordKey(password: string, kdf: PasswordKdf, salt: Uint8Array)
     // Validated above; the library caps memory at its own default unless told.
     maxmem: kdf.m * 1024 + 1024 * 1024,
     asyncTick: 25,
+    // Looked up per call, so a screen that subscribes just after starting the derivation still hears it.
+    onProgress: (fraction) => kdfProgressListener?.(fraction),
   });
   // Domain separation from every other use of the Argon2 output.
   return hkdf(sha256, raw, undefined, utf8('sipwise-vault/v1/password-wrap-key'), KEY_BYTES);
