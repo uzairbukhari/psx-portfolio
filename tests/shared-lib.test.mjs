@@ -29,6 +29,7 @@ const SHARED = [
   'security-catalog',
   'face-values',
   'ipo-offers',
+  'import-splits',
   'quote-job-types',
   'picks-local',
   'picks-run',

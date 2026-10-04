@@ -190,6 +190,25 @@ export const securityFaceValues = sqliteTable(
   (t) => [primaryKey({ columns: [t.ticker, t.effectiveFrom] })],
 );
 
+// Public corporate actions (splits) used to propose missing splits while importing a broker file. Rows are curated
+// against a PSX notice or company announcement and always carry their source; no user data is ever written here.
+export const corporateActions = sqliteTable(
+  'corporate_actions',
+  {
+    ticker: text('ticker').notNull(),
+    kind: text('kind').notNull().default('split'),
+    // First trading day on the new share basis.
+    effectiveDate: text('effective_date').notNull(),
+    oldShares: integer('old_shares').notNull(),
+    newShares: integer('new_shares').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    sourceLabel: text('source_label'),
+    verification: text('verification').notNull().default('curated'),
+    checkedAt: text('checked_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ticker, t.kind, t.effectiveDate] })],
+);
+
 export const aiUsage = sqliteTable(
   'ai_usage',
   {

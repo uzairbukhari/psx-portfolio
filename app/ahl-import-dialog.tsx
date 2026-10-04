@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { IpoOffersResponse } from '@/lib/api-types';
 import { useCompanyStates } from './use-company-lookup';
 import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import { applyAhlLedgerPlan, planAhlLedgerImport, planIsNoop, type RowResolution } from '@/lib/ahl-reconcile';
 import type { IpoLookup } from '@/lib/ipo-offers';
 import { money, type Portfolio } from '@/lib/portfolio';
-import './import-review.css';
+import { HoldingsAfter, Notes, ReviewShell, SplitSection, StaleBanner } from './import-review-parts';
+import { useSplitReview } from './use-split-review';
 import { readJson } from '@/lib/safe-json';
 
 const STATUS_LABEL = { new: 'New', duplicate: 'Already in ledger', 'previously-removed': 'Removed earlier', ambiguous: 'Needs decision' } as const;
@@ -38,9 +38,14 @@ export function AhlImportDialog({
   const [reviewedRevision, setReviewedRevision] = useState(revision);
   const stale = revision !== reviewedRevision;
 
+  const activity = useMemo(
+    () => statement.trades.map((t) => ({ ticker: t.ticker, date: t.executionDate, price: t.price })),
+    [statement],
+  );
+  const splitReview = useSplitReview(portfolio, activity);
   const plan = useMemo(
-    () => planAhlLedgerImport(portfolio, statement, { resolutions, inferredEdits: edits, acceptedIpo: accepted, ipo }),
-    [portfolio, statement, resolutions, edits, accepted, ipo],
+    () => planAhlLedgerImport(portfolio, statement, { resolutions, inferredEdits: edits, acceptedIpo: accepted, ipo, splits: splitReview.splits }),
+    [portfolio, statement, resolutions, edits, accepted, ipo, splitReview.splits],
   );
   const companyState = useCompanyStates(plan.newCompanies);
   const needIpo = useMemo(() => [...new Set(plan.inferred.map((i) => i.ticker))].sort().join(','), [plan.inferred]);
@@ -97,35 +102,36 @@ export function AhlImportDialog({
     const parts = [
       `${plan.counts.imported} AHL trade${plan.counts.imported === 1 ? '' : 's'} imported`,
       plan.inferred.filter((i) => i.change !== 'keep').length ? `${plan.inferred.filter((i) => i.change !== 'keep').length} assumed acquisition(s) added` : '',
+      plan.splits.length ? `${plan.splits.length} stock split${plan.splits.length === 1 ? '' : 's'} added` : '',
       plan.counts.duplicate ? `${plan.counts.duplicate} already in your ledger` : '',
       plan.newCompanies.length ? `added ${plan.newCompanies.length} unapproved compan${plan.newCompanies.length === 1 ? 'y' : 'ies'}` : '',
     ].filter(Boolean);
     await onCommit(next, parts.join('. ') + '.');
   }
 
+  const summary = (
+    <>
+      <span><b>{statement.trades.length}</b> trades ({statement.trades.filter((t) => t.kind === 'buy').length} buys, {statement.trades.filter((t) => t.kind === 'sell').length} sells)</span>
+      <span><b>{plan.counts.imported}</b> to import</span>
+      <span><b>{plan.counts.duplicate}</b> already in ledger</span>
+      {plan.counts.ambiguous > 0 && <span><b>{plan.counts.ambiguous}</b> need a decision</span>}
+      {plan.counts.removed > 0 && <span><b>{plan.counts.removed}</b> removed earlier</span>}
+      {plan.splits.length > 0 && <span><b>{plan.splits.length}</b> split{plan.splits.length === 1 ? '' : 's'} to add</span>}
+    </>
+  );
+
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !busy) onCancel(); }}>
-      <DialogContent className="form-dialog import-review">
-        <DialogTitle>Review AHL statement import</DialogTitle>
-        <DialogDescription>
-          {fileName} · {statement.from} to {statement.to} (generated {statement.generated}). Nothing is saved until you import.
-          The statement was read in your browser; it was not uploaded.
-        </DialogDescription>
-
-        {stale && (
-          <div className="ir-banner ir-warn" role="alert">
-            Your portfolio changed while this preview was open. The preview below was recomputed from the latest ledger; review it again.
-            <button type="button" className="secondary compact" onClick={() => setReviewedRevision(revision)}>Review updated preview</button>
-          </div>
-        )}
-
-        <div className="ir-summary">
-          <span><b>{statement.trades.length}</b> trades ({statement.trades.filter((t) => t.kind === 'buy').length} buys, {statement.trades.filter((t) => t.kind === 'sell').length} sells)</span>
-          <span><b>{plan.counts.imported}</b> to import</span>
-          <span><b>{plan.counts.duplicate}</b> already in ledger</span>
-          {plan.counts.ambiguous > 0 && <span><b>{plan.counts.ambiguous}</b> need a decision</span>}
-          {plan.counts.removed > 0 && <span><b>{plan.counts.removed}</b> removed earlier</span>}
-        </div>
+    <ReviewShell
+      title="Review AHL statement import"
+      description={`${fileName} · ${statement.from} to ${statement.to} (generated ${statement.generated}). Nothing is saved until you import. The statement was read in your browser; it was not uploaded.`}
+      summary={summary}
+      busy={busy}
+      onCancel={onCancel}
+      primaryLabel={noop ? 'Nothing to import' : `Import ${plan.counts.imported} trade${plan.counts.imported === 1 ? '' : 's'}`}
+      primaryDisabled={!canImport}
+      onPrimary={() => void commit().catch(() => {})}
+    >
+        {stale && <StaleBanner onRefresh={() => setReviewedRevision(revision)} />}
 
         {plan.excluded.length > 0 && (
           <p className="muted ir-excluded">
@@ -194,6 +200,8 @@ export function AhlImportDialog({
           </table>
         </div>
 
+        <SplitSection review={splitReview} />
+
         {plan.inferred.length > 0 && (
           <>
             <h3 className="ir-h">Sales with no purchase history</h3>
@@ -245,46 +253,8 @@ export function AhlImportDialog({
           </>
         )}
 
-        {plan.holdingChanges.length > 0 && (
-          <>
-            <h3 className="ir-h">Holdings after import</h3>
-            <div className="ir-table-wrap">
-              <table className="ir-table">
-                <thead><tr><th>Symbol</th><th className="num">Shares before</th><th className="num">Shares after</th><th>Cost basis</th></tr></thead>
-                <tbody>
-                  {plan.holdingChanges.map((c) => (
-                    <tr key={c.ticker}>
-                      <td>
-                        <b>{c.ticker}</b>
-                        {plan.newCompanies.includes(c.ticker) ? <small>new, not approved, 0% target</small> : null}
-                        {plan.newCompanies.includes(c.ticker) && companyState[c.ticker] !== 'resolved' ? (
-                          <small>{companyState[c.ticker] === 'pending' ? 'company details being looked up' : companyState[c.ticker] === 'unresolved' ? 'company details pending: trades are kept' : 'checking company details…'}</small>
-                        ) : null}
-                      </td>
-                      <td className="num">{c.beforeShares}</td><td className="num">{c.afterShares}</td>
-                      <td>{c.afterCostKnown ? 'known' : 'unknown (no cost for some shares)'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {plan.warnings.length > 0 && (
-          <details className="ir-warnings"><summary>{plan.warnings.length} note{plan.warnings.length === 1 ? '' : 's'}</summary>
-            <ul>{plan.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
-          </details>
-        )}
-        {plan.blockers.length > 0 && <div className="ir-banner ir-warn" role="alert">{plan.blockers.map((b, i) => <div key={i}>{b}</div>)}</div>}
-
-        <div className="row ir-actions">
-          <button type="button" className="secondary" onClick={onCancel} disabled={busy}>Cancel</button>
-          <button type="button" disabled={!canImport} onClick={() => void commit().catch(() => {})}>
-            {noop ? 'Nothing to import' : `Import ${plan.counts.imported} trade${plan.counts.imported === 1 ? '' : 's'}`}
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        <HoldingsAfter changes={plan.holdingChanges} newCompanies={plan.newCompanies} companyState={companyState} />
+        <Notes warnings={plan.warnings} blockers={plan.blockers} />
+    </ReviewShell>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -12,7 +12,6 @@ import {
   Receipt,
   RefreshCw,
   ShieldCheck,
-  Upload,
   UserRound,
   Zap,
 } from 'lucide-react';
@@ -36,6 +35,8 @@ import {
 import { useConfirm } from '@/components/confirm-dialog';
 import SystemHealth from './system-health';
 import { UserAvatar } from './user-avatar';
+import { ImportPanel, UploadButton } from './settings-imports';
+import type { ImportKind, ImportSummary } from '@/lib/import-detect';
 import './settings.css';
 
 type Usage = { inputTokens: number; outputTokens: number; costUsd: number };
@@ -92,43 +93,6 @@ function Section({
   );
 }
 
-function UploadButton({
-  accept,
-  onFile,
-  disabled,
-  label = 'Choose file',
-}: {
-  accept: string;
-  onFile: (file: File) => void;
-  disabled: boolean;
-  label?: string;
-}) {
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <>
-      <button
-        type="button"
-        className="secondary compact"
-        disabled={disabled}
-        onClick={() => input.current?.click()}
-      >
-        <Upload size={14} /> {label}
-      </button>
-      <input
-        ref={input}
-        type="file"
-        accept={accept}
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = '';
-          if (f) onFile(f);
-        }}
-      />
-    </>
-  );
-}
-
 function NumberField({
   value,
   min,
@@ -182,9 +146,8 @@ export default function SettingsView({
   onExportEncrypted,
   onClearLedger,
   onRestore,
-  onImportCdc,
-  onImportFinqalab,
-  onImportAhl,
+  onImportFile,
+  importSummary,
   dividendSync,
   security,
 }: {
@@ -204,9 +167,9 @@ export default function SettingsView({
   /** Saves a blank, freshly encrypted portfolio from this device. */
   onClearLedger: () => Promise<void>;
   onRestore: (file: File) => void;
-  onImportCdc: (file: File) => void;
-  onImportFinqalab: (file: File) => void;
-  onImportAhl: (file: File) => void;
+  /** Any import file; `expected` is set when the user picked a specific source card. */
+  onImportFile: (file: File, expected?: ImportKind) => void;
+  importSummary: ImportSummary;
   dividendSync?: ReactNode;
   /** The vault security card (lock, change password, recovery key). */
   security?: ReactNode;
@@ -460,40 +423,26 @@ export default function SettingsView({
               title="Data & imports"
               description="Back up your ledger, or bring in history from your broker and CDC."
             >
-              <Row
-                label="CDC dividends"
-                hint="CDC Access export (JSON). Only Paid rows are imported; bank and personal fields are never read."
-              >
-              <UploadButton accept="application/json,.json" disabled={busy} onFile={onImportCdc} />
-            </Row>
-            <Row
-              label="Finqalab trades"
-              hint="Periodic Trade Details Report (PDF). Re-uploading or overlapping reports won't duplicate trades."
-            >
-              <UploadButton accept="application/pdf,.pdf" disabled={busy} onFile={onImportFinqalab} />
-            </Row>
-            <Row
-              label="AHL trades"
-              hint="Client Ledger (PDF) or trade history (JSON). A PDF is read in your browser and shown for review before anything is saved; deposits, withdrawals, interest, charges and tax entries are never imported. Re-uploads and overlapping files won't duplicate trades."
-            >
-              <UploadButton accept="application/pdf,.pdf,application/json,.json" disabled={busy} onFile={onImportAhl} />
-            </Row>
-            <Row
-              label="Encrypted backup"
-              hint="Download your ledger as an encrypted file. It opens only with your vault password or recovery key, so it is safe to store anywhere."
-            >
-              <button className="secondary compact" onClick={onExportEncrypted}>
-                <Download size={14} /> Export encrypted backup
-              </button>
-            </Row>
-            <Row
-              label="Readable export"
-              hint="Not encrypted: anyone who gets this file can read every holding and trade in it. Keep it private and delete it when you are done."
-            >
-              <button className="secondary compact" onClick={onExport}>
-                <Download size={14} /> Export readable file
-              </button>
-            </Row>
+              <ImportPanel busy={busy} summary={importSummary} onImportFile={onImportFile} />
+              <h3 className="set-group-title">Backup &amp; export</h3>
+              <div className="set-split">
+                <div className="set-tile">
+                  <strong>Encrypted backup</strong>
+                  <span>Opens only with your vault password or recovery key, so it is safe to store anywhere.</span>
+                  <button className="secondary compact" onClick={onExportEncrypted}>
+                    <Download size={14} /> Export encrypted backup
+                  </button>
+                </div>
+                <div className="set-tile">
+                  <strong>Readable export</strong>
+                  <span>Not encrypted: anyone who gets this file can read every holding and trade. Keep it private and delete it when done.</span>
+                  <button className="secondary compact" onClick={onExport}>
+                    <Download size={14} /> Export readable file
+                  </button>
+                </div>
+              </div>
+              <details className="set-danger">
+                <summary>Danger zone: restore, delete data, delete account</summary>
             <div className="danger-zone">
               <div className="set-row-text">
                 <strong>Restore from backup</strong>
@@ -533,6 +482,7 @@ export default function SettingsView({
                 Delete account…
               </button>
             </div>
+              </details>
             </Section>
           )}
 
