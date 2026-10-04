@@ -161,6 +161,19 @@ export async function unlockVault(
   cache: VaultCache = memoryCache(),
 ): Promise<VaultSession> {
   const dataKey = 'password' in secret ? await unwrapWithPassword(status.vault, secret.password) : await unwrapWithRecovery(status.vault, secret.recovery);
+  return openWithKey(transport, status, dataKey, cache);
+}
+
+/**
+ * Opens a vault with an already-unwrapped data key (the opt-in "stay unlocked in this tab" path). Takes ownership of
+ * `dataKey`: it is zeroed if the stored portfolio does not decrypt with it.
+ */
+export async function openWithKey(
+  transport: VaultTransport,
+  status: Extract<VaultStatus, { state: 'locked' }>,
+  dataKey: Uint8Array,
+  cache: VaultCache = memoryCache(),
+): Promise<VaultSession> {
   try {
     const stored = status.portfolio;
     if (!stored) throw new VaultError('invalid', 'No encrypted portfolio was found for this vault.');
@@ -242,6 +255,11 @@ export class VaultSession {
     this.revision = 0;
     for (const fn of [...this.listeners]) fn();
     this.listeners.clear();
+  }
+
+  /** A copy of the data key, only for the opt-in tab keep-alive (lib/vault-tab-keep.ts). The caller must zero it. */
+  exportKey(): Uint8Array {
+    return new Uint8Array(this.requireKey());
   }
 
   private requireKey(): Uint8Array {
