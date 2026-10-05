@@ -53,6 +53,7 @@ import {
 import { LogoMark, Wordmark } from '@/components/logo';
 import {
   holdings,
+  DISPLAY_PARTS,
   portfolioSummary,
   plan,
   money,
@@ -117,12 +118,13 @@ import { importAhlTrades, parseAhlHistory } from './ahl-import';
 import { importCdcDividends } from '@/lib/cdc-import';
 import type { PortfolioResponse } from '@/lib/api-types';
 import { ConflictError, VaultLockedError, type VaultSession } from '@/lib/vault-client';
-import { loadPortfolioView, savePortfolioView } from '@/lib/portfolio-view';
+import { loadPortfolioView, loadAccountView, savePortfolioView } from '@/lib/portfolio-view';
 import { parseBackup, type BackupPackage } from '@/lib/vault-backup';
 import { EncryptedRestoreDialog, VaultSecurity } from './vault-security';
 import VaultGate from './vault-gate';
+import { refreshImportQuotes } from '@/lib/import-refresh';
 import PortfolioWorkspace, { type WorkspaceControls } from './portfolio-workspace';
-import { accountFromPortfolio, importMatches } from '@/lib/portfolio-account';
+import { accountFromPortfolio, dashboardPortfolio, ALL_PORTFOLIOS, importMatches } from '@/lib/portfolio-account';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
 import { canSaveCompany } from '@/lib/company-lookup-client';
@@ -386,6 +388,11 @@ function DashboardContent({
 }: DashboardProps & { vault: VaultContext | null; workspace?: WorkspaceControls }) {
   const isAdmin = role === 'super_admin';
   const target = workspace?.target;
+  const isAll = !!workspace?.isAll;
+  const locked = !!workspace?.locked;
+  const [namedAction, setNamedAction] = useState(false);
+  const [txDestination, setTxDestination] = useState('');
+  const [importRefreshError, setImportRefreshError] = useState('');
   const importHash = useRef<string | undefined>(undefined);
   const importActive = useRef(false);
   const mounted = useRef(true);
@@ -402,9 +409,9 @@ function DashboardContent({
   const initialPathname = usePathname();
   const [bellOpen, setBellOpen] = useState(false);
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
-  const [settingsEntry, setSettingsEntry] = useState({ n: 0, section: 'account' });
+  const [settingsEntry, setSettingsEntry] = useState({ n: 0, section: typeof window !== 'undefined' && window.location.hash ? window.location.hash.slice(1) : 'account' });
   const [tab, setTabState] = useState(() =>
-    allowTab(tabFromPathname(initialPathname), isAdmin),
+    allowTab(tabFromPathname(typeof window !== 'undefined' ? window.location.pathname : initialPathname), isAdmin),
   );
   const [companyTicker, setCompanyTicker] = useState(() =>
     companyFromPathname(initialPathname),
@@ -525,6 +532,10 @@ function DashboardContent({
   /** Applies refreshed prices locally. They are already in the shared cache the next load merges in, so no save is needed. */
   function applyQuotes(quotes: Portfolio['quotes'], stale: Record<string, string> = {}) {
     setP((current) => {
+      if (current?.[DISPLAY_PARTS]) {
+        const parts = current[DISPLAY_PARTS]!.map((part)=>({...part,portfolio:{...part.portfolio,quotes:{...part.portfolio.quotes,...Object.fromEntries(Object.entries(quotes).filter(([ticker,q])=>part.portfolio.companies.some((c)=>c.ticker===ticker) && isValidQuote(q) && quoteSupersedes(q,part.portfolio.quotes[ticker])))}}}));
+        return dashboardPortfolio({kind:'sipwise-portfolio-account',version:1,portfolios:parts});
+      }
       if (!current) return current;
       const fresh = Object.fromEntries(
         Object.entries(quotes).filter(
@@ -563,6 +574,16 @@ function DashboardContent({
     if (isPending(final.job)) return notify(QUOTE_MESSAGES.pending);
     if (final.job) notify(jobMessage(final.job), isProblem(final.job));
   }
+  async function refreshImported(tickers: string[]) {
+    setImportRefreshError('');
+    if (!tickers.length) return;
+    try {
+      notify('Import saved. Refreshing PSX prices…');
+      const result = await refreshImportQuotes({start:()=>quoteCall(tickers),poll:(since)=>quoteCall(tickers,since??''),cancelled:()=>!quoteAlive.current,onPending:(d)=>applyQuotes(d.quotes,d.stale)});
+      if (quoteAlive.current) { applyQuotes(result.quotes,result.stale); notify('Import saved. PSX prices refreshed.'); }
+    }
+    catch (e) { setImportRefreshError(e instanceof Error ? e.message : 'PSX prices could not be refreshed.'); }
+  }
   async function refresh() {
     if (!p || quoteRunning.current) return;
     quoteRunning.current = true;
@@ -597,12 +618,12 @@ function DashboardContent({
     setBusy(true);
     try {
       // Decrypts locally, then overlays the shared public caches (quotes, announcements, face values).
-      const d = await loadPortfolioView(vault!.session, webPublicData, target);
+      const d = isAll ? await loadAccountView(vault!.session, webPublicData, true).then((out)=>({portfolio:dashboardPortfolio(out.account),revision:out.revision,pendingCompanies:[],announcements:[],faceValues:{}})) : await loadPortfolioView(vault!.session, webPublicData, target);
       setP(d.portfolio);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
       void resumeRefresh(d.portfolio.companies.map((c) => c.ticker));
-      if (!target?.name) await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
+      if (!isAll && !locked && !target?.name) await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
     } catch (e) {
       // A lock mid-load is not an error to show: the unlock screen takes over.
       if (!(e instanceof VaultLockedError)) notify(String(e), true);
@@ -668,6 +689,12 @@ function DashboardContent({
     change: (list: AppNotification[]) => AppNotification[],
   ) {
     attempt(async () => {
+      if (isAll) {
+        const changed = change(p!.notifications ?? []);
+        const account = vault!.session.account;
+        await vault!.session.saveAccount({...account,portfolios:account.portfolios.map((part)=>part.locked ? part : {...part,portfolio:{...part.portfolio,notifications:changed.filter((n)=>n.id.startsWith(part.id+'::')).map((n)=>({...n,id:n.id.slice(part.id.length+2),title:n.title.replace(part.name+' · ','')}))}})},revision);
+        await load(); return;
+      }
       const next = clone(p!);
       next.notifications = change(next.notifications ?? []);
       await save(next, 'Notifications updated.');
@@ -693,12 +720,15 @@ function DashboardContent({
   async function save(
     next: Portfolio,
     success = 'Saved to your private portfolio.',
-    options: { createCompanies?: string[] } = {},
+    options: { createCompanies?: string[]; target?: import('@/lib/portfolio-account').PortfolioTarget } = {},
   ) {
     if (!mounted.current) throw Error('This portfolio view was closed. Reopen it before saving.');
     if (busy)
       throw Error('Wait for the current operation to finish.');
     if (target?.name && !importActive.current) throw Error('Save the import first to create this portfolio.');
+    const saveTarget = options.target ?? (isAll ? undefined : target);
+    if (!saveTarget || saveTarget.id === ALL_PORTFOLIOS) throw Error('Choose a portfolio before saving.');
+    const wasImport = importActive.current;
     validate(next);
     if (importActive.current && target) {
       const matches = importMatches(vault!.session.account, target.id, next, importHash.current);
@@ -708,7 +738,7 @@ function DashboardContent({
     setBusy(true);
     try {
       // Validates, fills company details from the public directory, encrypts here and stores ciphertext only.
-      const d = await savePortfolioView(vault!.session, webPublicData, next, revision, options.createCompanies, target);
+      const d = await savePortfolioView(vault!.session, webPublicData, next, revision, options.createCompanies, saveTarget);
       // Show the name and sector filled in from the company directory.
       for (const detail of d.details ?? []) {
         const company = next.companies.find((c) => c.ticker === detail.ticker);
@@ -717,10 +747,11 @@ function DashboardContent({
           company.sector = detail.sector;
         }
       }
-      setP(next);
+      if (isAll) await load(); else setP(next);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
       if (importActive.current) { importActive.current = false; importHash.current = undefined; workspace?.onSaved(); }
+      if (wasImport) void refreshImported(next.companies.map((c)=>c.ticker));
       notify(
         d.pendingCompanies?.length
           ? `${success} Company details for ${d.pendingCompanies.join(', ')} are still being looked up; your transactions are saved and the details will fill in on a later load.`
@@ -829,6 +860,7 @@ function DashboardContent({
       p.dividends ?? [],
     );
     if (!result.imported) {
+      if (result.skippedDuplicate) void refreshImported(p.companies.map((c)=>c.ticker));
       notify(
         `No dividends imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
         true,
@@ -879,6 +911,7 @@ function DashboardContent({
     const rows = parseAhlHistory(raw);
     const result = importAhlTrades(p, rows);
     if (!result.imported) {
+      if (result.skippedDuplicate || result.skippedManualMatch) void refreshImported(p.companies.map((c)=>c.ticker));
       notify(
         `No AHL trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
         true,
@@ -910,7 +943,7 @@ function DashboardContent({
       const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
       if (!mounted.current) return;
       importHash.current = hash; importActive.current = true;
-      if (p.brokerFileHashes?.includes(hash)) { notify('This statement was already imported. No AI call or ledger change was needed.'); return; }
+      if (p.brokerFileHashes?.includes(hash)) { notify('This statement was already imported. Refreshing PSX prices…'); void refreshImported(p.companies.map((c)=>c.ticker)); return; }
       let kind: ImportKind | null;
       let pdf: { text: string; pages: number } | null = null;
       let raw: unknown;
@@ -987,7 +1020,7 @@ function DashboardContent({
     download(
       `psx-portfolio-${today()}.json`,
       JSON.stringify(
-        {
+        isAll ? {kind:'sipwise-portfolio-account-backup',schemaVersion:1,account:vault!.session.account} : {
           schemaVersion: 1,
           kind: 'psx-portfolio-ledger',
           exportedAt: new Date().toISOString(),
@@ -1121,6 +1154,8 @@ function DashboardContent({
         )}
         <DropdownMenuItem
           onClick={() => {
+            if (isAll) {setNamedAction(true);return;}
+            if (locked) return;
             setCreatingCompany(false);
             setCompany({
               ...p.companies.find(
@@ -1183,6 +1218,8 @@ function DashboardContent({
   }
   /** Opens the one Add transaction dialog, preset to a type and (optionally) a company. */
   function openTx(type: TxType, ticker = '', price: number | null = null) {
+    if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+    setTxDestination(isAll ? '' : target?.id ?? '');
     setEditing(null);
     setEditingDividend(null);
     setEditingStockSplit(null);
@@ -1249,14 +1286,22 @@ function DashboardContent({
       patchTx({ ticker: '' });
   }
   function correctTrade(t: Trade) {
+    if (isAll) {
+      const owner = p![DISPLAY_PARTS]?.find((part)=>t.id.startsWith(part.id+'::'));
+      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      const original = owner.portfolio.trades?.find((row)=>owner.id+'::'+row.id===t.id);
+      if (!original) return;
+      setTxDestination(owner.id); t=original;
+    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
     if (t.kind === 'adjustment') {
       void confirm({ title: 'Void this holding adjustment?', description: 'The original adjustment stays in the audit history. Re-import the corrected statement to add a replacement.', confirmLabel: 'Void', destructive: true }).then((ok) => {
         if (!ok) return;
         attempt(async () => {
-          const next = clone(p!);
+          const owner = isAll ? p![DISPLAY_PARTS]?.find((part)=>part.portfolio.trades.some((row)=>row===t)) : undefined;
+          const next = clone(owner?.portfolio ?? p!);
           const entry = next.trades.find((x) => x.id === t.id);
           if (entry) entry.voided = true;
-          await save(next, 'Holding adjustment voided.');
+          await save(next, 'Holding adjustment voided.', owner ? {target:{id:owner.id}} : {});
         });
       });
       return;
@@ -1266,6 +1311,13 @@ function DashboardContent({
     setTrade({ ...t });
   }
   function correctDividend(d: Dividend) {
+    if (isAll) {
+      const owner = p![DISPLAY_PARTS]?.find((part)=>d.id.startsWith(part.id+'::'));
+      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      const original = owner.portfolio.dividends?.find((row)=>owner.id+'::'+row.id===d.id);
+      if (!original) return;
+      setTxDestination(owner.id); d=original;
+    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
     setEditingDividend(d.id);
     setTxType('dividend');
     setDividend(
@@ -1286,12 +1338,19 @@ function DashboardContent({
     );
   }
   function openReceipt(d: Dividend) {
+    if (isAll) {
+      const owner = p![DISPLAY_PARTS]?.find((part)=>d.id.startsWith(part.id+'::'));
+      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      const original = owner.portfolio.dividends?.find((row)=>owner.id+'::'+row.id===d.id);
+      if (!original) return;
+      setTxDestination(owner.id); d=original;
+    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
     setReceipt({ dividend: d, paymentDate: today(), gross: '', tax: '' });
   }
   async function confirmReceipt(e: { preventDefault: () => void }) {
     e.preventDefault();
     if (!receipt) return;
-    const next = clone(p!);
+    const next = clone(transactionPortfolio());
     const target = next.dividends?.find((d) => d.id === receipt.dividend.id);
     if (!target) return;
     const gross = receipt.gross.trim() === '' ? undefined : Number(receipt.gross);
@@ -1306,19 +1365,32 @@ function DashboardContent({
         taxWithheld: tax,
       }),
     );
-    await save(next, `${target.ticker} dividend marked as received.`);
+    await save(next, `${target.ticker} dividend marked as received.`, isAll ? {target:{id:txDestination}} : {});
     setReceipt(null);
   }
   function correctStockSplit(entry: StockSplit) {
+    if (isAll) {
+      const owner = p![DISPLAY_PARTS]?.find((part)=>entry.id.startsWith(part.id+'::'));
+      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      const original = owner.portfolio.stockSplits?.find((row)=>owner.id+'::'+row.id===entry.id);
+      if (!original) return;
+      setTxDestination(owner.id); entry=original;
+    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
     setEditingStockSplit(entry.id);
     setTxType('split');
     setStockSplit({ ...entry });
+  }
+  function transactionPortfolio(): Portfolio {
+    if (!isAll) return p!;
+    const part = p?.[DISPLAY_PARTS]?.find((entry)=>entry.id===txDestination);
+    if (!part) throw Error('Choose a destination portfolio.');
+    return part.portfolio;
   }
   async function record(e: React.FormEvent) {
     e.preventDefault();
     if (!trade) return;
     if (!trade.ticker) throw Error('Choose a company first.');
-    const next = clone(p!);
+    const next = clone(transactionPortfolio());
     const isNew = !next.companies.some((c) => c.ticker === trade.ticker);
     if (isNew) {
       if (!/^[A-Z0-9]{2,12}$/.test(trade.ticker))
@@ -1349,7 +1421,7 @@ function DashboardContent({
       editing
         ? 'Correction saved. Previous entry retained as voided.'
         : `${isNew ? `${trade.ticker} added to your companies. ` : ''}Transaction saved as a new line item. Holdings and average cost updated.`,
-      isNew ? { createCompanies: [trade.ticker] } : {},
+      { ...(isNew ? {createCompanies:[trade.ticker]} : {}), ...(isAll ? {target:{id:txDestination}} : {}) },
     );
     if (isNew) void queueQuoteRefresh([trade.ticker]);
     closeTx();
@@ -1358,9 +1430,9 @@ function DashboardContent({
   async function recordStockSplit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!stockSplit) return;
-    if (!p!.companies.some((c) => c.ticker === stockSplit.ticker))
+    if (!transactionPortfolio().companies.some((c) => c.ticker === stockSplit.ticker))
       throw Error('Choose a company you own.');
-    const next = clone(p!);
+    const next = clone(transactionPortfolio());
     next.stockSplits ??= [];
     if (editingStockSplit) {
       const old = next.stockSplits.find(
@@ -1380,15 +1452,16 @@ function DashboardContent({
       editingStockSplit
         ? 'Stock split correction saved. Previous entry retained as voided.'
         : 'Stock split saved. Shares and average costs were recalculated.',
+      isAll ? {target:{id:txDestination}} : {},
     );
     closeTx();
   }
   async function recordDividend(e: React.FormEvent) {
     e.preventDefault();
     if (!dividend) return;
-    if (!p!.companies.some((c) => c.ticker === dividend.ticker))
+    if (!transactionPortfolio().companies.some((c) => c.ticker === dividend.ticker))
       throw Error('Choose a company you own.');
-    const next = clone(p!);
+    const next = clone(transactionPortfolio());
     next.dividends = next.dividends ?? [];
     if (editingDividend) {
       const old = next.dividends.find((d) => d.id === editingDividend);
@@ -1415,6 +1488,7 @@ function DashboardContent({
       editingDividend
         ? 'Correction saved. Previous dividend record retained as voided.'
         : 'Dividend recorded.',
+      isAll ? {target:{id:txDestination}} : {},
     );
     closeTx();
   }
@@ -1471,6 +1545,7 @@ function DashboardContent({
           <LogoMark size={28} />
           <Wordmark />
         </button>
+        {workspace?.selector}
         <div className="header-right">
           <button
             type="button"
@@ -1758,8 +1833,7 @@ function DashboardContent({
             </h2>
             <button
               className="secondary compact holdings-add holdings-targets"
-              disabled={busy}
-              onClick={() => setTargetsOpen(true)}
+              disabled={busy || locked} onClick={() => isAll ? setNamedAction(true) : setTargetsOpen(true)}
             >
               Targets
             </button>
@@ -1768,6 +1842,8 @@ function DashboardContent({
               disabled={busy}
               aria-label="Add company"
               onClick={() => {
+                if (isAll) {setNamedAction(true);return;}
+                if (locked) return;
                 setCreatingCompany(true);
                 setCompany({
                   ticker: '',
@@ -2034,13 +2110,13 @@ function DashboardContent({
           <PortfolioReports portfolio={p} />
         </TabsContent>
         <TabsContent value="sip">
-          <MonthlyPicks
+          {isAll ? p[DISPLAY_PARTS]?.map((part)=><section key={part.id} className="account-plan-section"><div className="row"><h2>{part.name}</h2><button className="secondary compact" onClick={()=>workspace?.choose(part.id)}>Open portfolio to plan</button></div><MonthlyPicks portfolio={part.portfolio} month={month} setMonth={setMonth} feePct={fees} setFeePct={setFees} busy={true} onSave={async()=>{throw Error('Choose a portfolio to edit its plan.')}} onRecordBuys={()=>workspace?.choose(part.id)} onRefreshPrices={refresh} onOpenCompany={openCompany} onManualPrice={()=>workspace?.choose(part.id)} /></section>) : (<MonthlyPicks
             portfolio={p}
             month={month}
             setMonth={setMonth}
             feePct={fees}
             setFeePct={setFees}
-            busy={busy}
+            busy={busy || locked}
             onSave={save}
             onRecordBuys={recordPicks}
             onRefreshPrices={refresh}
@@ -2050,7 +2126,7 @@ function DashboardContent({
               setQuotePrice(String(p.quotes[ticker]?.price ?? ''));
               setQuoteDate(p.quotes[ticker]?.date ?? today());
             }}
-          />
+          />)}
         </TabsContent>
         <TabsContent value="history">
           <div className="activity-head">
@@ -2130,6 +2206,7 @@ function DashboardContent({
             usage={usage}
             filerStatus={p.taxProfile?.filerStatus ?? ''}
             researchSettings={p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS}
+            portfolios={workspace?.manager}
             onBack={() => setTab('holdings')}
             onFilerStatus={saveFilerStatus}
             onResearchSettings={saveResearchSettings}
@@ -2162,6 +2239,8 @@ function DashboardContent({
           />
         </TabsContent>
       </Tabs>
+      {locked ? <p className="notice">This portfolio is locked. Unlock it in Settings → Portfolios to make changes.</p> : null}
+      {importRefreshError ? <p className="notice error">Your import is saved. {importRefreshError} <button className="secondary compact" onClick={()=>void refreshImported(p.companies.map((c)=>c.ticker))}>Retry refresh</button></p> : null}
       <footer>
         <div className="row">
           <span>All amounts in PKR · Private saved ledger</span>
@@ -2249,13 +2328,14 @@ function DashboardContent({
       >
         <DialogContent className="form-dialog tx-dialog">
           {(() => {
+            const txP = isAll && txDestination ? transactionPortfolio() : p;
             const correcting = !!(editing || editingDividend || editingStockSplit);
             const t = trade,
               d = dividend,
               sp = stockSplit;
             const ticker =
               txType === 'dividend' ? d?.ticker : txType === 'split' ? sp?.ticker : t?.ticker;
-            const owned = !!ticker && p.companies.some((c) => c.ticker === ticker);
+            const owned = !!ticker && txP.companies.some((c) => c.ticker === ticker);
             const isTrade = txType === 'buy' || txType === 'sell' || txType === 'opening';
             const addNew =
               !correcting && isTrade && txType !== 'sell' && !!ticker && !owned &&
@@ -2289,7 +2369,7 @@ function DashboardContent({
               if (editing) {
                 if (!(await ok())) return;
                 attempt(async () => {
-                  const next = clone(p);
+                  const next = clone(txP);
                   next.trades.find((x) => x.id === editing)!.voided = true;
                   await save(next, 'Entry voided.');
                   closeTx();
@@ -2297,7 +2377,7 @@ function DashboardContent({
               } else if (editingDividend) {
                 if (!(await ok())) return;
                 attempt(async () => {
-                  const next = clone(p);
+                  const next = clone(txP);
                   next.dividends!.find((x) => x.id === editingDividend)!.voided = true;
                   await save(next, 'Dividend record voided.');
                   closeTx();
@@ -2305,7 +2385,7 @@ function DashboardContent({
               } else if (editingStockSplit) {
                 if (!(await ok())) return;
                 attempt(async () => {
-                  const next = clone(p);
+                  const next = clone(txP);
                   next.stockSplits!.find((x) => x.id === editingStockSplit)!.voided = true;
                   await save(next, 'Stock split voided.');
                   closeTx();
@@ -2316,6 +2396,7 @@ function DashboardContent({
               <>
                 <DialogTitle>{pickQueue ? `Pick ${pickQueue.index + 1} of ${pickQueue.picks.length} · ${title}` : title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
+                {workspace && workspace.account.portfolios.length>1 && !correcting ? <label className="tx-destination">Portfolio<select aria-label="Transaction portfolio" value={txDestination} disabled={busy} required onChange={(e)=>{setTxDestination(e.target.value);patchTx({ticker:''});}}><option value="" disabled>Choose portfolio</option>{workspace.account.portfolios.map((entry)=><option key={entry.id} value={entry.id} disabled={entry.locked}>{entry.name}{entry.locked ? ' · locked' : ''}</option>)}</select></label> : null}
                 <form
                   onSubmit={(e) =>
                     attempt(() =>
@@ -2327,6 +2408,7 @@ function DashboardContent({
                     )
                   }
                 >
+                  <fieldset disabled={busy || locked || (isAll && !txDestination)} className="tx-fields">
                   {!correcting && (
                     <fieldset className="tx-types">
                       <legend className="sr-only">Transaction type</legend>
@@ -2349,7 +2431,7 @@ function DashboardContent({
                       <TickerPicker
                         key={txType}
                         value={ticker ?? ''}
-                        companies={p.companies}
+                        companies={txP.companies}
                         allowNew={!correcting && isTrade && txType !== 'sell'}
                         disabled={correcting && !isTrade}
                         onChange={(v) => patchTx({ ticker: v })}
@@ -2523,10 +2605,10 @@ function DashboardContent({
                     </p>
                   )}
                   {txType === 'dividend' && d && (() => {
-                    const shares = d.ticker ? sharesHeldOn(p, d.ticker, d.date) : 0;
+                    const shares = d.ticker ? sharesHeldOn(txP, d.ticker, d.date) : 0;
                     const gross = round((d.perShare ?? 0) * shares);
-                    const rate = p.taxProfile
-                      ? p.taxProfile.filerStatus === 'filer'
+                    const rate = txP.taxProfile
+                      ? txP.taxProfile.filerStatus === 'filer'
                         ? 0.15
                         : 0.3
                       : null;
@@ -2547,7 +2629,7 @@ function DashboardContent({
                         </p>
                       );
                     try {
-                      const base = clone(p);
+                      const base = clone(txP);
                       if (editingStockSplit) {
                         const old = (base.stockSplits ?? []).find((x) => x.id === editingStockSplit);
                         if (old) old.voided = true;
@@ -2611,6 +2693,7 @@ function DashboardContent({
                       </button>
                     )}
                   </div>
+                  </fieldset>
                 </form>
               </>
             );
@@ -2866,6 +2949,7 @@ function DashboardContent({
           )}
         </DialogContent>
       </Dialog>
+      <Dialog open={namedAction} onOpenChange={setNamedAction}><DialogContent className="form-dialog"><DialogTitle>Choose a portfolio</DialogTitle><DialogDescription>Open a portfolio to change its companies or SIP settings.</DialogDescription><div className="portfolio-action-choices">{workspace?.account.portfolios.map((part)=><button key={part.id} className="secondary" disabled={part.locked} onClick={()=>workspace.choose(part.id)}>{part.name}{part.locked ? ' · locked' : ''}</button>)}</div></DialogContent></Dialog>
       <TargetsEditor
         portfolio={p}
         open={targetsOpen}

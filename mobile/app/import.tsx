@@ -31,13 +31,14 @@ export default function Import() {
   const { colors } = useTheme();
   const p = usePortfolio();
   const toast = useToast();
+  const [refreshError, setRefreshError] = useState('');
   const [busy, setBusy] = useState<ImportKind | 'saving' | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const [undoing, setUndoing] = useState(false);
   const [allRows, setAllRows] = useState(false);
-  const [destination, setDestination] = useState(p.isAll ? '' : p.selectedId);
+  const [destination, setDestination] = useState(p.isAll ? '' : p.targetId ?? '');
   const [newName, setNewName] = useState('');
   const [draftId] = useState(() => Crypto.randomUUID());
   const [override, setOverride] = useState(false);
@@ -45,16 +46,17 @@ export default function Import() {
   function targetFor(id = destination): PortfolioTarget {
     if (!id) throw new Error('Choose a destination portfolio.');
     if (id === 'new') return { id: draftId, name: portfolioName(newName) };
+    if (p.account?.portfolios.find((entry)=>entry.id===id)?.locked) throw Error('This portfolio is locked. Unlock it in Settings → Portfolios.');
     return { id };
   }
   function buildPreview(kind: ImportKind, raw: unknown, hash: string, fileName: string, target: PortfolioTarget) {
     if (!p.account) throw new Error('Portfolios are not loaded.');
     if (target.name && p.account.portfolios.some((e) => e.name.toLowerCase() === target.name!.toLowerCase() && e.id !== target.id)) throw new Error('That portfolio name already exists.');
     const previous = p.account.portfolios.find((e) => e.id === target.id)?.portfolio ?? blankPortfolio();
-    if (previous.brokerFileHashes?.includes(hash)) { setPending(null); setMessage({ text: 'This file was already imported into this portfolio.', error: false }); return; }
+    if (previous.brokerFileHashes?.includes(hash)) { void p.refreshPrices(previous.companies.map((c)=>c.ticker),target.id).catch((e)=>setRefreshError(e.message)); setPending(null); setMessage({ text: 'This file was already imported into this portfolio.', error: false }); return; }
     const preview = previewImport(kind, previous, raw);
     setOverride(false);
-    if (!preview.next) { setPending(null); setMessage({ text: preview.message, error: false }); }
+    if (!preview.next) { if (/duplicate|already/i.test(preview.message)) void p.refreshPrices(previous.companies.map((c)=>c.ticker),target.id).catch((e)=>setRefreshError(e.message)); setPending(null); setMessage({ text: preview.message, error: false }); }
     else setPending({ preview, fileName, baseRevision: p.revision, target, previous, raw, kind, hash, matches: importMatches(p.account, target.id, preview.next, hash).map((e) => e.name) });
   }
   function changeDestination(id: string) {
@@ -108,6 +110,8 @@ export default function Import() {
       ].filter(Boolean).join(' and ');
       setPending(null);
       setDone({ summary, added, previous, target: pending.target, revision: savedRevision });
+      setRefreshError('');
+      void p.refreshPrices(pending.preview.next.companies.map((c)=>c.ticker),pending.target.id).catch((e)=>setRefreshError(e instanceof Error ? e.message : 'PSX refresh failed.'));
       // Batch undo: one revisioned save puts the whole portfolio back as it was before the import.
       toast.show({
         message: `Imported ${added}`,
@@ -150,6 +154,7 @@ export default function Import() {
   if (done)
     return (
       <Screen edges={['bottom']}>
+        {refreshError ? <Notice tone="error">Import saved. {refreshError}<Button label="Retry refresh" onPress={()=>{setRefreshError('');void p.refreshPrices(done.previous.companies.map((c)=>c.ticker),done.target.id).catch((e)=>setRefreshError(e.message));}} /></Notice> : null}
         <View style={{ alignItems: 'center', gap: 12, paddingTop: 32, paddingBottom: 8 }}>
           <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: colors.gainSoft, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="check" size={32} color={colors.gain} strokeWidth={2.6} />
@@ -168,9 +173,10 @@ export default function Import() {
   return (
     <Screen edges={['bottom']}>
       <SectionLabel>Which portfolio should receive this import?</SectionLabel>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{p.account?.portfolios.map((e) => <Chip key={e.id} label={e.name} selected={destination === e.id} onPress={busy ? undefined : () => changeDestination(e.id)} />)}<Chip label="Create new portfolio" selected={destination === 'new'} onPress={busy ? undefined : () => changeDestination('new')} /></View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{p.account?.portfolios.map((e) => <Chip key={e.id} label={e.name+(e.locked?' · locked':'')} selected={destination === e.id} onPress={busy || e.locked ? undefined : () => changeDestination(e.id)} />)}<Chip label="Create new portfolio" selected={destination === 'new'} onPress={busy ? undefined : () => changeDestination('new')} /></View>
       {destination === 'new' ? <Input label="New portfolio name" value={newName} maxLength={80} editable={!busy} onChangeText={(value) => { setNewName(value); setPending(null); }} /> : null}
       <Text style={styles.muted}>Pick a file from your phone's Files app. You see what it would add before anything is saved.</Text>
+      {refreshError ? <Notice tone="error">Your saved data is safe. {refreshError}<Button label="Retry refresh" onPress={()=>{setRefreshError('');void p.refreshPrices([],destination).catch((e)=>setRefreshError(e.message))}} /></Notice> : null}
       {message ? <Notice tone={message.error ? 'error' : 'success'}>{message.text}</Notice> : null}
       {pending && pv ? (
         <>

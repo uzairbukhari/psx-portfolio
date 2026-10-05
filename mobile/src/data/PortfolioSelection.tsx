@@ -1,5 +1,4 @@
 import {
-  Fragment,
   createContext,
   useContext,
   useState,
@@ -20,7 +19,7 @@ export function PortfolioSelectionProvider({
   const [selectedId, select] = useState(ALL_PORTFOLIOS);
   return (
     <Context.Provider value={{ selectedId, select }}>
-      <Fragment key={selectedId}>{children}</Fragment>
+      {children}
     </Context.Provider>
   );
 }

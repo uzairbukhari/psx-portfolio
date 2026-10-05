@@ -1,5 +1,6 @@
 import {
   holdings,
+  portfolioSummary,
   round,
   taxSummary,
   today,
@@ -150,9 +151,7 @@ export function portfolioReport(portfolio: Portfolio): PortfolioReport {
     (item): item is typeof item & { value: number } =>
       typeof item.value === 'number',
   );
-  const pricedValue = round(
-    priced.reduce((total, item) => total + item.value, 0),
-  );
+  const pricedValue = portfolioSummary(allHoldings).value;
 
   const companyAllocation = priced
     .filter((item) => item.value > 0)

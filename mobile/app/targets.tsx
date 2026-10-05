@@ -66,6 +66,7 @@ export default function Targets() {
 
   async function save() {
     if (!portfolio) return;
+    if (p.locked) {setError('This portfolio is locked. Unlock it in Settings → Portfolios.');return;}
     setError(null);
     try {
       for (const r of draft)
@@ -215,7 +216,7 @@ export default function Targets() {
 
           <Muted>A screen older than 183 days pauses new buys for that company until you renew its date. Today is {today()}.</Muted>
           {error ? <Notice tone="error">{error}</Notice> : null}
-          <Button label="Save targets" icon="check" loading={busy} disabled={totals.status !== 'exact'} onPress={() => void save()} />
+          <Button label="Save targets" icon="check" loading={busy} disabled={p.locked || totals.status !== 'exact'} onPress={() => void save()} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -500,3 +500,12 @@ html[data-app-env=staging] .app-header>.brand::after{content:'STAGING';margin-le
 .account-table small { display:block; }
 .account-table td button { margin:3px; }
 .consolidated-view nav { margin:24px 0; flex-wrap:wrap; }
+
+/* Portfolio scope shares the existing dashboard header and Settings layout. */
+.header-portfolio-select{width:auto;max-width:180px;min-width:76px;margin-left:10px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);padding:7px 28px 7px 10px;font-size:13px;align-self:center}
+.header-portfolio-label{margin-left:10px;padding:5px 10px;border-radius:6px;color:var(--muted-foreground);font-size:13px;align-self:center}
+.portfolio-settings{display:grid;gap:16px}.portfolio-settings .set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--border)}
+.tx-fields{border:0;padding:0;margin:0;min-width:0}.tx-destination{display:grid;gap:7px;margin:12px 0 18px}.account-plan-section{margin-bottom:28px}.account-plan-section>.row{justify-content:space-between;margin-bottom:16px}
+@media(max-width:760px){.header-portfolio-select{max-width:132px;margin-left:6px}.header-portfolio-label{margin-left:4px}.portfolio-settings .set-row{align-items:flex-start;flex-direction:column}.portfolio-settings .row{flex-wrap:wrap}}
+
+.portfolio-action-choices{display:grid;gap:10px}.tx-fields:disabled{opacity:.5}

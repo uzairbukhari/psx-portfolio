@@ -53,11 +53,11 @@ function Sources({ item }: { item: Parameters<typeof pickSources>[0] }) {
 }
 
 /** Monthly Picks inside Plan: shortlist, amount, run state, results and the shared review-and-record sheet. */
-export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee: string; onFee: (v: string) => void; readOnly: boolean }) {
+export function PicksView({ month, fee, onFee, readOnly, portfolioId }: { portfolioId?: string; month: string; fee: string; onFee: (v: string) => void; readOnly: boolean }) {
   const styles = useKitStyles();
   const { colors } = useTheme();
   const { api } = useAuth();
-  const p = usePortfolio();
+  const p = usePortfolio(portfolioId);
   const [reviewing, setReviewing] = useState(false);
   const [shortlist, setShortlist] = useState<string[] | null>(null);
   const [amount, setAmount] = useState('');
@@ -210,7 +210,7 @@ export function PicksView({ month, fee, onFee, readOnly }: { month: string; fee:
           {estimateError.current && rows.length === 0 ? <Notice tone="error">{estimateError.current}</Notice> : null}
           <SectionLabel>Top picks</SectionLabel>
           {rows.some((r) => (r.shares ?? 0) > 0 && r.price !== null) && !readOnly ? (
-            <Button label="Record these buys…" icon="check" disabled={p.offline} onPress={() => setReviewing(true)} accessibilityHint="Opens a review sheet; nothing is saved until you confirm" />
+            <Button label="Record these buys…" icon="check" disabled={p.offline || readOnly || p.locked} onPress={() => setReviewing(true)} accessibilityHint="Opens a review sheet; nothing is saved until you confirm" />
           ) : null}
           {rows.map((r) => (
             <Card key={r.ticker}>

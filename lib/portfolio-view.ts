@@ -130,6 +130,7 @@ export async function loadAccountView(session: VaultSession, publicData: PublicD
     if (syncDividends && market && !session.offline) {
       let changed = false;
       const updated = { ...account, portfolios: account.portfolios.map((entry) => {
+        if (entry.locked) return entry;
         const update = planAutoDividendUpdate(entry.portfolio, market.announcements ?? [], undefined, undefined, market.faceValues ?? {});
         if (!update) return entry;
         changed = true;

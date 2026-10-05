@@ -1,4 +1,3 @@
-import { AllPortfolios } from '@/ui/AllPortfolios';
 import { useMemo, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -47,7 +46,6 @@ export default function Inbox() {
   const items = useMemo(() => filterNotifications(list, filter), [list, filter]);
   const tickers = useMemo(() => new Set((p.portfolio?.companies ?? []).map((c) => c.ticker)), [p.portfolio]);
 
-  if (p.isAll) return <AllPortfolios mode="notifications" />;
   if (p.isLoading)
     return (
       <Screen edges={['bottom']}>
@@ -61,7 +59,7 @@ export default function Inbox() {
     setBusy(true);
     setError(null);
     try {
-      await p.save(changeNotifications(p.portfolio, change));
+      await p.saveNotifications(changeNotifications(p.portfolio, change).notifications ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not update your alerts.');
     } finally {

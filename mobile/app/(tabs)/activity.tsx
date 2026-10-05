@@ -1,4 +1,3 @@
-import { AllPortfolios } from '@/ui/AllPortfolios';
 import { useMemo, useState } from 'react';
 import { RefreshControl, SectionList, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +21,6 @@ export default function Activity() {
   const shown = sections.reduce((n, s) => n + s.data.length, 0);
   const filtering = filter !== 'all' || query.trim() !== '';
 
-  if (p.isAll) return <AllPortfolios mode="activity" />;
   if (p.isLoading)
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>

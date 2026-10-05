@@ -68,7 +68,7 @@ test('management rejects duplicate names, invalid IDs and deleting financial his
   assert.throws(() => removePortfolio(all, 'ahl'), /financial records/);
   const withEmpty = replacePortfolio(all, blankPortfolio(), { id: 'new', name: 'Other' });
   assert.equal(removePortfolio(withEmpty, 'new').portfolios.length, 2);
-  assert.throws(() => removePortfolio(accountFromPortfolio(), 'default'), /at least one/);
+  assert.throws(() => removePortfolio(accountFromPortfolio(), 'default'), /at least one|default/);
   assert.throws(() => normalizeAccount({ ...all, portfolios: [{ ...all.portfolios[0], id: 'all' }] }), /identifier/);
 });
 

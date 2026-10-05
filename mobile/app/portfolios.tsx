@@ -11,6 +11,8 @@ import {
   portfolioName,
   removePortfolio,
   renamePortfolio,
+  setPortfolioLocked,
+  LEGACY_PORTFOLIO_ID,
 } from '@shared/portfolio-account.ts';
 import { usePortfolio } from '@/data/usePortfolio';
 import { useVault } from '@/vault/VaultProvider';
@@ -52,26 +54,15 @@ export default function Portfolios() {
   }
   return (
     <Screen edges={['bottom']}>
-      <Text style={styles.title}>Your portfolios</Text>
+      <Text style={styles.title}>Portfolios</Text>
       <Muted>
         Manage broker accounts and investment goals under one login.
       </Muted>
       {error ? <Notice tone="error">{error}</Notice> : null}
-      <Button
-        label="All portfolios"
-        variant="outline"
-        onPress={() => choose(ALL_PORTFOLIOS)}
-        disabled={busy}
-      />
       {p.account?.portfolios.map((entry) => (
         <Card key={entry.id}>
           <Text style={styles.strong}>{entry.name}</Text>
-          <Button
-            label="Open portfolio"
-            variant="outline"
-            onPress={() => choose(entry.id)}
-            disabled={busy}
-          />
+          <Muted>{entry.locked ? 'Locked · read only' : 'Open for edits'}</Muted><Button label={entry.locked?'Unlock':'Lock'} variant="text" disabled={busy || p.offline} onPress={()=>void change(async()=>{await session.saveAccount(setPortfolioLocked(session.account,entry.id,!entry.locked),p.revision)})} />
           <Button
             label="Rename"
             variant="text"
@@ -81,7 +72,7 @@ export default function Portfolios() {
             }}
             disabled={busy || p.offline}
           />
-          {!hasFinancialRecords(entry.portfolio) &&
+          {entry.id !== LEGACY_PORTFOLIO_ID && !entry.locked && !hasFinancialRecords(entry.portfolio) &&
           p.account!.portfolios.length > 1 ? (
             <Button
               label="Delete empty portfolio"

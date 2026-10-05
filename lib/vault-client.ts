@@ -19,7 +19,7 @@ import type {
   VaultWrappersResponse,
 } from './api-types.ts';
 import { blankPortfolio, type Portfolio } from './portfolio.ts';
-import { accountFromPortfolio, normalizeAccount, portfolioAt, replacePortfolio, type PortfolioAccount, type PortfolioTarget } from './portfolio-account.ts';
+import { accountFromPortfolio, assertAccountWritable, normalizeAccount, portfolioAt, replacePortfolio, type PortfolioAccount, type PortfolioTarget } from './portfolio-account.ts';
 import { createBackupPackage, type BackupPackage } from './vault-backup.ts';
 import {
   VaultError,
@@ -329,6 +329,7 @@ export class VaultSession {
     return this.guarded(async () => {
       if (expectedRevision !== this.revision) throw new ConflictError();
       normalizeAccount(next);
+      assertAccountWritable(this.account, next);
       const key = this.requireKey();
       const epoch = this.epoch;
       const envelope = await encryptPortfolio(key, this.material.vaultId, this.material.keyVersion, expectedRevision + 1, JSON.stringify(next));

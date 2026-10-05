@@ -1,4 +1,4 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Alert, Image, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/auth/AuthProvider';
 import { usePortfolio, useUnreadAlerts } from '@/data/usePortfolio';
@@ -19,11 +19,10 @@ export function AppBar({ title, subtitle }: { title: string; subtitle?: string }
   const initial = (user?.name ?? user?.email ?? '?').slice(0, 1).toUpperCase();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 56 }}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.ink, ...type.title }} accessibilityRole="header">
-          {title}
-        </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Choose portfolio" onPress={() => router.push('/portfolios')} style={{ paddingVertical: 8 }}><Text style={{ color: colors.primary, ...type.caption }}>{portfolio.portfolioName} ▾</Text></Pressable>
+      <View style={{flex:1}}>
+        <View style={{flexDirection:'row',alignItems:'center',gap:10}}><Text style={{color:colors.ink,fontSize:18,fontWeight:'700'}}>Sipwise</Text>
+        {portfolio.account && portfolio.account.portfolios.length>1 ? <Pressable accessibilityRole="button" accessibilityLabel="Choose portfolio" onPress={()=>Alert.alert('Portfolio','Choose the data to display.',[{text:'All',onPress:()=>portfolio.select('all')},...portfolio.account!.portfolios.map((entry)=>({text:entry.name+(entry.locked?' · locked':''),onPress:()=>portfolio.select(entry.id)})),{text:'Cancel',style:'cancel'}])} style={{padding:8}}><Text style={{color:colors.primary,...type.caption}}>{portfolio.portfolioName} ▾</Text></Pressable> : <Text style={{color:colors.muted,...type.caption}}>All</Text>}</View>
+        <Text style={{ color: colors.ink, ...type.title }} accessibilityRole="header">{title}</Text>
         {subtitle ? <Text style={{ color: colors.muted, ...type.caption }}>{subtitle}</Text> : null}
       </View>
       <Pressable

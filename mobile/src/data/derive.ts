@@ -1,6 +1,6 @@
 // Pure view-model helpers over the shared portfolio code (no React / native imports,
 // so they can be unit tested with plain node).
-import { holdings, portfolioSummary, taxSummary, type AppNotification, type Portfolio } from '../../../lib/portfolio.ts';
+import { DISPLAY_PARTS, holdings, portfolioSummary, taxSummary, type AppNotification, type Portfolio } from '../../../lib/portfolio.ts';
 
 export type Holding = ReturnType<typeof holdings>[number];
 
@@ -56,6 +56,7 @@ const num = (n: number) => new Intl.NumberFormat('en-PK', { maximumFractionDigit
 
 /** Trades, dividends and splits as one newest-first list; voided entries are dropped. */
 export function activityEntries(p: Portfolio, ticker?: string): ActivityEntry[] {
+  if (p[DISPLAY_PARTS]) return p[DISPLAY_PARTS]!.flatMap((part)=>activityEntries(part.portfolio,ticker).map((entry)=>({...entry,id:`${part.id}::${entry.id}`,detail:`${part.name} · ${entry.detail}`,editable:entry.editable && !('locked' in part && part.locked)}))).sort((a,b)=>b.date.localeCompare(a.date));
   const out: ActivityEntry[] = [];
   for (const t of p.trades) {
     if (t.voided || (ticker && t.ticker !== ticker)) continue;

@@ -1,5 +1,6 @@
 import {
   blankPortfolio,
+  DISPLAY_PARTS,
   holdings,
   portfolioSummary,
   round,
@@ -11,7 +12,12 @@ import {
 export const ACCOUNT_VERSION = 1;
 export const ALL_PORTFOLIOS = 'all';
 export const LEGACY_PORTFOLIO_ID = 'default';
-export type NamedPortfolio = { id: string; name: string; portfolio: Portfolio };
+export type NamedPortfolio = {
+  id: string;
+  name: string;
+  portfolio: Portfolio;
+  locked?: boolean;
+};
 export type PortfolioAccount = {
   kind: 'sipwise-portfolio-account';
   version: 1;
@@ -67,6 +73,8 @@ export function normalizeAccount(value: unknown): PortfolioAccount {
         throw new Error('Portfolio names must be unique.');
       ids.add(entry.id);
       names.add(entry.name.toLowerCase());
+      if (entry.locked !== undefined && typeof entry.locked !== 'boolean')
+        throw Error('Invalid portfolio lock.');
       validate(entry.portfolio);
     }
     return account;
@@ -95,6 +103,7 @@ export function replacePortfolio(
   target?: PortfolioTarget,
 ): PortfolioAccount {
   const id = target?.id ?? account.portfolios[0].id;
+  assertPortfolioWritable(account, id);
   const exists = account.portfolios.some((p) => p.id === id);
   if (!exists && !target?.name)
     throw new Error('That portfolio no longer exists.');
@@ -139,6 +148,8 @@ export function removePortfolio(
 ): PortfolioAccount {
   const entry = account.portfolios.find((p) => p.id === id);
   if (!entry) throw new Error('That portfolio no longer exists.');
+  assertPortfolioWritable(account, id);
+  if (id === LEGACY_PORTFOLIO_ID) throw Error('Keep the default portfolio.');
   if (hasFinancialRecords(entry.portfolio))
     throw new Error('A portfolio with financial records cannot be deleted.');
   if (account.portfolios.length === 1)
@@ -326,4 +337,93 @@ export function accountActivity(account: PortfolioAccount) {
         a.portfolioId.localeCompare(b.portfolioId) ||
         a.id.localeCompare(b.id),
     );
+}
+
+export function assertPortfolioWritable(account: PortfolioAccount, id: string) {
+  if (account.portfolios.find((p) => p.id === id)?.locked)
+    throw Error(
+      'This portfolio is locked. Unlock it in Settings → Portfolios before making changes.',
+    );
+}
+export function setPortfolioLocked(
+  account: PortfolioAccount,
+  id: string,
+  locked: boolean,
+): PortfolioAccount {
+  if (!account.portfolios.some((p) => p.id === id))
+    throw Error('That portfolio no longer exists.');
+  return {
+    ...account,
+    portfolios: account.portfolios.map((p) =>
+      p.id === id ? { ...p, locked } : p,
+    ),
+  };
+}
+export function assertAccountWritable(
+  previous: PortfolioAccount,
+  next: PortfolioAccount,
+) {
+  for (const entry of previous.portfolios.filter((p) => p.locked)) {
+    const replacement = next.portfolios.find((p) => p.id === entry.id);
+    if (
+      !replacement ||
+      JSON.stringify(replacement.portfolio) !== JSON.stringify(entry.portfolio)
+    )
+      assertPortfolioWritable(previous, entry.id);
+  }
+}
+/** Read-only presentation data. Accounting delegates to the original parts through DISPLAY_PARTS. */
+export function dashboardPortfolio(
+  account: PortfolioAccount,
+  selected = ALL_PORTFOLIOS,
+): Portfolio {
+  if (account.portfolios.length === 1) return account.portfolios[0].portfolio;
+  if (selected !== ALL_PORTFOLIOS)
+    return portfolioAt(account, { id: selected });
+  const result = blankPortfolio();
+  result[DISPLAY_PARTS] = account.portfolios;
+  result.dividends = [];
+  const companies = new Map<string, Portfolio['companies'][number]>();
+  for (const part of account.portfolios) {
+    for (const company of part.portfolio.companies)
+      if (!companies.has(company.ticker))
+        companies.set(company.ticker, { ...company, target: 0 });
+    for (const [ticker, quote] of Object.entries(part.portfolio.quotes))
+      if (!result.quotes[ticker] || quote.date > result.quotes[ticker].date)
+        result.quotes[ticker] = quote;
+    result.trades.push(
+      ...part.portfolio.trades.map((t) => ({
+        ...t,
+        id: `${part.id}::${t.id}`,
+        note: `${part.name}${t.note ? ' · ' + t.note : ''}`,
+      })),
+    );
+    result.dividends!.push(
+      ...(part.portfolio.dividends ?? []).map((d) => ({
+        ...d,
+        id: `${part.id}::${d.id}`,
+        note: `${part.name}${d.note ? ' · ' + d.note : ''}`,
+      })),
+    );
+    result.stockSplits ??= [];
+    result.stockSplits.push(
+      ...(part.portfolio.stockSplits ?? []).map((d) => ({
+        ...d,
+        id: `${part.id}::${d.id}`,
+        note: `${part.name}${d.note ? ' · ' + d.note : ''}`,
+      })),
+    );
+    result.notifications ??= [];
+    result.notifications.push(
+      ...(part.portfolio.notifications ?? []).map((n) => ({
+        ...n,
+        id: `${part.id}::${n.id}`,
+        title: `${part.name} · ${n.title}`,
+      })),
+    );
+    for (const [month, budget] of Object.entries(part.portfolio.budgets))
+      result.budgets[month] = (result.budgets[month] ?? 0) + budget;
+  }
+  result.companies = [...companies.values()];
+  return result;
 }
