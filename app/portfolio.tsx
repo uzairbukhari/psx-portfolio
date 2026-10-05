@@ -372,6 +372,7 @@ function DashboardContent({
 }: DashboardProps & { vault: VaultContext | null }) {
   const isAdmin = role === 'super_admin';
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
+  const emptyImportRef = useRef<HTMLInputElement>(null);
   // From 1100px the market pulse sits beside the value card's chart; below it stays under the table.
   const widePulse = useSyncExternalStore(
     subscribeWide,
@@ -1641,16 +1642,24 @@ function DashboardContent({
                   type="button"
                   className="secondary"
                   disabled={busy}
-                  onClick={() => {
-                    setSettingsEntry((e) => ({ n: e.n + 1, section: 'data' }));
-                    setTab('settings');
-                  }}
+                  onClick={() => emptyImportRef.current?.click()}
                 >
                   <Upload size={16} /> Import from your broker
                 </button>
+                <input
+                  ref={emptyImportRef}
+                  type="file"
+                  accept="application/pdf,.pdf,application/json,.json,text/csv,.csv,.xlsx"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) importFile(file);
+                  }}
+                />
               </div>
               <small className="empty-holdings-hint">
-                Already have a statement or backup? Import it and your history fills in at once.
+                Already have a broker statement? Choose it to review your holdings and history before saving.
               </small>
             </div>
           ) : (

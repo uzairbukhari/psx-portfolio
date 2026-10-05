@@ -62,6 +62,17 @@ test('activity is newest first, can filter by ticker, and skips voided entries',
   assert.deepEqual(activityEntries(p, 'CCC').map((e) => e.id), ['t4', 't3']);
 });
 
+test('holding adjustments are displayed without purchase wording or cash effects and stay read-only', () => {
+  const p = sample();
+  p.trades.push({ id: 'adjust', ticker: 'AAA', kind: 'adjustment', date: '2026-04-01', shares: -2, price: null, fees: 0, month: '', note: 'Statement correction', source: 'broker', externalId: 'broker:balance:test', accountId: 'JS:main' });
+  const entry = activityEntries(p).find((e) => e.id === 'adjust');
+  assert.equal(entry?.kind, 'adjustment');
+  assert.equal(entry?.title, 'Holding adjustment -2');
+  assert.equal(entry?.amount, null);
+  assert.equal(entry?.editable, false);
+  assert.match(readOnlyReason(p, 'adjust') ?? '', /Holding adjustments/);
+});
+
 test('dividends and splits join the activity list', () => {
   const p = sample();
   p.dividends = [{ id: 'd1', ticker: 'AAA', date: '2026-03-10', source: 'manual', netAmount: 85, perShare: 10, note: '' }];

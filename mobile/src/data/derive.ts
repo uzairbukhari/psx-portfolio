@@ -43,7 +43,7 @@ export function soldOutPositions(p: Portfolio, held: Holding[]): Holding[] {
 export type ActivityEntry = {
   id: string;
   date: string;
-  kind: 'opening' | 'buy' | 'sell' | 'dividend' | 'split';
+  kind: 'opening' | 'buy' | 'sell' | 'adjustment' | 'dividend' | 'split';
   ticker: string;
   title: string;
   detail: string;
@@ -65,10 +65,10 @@ export function activityEntries(p: Portfolio, ticker?: string): ActivityEntry[] 
       date: t.date,
       kind: t.kind,
       ticker: t.ticker,
-      title: `${t.kind === 'sell' ? 'Sold' : t.kind === 'opening' ? 'Opening' : 'Bought'} ${num(t.shares)}`,
-      detail: `${price}${t.fees ? ` · fees ${num(t.fees)}` : ''}`,
-      amount: t.price === null ? null : t.shares * t.price,
-      editable: !t.source || t.source === 'manual',
+      title: `${t.kind === 'adjustment' ? 'Holding adjustment' : t.kind === 'sell' ? 'Sold' : t.kind === 'opening' ? 'Opening' : 'Bought'} ${num(t.shares)}`,
+      detail: t.kind === 'adjustment' ? 'Statement balance correction · acquisition cost unknown' : `${price}${t.fees ? ` · fees ${num(t.fees)}` : ''}`,
+      amount: t.kind === 'adjustment' || t.price === null ? null : t.shares * t.price,
+      editable: t.kind !== 'adjustment' && (!t.source || t.source === 'manual'),
     });
   }
   for (const d of p.dividends ?? []) {
@@ -148,6 +148,7 @@ export function companyDividends(p: Portfolio, ticker: string): DividendRow[] {
 /** Why an entry cannot be edited on the phone, or null when it can (or when no such entry exists). */
 export function readOnlyReason(p: Portfolio, id: string): string | null {
   const t = p.trades.find((x) => x.id === id);
+  if (t?.kind === 'adjustment') return 'Holding adjustments come from statement imports. Review or void them on the web.';
   if (t) return t.voided ? "Voided entries can't be edited." : t.source && t.source !== 'manual' ? "Imported entries can't be edited." : null;
   const d = p.dividends?.find((x) => x.id === id);
   if (d) return d.voided ? "Voided entries can't be edited." : d.source !== 'manual' ? "Automatic and imported dividends can't be edited." : null;

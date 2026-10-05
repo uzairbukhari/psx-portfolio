@@ -15,7 +15,7 @@ import { DatePicker } from '@/ui/DatePicker';
 import { useToast } from '@/ui/Toast';
 import { Button, Card, Chip, Input, Muted, Notice, SectionLabel, useKitStyles } from '@/ui/kit';
 
-type Kind = 'buy' | 'sell' | 'dividend' | 'split' | 'opening';
+type Kind = Trade['kind'] | 'dividend' | 'split';
 const KINDS: { key: Kind; label: string }[] = [
   { key: 'buy', label: 'Buy' },
   { key: 'sell', label: 'Sell' },
@@ -143,12 +143,15 @@ export default function Transaction() {
   );
   const editing = Boolean(editingId);
   // Deep links can reach any entry id; imported, automatic and voided entries are not editable here.
-  const locked = editingId && p.portfolio ? readOnlyReason(p.portfolio, editingId) : null;
+  const locked = kind === 'adjustment'
+    ? 'Holding adjustments come from statement imports. Review or void them on the web.'
+    : editingId && p.portfolio ? readOnlyReason(p.portfolio, editingId) : null;
 
   async function submit() {
     setError(null);
     if (!p.portfolio) return;
     try {
+      if (kind === 'adjustment') throw new Error('Holding adjustments cannot be entered here.');
       let working = p.portfolio;
       let ticker = tickerChoice;
       if (newCompany) {

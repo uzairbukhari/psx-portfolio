@@ -5,7 +5,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { type } from '@/theme/tokens';
 import { Avatar, ListRow } from '@/ui/kit';
 
-const SIGN: Record<ActivityEntry['kind'], string> = { buy: '−', opening: '', sell: '+', dividend: '+', split: '' };
+const SIGN: Record<ActivityEntry['kind'], string> = { buy: '−', opening: '', adjustment: '', sell: '+', dividend: '+', split: '' };
 
 /**
  * One ledger line. Put several inside a padding-less Card; `last` drops the final divider. The amount is the
@@ -26,6 +26,7 @@ export function ActivityRow({
   const tone: Record<ActivityEntry['kind'], string> = {
     buy: colors.ink,
     opening: colors.ink,
+    adjustment: colors.muted,
     sell: colors.gain,
     dividend: colors.gain,
     split: colors.muted,
