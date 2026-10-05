@@ -1,3 +1,4 @@
+import { AllPortfolios } from '@/ui/AllPortfolios';
 import { useMemo, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -46,6 +47,7 @@ export default function Inbox() {
   const items = useMemo(() => filterNotifications(list, filter), [list, filter]);
   const tickers = useMemo(() => new Set((p.portfolio?.companies ?? []).map((c) => c.ticker)), [p.portfolio]);
 
+  if (p.isAll) return <AllPortfolios mode="notifications" />;
   if (p.isLoading)
     return (
       <Screen edges={['bottom']}>

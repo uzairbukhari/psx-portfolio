@@ -5,6 +5,7 @@
 import type { PortfolioEnvelope, VaultKeyMaterial } from './vault-crypto.ts';
 import { VaultError, decryptPortfolio, unwrapWithPassword, unwrapWithRecovery, validateEnvelope, validateVaultKeyMaterial } from './vault-crypto.ts';
 import { validate, type Portfolio } from './portfolio.ts';
+import { normalizeAccount, type PortfolioAccount } from './portfolio-account.ts';
 
 export const BACKUP_KIND = 'sipwise-encrypted-backup';
 export const BACKUP_VERSION = 1;
@@ -27,7 +28,7 @@ export function createBackupPackage(vault: VaultKeyMaterial, stored: { revision:
 /** The file contents of a plain (readable!) ledger backup, as older versions of the app exported. */
 export type PlainBackup = { kind: 'psx-portfolio-ledger'; schemaVersion: 1; portfolio: Portfolio };
 
-export type ParsedBackup = { type: 'encrypted'; backup: BackupPackage } | { type: 'plain'; portfolio: Portfolio };
+export type ParsedBackup = { type: 'encrypted'; backup: BackupPackage } | { type: 'plain'; portfolio: Portfolio } | { type: 'account'; account: PortfolioAccount };
 
 /** Recognises either backup kind and validates its shape. Throws a plain-language error otherwise. */
 export function parseBackup(text: string): ParsedBackup {
@@ -46,6 +47,10 @@ export function parseBackup(text: string): ParsedBackup {
     if (!Number.isInteger(backup.portfolio.revision) || backup.portfolio.revision < 0) throw new VaultError('invalid', 'That backup is damaged.');
     return { type: 'encrypted', backup };
   }
+  if (data?.kind === 'sipwise-portfolio-account-backup') {
+    if (data.schemaVersion !== 1) throw new VaultError('unsupported', 'Update the app to restore this backup.');
+    return { type: 'account', account: normalizeAccount(data.account) };
+  }
   if (data?.kind === 'psx-portfolio-ledger' && data.schemaVersion === 1) {
     validate(data.portfolio as Portfolio);
     return { type: 'plain', portfolio: data.portfolio as Portfolio };
@@ -54,14 +59,19 @@ export function parseBackup(text: string): ParsedBackup {
 }
 
 /** Decrypts a package with ITS password or recovery key (which may differ from the current vault's) and validates the result. */
-export async function openBackup(backup: BackupPackage, secret: { password: string } | { recovery: string }): Promise<Portfolio> {
+export async function openAccountBackup(backup: BackupPackage, secret: { password: string } | { recovery: string }): Promise<PortfolioAccount> {
   const key = 'password' in secret ? await unwrapWithPassword(backup.vault, secret.password) : await unwrapWithRecovery(backup.vault, secret.recovery);
   try {
     const text = await decryptPortfolio(key, backup.portfolio.envelope, { vaultId: backup.vault.vaultId, keyVersion: backup.vault.keyVersion, revision: backup.portfolio.revision });
-    const portfolio = JSON.parse(text) as Portfolio;
-    validate(portfolio);
-    return portfolio;
+    return normalizeAccount(JSON.parse(text));
   } finally {
     key.fill(0);
   }
+}
+
+/** Legacy single-ledger callers must never silently drop the rest of a collection. */
+export async function openBackup(backup: BackupPackage, secret: { password: string } | { recovery: string }): Promise<Portfolio> {
+  const account = await openAccountBackup(backup, secret);
+  if (account.portfolios.length !== 1) throw new Error('This backup contains multiple portfolios. Restore it as an account backup.');
+  return account.portfolios[0].portfolio;
 }

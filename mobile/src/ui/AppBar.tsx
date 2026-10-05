@@ -1,7 +1,7 @@
 import { Image, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/auth/AuthProvider';
-import { useUnreadAlerts } from '@/data/usePortfolio';
+import { usePortfolio, useUnreadAlerts } from '@/data/usePortfolio';
 import { useTheme } from '@/theme/ThemeProvider';
 import { type } from '@/theme/tokens';
 import { Icon } from './Icon';
@@ -14,6 +14,7 @@ export function AppBar({ title, subtitle }: { title: string; subtitle?: string }
   const { colors } = useTheme();
   const { state } = useAuth();
   const unread = useUnreadAlerts();
+  const portfolio = usePortfolio();
   const user = state.status === 'signedIn' ? state.user : null;
   const initial = (user?.name ?? user?.email ?? '?').slice(0, 1).toUpperCase();
   return (
@@ -22,6 +23,7 @@ export function AppBar({ title, subtitle }: { title: string; subtitle?: string }
         <Text style={{ color: colors.ink, ...type.title }} accessibilityRole="header">
           {title}
         </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Choose portfolio" onPress={() => router.push('/portfolios')} style={{ paddingVertical: 8 }}><Text style={{ color: colors.primary, ...type.caption }}>{portfolio.portfolioName} ▾</Text></Pressable>
         {subtitle ? <Text style={{ color: colors.muted, ...type.caption }}>{subtitle}</Text> : null}
       </View>
       <Pressable

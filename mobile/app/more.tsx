@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
 import { useBiometricLock } from '@/auth/BiometricLock';
-import { backupShare, encryptedBackupShare } from '@/data/backup';
+import { accountBackupShare, encryptedBackupShare } from '@/data/backup';
 import { useVault } from '@/vault/VaultProvider';
 import { setFilerStatus, type FilerStatus } from '@/data/mutations';
 import { usePortfolio } from '@/data/usePortfolio';
@@ -104,14 +104,14 @@ export default function More() {
   }
 
   function exportReadable() {
-    if (!p.portfolio) return;
-    const portfolio = p.portfolio;
+    if (!p.account) return;
+    const account = p.account;
     Alert.alert(
       'Share a readable copy?',
       'This file is NOT encrypted. Anyone who gets it can read every holding, trade and note. Prefer the encrypted backup.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Share unencrypted', style: 'destructive', onPress: () => void shareText(backupShare(portfolio)) },
+        { text: 'Share unencrypted', style: 'destructive', onPress: () => void shareText(accountBackupShare(account)) },
       ],
     );
   }
@@ -157,6 +157,10 @@ export default function More() {
 
   return (
     <Screen edges={['bottom']}>
+      <Button label="Manage portfolios" variant="outline" onPress={() => router.push('/portfolios')} />
+      <Button label="Restore account backup" variant="outline" onPress={() => router.push('/restore')} />
+      {p.isAll ? <Notice>Choose a portfolio to change its tax status.</Notice> : null}
+
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           {user?.picture ? (

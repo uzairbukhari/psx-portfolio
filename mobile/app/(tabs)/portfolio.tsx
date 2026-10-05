@@ -1,3 +1,4 @@
+import { AllPortfolios } from '@/ui/AllPortfolios';
 import { useEffect, useMemo, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -45,6 +46,7 @@ export default function Portfolio() {
   const bar = <AppBar title="Portfolio" />;
   const switcher = <Segmented label="Portfolio view" value={segment} onChange={setSegment} options={[{ key: 'holdings', label: 'Holdings' }, { key: 'insights', label: 'Insights' }]} />;
 
+  if (p.isAll) return <AllPortfolios />;
   if (p.isLoading)
     return (
       <Screen>

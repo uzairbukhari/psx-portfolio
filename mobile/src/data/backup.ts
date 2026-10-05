@@ -1,5 +1,6 @@
 // Backup export: the same JSON document the web's "Export backup" writes, so either app's file restores on the web.
 import { today, type Portfolio } from '../../../lib/portfolio.ts';
+import type { PortfolioAccount } from '../../../lib/portfolio-account.ts';
 import type { BackupPackage } from '../../../lib/vault-backup.ts';
 
 /** Android's share intent fails on very large text, so bigger ledgers are exported from the website instead. */
@@ -27,4 +28,10 @@ export function encryptedBackupShare(pkg: BackupPackage, now: Date = new Date())
   if (text.length > BACKUP_SHARE_LIMIT_CHARS)
     return { ok: false, reason: 'Your backup is too large to share as text from the phone. Use Settings > Backup on the website.' };
   return { ok: true, text, title: `sipwise-encrypted-backup-${now.toISOString().slice(0, 10)}.json` };
+}
+
+export function accountBackupShare(account: PortfolioAccount): { ok: true; text: string; title: string } | { ok: false; reason: string } {
+  const text = JSON.stringify({ kind: 'sipwise-portfolio-account-backup', schemaVersion: 1, exportedAt: new Date().toISOString(), account });
+  if (text.length > BACKUP_SHARE_LIMIT_CHARS) return { ok: false, reason: 'This account is too large to share as text. Export a backup from the website.' };
+  return { ok: true, text, title: `sipwise-all-portfolios-${today()}.json` };
 }

@@ -1,6 +1,6 @@
 'use client';
 import { useConfirm } from '@/components/confirm-dialog';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -66,7 +66,6 @@ import {
   taxSummary,
   dateOK,
   DEFAULT_RESEARCH_SETTINGS,
-  blankPortfolio,
   renameTicker,
   type ResearchSettings,
   type Portfolio,
@@ -122,6 +121,8 @@ import { loadPortfolioView, savePortfolioView } from '@/lib/portfolio-view';
 import { parseBackup, type BackupPackage } from '@/lib/vault-backup';
 import { EncryptedRestoreDialog, VaultSecurity } from './vault-security';
 import VaultGate from './vault-gate';
+import PortfolioWorkspace, { type WorkspaceControls } from './portfolio-workspace';
+import { accountFromPortfolio, importMatches } from '@/lib/portfolio-account';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
 import { canSaveCompany } from '@/lib/company-lookup-client';
@@ -359,18 +360,37 @@ export default function Dashboard(props: DashboardProps) {
   if (!props.email) return <DashboardContent {...props} vault={null} />;
   return (
     <VaultGate email={props.email}>
-      {(session, lock) => <DashboardContent {...props} vault={{ session, lock }} />}
+      {(session, lock) => <PortfolioWorkspace session={session} lock={lock}>{(workspace) => <DashboardContent {...props} vault={{ session, lock }} workspace={workspace} />}</PortfolioWorkspace>}
     </VaultGate>
   );
 }
+function ImportRequestRunner({ request, busy, onRequest }: { request: WorkspaceControls['importRequest']; busy: boolean; onRequest: (request: NonNullable<WorkspaceControls['importRequest']>) => void }) {
+  const processed = useRef<string | null>(null);
+  const handle = useEffectEvent(onRequest);
+  useEffect(() => {
+    if (!busy && request && processed.current !== request.token) {
+      processed.current = request.token;
+      handle(request);
+    }
+  }, [busy, request]);
+  return null;
+}
+
 function DashboardContent({
   email,
   name,
   picture,
   role,
   vault,
-}: DashboardProps & { vault: VaultContext | null }) {
+  workspace,
+}: DashboardProps & { vault: VaultContext | null; workspace?: WorkspaceControls }) {
   const isAdmin = role === 'super_admin';
+  const target = workspace?.target;
+  const importHash = useRef<string | undefined>(undefined);
+  const importActive = useRef(false);
+  const mounted = useRef(true);
+  const [readingImport, setReadingImport] = useState(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
   const emptyImportRef = useRef<HTMLInputElement>(null);
   // From 1100px the market pulse sits beside the value card's chart; below it stays under the table.
@@ -577,12 +597,12 @@ function DashboardContent({
     setBusy(true);
     try {
       // Decrypts locally, then overlays the shared public caches (quotes, announcements, face values).
-      const d = await loadPortfolioView(vault!.session, webPublicData);
+      const d = await loadPortfolioView(vault!.session, webPublicData, target);
       setP(d.portfolio);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
       void resumeRefresh(d.portfolio.companies.map((c) => c.ticker));
-      await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
+      if (!target?.name) await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
     } catch (e) {
       // A lock mid-load is not an error to show: the unlock screen takes over.
       if (!(e instanceof VaultLockedError)) notify(String(e), true);
@@ -608,7 +628,7 @@ function DashboardContent({
       {
         save: async (next, revision) => {
           try {
-            return { revision: await vault!.session.save(next, revision) };
+            return { revision: await vault!.session.save(next, revision, target) };
           } catch (e) {
             if (e instanceof ConflictError) return { conflict: true };
             throw e;
@@ -616,7 +636,7 @@ function DashboardContent({
         },
         reload: async () => {
           try {
-            const d = await loadPortfolioView(vault!.session, webPublicData);
+            const d = await loadPortfolioView(vault!.session, webPublicData, target);
             return { portfolio: d.portfolio, revision: d.revision };
           } catch {
             return null;
@@ -675,13 +695,20 @@ function DashboardContent({
     success = 'Saved to your private portfolio.',
     options: { createCompanies?: string[] } = {},
   ) {
+    if (!mounted.current) throw Error('This portfolio view was closed. Reopen it before saving.');
     if (busy)
       throw Error('Wait for the current operation to finish.');
+    if (target?.name && !importActive.current) throw Error('Save the import first to create this portfolio.');
     validate(next);
+    if (importActive.current && target) {
+      const matches = importMatches(vault!.session.account, target.id, next, importHash.current);
+      if (matches.length && !await confirm({ title: 'This import appears in another portfolio', description: `Matching records were found in ${matches.map((p) => p.name).join(', ')}. Importing here too will count them twice in All portfolios.`, confirmLabel: 'Import here anyway' })) throw Error('Import cancelled. Nothing was saved.');
+      if (importHash.current) next.brokerFileHashes = [...new Set([...(next.brokerFileHashes ?? []), importHash.current])];
+    }
     setBusy(true);
     try {
       // Validates, fills company details from the public directory, encrypts here and stores ciphertext only.
-      const d = await savePortfolioView(vault!.session, webPublicData, next, revision, options.createCompanies);
+      const d = await savePortfolioView(vault!.session, webPublicData, next, revision, options.createCompanies, target);
       // Show the name and sector filled in from the company directory.
       for (const detail of d.details ?? []) {
         const company = next.companies.find((c) => c.ticker === detail.ticker);
@@ -693,12 +720,14 @@ function DashboardContent({
       setP(next);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
+      if (importActive.current) { importActive.current = false; importHash.current = undefined; workspace?.onSaved(); }
       notify(
         d.pendingCompanies?.length
           ? `${success} Company details for ${d.pendingCompanies.join(', ')} are still being looked up; your transactions are saved and the details will fill in on a later load.`
           : success,
       );
     } catch (e) {
+      if (e instanceof ConflictError) { importActive.current = false; importHash.current = undefined; setAhlStatement(null); setFinqalabReview(null); setBrokerReview(null); setIpoReview(null); await load(); }
       if (!(e instanceof VaultLockedError)) notify(e instanceof Error ? e.message : String(e), true);
       throw e;
     } finally {
@@ -724,13 +753,13 @@ function DashboardContent({
   useEffect(() => {
     const context = (
       document as unknown as {
-        modelContext?: { registerTool: (tool: unknown, opts: unknown) => void };
+        modelContext?: { registerTool: (tool: unknown, opts: unknown) => Promise<void> | void };
       }
     ).modelContext;
     if (!context?.registerTool || !p) return;
     const abort = new AbortController();
     try {
-      context.registerTool(
+      Promise.resolve(context.registerTool(
         {
           name: 'read_psx_portfolio',
           description:
@@ -752,10 +781,14 @@ function DashboardContent({
           },
         },
         { signal: abort.signal },
-      );
+      )).catch(() => {});
     } catch {}
     return () => abort.abort();
   }, [p, fees, allowOld]);
+  const workspaceBusy = workspace?.onBusy;
+  useEffect(() => {
+    workspaceBusy?.(busy || readingImport || !!ahlStatement || !!finqalabReview || !!brokerReview || !!ipoReview || !!trade || !!company || !!receipt || targetsOpen || !!quoteTicker);
+  }, [workspaceBusy, busy, readingImport, ahlStatement, finqalabReview, brokerReview, ipoReview, trade, company, receipt, targetsOpen, quoteTicker]);
   if (!p && email && !(failed && message))
     return (
       <main className="app-loading">
@@ -776,15 +809,19 @@ function DashboardContent({
     names: Object.fromEntries(p.companies.map((c) => [c.ticker, c.name])),
     saved: p.quotes,
   };
-  const restoreBackup = (f: File) => {
+  const destinationName = target?.name ?? vault?.session.account?.portfolios.find((entry) => entry.id === target?.id)?.name ?? 'My Portfolio';
+  function restoreBackup(f: File) {
     attempt(async () => {
       // Either an encrypted package (asks for its password) or a readable ledger from an older version. Both are
       // decrypted/validated here and re-encrypted into the current vault; nothing readable is uploaded.
-      const parsed = parseBackup(await f.text());
-      if (parsed.type === 'encrypted') return setEncryptedRestore(parsed.backup);
-      await save(parsed.portfolio, 'Portfolio backup restored.');
+      try {
+        const parsed = parseBackup(await f.text());
+        if (parsed.type === 'encrypted') return setEncryptedRestore(parsed.backup);
+        if (parsed.type === 'account') throw Error('Restore this collection from All portfolios.');
+        await save(parsed.portfolio, 'Portfolio backup restored.');
+      } finally { importActive.current = false; }
     });
-  };
+  }
   const runCdc = async (raw: unknown) => {
     const result = importCdcDividends(
       raw,
@@ -828,6 +865,7 @@ function DashboardContent({
       ...(next.dividends ?? []),
       ...result.dividends,
     ];
+    if (!await confirm({ title: 'Review CDC import', description: `${result.imported} paid dividends will be added to ${destinationName}; ${superseded} PSX estimates will be replaced.`, confirmLabel: 'Import dividends' })) return;
     await save(
       next,
       `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
@@ -854,16 +892,24 @@ function DashboardContent({
         trade.voided = true;
     }
     next.trades = [...next.trades, ...result.trades];
+    if (!await confirm({ title: 'Review AHL import', description: `${result.imported} trades and ${result.addedCompanies} companies will be added to ${destinationName}. ${result.skippedDuplicate} duplicates will be skipped.`, confirmLabel: 'Import trades' })) return;
     await save(
       next,
       `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
     );
   };
   /** One entry point for every import file: works out what it is, then opens that import's review. */
-  const importFile = (f: File, expected?: ImportKind) => {
+  const importFile = (f: File, expected?: ImportKind) => workspace ? workspace.requestImport(f, expected) : processImportFile(f, expected);
+  function processImportFile(f: File, expected?: ImportKind) {
+    if (!p) return;
     attempt(async () => {
+      setReadingImport(true);
+      let reviewing = false;
+      try {
       const bytes = await f.arrayBuffer();
       const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
+      if (!mounted.current) return;
+      importHash.current = hash; importActive.current = true;
       if (p.brokerFileHashes?.includes(hash)) { notify('This statement was already imported. No AI call or ledger change was needed.'); return; }
       let kind: ImportKind | null;
       let pdf: { text: string; pages: number } | null = null;
@@ -883,6 +929,7 @@ function DashboardContent({
           new RegExp(format.broker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(`${f.name} ${table!.text.slice(0, 500)}`));
         if (saved) {
           try {
+            reviewing = true;
             setBrokerReview({ statement: parseSavedFormat(table, saved), fileName: f.name, format: null, hash, method: 'saved' });
             return;
           } catch { /* A changed layout needs fresh extraction and review. */ }
@@ -905,6 +952,7 @@ function DashboardContent({
         const data = await response.json() as { statement?: unknown; error?: string };
         if (!response.ok) throw Error(data.error ?? 'Statement extraction failed.');
         const statement = validateBrokerStatement(data.statement);
+        reviewing = true;
         setBrokerReview({ statement, fileName: f.name, format: table ? formatFromReviewed(table, statement) : null, hash, method: 'ai' });
         return;
       }
@@ -912,13 +960,14 @@ function DashboardContent({
         throw Error('IPO and dividend imports are available to super admins only.');
       if (expected && kind !== expected)
         throw Error(`That looks like a ${IMPORT_LABEL[kind]} file, not ${IMPORT_LABEL[expected]}. Use the matching card, or the drop box, which picks the right import itself.`);
-      if (kind === 'finqalab') runFinqalab(pdf!.text, f.name);
-      else if (kind === 'ahl' && pdf) setAhlStatement({ statement: await parseAhlLedgerText(pdf.text, pdf.pages), fileName: f.name });
+      if (kind === 'finqalab') { reviewing = true; runFinqalab(pdf!.text, f.name); }
+      else if (kind === 'ahl' && pdf) { reviewing = true; setAhlStatement({ statement: await parseAhlLedgerText(pdf.text, pdf.pages), fileName: f.name }); }
       else if (kind === 'ahl') await runAhlJson(raw);
       else if (kind === 'cdc') await runCdc(raw);
-      else setIpoReview({ items: parseIpoList(raw), fileName: f.name });
+      else { reviewing = true; setIpoReview({ items: parseIpoList(raw), fileName: f.name }); }
+      } finally { if (!reviewing) { importActive.current = false; importHash.current = undefined; } setReadingImport(false); }
     });
-  };
+  }
   const exportEncryptedBackup = () =>
     attempt(async () => {
       const pkg = await vault!.session.backupPackage();
@@ -1407,6 +1456,10 @@ function DashboardContent({
   return (
     <CompanyNavProvider value={openCompany}>
     <main className="desk">
+      <ImportRequestRunner request={workspace?.importRequest ?? null} busy={busy} onRequest={(request) => {
+        if (request.restore) { importActive.current = true; restoreBackup(request.file); }
+        else processImportFile(request.file, request.expected);
+      }} />
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
       <header className={'app-header' + (chromeless ? ' no-tabs' : '')}>
         <button
@@ -2082,8 +2135,11 @@ function DashboardContent({
             onResearchSettings={saveResearchSettings}
             onExport={exportBackup}
             onExportEncrypted={exportEncryptedBackup}
-            onClearLedger={() => save(blankPortfolio(), 'Your portfolio data was cleared.')}
-            onRestore={restoreBackup}
+            onClearLedger={async () => {
+              if (!vault || vault.session.revision === null) throw Error('Unlock your account first.');
+              await vault.session.saveAccount(accountFromPortfolio(), vault.session.revision);
+            }}
+            onRestore={(file) => workspace ? workspace.requestImport(file, undefined, true) : restoreBackup(file)}
             security={vault ? <VaultSecurity session={vault.session} onLock={vault.lock} /> : undefined}
             onImportFile={importFile}
             importSummary={summarizeImports(p)}
@@ -2116,18 +2172,19 @@ function DashboardContent({
         backup={encryptedRestore}
         onCancel={() => setEncryptedRestore(null)}
         onRestore={async (portfolio) => {
-          await save(portfolio, 'Encrypted backup restored.');
+          await vault!.session.saveAccount(portfolio, revision);
+          await load();
           setEncryptedRestore(null);
         }}
       />
       {ahlStatement && (
         <AhlImportDialog
           statement={ahlStatement.statement}
-          fileName={ahlStatement.fileName}
+          fileName={`${ahlStatement.fileName} · ${destinationName}`}
           portfolio={p}
           revision={revision}
           busy={busy}
-          onCancel={() => setAhlStatement(null)}
+          onCancel={() => { importActive.current = false; importHash.current = undefined; setAhlStatement(null); }}
           onCommit={async (next, message) => {
             await save(next, message + unknownCostWarning(next));
             setAhlStatement(null);
@@ -2137,11 +2194,11 @@ function DashboardContent({
       {finqalabReview && (
         <FinqalabImportDialog
           rows={finqalabReview.rows}
-          fileName={finqalabReview.fileName}
+          fileName={`${finqalabReview.fileName} · ${destinationName}`}
           portfolio={p}
           revision={revision}
           busy={busy}
-          onCancel={() => setFinqalabReview(null)}
+          onCancel={() => { importActive.current = false; importHash.current = undefined; setFinqalabReview(null); }}
           onCommit={async (next, message) => {
             await save(next, message + unknownCostWarning(next));
             setFinqalabReview(null);
@@ -2151,13 +2208,13 @@ function DashboardContent({
       {brokerReview && (
         <BrokerImportDialog
           statement={brokerReview.statement}
-          fileName={brokerReview.fileName}
+          fileName={`${brokerReview.fileName} · ${destinationName}`}
           portfolio={p}
           revision={revision}
           busy={busy}
           method={brokerReview.method}
           mappingReady={!!brokerReview.format}
-          onCancel={() => setBrokerReview(null)}
+          onCancel={() => { importActive.current = false; importHash.current = undefined; setBrokerReview(null); }}
           onCommit={async (next, message, broker) => {
             if (brokerReview.format && !(next.brokerFormats ?? []).some((f) => f.signature === brokerReview.format!.signature && f.broker === broker))
               next.brokerFormats = [...(next.brokerFormats ?? []), { ...brokerReview.format, broker }];
@@ -2170,11 +2227,11 @@ function DashboardContent({
       {ipoReview && (
         <IpoImportDialog
           items={ipoReview.items}
-          fileName={ipoReview.fileName}
+          fileName={`${ipoReview.fileName} · ${destinationName}`}
           portfolio={p}
           revision={revision}
           busy={busy}
-          onCancel={() => setIpoReview(null)}
+          onCancel={() => { importActive.current = false; importHash.current = undefined; setIpoReview(null); }}
           onCommit={async (next, message) => {
             await save(next, message + unknownCostWarning(next));
             setIpoReview(null);

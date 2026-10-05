@@ -62,14 +62,14 @@ function ReviewBody({ suggestions, month, feePct, onClose }: { suggestions: Sugg
     setBusy(true);
     try {
       const previous = p.portfolio;
-      await p.save(recordBuys(previous, parsed.buys, month, today(), 'SIP'));
+      const savedRevision = await p.save(recordBuys(previous, parsed.buys, month, today(), 'SIP'));
       toast.show({
         message: `${plural(parsed.buys.length, 'buy')} recorded for ${month}`,
         actionLabel: 'Undo',
         durationMs: 12000,
         // One save put them all in; one save puts the portfolio back as it was.
         onAction: async () => {
-          await p.save(previous);
+          await p.save(previous, { expectedRevision: savedRevision });
           toast.show({ message: 'Undone. Your portfolio is back as it was.' });
         },
       });

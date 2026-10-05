@@ -1,18 +1,5 @@
-import { failure, identity, vaultDb } from '@/lib/server';
-import { getCiphertext, putCiphertext } from '@/lib/vault-api';
+import { upgradeRequired } from '@/lib/vault-api';
 
-// Ciphertext only. The server never loads, merges or enriches portfolio content.
-export async function GET(req: Request) {
-  try {
-    return await getCiphertext(vaultDb(), await identity(req));
-  } catch (e) {
-    return failure(e);
-  }
-}
-export async function PUT(req: Request) {
-  try {
-    return await putCiphertext(vaultDb(), await identity(req, true), req);
-  } catch (e) {
-    return failure(e);
-  }
-}
+// Old clients cannot safely write a portfolio collection. Keep this barrier during rollback.
+export const GET = () => upgradeRequired();
+export const PUT = () => upgradeRequired();

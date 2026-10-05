@@ -41,7 +41,7 @@ test('only the vault routes are bound to the private database, and no Worker or 
     .filter((f) => /\.VAULT_DB|vaultDb\(/.test(read(f)))
     .map((f) => relative(root, f))
     .sort();
-  const allowed = ['app/api/me/route.ts', 'app/api/v2/portfolio/route.ts', 'app/api/vault/route.ts', 'lib/server.ts'];
+  const allowed = ['app/api/me/route.ts', 'app/api/v3/portfolio/route.ts', 'app/api/vault/route.ts', 'lib/server.ts'];
   assert.deepEqual(usesVault, allowed);
   assert.ok(!/VAULT/.test(read(join(root, 'workers/quote-refresh/wrangler.jsonc'))), 'the cron Worker must not bind the vault database');
   assert.ok(!/\.VAULT_DB|VAULT_DB\s*[?:]/.test(read(join(root, 'workers/quote-refresh/src/index.ts'))));
@@ -51,6 +51,9 @@ test('the API surface keeps the legacy portfolio endpoint closed', () => {
   const route = read(join(root, 'app/api/portfolio/route.ts'));
   assert.ok(!/db\(\)|vaultDb|prepare\(/.test(route));
   assert.match(route, /upgradeRequired/);
+  const v2 = read(join(root, 'app/api/v2/portfolio/route.ts'));
+  assert.match(v2, /upgradeRequired/);
+  assert.ok(!/vaultDb|putCiphertext/.test(v2));
 });
 
 test.beforeEach(() => v.setCryptoAdapter({ randomBytes: (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)), ...v.webCryptoAes(globalThis.crypto.subtle) }));

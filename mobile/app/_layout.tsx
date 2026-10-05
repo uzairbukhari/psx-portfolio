@@ -8,6 +8,7 @@ import { PushBridge } from '@/push/PushBridge';
 import { SignIn } from '@/screens/SignIn';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { ToastProvider } from '@/ui/Toast';
+import { PortfolioSelectionProvider } from '@/data/PortfolioSelection';
 import { VaultGate } from '@/vault/VaultProvider';
 
 function Root() {
@@ -23,6 +24,7 @@ function Root() {
   return (
     <ToastProvider>
       <VaultGate>
+        <PortfolioSelectionProvider>
         <PushBridge />
         <Stack
           screenOptions={{
@@ -39,6 +41,8 @@ function Root() {
           <Stack.Screen name="company/[ticker]" options={{ title: '' }} />
           <Stack.Screen name="inbox" options={{ title: 'Inbox' }} />
           <Stack.Screen name="more" options={{ title: 'More' }} />
+          <Stack.Screen name="portfolios" options={{ title: 'Portfolios' }} />
+          <Stack.Screen name="restore" options={{ title: 'Restore backup' }} />
           <Stack.Screen name="import" options={{ title: 'Import' }} />
           {/* Old paths that now live inside Portfolio and Plan; they redirect, so they have no header. */}
           <Stack.Screen name="reports" options={{ headerShown: false }} />
@@ -48,6 +52,7 @@ function Root() {
           <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
           <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
         </Stack>
+        </PortfolioSelectionProvider>
       </VaultGate>
     </ToastProvider>
   );

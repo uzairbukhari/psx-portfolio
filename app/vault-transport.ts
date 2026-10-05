@@ -26,8 +26,8 @@ export const webVaultTransport: VaultTransport = {
   postVault: (request) => call('/api/vault', 'POST', request),
   putWrappers: (request) => call('/api/vault', 'PUT', request),
   deleteVault: async () => void (await call('/api/vault', 'DELETE', { confirm: true })),
-  getPortfolio: () => call('/api/v2/portfolio'),
-  putPortfolio: (request) => call('/api/v2/portfolio', 'PUT', request),
+  getPortfolio: () => call('/api/v3/portfolio'),
+  putPortfolio: (request) => call('/api/v3/portfolio', 'PUT', request),
 };
 
 export const webPublicData: PublicData = createPublicData(call);

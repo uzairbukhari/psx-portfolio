@@ -1,3 +1,4 @@
+import { ChoosePortfolio } from '@/ui/AllPortfolios';
 import { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -196,14 +197,14 @@ export default function Transaction() {
       }
       setBusy(true);
       const previous = p.portfolio;
-      await p.save(next);
+      const savedRevision = await p.save(next);
       // Undo is a second revisioned save of the portfolio as it was; a change from another device in between
       // makes it fail with the usual "portfolio changed" message instead of overwriting that change.
       toast.show({
         message: `${editing ? 'Correction saved' : `${kind === 'buy' ? 'Buy' : kind === 'sell' ? 'Sale' : kind === 'dividend' ? 'Dividend' : kind === 'split' ? 'Split' : 'Opening balance'} recorded`} for ${ticker}`,
         actionLabel: 'Undo',
         onAction: async () => {
-          await p.save(previous);
+          await p.save(previous, { expectedRevision: savedRevision });
           toast.show({ message: 'Undone. Your portfolio is back as it was.' });
         },
       });
@@ -226,12 +227,12 @@ export default function Transaction() {
           try {
             setBusy(true);
             const previous = p.portfolio!;
-            await p.save(voidEntry(previous, existing.entryKind, editingId));
+            const savedRevision = await p.save(voidEntry(previous, existing.entryKind, editingId));
             toast.show({
               message: 'Entry voided',
               actionLabel: 'Undo',
               onAction: async () => {
-                await p.save(previous);
+                await p.save(previous, { expectedRevision: savedRevision });
                 toast.show({ message: 'Undone. The entry counts again.' });
               },
             });
@@ -246,6 +247,7 @@ export default function Transaction() {
     ]);
   }
 
+  if (p.isAll) return <ChoosePortfolio purpose="Choose where to record this transaction." />;
   if (locked)
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>

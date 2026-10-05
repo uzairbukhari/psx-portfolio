@@ -1,3 +1,4 @@
+import { ChoosePortfolio } from '@/ui/AllPortfolios';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,6 +38,7 @@ export default function ManualQuote() {
     }
   }
 
+  if (p.isAll) return <ChoosePortfolio purpose="Choose the portfolio whose saved price you want to edit." />;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
       <Stack.Screen options={{ title: `${ticker} price` }} />

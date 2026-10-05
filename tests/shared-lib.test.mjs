@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 const SHARED = [
   'api-types',
   'portfolio',
+  'portfolio-account',
   'portfolio-reports',
   'allocation',
   'psx-calendar',

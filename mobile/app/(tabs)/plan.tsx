@@ -1,3 +1,4 @@
+import { ChoosePortfolio } from '@/ui/AllPortfolios';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -40,6 +41,7 @@ export default function Plan() {
   const result = useMemo(() => (p.portfolio ? buildPlan(p.portfolio, month, parseNumber(fee) ?? 0, allowOld) : null), [p.portfolio, month, fee, allowOld]);
   const bar = <AppBar title="Plan" subtitle="Decide this month’s buys" />;
 
+  if (p.isAll) return <ChoosePortfolio purpose="Choose the portfolio for this SIP budget and Monthly Picks." />;
   if (p.isLoading)
     return (
       <Screen>

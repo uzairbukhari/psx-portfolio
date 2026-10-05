@@ -1,3 +1,4 @@
+import { AllPortfolios } from '@/ui/AllPortfolios';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -37,6 +38,7 @@ export default function Today() {
   const breakdown = useMemo(() => (p.portfolio && p.view ? returnBreakdown(p.portfolio, p.view.totals.gain) : null), [p.portfolio, p.view]);
 
   const bar = <AppBar title="Today" subtitle={dateLine(now)} />;
+  if (p.isAll) return <AllPortfolios />;
   if (p.isLoading)
     return (
       <Screen>
