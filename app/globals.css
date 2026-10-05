@@ -377,9 +377,9 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 /* ---- App chrome: sticky header + nav (desktop), 2-row (tablet), bottom bar (phone) ---- */
 .app-header{--hdr-h:60px;--bar-h:60px;position:sticky;top:0;z-index:30;height:var(--hdr-h);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;gap:0 28px;border-bottom:1px solid var(--border);isolation:isolate}
 .app-header::before{content:'';position:absolute;inset:0 -48px;z-index:-1;background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-.app-header>.brand{align-self:center;gap:12px;font-size:22px}
-.app-header>.brand svg{width:22px;height:22px}
-.app-header>.brand span{font-size:13px}
+.app-header .brand{align-self:center;gap:12px;font-size:22px}
+.app-header .brand svg{width:22px;height:22px}
+.app-header .brand span{font-size:13px}
 .app-header .brand-short,.app-header .tab-short,.app-header .tab-icon{display:none}
 .app-header>.header-right{align-self:center;grid-column:3}
 .app-header [data-slot=tabs-list]{grid-column:2;grid-row:1;height:100%;max-width:100%;width:auto;justify-self:start;padding:0;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;background:transparent}
@@ -396,7 +396,7 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 @media(max-width:1099px){
   .app-header{height:auto;grid-template-columns:1fr auto;grid-template-rows:var(--hdr-h) 40px;gap:0}
   .app-header.no-tabs{grid-template-rows:var(--hdr-h)}
-  .app-header>.brand{grid-column:1;grid-row:1}
+  .app-header .brand{grid-column:1;grid-row:1}
   .app-header>.header-right{grid-column:2;grid-row:1}
   .app-header [data-slot=tabs-list]{grid-column:1/-1;grid-row:2;width:100%;justify-self:stretch;
     -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);padding-right:24px}
@@ -407,9 +407,9 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 @media(max-width:760px){
   .app-header{--hdr-h:52px;grid-template-rows:var(--hdr-h)}
   .app-header::before{inset:0 -18px;background:linear-gradient(var(--card),var(--card)),var(--background);backdrop-filter:none;-webkit-backdrop-filter:none}
-  .app-header>.brand{font-size:18px;gap:8px;min-width:0}
+  .app-header .brand{font-size:18px;gap:8px;min-width:0}
   .app-header .hdr-btn .hdr-label{display:none}
-  .app-header>.brand svg{width:20px;height:20px}
+  .app-header .brand svg{width:20px;height:20px}
   .app-header .brand-long{display:none}.app-header .brand-short{display:inline;font-size:15px;letter-spacing:1.5px}
   .app-header .tab-long{display:none}.app-header .tab-short,.app-header .tab-icon{display:block}
   .app-header [data-slot=tabs-list]{position:fixed;left:0;right:0;bottom:0;z-index:40;width:100%;height:calc(var(--bar-h) + env(safe-area-inset-bottom));padding:0 0 env(safe-area-inset-bottom);gap:0;justify-content:space-around;overflow:hidden;border-top:1px solid var(--border);background:linear-gradient(var(--card),var(--card)),var(--background);-webkit-mask-image:none;mask-image:none}
@@ -430,12 +430,12 @@ button:not([data-slot]){display:inline-flex;align-items:center;justify-content:c
 .brand .logo-mark{flex:none;width:28px;height:28px;filter:drop-shadow(0 0 14px var(--primary-glow))}
 .brand .logo-word{font-size:22px;font-weight:800;letter-spacing:-.8px;color:var(--foreground);text-shadow:none}
 .brand .logo-word em{font-style:normal;color:#60a5fa}
-.app-header>.brand .logo-mark{width:28px;height:28px}
-.app-header>.brand .logo-word{font-size:20px}
-@media(max-width:760px){.app-header>.brand .logo-mark{width:26px;height:26px}.app-header>.brand .logo-word{font-size:18px}}
+.app-header .brand .logo-mark{width:28px;height:28px}
+.app-header .brand .logo-word{font-size:20px}
+@media(max-width:760px){.app-header .brand .logo-mark{width:26px;height:26px}.app-header .brand .logo-word{font-size:18px}}
 /* Staging deployments (APP_ENV=staging) mark the app bar brand so they can't be mistaken for production. */
-html[data-app-env=staging] .app-header>.brand::after{content:'STAGING';margin-left:2px;padding:2px 7px;border-radius:999px;border:1px solid rgba(211,154,41,.45);background:rgba(211,154,41,.14);color:#e8c27a;font-size:10px;font-weight:700;letter-spacing:1.2px;line-height:1.4}
-@media(max-width:760px){html[data-app-env=staging] .app-header>.brand::after{content:"";display:block;width:8px;height:8px;padding:0;margin-left:0;flex:none;border-color:transparent;background:#e8c27a}}
+html[data-app-env=staging] .app-header .brand::after{content:'STAGING';margin-left:2px;padding:2px 7px;border-radius:999px;border:1px solid rgba(211,154,41,.45);background:rgba(211,154,41,.14);color:#e8c27a;font-size:10px;font-weight:700;letter-spacing:1.2px;line-height:1.4}
+@media(max-width:760px){html[data-app-env=staging] .app-header .brand::after{content:"";display:block;width:8px;height:8px;padding:0;margin-left:0;flex:none;border-color:transparent;background:#e8c27a}}
 
 /* Value card: chart column + optional market pulse aside (>=1100px: 70 / 30) */
 .value-card-chart,.value-card-left{min-width:0}
@@ -509,3 +509,15 @@ html[data-app-env=staging] .app-header>.brand::after{content:'STAGING';margin-le
 @media(max-width:760px){.header-portfolio-select{max-width:132px;margin-left:6px}.header-portfolio-label{margin-left:4px}.portfolio-settings .set-row{align-items:flex-start;flex-direction:column}.portfolio-settings .row{flex-wrap:wrap}}
 
 .portfolio-action-choices{display:grid;gap:10px}.tx-fields:disabled{opacity:.5}
+
+/* Keep branding and scope in one grid cell; actions stay on the same row. */
+.header-brand-group{display:flex;align-items:center;gap:10px;min-width:0;align-self:center;grid-column:1;grid-row:1}
+.app-header>.header-right{grid-row:1;white-space:nowrap}
+.header-brand-group .brand{flex:none}
+.header-brand-group .header-portfolio-select,.header-brand-group .header-portfolio-label{margin-left:0}
+.header-brand-group .header-portfolio-select{max-width:140px;text-overflow:ellipsis}
+@media(min-width:1101px){.app-header{column-gap:18px}.app-header [data-slot=tabs-trigger]{padding-inline:10px}}
+@media(max-width:1100px){.header-brand-group{grid-column:1;grid-row:1}}
+@media(max-width:760px){.header-brand-group{gap:6px}.header-brand-group .header-portfolio-select{max-width:104px;min-width:64px;padding:6px 20px 6px 8px}.app-header .header-right{gap:5px}}
+
+@media(max-width:480px){.header-brand-group .logo-word{display:none}.header-brand-group .brand{gap:4px}.app-header .hdr-btn{width:32px;height:32px;padding:0}.app-header .account-trigger{gap:4px;padding:3px 6px}}

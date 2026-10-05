@@ -1536,6 +1536,7 @@ function DashboardContent({
       }} />
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
       <header className={'app-header' + (chromeless ? ' no-tabs' : '')}>
+        <div className="header-brand-group">
         <button
           type="button"
           data-slot="brand"
@@ -1546,6 +1547,7 @@ function DashboardContent({
           <Wordmark />
         </button>
         {workspace?.selector}
+        </div>
         <div className="header-right">
           <button
             type="button"
