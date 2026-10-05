@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { detectJsonImport, detectPdfImport, summarizeImports } from '../lib/import-detect.ts';
 
-test('PDFs: Finqalab by title, anything else goes to the AHL parser', () => {
+test('PDFs: known reports use local parsers; unfamiliar reports need general extraction', () => {
   assert.equal(detectPdfImport('Periodic Trade Details Report By Finqalab\nTotal Records: 1'), 'finqalab');
-  assert.equal(detectPdfImport('Client Ledger'), 'ahl');
+  assert.equal(detectPdfImport('Arif Habib Limited Client Ledger'), 'ahl');
+  assert.equal(detectPdfImport('JS Global Account Statement'), null);
 });
 
 test('JSON files are told apart by their fields', () => {

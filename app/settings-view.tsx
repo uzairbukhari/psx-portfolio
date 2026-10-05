@@ -423,9 +423,9 @@ export default function SettingsView({
               id="data"
               icon={<Database size={18} />}
               title="Data & imports"
-              description="Back up your ledger, or bring in history from your broker and CDC."
+              description="Back up your ledger or import a broker statement."
             >
-              <ImportPanel busy={busy} summary={importSummary} onImportFile={onImportFile} />
+              <ImportPanel isAdmin={isAdmin} busy={busy} summary={importSummary} onImportFile={onImportFile} />
               <h3 className="set-group-title">Backup &amp; export</h3>
               <div className="set-split">
                 <div className="set-tile">

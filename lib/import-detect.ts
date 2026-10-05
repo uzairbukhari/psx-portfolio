@@ -10,9 +10,11 @@ export const IMPORT_LABEL: Record<ImportKind, string> = {
 export const UNSUPPORTED_FILE =
   'That file is not one of the supported imports: an AHL Client Ledger (PDF) or trade history (JSON), a Finqalab Periodic Trade Details Report (PDF), a CDC dividend export (JSON) or an IPO list (JSON).';
 
-/** PDFs: a Finqalab report is recognised by its title; any other PDF goes to the AHL parser, which validates it. */
-export function detectPdfImport(text: string): 'finqalab' | 'ahl' {
-  return /Periodic\s+Trade\s+Details\s+Report\s+By\s+Finqalab/i.test(text) ? 'finqalab' : 'ahl';
+/** Only known statement headings enter deterministic parsers. */
+export function detectPdfImport(text: string): 'finqalab' | 'ahl' | null {
+  if (/Periodic\s+Trade\s+Details\s+Report\s+By\s+Finqalab/i.test(text)) return 'finqalab';
+  if (/Arif\s+Habib\s+Limited/i.test(text) && /Client\s+Ledger/i.test(text)) return 'ahl';
+  return null;
 }
 
 /** JSON: by the fields of the first row. Returns null when nothing matches. */

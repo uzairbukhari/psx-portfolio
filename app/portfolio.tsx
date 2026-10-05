@@ -106,6 +106,9 @@ import { watchTickers } from '@/lib/market-watch';
 import MonthlyPicks from './monthly-picks';
 import { parseFinqalabReport } from './finqalab-import';
 import { FinqalabImportDialog } from './finqalab-import-dialog';
+import { BrokerImportDialog } from './broker-import-dialog';
+import { validateBrokerStatement, type BrokerStatement, type BrokerFormat } from '@/lib/broker-import';
+import { readBrokerTable, parseSavedFormat, formatFromReviewed, redactBrokerText, type BrokerTable } from '@/lib/broker-file';
 import { IpoImportDialog } from './ipo-import-dialog';
 import { parseIpoList, type IpoAllotment } from '@/lib/ipo-list-import';
 import { detectJsonImport, detectPdfImport, summarizeImports, IMPORT_LABEL, UNSUPPORTED_FILE, type ImportKind } from '@/lib/import-detect';
@@ -416,6 +419,7 @@ function DashboardContent({
   const [trade, setTrade] = useState<Trade | null>(null),
     [ahlStatement, setAhlStatement] = useState<{ statement: AhlLedgerStatement; fileName: string } | null>(null),
     [finqalabReview, setFinqalabReview] = useState<{ rows: FinqalabTrade[]; fileName: string } | null>(null),
+    [brokerReview, setBrokerReview] = useState<{ statement: BrokerStatement; fileName: string; format: BrokerFormat | null; hash: string; method: 'ai' | 'saved' } | null>(null),
     [ipoReview, setIpoReview] = useState<{ items: IpoAllotment[]; fileName: string } | null>(null),
     [editing, setEditing] = useState<string | null>(null),
     [stockSplit, setStockSplit] = useState<StockSplit | null>(null),
@@ -714,7 +718,7 @@ function DashboardContent({
       ),
     ];
     if (!tickers.length) return '';
-    return ` Warning: ${tickers.length === 1 ? 'a sale has' : tickers.length + ' sales have'} unknown cost basis (${tickers.join(', ')}) — edit the opening trade to enter its real cost for accurate tax figures.`;
+    return ` Warning: ${tickers.length === 1 ? 'a sale has' : tickers.length + ' sales have'} unknown cost basis (${tickers.join(', ')}). Review the acquisition history before relying on tax figures.`;
   }
   useEffect(() => {
     const context = (
@@ -857,22 +861,54 @@ function DashboardContent({
   /** One entry point for every import file: works out what it is, then opens that import's review. */
   const importFile = (f: File, expected?: ImportKind) => {
     attempt(async () => {
+      const bytes = await f.arrayBuffer();
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
+      if (p.brokerFileHashes?.includes(hash)) { notify('This statement was already imported. No AI call or ledger change was needed.'); return; }
       let kind: ImportKind | null;
       let pdf: { text: string; pages: number } | null = null;
       let raw: unknown;
+      let table: BrokerTable | null = null;
+      let unknownText = '';
       if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
         // Read locally, then review: nothing is saved until the preview is confirmed.
-        pdf = await extractPdfText(new Uint8Array(await f.arrayBuffer()));
+        pdf = await extractPdfText(new Uint8Array(bytes));
         kind = detectPdfImport(pdf.text);
+        unknownText = pdf.text;
+      } else if (/\.(csv|xlsx)$/i.test(f.name)) {
+        table = await readBrokerTable(f);
+        kind = null;
+        unknownText = table.text;
+        const saved = (p.brokerFormats ?? []).find((format) => format.signature === table!.signature &&
+          new RegExp(format.broker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(`${f.name} ${table!.text.slice(0, 500)}`));
+        if (saved) {
+          try {
+            setBrokerReview({ statement: parseSavedFormat(table, saved), fileName: f.name, format: null, hash, method: 'saved' });
+            return;
+          } catch { /* A changed layout needs fresh extraction and review. */ }
+        }
       } else {
         try {
           raw = JSON.parse(await f.text());
+          kind = detectJsonImport(raw);
+          unknownText = JSON.stringify(raw);
         } catch {
           throw Error(UNSUPPORTED_FILE);
         }
-        kind = detectJsonImport(raw);
       }
-      if (!kind) throw Error(UNSUPPORTED_FILE);
+      if (!kind) {
+        if (expected) throw Error(UNSUPPORTED_FILE);
+        if (!unknownText.trim()) throw Error('No readable text was found. Scanned statements are not supported yet.');
+        const ok = await confirm({ title: 'Read this statement with AI?', description: 'Statement text will be sent to the app’s configured AI provider for extraction. It may contain personal details. Your saved portfolio stays on this device, and nothing is added until you review the result.', confirmLabel: 'Read statement' });
+        if (!ok) return;
+        const response = await fetch('/api/broker-import/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: redactBrokerText(unknownText) }), credentials: 'same-origin' });
+        const data = await response.json() as { statement?: unknown; error?: string };
+        if (!response.ok) throw Error(data.error ?? 'Statement extraction failed.');
+        const statement = validateBrokerStatement(data.statement);
+        setBrokerReview({ statement, fileName: f.name, format: table ? formatFromReviewed(table, statement) : null, hash, method: 'ai' });
+        return;
+      }
+      if (!isAdmin && (kind === 'cdc' || kind === 'ipo'))
+        throw Error('IPO and dividend imports are available to super admins only.');
       if (expected && kind !== expected)
         throw Error(`That looks like a ${IMPORT_LABEL[kind]} file, not ${IMPORT_LABEL[expected]}. Use the matching card, or the drop box, which picks the right import itself.`);
       if (kind === 'finqalab') runFinqalab(pdf!.text, f.name);
@@ -1163,6 +1199,18 @@ function DashboardContent({
       patchTx({ ticker: '' });
   }
   function correctTrade(t: Trade) {
+    if (t.kind === 'adjustment') {
+      void confirm({ title: 'Void this holding adjustment?', description: 'The original adjustment stays in the audit history. Re-import the corrected statement to add a replacement.', confirmLabel: 'Void', destructive: true }).then((ok) => {
+        if (!ok) return;
+        attempt(async () => {
+          const next = clone(p!);
+          const entry = next.trades.find((x) => x.id === t.id);
+          if (entry) entry.voided = true;
+          await save(next, 'Holding adjustment voided.');
+        });
+      });
+      return;
+    }
     setEditing(t.id);
     setTxType(t.kind);
     setTrade({ ...t });
@@ -2088,6 +2136,25 @@ function DashboardContent({
           onCommit={async (next, message) => {
             await save(next, message + unknownCostWarning(next));
             setFinqalabReview(null);
+          }}
+        />
+      )}
+      {brokerReview && (
+        <BrokerImportDialog
+          statement={brokerReview.statement}
+          fileName={brokerReview.fileName}
+          portfolio={p}
+          revision={revision}
+          busy={busy}
+          method={brokerReview.method}
+          mappingReady={!!brokerReview.format}
+          onCancel={() => setBrokerReview(null)}
+          onCommit={async (next, message, broker) => {
+            if (brokerReview.format && !(next.brokerFormats ?? []).some((f) => f.signature === brokerReview.format!.signature && f.broker === broker))
+              next.brokerFormats = [...(next.brokerFormats ?? []), { ...brokerReview.format, broker }];
+            next.brokerFileHashes = [...(next.brokerFileHashes ?? []), brokerReview.hash];
+            await save(next, message + unknownCostWarning(next));
+            setBrokerReview(null);
           }}
         />
       )}

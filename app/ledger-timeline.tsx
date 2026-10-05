@@ -12,7 +12,7 @@ import {
   type Trade,
 } from '@/lib/portfolio';
 
-type EntryType = 'buy' | 'sell' | 'opening' | 'dividend' | 'split';
+type EntryType = 'buy' | 'sell' | 'opening' | 'adjustment' | 'dividend' | 'split';
 type Filter = 'all' | 'buy' | 'sell' | 'dividend' | 'split';
 
 export type LedgerEntry = {
@@ -104,6 +104,8 @@ export function buildEntries({
       label:
         t.kind === 'opening'
           ? 'Opening'
+          : t.kind === 'adjustment'
+            ? 'Holding adjustment'
           : t.kind === 'sell'
             ? 'Sale'
             : 'Purchase',

@@ -116,7 +116,7 @@ export function suspectedCorporateActions(p: Portfolio): CorporateActionSuspect[
 
 /** First date any shares of the ticker were held, or null. */
 export function firstHeldDate(p: Portfolio, ticker: string): string | null {
-  const dates = p.trades.filter((t) => t.ticker === ticker && !t.voided && t.kind !== 'sell').map((t) => t.date).sort();
+  const dates = p.trades.filter((t) => t.ticker === ticker && !t.voided && (t.kind === 'buy' || t.kind === 'opening' || (t.kind === 'adjustment' && t.shares > 0))).map((t) => t.date).sort();
   return dates[0] ?? null;
 }
 
@@ -373,4 +373,3 @@ export function approveSelectedAsReceived(
   }
   return { ok: true, portfolio: next, approved, converted, total };
 }
-

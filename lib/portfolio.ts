@@ -35,7 +35,7 @@ export type Company = {
 export type Trade = {
   id: string;
   ticker: string;
-  kind: 'opening' | 'buy' | 'sell';
+  kind: 'opening' | 'buy' | 'sell' | 'adjustment';
   date: string;
   shares: number;
   price: number | null;
@@ -43,7 +43,9 @@ export type Trade = {
   month: string;
   note: string;
   /** Undefined is a legacy/manual entry; broker imports carry a stable key. */
-  source?: 'manual' | 'finqalab' | 'ahl' | 'ipo';
+  source?: 'manual' | 'finqalab' | 'ahl' | 'ipo' | 'broker';
+  /** Opaque broker account key. Only import reconciliation uses it. */
+  accountId?: string;
   externalId?: string;
   voided?: boolean;
   /** Broker/NCCPL capital-gains-tax deduction recorded for a sale; an actual figure, never re-estimated. */
@@ -212,6 +214,8 @@ export const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
 export type Portfolio = {
   companies: Company[];
   trades: Trade[];
+  brokerFormats?: import('./broker-import.ts').BrokerFormat[];
+  brokerFileHashes?: string[];
   stockSplits?: StockSplit[];
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
@@ -445,6 +449,7 @@ export function sharesHeldOn(p: Portfolio, ticker: string, date: string) {
       shares +=
         event.value.kind === 'sell' ? -event.value.shares : event.value.shares;
   }
+  if (shares < 0) throw new UserError(ticker + ': a holding adjustment exceeds shares held.');
   return shares;
 }
 export function sharesHeldBefore(p: Portfolio, ticker: string, date: string) {
@@ -456,6 +461,7 @@ export function sharesHeldBefore(p: Portfolio, ticker: string, date: string) {
       shares +=
         event.value.kind === 'sell' ? -event.value.shares : event.value.shares;
   }
+  if (shares < 0) throw new UserError(ticker + ': a holding adjustment exceeds shares held.');
   return shares;
 }
 /**
@@ -472,6 +478,7 @@ export function saleShortfalls(p: Portfolio, ticker: string) {
       continue;
     }
     const t = event.value;
+    if (t.kind === 'adjustment') { shares += t.shares; continue; }
     if (t.kind !== 'sell') {
       shares += t.shares;
       continue;
@@ -503,6 +510,12 @@ export function realizedSales(p: Portfolio): RealizedSale[] {
         continue;
       }
       const t = event.value;
+      if (t.kind === 'adjustment') {
+        shares += t.shares;
+        if (shares < 0) throw new UserError(c.ticker + ': a holding adjustment exceeds shares held.');
+        cost = shares === 0 ? 0 : null;
+        continue;
+      }
       if (t.kind === 'sell') {
         if (t.shares > shares)
           throw new UserError(c.ticker + ': sale exceeds shares held on ' + t.date);
@@ -933,7 +946,11 @@ export function positionTimeline(p: Portfolio, ticker: string) {
     if (event.type === 'split') shares = applySplit(shares, event.value);
     else {
       const t = event.value;
-      if (t.kind === 'sell') {
+      if (t.kind === 'adjustment') {
+        shares += t.shares;
+        if (shares < 0) oversold = true;
+        cost = shares === 0 ? 0 : null;
+      } else if (t.kind === 'sell') {
         if (t.shares > shares) oversold = true;
         const avg: number | null = cost === null ? null : shares ? cost / shares : 0;
         cost = avg === null ? null : Math.max(0, cost! - avg * Math.min(t.shares, shares));
@@ -961,6 +978,12 @@ export function holdings(p: Portfolio) {
         continue;
       }
       const t = event.value;
+      if (t.kind === 'adjustment') {
+        shares += t.shares;
+        if (shares < 0) throw new UserError(c.ticker + ': a holding adjustment exceeds shares held.');
+        cost = shares === 0 ? 0 : null;
+        continue;
+      }
       if (t.kind === 'sell') {
         if (t.shares > shares)
           throw new UserError(c.ticker + ': sale exceeds shares held on ' + t.date);
@@ -1100,6 +1123,15 @@ export function validate(p: Portfolio) {
   }
   if (p.companies.length > 200 || p.trades.length > 20000)
     throw new UserError('Portfolio exceeds supported size.');
+  if (p.brokerFormats !== undefined && (!Array.isArray(p.brokerFormats) || p.brokerFormats.length > 100 || p.brokerFormats.some((f) =>
+    !f || typeof f.broker !== 'string' || f.broker.length > 80 || typeof f.signature !== 'string' || f.signature.length > 1000 || !['trades', 'holdings'].includes(f.report) || !['iso', 'dmy'].includes(f.dateStyle) ||
+    !f.columns || !['ticker', 'date', 'side', 'shares', 'price', 'fees', 'reference'].every((key) => {
+      const n = f.columns[key as keyof typeof f.columns];
+      return n === null || (Number.isSafeInteger(n) && n >= 0 && n < 200);
+    })))) throw new UserError('Invalid saved broker format.');
+  if (p.brokerFileHashes !== undefined && (!Array.isArray(p.brokerFileHashes) || p.brokerFileHashes.length > 2000 ||
+    p.brokerFileHashes.some((hash) => typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash))))
+    throw new UserError('Invalid broker import history.');
   const tickers = new Set<string>();
   for (const c of p.companies) {
     if (
@@ -1135,25 +1167,27 @@ export function validate(p: Portfolio) {
       typeof t.id !== 'string' ||
       ids.has(t.id) ||
       !tickers.has(t.ticker) ||
-      !['opening', 'buy', 'sell'].includes(t.kind) ||
+      !['opening', 'buy', 'sell', 'adjustment'].includes(t.kind) ||
       !dateOK(t.date) ||
       t.date > today() ||
       !Number.isSafeInteger(t.shares) ||
-      t.shares <= 0 ||
+      (t.kind === 'adjustment' ? t.shares === 0 : t.shares <= 0) ||
       t.shares > 1e9 ||
       !Number.isFinite(t.fees) ||
       t.fees < 0 ||
       t.fees > 1e9 ||
       (t.price === null
-        ? t.kind !== 'opening'
+        ? t.kind !== 'opening' && t.kind !== 'adjustment'
         : !Number.isFinite(t.price) || t.price <= 0 || t.price > 1e8) ||
+      (t.kind === 'adjustment' && (t.price !== null || t.fees !== 0 || t.source !== 'broker')) ||
       typeof t.note !== 'string' ||
       t.note.length > 2000 ||
       (t.source !== undefined &&
-        !['manual', 'finqalab', 'ahl', 'ipo'].includes(t.source)) ||
+        !['manual', 'finqalab', 'ahl', 'ipo', 'broker'].includes(t.source)) ||
+      (t.accountId !== undefined && (typeof t.accountId !== 'string' || t.accountId.length > 80)) ||
       (t.externalId !== undefined &&
         (typeof t.externalId !== 'string' || t.externalId.length > 120)) ||
-      (['finqalab', 'ahl', 'ipo'].includes(t.source ?? '') && !t.externalId) ||
+      (['finqalab', 'ahl', 'ipo', 'broker'].includes(t.source ?? '') && !t.externalId) ||
       ((t.source === undefined || t.source === 'manual') &&
         t.externalId !== undefined) ||
       (t.month !== '' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(t.month)) ||
@@ -1180,10 +1214,10 @@ export function validate(p: Portfolio) {
       throw new UserError('Invalid transaction. Check dates, shares and price.');
     if (
       !t.voided &&
-      t.kind !== 'opening' &&
+      t.kind !== 'opening' && t.kind !== 'adjustment' &&
       t.source !== 'finqalab' &&
       t.source !== 'ahl' &&
-      t.source !== 'ipo' &&
+      t.source !== 'ipo' && t.source !== 'broker' &&
       openings.has(t.ticker) &&
       t.date < openings.get(t.ticker)!
     )
@@ -1191,10 +1225,10 @@ export function validate(p: Portfolio) {
         'Transaction predates the opening balance. Correct or void that opening balance before importing earlier history.',
       );
     ids.add(t.id);
-    if (!t.voided && (t.source === 'finqalab' || t.source === 'ahl' || t.source === 'ipo')) {
+    if (!t.voided && (t.source === 'finqalab' || t.source === 'ahl' || t.source === 'ipo' || t.source === 'broker')) {
       const brokerKey = `${t.source}:${t.externalId}`;
       if (brokerImportIds.has(brokerKey))
-        throw new UserError(`Duplicate ${t.source === 'ahl' ? 'AHL' : t.source === 'ipo' ? 'IPO' : 'Finqalab'} trade import.`);
+        throw new UserError(`Duplicate ${t.source} trade import.`);
       brokerImportIds.add(brokerKey);
     }
   }
