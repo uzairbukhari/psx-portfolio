@@ -73,3 +73,17 @@ test('validation rejects a malformed stored history', () => {
   const p = { ...blankPortfolio(), monthlyPicksRuns: [{ id: 'x', month: 'bad' }] };
   assert.throws(() => validate(p), /Monthly Picks history/);
 });
+
+test('a run can be created where there is no global crypto (Hermes on the phone)', async () => {
+  const db = await seeded();
+  const analysis = await buildPublicAnalysis(db, ['AAA']);
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+  try {
+    const run = runLocalPicks({ analysis, month: '2026-10', amount: 50_000, feePct: 0, shortlist: ['AAA'], holdings: [] });
+    assert.equal(typeof run.id, 'string');
+    assert.ok(run.id.length > 8);
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'crypto', original);
+  }
+});

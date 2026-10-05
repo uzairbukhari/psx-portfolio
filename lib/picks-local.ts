@@ -59,12 +59,20 @@ function snapshotFor(input: LocalRunInput, day: string): SnapshotV8 {
   };
 }
 
+let runCounter = 0;
+/** A run id that works where there is no global `crypto` (Hermes on the phone). Not key material, only a label. */
+function newRunId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (typeof c?.randomUUID === 'function') return c.randomUUID();
+  return `run-${Date.now().toString(36)}-${(runCounter++).toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /** Ranks the shortlist from public data and sizes it against the user's own holdings. Pure; never throws on bad data. */
 export function runLocalPicks(input: LocalRunInput): StoredPicksRun {
   const now = input.now ?? new Date();
   const at = now.toISOString();
   const base = {
-    id: input.id ?? crypto.randomUUID(), month: input.month, amount: input.amount, feePct: input.feePct,
+    id: input.id ?? newRunId(), month: input.month, amount: input.amount, feePct: input.feePct,
     shortlist: [...input.shortlist], model: 'quant', estimatedCostUsd: 0, createdAt: at, updatedAt: at,
     workflowVersion: WORKFLOW_VERSION, method: LOCAL_METHOD, dataAsOf: input.analysis.dataAsOf,
   };
