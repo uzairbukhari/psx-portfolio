@@ -1163,19 +1163,21 @@ function DashboardContent({
         )
       : p?.assets?.some((a) => a.kind === 'fund')) || tab === 'holdings',
   );
-  const planNavs = usePlanNavs(
+  const planNavData = usePlanNavs(
     (isAll
       ? (p?.[DISPLAY_PARTS]?.flatMap((part) => part.portfolio.assets ?? []) ??
         [])
       : (p?.assets ?? [])
     ).some((a) => a.kind === 'plan' && !!a.subFund),
   );
-  useTrackFunds(
+  const planNavs = planNavData.navs;
+  const tracking = useTrackFunds(
     (isAll
       ? (p?.[DISPLAY_PARTS]?.flatMap((part) => part.portfolio.assets ?? []) ??
         [])
       : (p?.assets ?? [])
     ).flatMap((a) => (a.kind === 'fund' ? [a.mufapId] : [])),
+    fundData.reload,
   );
   if (!p && email && !(failed && message))
     return (
@@ -2890,6 +2892,7 @@ function DashboardContent({
               addRequest={assetAdd.kind === 'plan' ? assetAdd.n : 0}
               owned={ownedPlans}
               planNavs={planNavs}
+              planNavsError={planNavData.loaded ? planNavData.error : ''}
               canEdit={!isAll && !locked}
               busy={busy}
               onChange={(plans, message) =>
@@ -2910,7 +2913,7 @@ function DashboardContent({
               owned={ownedFunds}
               catalog={fundData.funds}
               navs={fundData.navs}
-              catalogError={fundData.error}
+              catalogError={fundData.error || tracking.error}
               canEdit={!isAll && !locked}
               busy={busy}
               onChange={(funds, message) =>

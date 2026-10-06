@@ -56,8 +56,9 @@ export function createPublicData(call: PublicCall): PublicData {
     },
     funds: () => call<FundCatalogResponse>('/api/public-data/funds'),
     async planNavs() {
-      return (await call<{ navs: PlanNavRow[] }>('/api/public-data/plan-navs'))
-        .navs;
+      return await call<{ navs: PlanNavRow[]; error?: string }>(
+        '/api/public-data/plan-navs',
+      );
     },
     async trackFunds(mufapIds) {
       await call('/api/public-data/funds', 'POST', { mufapIds });

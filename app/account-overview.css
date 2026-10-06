@@ -658,3 +658,23 @@ button.start-tile:not([data-slot]):hover {
   align-items: center;
   gap: 6px;
 }
+
+/* Asset dialogs: a little wider, and never a sideways scroll from a long option or field */
+.form-dialog.asset-dialog {
+  max-width: 680px !important;
+  overflow-x: hidden;
+}
+.asset-dialog .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 760px) {
+  .asset-dialog .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.asset-dialog .form-grid > *,
+.asset-dialog select,
+.asset-dialog input {
+  min-width: 0;
+  max-width: 100%;
+}

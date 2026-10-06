@@ -401,7 +401,7 @@ function MetalEntryDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="form-dialog tx-dialog">
+      <DialogContent className="form-dialog tx-dialog asset-dialog">
         <DialogTitle>
           {type === 'sell'
             ? 'Record a sale'

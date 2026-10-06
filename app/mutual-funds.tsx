@@ -716,7 +716,7 @@ function FundDialog({
     kind === 'reinvest';
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="form-dialog tx-dialog">
+      <DialogContent className="form-dialog tx-dialog asset-dialog">
         <DialogTitle>{titles[mode.kind]}</DialogTitle>
         <DialogDescription>
           {fund

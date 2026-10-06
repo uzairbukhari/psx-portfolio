@@ -134,11 +134,14 @@ export default function SavingsPlansSection({
   busy,
   addRequest = 0,
   planNavs = [],
+  planNavsError = '',
   onChange,
 }: {
   owned: OwnedPlan[];
   /** Pak-Qatar sub-fund unit prices; they move a plan's value between statements. */
   planNavs?: PlanNavRow[];
+  /** Why the unit prices could not be loaded, when they could not. */
+  planNavsError?: string;
   canEdit: boolean;
   busy: boolean;
   /** Bumped by the page's + menu to open the add dialog. */
@@ -279,10 +282,22 @@ export default function SavingsPlansSection({
                 <dd className={tone(v.gain)}>{signed(v.gain)}</dd>
               </div>
             </dl>
+            {asset.subFund &&
+              !planNavs.some((n) => n.fundId === asset.subFund) && (
+                <p className="notice error">
+                  Unit prices for this sub-fund are not loaded
+                  {planNavsError ? ` (${planNavsError})` : ''}, so the value is
+                  not moved by the market yet.
+                </p>
+              )}
             <p className="report-source">
               {v.source === 'statement' &&
                 `Value from your statement of ${dateText(v.statementDate!)}.`}
               {v.source === 'estimate' &&
+                !v.statementDate &&
+                'Estimated from what you paid in (less any load), moved by the sub-fund’s unit price since each payment. Enter your statement value to correct it.'}
+              {v.source === 'estimate' &&
+                v.statementDate &&
                 `Estimated from your statement of ${dateText(v.statementDate!)}${planNavs.some((n) => n.fundId === asset.subFund) ? ' moved by the sub-fund’s unit price' : asset.assumedAnnualRate ? ` grown at ${(asset.assumedAnnualRate * 100).toFixed(1)}% a year` : ''} plus what you paid in and took out since. Enter the latest statement value to correct it.`}
               {v.source === 'paid-in' &&
                 'No statement value yet, so the plan is shown at the amount paid in. Enter the value from your statement or app.'}
@@ -629,7 +644,7 @@ function PlanDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="form-dialog tx-dialog">
+      <DialogContent className="form-dialog tx-dialog asset-dialog">
         <DialogTitle>{titles[mode.kind]}</DialogTitle>
         <DialogDescription>
           {mode.kind === 'plan'
