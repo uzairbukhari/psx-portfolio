@@ -156,24 +156,51 @@
   margin-top: 28px;
 }
 .metal-asset {
-  border-top: 1px solid var(--border);
-  padding: 16px 0;
-}
-.metal-asset:first-of-type {
-  border-top: 0;
-}
-.metal-asset__head {
   display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.metal-section .metal-asset + .metal-asset,
+.collapsible__body .metal-asset + .metal-asset {
+  margin-top: 14px;
+}
+.collapsible__body > .metal-asset:first-child {
+  margin-top: 18px;
+}
+.metal-asset .metal-asset__head {
+  display: flex;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
 }
+.metal-asset__head > div > b {
+  font-size: 16px;
+}
 .metal-asset__head small,
 .metal-asset__stats small {
   display: block;
+  margin-top: 3px;
   font-size: 12px;
   color: var(--muted-foreground);
   font-weight: 400;
+}
+.metal-asset__head .metal-asset__value small.pos-text,
+.metal-asset__stats small.pos-text {
+  color: var(--success);
+}
+.metal-asset__head .metal-asset__value small.neg-text,
+.metal-asset__stats small.neg-text {
+  color: var(--danger);
 }
 .metal-asset__value {
   text-align: right;
@@ -181,35 +208,67 @@
   font-weight: 600;
   letter-spacing: -0.4px;
 }
+.metal-asset__value small {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
 .metal-asset__stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 14px 0 0;
+  gap: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.metal-asset__stats > div {
+  padding: 10px 12px;
+  border-left: 1px solid var(--border);
+}
+.metal-asset__stats > div:first-child {
+  border-left: 0;
 }
 .metal-asset__stats dt {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
 }
 .metal-asset__stats dd {
   margin: 4px 0 0;
   font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.metal-history {
-  margin-top: 10px;
+.metal-asset__stats dd.pos-text {
+  color: var(--success);
 }
-.metal-history summary {
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--muted-foreground);
+.metal-asset__stats dd.neg-text {
+  color: var(--danger);
+}
+.metal-asset .report-source {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.metal-asset .asset-history {
+  margin-top: 0;
 }
 .metal-history tr.voided td {
   opacity: 0.5;
   text-decoration: line-through;
 }
 @media (max-width: 760px) {
+  .metal-asset {
+    padding: 14px;
+  }
   .metal-asset__stats {
     grid-template-columns: 1fr 1fr;
+  }
+  .metal-asset__stats > div:nth-child(odd) {
+    border-left: 0;
+  }
+  .metal-asset__stats > div:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
   }
   .metal-asset__value {
     font-size: 18px;
@@ -363,9 +422,6 @@ button.collapsible__toggle:not([data-slot]):focus-visible {
 .collapsible__body {
   padding: 0 22px 20px;
   border-top: 1px solid var(--border);
-}
-.collapsible .metal-asset:first-child {
-  border-top: 0;
 }
 .collapsible .table-panel,
 .collapsible__body > .table-panel {

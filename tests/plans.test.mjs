@@ -230,3 +230,23 @@ test('plans join the All dashboard as their own class and count in the combined 
   assert.equal(valueAsset(p, [], '2026-10-06').estimated, false);
   assert.ok(o.returns.rate > 0);
 });
+
+test('a front-end load is not invested: the estimate grows from amount less load, paid-in stays gross', () => {
+  const p = plan({
+    entries: [contribution('1', '2026-01-05', 100000, { load: 3000 })],
+  });
+  const v = planValue(p, '2026-02-01');
+  assert.equal(v.value, 97000);
+  assert.equal(v.cost, 100000);
+  assert.equal(v.gain, -3000);
+  assert.throws(
+    () =>
+      validatePlan(
+        plan({
+          entries: [contribution('1', '2026-01-05', 1000, { load: 1000 })],
+        }),
+        '2026-10-06',
+      ),
+    /load/,
+  );
+});

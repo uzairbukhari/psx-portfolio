@@ -11,6 +11,9 @@ export type PlanEntry = {
   type: 'contribution' | 'redeem';
   /** Rupees paid in, or rupees received on redemption. */
   amount: number;
+  /** Front-end load taken out of a contribution, in rupees. `amount` is still what you paid; `amount - load` is what
+   * was actually invested, which is what the plan's estimated value grows from. */
+  load?: number;
   /** Set when the entry came from a monthly rule the user confirmed. */
   recurringId?: string;
   note: string;
@@ -77,6 +80,10 @@ export type PlanValue = {
   gainPercent: number | null;
 };
 
+/** What a contribution actually put to work: the amount paid less any front-end load. */
+export const invested = (e: { amount: number; load?: number }) =>
+  Math.max(0, e.amount - (e.load ?? 0));
+
 const live = <T extends { voided?: boolean }>(list: T[]) =>
   list.filter((x) => !x.voided);
 
@@ -86,6 +93,11 @@ export function planValue(plan: PlanAsset, asOf: string): PlanValue {
     entries
       .filter((e) => e.type === 'contribution')
       .reduce((n, e) => n + e.amount, 0),
+  );
+  const contributedNet = cents(
+    entries
+      .filter((e) => e.type === 'contribution')
+      .reduce((n, e) => n + invested(e), 0),
   );
   const redeemed = cents(
     entries
@@ -102,7 +114,7 @@ export function planValue(plan: PlanAsset, asOf: string): PlanValue {
     value = 0;
     source = 'statement';
   } else if (!last) {
-    value = Math.max(0, cents(contributed - redeemed));
+    value = Math.max(0, cents(contributedNet - redeemed));
     source = 'paid-in';
   } else {
     const rate = plan.assumedAnnualRate;
@@ -113,7 +125,9 @@ export function planValue(plan: PlanAsset, asOf: string): PlanValue {
         : amount;
     let v = grow(last.value, last.date, asOf);
     for (const e of entries.filter((x) => x.date > last.date))
-      v += (e.type === 'contribution' ? 1 : -1) * grow(e.amount, e.date, asOf);
+      v +=
+        (e.type === 'contribution' ? 1 : -1) *
+        grow(e.type === 'contribution' ? invested(e) : e.amount, e.date, asOf);
     value = Math.max(0, cents(v));
     const moved = entries.some((e) => e.date > last.date);
     source = (rate && asOf > last.date) || moved ? 'estimate' : 'statement';
@@ -223,6 +237,14 @@ export function validatePlan(plan: PlanAsset, today: string) {
       throw new Error('Invalid plan entry type.');
     if (!Number.isFinite(e.amount) || e.amount <= 0 || e.amount > 1e12)
       throw new Error('Enter an amount greater than zero.');
+    if (
+      e.load !== undefined &&
+      (!Number.isFinite(e.load) ||
+        e.load < 0 ||
+        e.load >= e.amount ||
+        e.type !== 'contribution')
+    )
+      throw new Error('The load must be less than the amount paid.');
     if (typeof e.note !== 'string' || e.note.length > 500)
       throw new Error('Entry note is too long.');
   }

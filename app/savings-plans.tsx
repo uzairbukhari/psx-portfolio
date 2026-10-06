@@ -82,7 +82,9 @@ function planHistoryRows(
         e.type === 'contribution'
           ? 'Contribution to the plan'
           : 'Cash taken out',
-      note: e.note || undefined,
+      note: e.load
+        ? `Load ${money(e.load)} · ${money(e.amount - e.load)} invested`
+        : e.note || undefined,
       amount: `${e.type === 'contribution' ? '−' : '+'}${money(e.amount)}`,
       amountTone: e.type === 'contribution' ? '' : 'pos-text',
       voided: !!e.voided,
@@ -445,6 +447,7 @@ function PlanDialog({
   const [name, setName] = useState(PAK_QATAR_PLAN_NAME);
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState('');
+  const [loadPct, setLoadPct] = useState('');
   const [value, setValue] = useState('');
   const [rate, setRate] = useState('');
   const [day, setDay] = useState('5');
@@ -460,6 +463,15 @@ function PlanDialog({
     monthly: 'Monthly contribution',
   } as const;
   const number = (text: string) => Number(text.replace(/,/g, ''));
+  /** Front-end load in rupees for an amount paid, from the percentage typed (undefined when none). */
+  const loadFor = (paid: number | null) => {
+    const pct = loadPct.trim() === '' ? 0 : number(loadPct);
+    if (!(pct >= 0 && pct < 100))
+      throw new Error('Enter a load between 0 and 100 percent.');
+    return pct > 0 && paid
+      ? Math.round(((paid * pct) / 100) * 100) / 100
+      : undefined;
+  };
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault();
@@ -473,6 +485,7 @@ function PlanDialog({
             'Enter the assumed yearly return as a percentage, like 12.',
           );
         const first = amount.trim() === '' ? null : number(amount);
+        const firstLoad = loadFor(first);
         if (first !== null && !(first > 0))
           throw new Error(
             'Enter the amount you first paid in, or leave it empty.',
@@ -493,6 +506,7 @@ function PlanDialog({
                     type: 'contribution',
                     date,
                     amount: first,
+                    ...(firstLoad === undefined ? {} : { load: firstLoad }),
                     note: 'First contribution',
                   },
                 ],
@@ -554,7 +568,16 @@ function PlanDialog({
           ...plan,
           entries: [
             ...plan.entries,
-            { id: id(), type: mode.kind, date, amount: a, note: note.trim() },
+            {
+              id: id(),
+              type: mode.kind,
+              date,
+              amount: a,
+              ...(mode.kind === 'contribution' && loadFor(a) !== undefined
+                ? { load: loadFor(a) }
+                : {}),
+              note: note.trim(),
+            },
           ],
         };
         message =
@@ -651,6 +674,36 @@ function PlanDialog({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
+              </label>
+            )}
+            {(mode.kind === 'contribution' || mode.kind === 'plan') && (
+              <label>
+                Front-end load (%), if charged
+                <input
+                  inputMode="decimal"
+                  value={loadPct}
+                  placeholder="e.g. 3"
+                  onChange={(e) => setLoadPct(e.target.value)}
+                />
+                {number(loadPct) > 0 && number(amount) > 0 && (
+                  <small>
+                    Load{' '}
+                    {money(
+                      Math.round(
+                        ((number(amount) * number(loadPct)) / 100) * 100,
+                      ) / 100,
+                    )}{' '}
+                    taken out of what you paid, so{' '}
+                    {money(
+                      number(amount) -
+                        Math.round(
+                          ((number(amount) * number(loadPct)) / 100) * 100,
+                        ) /
+                          100,
+                    )}{' '}
+                    is invested.
+                  </small>
+                )}
               </label>
             )}
             {mode.kind === 'monthly' && (

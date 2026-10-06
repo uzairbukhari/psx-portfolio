@@ -10,17 +10,18 @@ export type PanelFigure = {
   tone?: string;
 };
 
-const KEY = 'sipwise:collapsed:';
-const read = (id: string) => {
+// Panels start folded; the ones you open are remembered.
+const KEY = 'sipwise:opened:';
+const readOpen = (id: string) => {
   try {
     return localStorage.getItem(KEY + id) === '1';
   } catch {
     return false;
   }
 };
-const write = (id: string, collapsed: boolean) => {
+const writeOpen = (id: string, open: boolean) => {
   try {
-    if (collapsed) localStorage.setItem(KEY + id, '1');
+    if (open) localStorage.setItem(KEY + id, '1');
     else localStorage.removeItem(KEY + id);
   } catch {
     // Storage can be blocked; the panel still works for this visit.
@@ -29,7 +30,7 @@ const write = (id: string, collapsed: boolean) => {
 
 /**
  * A panel that folds down to one line. While folded the header keeps the figures a dashboard needs (value, gain and
- * so on), so nothing important disappears. The folded state is remembered per panel in this browser only.
+ * so on), so nothing important disappears. Panels start folded; one you open stays open in this browser.
  */
 export default function CollapsiblePanel({
   id,
@@ -51,7 +52,7 @@ export default function CollapsiblePanel({
   className?: string;
   children: ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState(() => read(id));
+  const [collapsed, setCollapsed] = useState(() => !readOpen(id));
   const bodyId = `panel-body-${id}`;
   return (
     <section
@@ -66,7 +67,7 @@ export default function CollapsiblePanel({
           aria-controls={bodyId}
           onClick={() => {
             setCollapsed(!collapsed);
-            write(id, !collapsed);
+            writeOpen(id, collapsed);
           }}
         >
           <ChevronDown

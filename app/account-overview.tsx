@@ -277,100 +277,102 @@ export default function AccountOverview({
         </section>
       </div>
 
-      <section className="panel overview-panel" aria-label="Portfolios">
-        <div className="report-heading">
-          <div>
-            <p className="eyebrow">PORTFOLIOS</p>
-            <h3>Each portfolio</h3>
+      <div className="overview-grid">
+        <section className="panel overview-panel" aria-label="Portfolios">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">PORTFOLIOS</p>
+              <h3>Each portfolio</h3>
+            </div>
+            <span>Share of net worth</span>
           </div>
-          <span>Share of net worth</span>
-        </div>
-        <ul className="overview-portfolios">
-          {o.portfolios.map((p) => (
-            <li key={p.id}>
-              <button
-                type="button"
-                className="overview-portfolio"
-                onClick={() => onOpenPortfolio(p.id)}
-              >
-                <span className="overview-portfolio__top">
-                  <b>{p.name}</b>
-                  <span className="overview-portfolio__share">
-                    {p.share.toFixed(1)}%
+          <ul className="overview-portfolios">
+            {o.portfolios.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="overview-portfolio"
+                  onClick={() => onOpenPortfolio(p.id)}
+                >
+                  <span className="overview-portfolio__top">
+                    <b>{p.name}</b>
+                    <span className="overview-portfolio__share">
+                      {p.share.toFixed(1)}%
+                    </span>
                   </span>
-                </span>
-                <span className="overview-portfolio__value amount">
-                  {moneyShort(p.value)}
-                </span>
-                <span className={`overview-portfolio__gain ${tone(p.gain)}`}>
-                  {p.gain === null
-                    ? 'Gain not known'
-                    : `${signed(p.gain)}${pct(p.gainPercent) ? ` · ${pct(p.gainPercent)}` : ''}`}
-                </span>
-                <span className="bar" aria-hidden="true">
-                  <i style={{ width: `${Math.min(100, p.share)}%` }} />
-                </span>
-                <small>
-                  {p.heldCount} {p.heldCount === 1 ? 'holding' : 'holdings'}
-                  {p.locked ? ' · locked' : ''}
-                  {p.missingPrice ? ` · ${p.missingPrice} need a price` : ''}
-                </small>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+                  <span className="overview-portfolio__value amount">
+                    {moneyShort(p.value)}
+                  </span>
+                  <span className={`overview-portfolio__gain ${tone(p.gain)}`}>
+                    {p.gain === null
+                      ? 'Gain not known'
+                      : `${signed(p.gain)}${pct(p.gainPercent) ? ` · ${pct(p.gainPercent)}` : ''}`}
+                  </span>
+                  <span className="bar" aria-hidden="true">
+                    <i style={{ width: `${Math.min(100, p.share)}%` }} />
+                  </span>
+                  <small>
+                    {p.heldCount} {p.heldCount === 1 ? 'holding' : 'holdings'}
+                    {p.locked ? ' · locked' : ''}
+                    {p.missingPrice ? ` · ${p.missingPrice} need a price` : ''}
+                  </small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      <section className="panel overview-panel" aria-label="Income">
-        <div className="report-heading">
-          <div>
-            <p className="eyebrow">INCOME</p>
-            <h3>Dividends received</h3>
+        <section className="panel overview-panel" aria-label="Income">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">INCOME</p>
+              <h3>Dividends received</h3>
+            </div>
+            <span>Last 12 months</span>
           </div>
-          <span>Last 12 months</span>
-        </div>
-        {income.months.some((m) => m.amount > 0) ? (
-          <ChartContainer
-            config={{
-              amount: { label: 'Received', color: 'var(--primary)' },
-            }}
-            className="overview-income"
-          >
-            <BarChart
-              data={income.months}
-              margin={{ top: 8, right: 4, bottom: 0, left: 4 }}
+          {income.months.some((m) => m.amount > 0) ? (
+            <ChartContainer
+              config={{
+                amount: { label: 'Received', color: 'var(--primary)' },
+              }}
+              className="overview-income"
             >
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={monthLabel}
-                interval={0}
-                fontSize={11}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(_l, items) =>
-                      String(items?.[0]?.payload?.month ?? '')
-                    }
-                    formatter={(value) => <b>{money(Number(value))}</b>}
-                  />
-                }
-              />
-              <Bar dataKey="amount" fill="var(--primary)" radius={3} />
-            </BarChart>
-          </ChartContainer>
-        ) : (
-          <p className="report-empty">
-            No dividends received in the last 12 months.
+              <BarChart
+                data={income.months}
+                margin={{ top: 8, right: 4, bottom: 0, left: 4 }}
+              >
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={monthLabel}
+                  interval={0}
+                  fontSize={11}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      labelFormatter={(_l, items) =>
+                        String(items?.[0]?.payload?.month ?? '')
+                      }
+                      formatter={(value) => <b>{money(Number(value))}</b>}
+                    />
+                  }
+                />
+                <Bar dataKey="amount" fill="var(--primary)" radius={3} />
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <p className="report-empty">
+              No dividends received in the last 12 months.
+            </p>
+          )}
+          <p className="report-source">
+            {money(income.receivedTotal)} received in total. Expected dividends
+            are a plan and stay out of income until you confirm them.
           </p>
-        )}
-        <p className="report-source">
-          {money(income.receivedTotal)} received in total. Expected dividends
-          are a plan and stay out of income until you confirm them.
-        </p>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

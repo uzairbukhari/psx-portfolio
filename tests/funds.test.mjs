@@ -214,3 +214,23 @@ test('funds join the All dashboard as their own class', () => {
   );
   assert.ok(missing.total.incomplete.some((m) => /fund price/.test(m)));
 });
+
+test('a fund load stays inside the amount paid and must be smaller than it', () => {
+  const today = '2026-10-06';
+  const ok = fund({
+    entries: [e('1', 'buy', '2026-01-01', 10, 1000, { load: 30 })],
+  });
+  validateFund(ok, today);
+  const v = valueFund(ok, [nav('2026-01-02', 100)], '2026-01-02');
+  assert.equal(v.cost, 1000);
+  assert.throws(
+    () =>
+      validateFund(
+        fund({
+          entries: [e('1', 'buy', '2026-01-01', 10, 1000, { load: 1000 })],
+        }),
+        today,
+      ),
+    /load/,
+  );
+});

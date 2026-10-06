@@ -15,6 +15,8 @@ export type FundEntry = {
   units?: number;
   /** Rupees paid (buy), received after load and tax (redeem), received in cash (dividend) or reinvested (reinvest). Null only on an opening balance with unknown cost. */
   amount: number | null;
+  /** Front-end load in rupees, already part of `amount` (what you paid). Shown in the history; not added to the cost. */
+  load?: number;
   /** Actual tax withheld on a dividend or redemption, if the statement shows one. Never estimated. */
   taxWithheld?: number;
   /** Set when the entry came from a monthly rule the user confirmed. */
@@ -251,6 +253,15 @@ export function validateFund(fund: FundAsset, today: string) {
       (!Number.isFinite(e.taxWithheld) || e.taxWithheld < 0)
     )
       throw new Error('Invalid tax amount.');
+    if (
+      e.load !== undefined &&
+      (!Number.isFinite(e.load) ||
+        e.load < 0 ||
+        e.amount === null ||
+        e.load >= e.amount ||
+        e.type !== 'buy')
+    )
+      throw new Error('The load must be less than the amount paid.');
     if (typeof e.note !== 'string' || e.note.length > 500)
       throw new Error('Entry note is too long.');
   }

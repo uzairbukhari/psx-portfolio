@@ -466,9 +466,11 @@ function FundHistory({
         tagLabel: TYPE_LABEL[e.type],
         title:
           e.units === undefined ? 'Cash payout' : `${units(e.units)} units`,
-        note: e.taxWithheld
-          ? `Tax withheld ${money(e.taxWithheld)}`
-          : e.note || undefined,
+        note: e.load
+          ? `Load ${money(e.load)} · ${money((e.amount ?? 0) - e.load)} invested`
+          : e.taxWithheld
+            ? `Tax withheld ${money(e.taxWithheld)}`
+            : e.note || undefined,
         amount:
           e.amount === null
             ? 'Cost unknown'
@@ -578,6 +580,7 @@ function FundDialog({
     mode.kind !== 'add' && mode.prefill ? String(mode.prefill.amount) : '',
   );
   const [tax, setTax] = useState('');
+  const [loadPct, setLoadPct] = useState('');
   const [price, setPrice] = useState('');
   const [day, setDay] = useState('1');
   const [from, setFrom] = useState(today().slice(0, 7));
@@ -669,6 +672,12 @@ function FundDialog({
         if (kind !== 'dividend' && !(u! > 0))
           throw new Error('Enter the number of units.');
         const t = tax.trim() === '' ? undefined : number(tax);
+        const pct =
+          kind === 'buy' && loadPct.trim() !== '' ? number(loadPct) : 0;
+        if (!(pct >= 0 && pct < 100))
+          throw new Error('Enter a load between 0 and 100 percent.');
+        const load =
+          pct > 0 && a ? Math.round(((a * pct) / 100) * 100) / 100 : undefined;
         const entry: FundEntry = {
           id: rid(),
           type: kind,
@@ -676,6 +685,7 @@ function FundDialog({
           ...(u === undefined ? {} : { units: u }),
           amount: a,
           ...(t === undefined ? {} : { taxWithheld: t }),
+          ...(load === undefined ? {} : { load }),
           ...(mode.kind === 'buy' && mode.prefill
             ? { recurringId: mode.prefill.recurringId }
             : {}),
@@ -810,6 +820,36 @@ function FundDialog({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
+              </label>
+            )}
+            {kind === 'buy' && (
+              <label>
+                Front-end load (%), if charged
+                <input
+                  inputMode="decimal"
+                  value={loadPct}
+                  placeholder="e.g. 1.5"
+                  onChange={(e) => setLoadPct(e.target.value)}
+                />
+                {number(loadPct) > 0 && number(amount) > 0 && (
+                  <small>
+                    Load{' '}
+                    {money(
+                      Math.round(
+                        ((number(amount) * number(loadPct)) / 100) * 100,
+                      ) / 100,
+                    )}{' '}
+                    taken out of what you paid, so{' '}
+                    {money(
+                      number(amount) -
+                        Math.round(
+                          ((number(amount) * number(loadPct)) / 100) * 100,
+                        ) /
+                          100,
+                    )}{' '}
+                    is invested.
+                  </small>
+                )}
               </label>
             )}
             {(kind === 'redeem' || kind === 'dividend') && (
