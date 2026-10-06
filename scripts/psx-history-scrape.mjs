@@ -55,11 +55,26 @@ async function main() {
   const failed = [];
   let ok = 0;
   // One page token serves every request in a run; refresh it once if PSX rejects it.
-  let token = tickers.length ? await fetchPsxToken(tickers[0]) : '';
+  // The token is not ticker-specific, so a company page that answers 500 (an odd or delisted symbol sorted
+  // first) must not take the whole run down: try a few tracked symbols, then liquid ones that always load.
+  const tokenSources = [...new Set([...tickers.slice(0, 5), 'MEBL', 'OGDC', 'LUCK'])];
+  const acquireToken = async () => {
+    let lastError;
+    for (const source of tokenSources) {
+      try {
+        return await fetchPsxToken(source);
+      } catch (error) {
+        lastError = error;
+        console.warn(`  token via ${source} failed: ${error instanceof Error ? error.message : error}`);
+      }
+    }
+    throw lastError;
+  };
+  let token = tickers.length ? await acquireToken() : '';
   let tokenRefresh = null;
   const refreshToken = (stale) => {
     if (token !== stale) return Promise.resolve(token);
-    tokenRefresh ??= fetchPsxToken(tickers[0]).then((fresh) => ((token = fresh), fresh)).finally(() => (tokenRefresh = null));
+    tokenRefresh ??= acquireToken().then((fresh) => ((token = fresh), fresh)).finally(() => (tokenRefresh = null));
     return tokenRefresh;
   };
   const series = async (ticker, kind) => {
