@@ -49,3 +49,9 @@ test('both privacy covers use the self-healing foreground check, so one cannot g
   }
   assert.match(readFileSync(new URL('../src/auth/app-active.ts', app('x')), 'utf8'), /setInterval/);
 });
+
+test('entry screens are pushed cards, not native modals (a closed modal left a white layer over the app on Android)', () => {
+  const layout = readFileSync(app('_layout.tsx'), 'utf8');
+  assert.doesNotMatch(layout, /presentation: 'modal'/);
+  for (const name of ['transaction', 'targets', 'received', 'quote']) assert.match(layout, new RegExp(`name="${name}"`));
+});

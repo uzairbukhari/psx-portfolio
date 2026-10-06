@@ -49,10 +49,12 @@ function Root() {
           {/* Old paths that now live inside Portfolio and Plan; they redirect, so they have no header. */}
           <Stack.Screen name="reports" options={{ headerShown: false }} />
           <Stack.Screen name="picks" options={{ headerShown: false }} />
-          <Stack.Screen name="targets" options={{ presentation: 'modal', title: 'Targets' }} />
-          <Stack.Screen name="received" options={{ presentation: 'modal', title: 'Dividend' }} />
-          <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
-          <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
+          {/* Plain pushed screens, not native modals: closing a native-stack modal after a save left a white,
+              unresponsive layer over the app on Android. */}
+          <Stack.Screen name="targets" options={{ title: 'Targets' }} />
+          <Stack.Screen name="received" options={{ title: 'Dividend' }} />
+          <Stack.Screen name="quote" options={{ title: 'Price' }} />
+          <Stack.Screen name="transaction" options={{ title: 'Add transaction' }} />
         </Stack>
         </ErrorBoundary>
         </PortfolioSelectionProvider>
