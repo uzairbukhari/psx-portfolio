@@ -1,7 +1,10 @@
+import { refreshFunds } from '../../../lib/mufap-refresh';
+import { refreshPlanNavs } from '../../../lib/plan-navs';
 import { dispatchWorkflow, dueWorkflows } from '../../../lib/scrape-schedule';
 
 // This Worker has no VAULT_DB binding and no way to learn what any user holds: it only starts public scrapers.
 interface Env {
+  DB: Parameters<typeof refreshFunds>[0];
   GITHUB_DISPATCH_TOKEN?: string;
   GITHUB_REPO?: string;
   APP_ENV?: string;
@@ -14,19 +17,49 @@ interface Env {
  */
 async function startDueScrapers(env: Env, scheduledTime: number) {
   const due = dueWorkflows(new Date(scheduledTime));
-  const settings = { token: env.GITHUB_DISPATCH_TOKEN, repo: env.GITHUB_REPO, appEnv: env.APP_ENV };
+  const settings = {
+    token: env.GITHUB_DISPATCH_TOKEN,
+    repo: env.GITHUB_REPO,
+    appEnv: env.APP_ENV,
+  };
   for (const { workflow, reason } of due) {
     const error = await dispatchWorkflow(settings, workflow);
-    if (error) console.error(`Could not start ${workflow} (${reason}): ${error}`);
+    if (error)
+      console.error(`Could not start ${workflow} (${reason}): ${error}`);
     else console.log(`Started ${workflow} (${reason}).`);
   }
 }
+
+const MUFAP_CRON = '30 17 * * 1-5';
 
 export default {
   async fetch() {
     return new Response('Not found', { status: 404 });
   },
-  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(startDueScrapers(env, controller.scheduledTime).catch((error) => console.error('Starting scrapers failed', error)));
+  async scheduled(
+    controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext,
+  ) {
+    // MUFAP blocks GitHub's runners but answers Cloudflare, so the fund prices are fetched here (public data, no user data).
+    if (controller.cron === MUFAP_CRON) {
+      ctx.waitUntil(
+        (async () => {
+          // Two independent public sources: one failing must not stop the other.
+          await refreshFunds(env.DB)
+            .then((r) => console.log('Fund prices stored', r))
+            .catch((e) => console.error('Fund price refresh failed', e));
+          await refreshPlanNavs(env.DB)
+            .then((r) => console.log('Plan prices stored', r))
+            .catch((e) => console.error('Plan price refresh failed', e));
+        })(),
+      );
+      return;
+    }
+    ctx.waitUntil(
+      startDueScrapers(env, controller.scheduledTime).catch((error) =>
+        console.error('Starting scrapers failed', error),
+      ),
+    );
   },
 } satisfies ExportedHandler<Env>;

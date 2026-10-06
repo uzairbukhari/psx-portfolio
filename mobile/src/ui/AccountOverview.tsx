@@ -1,11 +1,11 @@
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
 import { accountOverview, type AssetClassKey } from '@shared/account-overview.ts';
+import type { FundNavRow } from '@shared/mufap.ts';
 import type { MetalRateRow } from '@shared/metal-rates.ts';
 import { moneyShort, today, type DisplayPart } from '@shared/portfolio.ts';
 import { signedMoney, signedPercent } from '@/data/format';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Amount, Avatar, Card, ListRow, Notice, SectionLabel, useKitStyles } from './kit';
+import { Amount, Card, ListRow, Notice, SectionLabel, useKitStyles } from './kit';
 
 const CLASS_COLORS: Record<AssetClassKey, string> = {
   stocks: '#3987e5',
@@ -16,10 +16,10 @@ const CLASS_COLORS: Record<AssetClassKey, string> = {
 };
 
 /** The All portfolios dashboard on the phone: net worth, asset mix, each portfolio and the largest holdings. */
-export function AccountOverview({ parts, rates, onOpenPortfolio }: { parts: (DisplayPart & { locked?: boolean })[]; rates: MetalRateRow[]; onOpenPortfolio: (id: string) => void }) {
+export function AccountOverview({ parts, rates, fundNavs = [], onOpenPortfolio }: { parts: (DisplayPart & { locked?: boolean })[]; rates: MetalRateRow[]; fundNavs?: FundNavRow[]; onOpenPortfolio: (id: string) => void }) {
   const styles = useKitStyles();
   const { colors } = useTheme();
-  const o = accountOverview(parts, today(), { metalRates: rates });
+  const o = accountOverview(parts, today(), { metalRates: rates, fundNavs });
   const { total, returns, income } = o;
   return (
     <>
@@ -91,32 +91,6 @@ export function AccountOverview({ parts, rates, onOpenPortfolio }: { parts: (Dis
           />
         ))}
       </View>
-
-      {o.topHoldings.length ? (
-        <>
-          <SectionLabel>Largest holdings</SectionLabel>
-          <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-            {o.topHoldings.slice(0, 5).map((h, i, list) => (
-              <ListRow
-                key={h.ticker}
-                left={<Avatar ticker={h.ticker} />}
-                title={h.ticker}
-                subtitle={`${h.name} · ${h.portfolios.length > 1 ? `in ${h.portfolios.length} portfolios` : h.portfolios[0]}`}
-                right={
-                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                    <Text style={styles.number}>{moneyShort(h.value)}</Text>
-                    <Text style={styles.muted}>{h.share.toFixed(1)}%</Text>
-                  </View>
-                }
-                accessibilityLabel={`${h.ticker}, ${moneyShort(h.value)}, ${h.share.toFixed(1)} percent of net worth`}
-                accessibilityHint="Opens the company"
-                onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}
-                last={i === list.length - 1}
-              />
-            ))}
-          </View>
-        </>
-      ) : null}
     </>
   );
 }

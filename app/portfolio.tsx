@@ -1,6 +1,12 @@
 'use client';
 import { useConfirm } from '@/components/confirm-dialog';
-import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -80,19 +86,24 @@ import {
   confirmDividendReceipt,
   type AppNotification,
 } from '@/lib/portfolio';
-import {
-  addNotifications,
-  dividendNotifications,
-} from '@/lib/notifications';
+import { addNotifications, dividendNotifications } from '@/lib/notifications';
 import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
 import GoldSilverSection, { type OwnedMetal } from './gold-silver';
+import SavingsPlansSection, { type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
+import MutualFundsSection, { type OwnedFund } from './mutual-funds';
+import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
+import CollapsiblePanel from './collapsible-panel';
+import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
 import CompanyDetail from './company-detail';
-import LedgerTimeline, { buildEntries } from './ledger-timeline';
+import LedgerTimeline, {
+  buildAssetEntries,
+  buildEntries,
+} from './ledger-timeline';
 import { CompanyNavProvider } from './ticker-link';
 import ResearchDesk from './research-desk';
 import AiLab from './ai-lab';
@@ -103,35 +114,75 @@ import TargetsEditor from './targets-editor';
 import SettingsView from './settings-view';
 import { AhlImportDialog } from './ahl-import-dialog';
 import { DividendSyncView } from './dividend-sync-view';
-import { parseAhlLedgerText, type AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
+import {
+  parseAhlLedgerText,
+  type AhlLedgerStatement,
+} from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import { watchTickers } from '@/lib/market-watch';
 import MonthlyPicks from './monthly-picks';
 import { parseFinqalabReport } from './finqalab-import';
 import { FinqalabImportDialog } from './finqalab-import-dialog';
 import { BrokerImportDialog } from './broker-import-dialog';
-import { validateBrokerStatement, type BrokerStatement, type BrokerFormat } from '@/lib/broker-import';
-import { readBrokerTable, parseSavedFormat, formatFromReviewed, redactBrokerText, type BrokerTable } from '@/lib/broker-file';
+import {
+  validateBrokerStatement,
+  type BrokerStatement,
+  type BrokerFormat,
+} from '@/lib/broker-import';
+import {
+  readBrokerTable,
+  parseSavedFormat,
+  formatFromReviewed,
+  redactBrokerText,
+  type BrokerTable,
+} from '@/lib/broker-file';
 import { IpoImportDialog } from './ipo-import-dialog';
 import { parseIpoList, type IpoAllotment } from '@/lib/ipo-list-import';
-import { detectJsonImport, detectPdfImport, summarizeImports, IMPORT_LABEL, UNSUPPORTED_FILE, type ImportKind } from '@/lib/import-detect';
+import {
+  detectJsonImport,
+  detectPdfImport,
+  summarizeImports,
+  IMPORT_LABEL,
+  UNSUPPORTED_FILE,
+  type ImportKind,
+} from '@/lib/import-detect';
 import type { FinqalabTrade } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
 import { importAhlTrades, parseAhlHistory } from './ahl-import';
 import { importCdcDividends } from '@/lib/cdc-import';
 import type { PortfolioResponse } from '@/lib/api-types';
-import { ConflictError, VaultLockedError, type VaultSession } from '@/lib/vault-client';
-import { loadPortfolioView, loadAccountView, savePortfolioView } from '@/lib/portfolio-view';
+import {
+  ConflictError,
+  VaultLockedError,
+  type VaultSession,
+} from '@/lib/vault-client';
+import {
+  loadPortfolioView,
+  loadAccountView,
+  savePortfolioView,
+} from '@/lib/portfolio-view';
 import { parseBackup, type BackupPackage } from '@/lib/vault-backup';
 import { EncryptedRestoreDialog, VaultSecurity } from './vault-security';
 import VaultGate from './vault-gate';
 import { refreshImportQuotes } from '@/lib/import-refresh';
-import PortfolioWorkspace, { type WorkspaceControls } from './portfolio-workspace';
-import { accountFromPortfolio, dashboardPortfolio, ALL_PORTFOLIOS, importMatches } from '@/lib/portfolio-account';
+import PortfolioWorkspace, {
+  type WorkspaceControls,
+} from './portfolio-workspace';
+import {
+  accountFromPortfolio,
+  dashboardPortfolio,
+  ALL_PORTFOLIOS,
+  importMatches,
+} from '@/lib/portfolio-account';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
 import { canSaveCompany } from '@/lib/company-lookup-client';
-import { followQuoteJob, isPending, isProblem, jobMessage } from '@/lib/quote-refresh-client';
+import {
+  followQuoteJob,
+  isPending,
+  isProblem,
+  jobMessage,
+} from '@/lib/quote-refresh-client';
 import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
@@ -146,9 +197,10 @@ const TAB_PATHS: Record<string, string> = {
   settings: '/settings',
   notifications: '/notifications',
 };
-const PATH_TABS: Record<string, string> = Object.fromEntries(
-  [...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]), ['/history', 'history']],
-);
+const PATH_TABS: Record<string, string> = Object.fromEntries([
+  ...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
+  ['/history', 'history'],
+]);
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
 function subscribeWide(onChange: () => void) {
   const query = window.matchMedia('(min-width: 1100px)');
@@ -161,10 +213,14 @@ function companyFromPathname(pathname: string): string {
 }
 /** Non-admins never land on the Research desk, even via a direct URL or history entry. */
 function allowTab(tab: string, isAdmin: boolean): string {
-  return (tab === 'research-desk' || tab === 'ai-lab') && !isAdmin ? 'holdings' : tab;
+  return (tab === 'research-desk' || tab === 'ai-lab') && !isAdmin
+    ? 'holdings'
+    : tab;
 }
 function tabFromPathname(pathname: string): string {
-  return companyFromPathname(pathname) ? 'company' : (PATH_TABS[pathname] ?? 'holdings');
+  return companyFromPathname(pathname)
+    ? 'company'
+    : (PATH_TABS[pathname] ?? 'holdings');
 }
 type ApiResponse = {
   error?: string;
@@ -186,7 +242,8 @@ type ApiResponse = {
 const SHORTLISTED = '__shortlisted';
 /** Add Company may save only once the directory answered for exactly this symbol. */
 const lookupReady = (lookup: LookupView, ticker: string) =>
-  lookup.ticker === ticker.trim().toUpperCase() && canSaveCompany({ state: lookup.status, company: lookup.company });
+  lookup.ticker === ticker.trim().toUpperCase() &&
+  canSaveCompany({ state: lookup.status, company: lookup.company });
 /** Asks for a price for a company that has none yet; the scheduled scraper does the fetch. */
 async function queueQuoteRefresh(tickers: string[]) {
   try {
@@ -200,19 +257,46 @@ async function queueQuoteRefresh(tickers: string[]) {
   }
 }
 /** Status line under the symbol field while the company directory is consulted. */
-function CompanyLookupNote({ lookup, ticker }: { lookup: LookupView & { retry: () => void }; ticker: string }) {
+function CompanyLookupNote({
+  lookup,
+  ticker,
+}: {
+  lookup: LookupView & { retry: () => void };
+  ticker: string;
+}) {
   if (!ticker.trim()) return null;
   const current = lookup.ticker === ticker.trim().toUpperCase();
   if (!current || lookup.status === 'idle')
-    return /^[A-Z0-9]{2,12}$/.test(ticker.trim().toUpperCase()) ? <p className="muted" role="status">Checking company details…</p> : <p className="muted">Enter a PSX symbol (2-12 letters or digits).</p>;
-  if (lookup.status === 'loading') return <p className="muted" role="status">Checking company details…</p>;
+    return /^[A-Z0-9]{2,12}$/.test(ticker.trim().toUpperCase()) ? (
+      <p className="muted" role="status">
+        Checking company details…
+      </p>
+    ) : (
+      <p className="muted">Enter a PSX symbol (2-12 letters or digits).</p>
+    );
+  if (lookup.status === 'loading')
+    return (
+      <p className="muted" role="status">
+        Checking company details…
+      </p>
+    );
   if (lookup.status === 'pending')
-    return <p className="muted" role="status">{lookup.message ?? 'Looking up this company…'}</p>;
+    return (
+      <p className="muted" role="status">
+        {lookup.message ?? 'Looking up this company…'}
+      </p>
+    );
   if (lookup.status === 'resolved') return null;
   return (
     <p className="notice error" role="alert">
       {lookup.message ?? 'Company details could not be found.'}{' '}
-      <button type="button" className="secondary compact" onClick={lookup.retry}>Try again</button>
+      <button
+        type="button"
+        className="secondary compact"
+        onClick={lookup.retry}
+      >
+        Try again
+      </button>
     </p>
   );
 }
@@ -315,7 +399,9 @@ function TickerPicker({
         aria-expanded={open}
         aria-controls="ticker-picker-list"
         aria-label="Company symbol"
-        placeholder={allowNew ? 'Search or type a PSX symbol' : 'Search your companies'}
+        placeholder={
+          allowNew ? 'Search or type a PSX symbol' : 'Search your companies'
+        }
         autoComplete="off"
         autoCapitalize="characters"
         spellCheck={false}
@@ -365,11 +451,29 @@ export default function Dashboard(props: DashboardProps) {
   if (!props.email) return <DashboardContent {...props} vault={null} />;
   return (
     <VaultGate email={props.email}>
-      {(session, lock) => <PortfolioWorkspace session={session} lock={lock}>{(workspace) => <DashboardContent {...props} vault={{ session, lock }} workspace={workspace} />}</PortfolioWorkspace>}
+      {(session, lock) => (
+        <PortfolioWorkspace session={session} lock={lock}>
+          {(workspace) => (
+            <DashboardContent
+              {...props}
+              vault={{ session, lock }}
+              workspace={workspace}
+            />
+          )}
+        </PortfolioWorkspace>
+      )}
     </VaultGate>
   );
 }
-function ImportRequestRunner({ request, busy, onRequest }: { request: WorkspaceControls['importRequest']; busy: boolean; onRequest: (request: NonNullable<WorkspaceControls['importRequest']>) => void }) {
+function ImportRequestRunner({
+  request,
+  busy,
+  onRequest,
+}: {
+  request: WorkspaceControls['importRequest'];
+  busy: boolean;
+  onRequest: (request: NonNullable<WorkspaceControls['importRequest']>) => void;
+}) {
   const processed = useRef<string | null>(null);
   const handle = useEffectEvent(onRequest);
   useEffect(() => {
@@ -388,7 +492,10 @@ function DashboardContent({
   role,
   vault,
   workspace,
-}: DashboardProps & { vault: VaultContext | null; workspace?: WorkspaceControls }) {
+}: DashboardProps & {
+  vault: VaultContext | null;
+  workspace?: WorkspaceControls;
+}) {
   const isAdmin = role === 'super_admin';
   const target = workspace?.target;
   const isAll = !!workspace?.isAll;
@@ -400,7 +507,12 @@ function DashboardContent({
   const importActive = useRef(false);
   const mounted = useRef(true);
   const [readingImport, setReadingImport] = useState(false);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const pulseRef = useRef<PsxMarketPulseHandle>(null);
   const emptyImportRef = useRef<HTMLInputElement>(null);
   // From 1100px the market pulse sits beside the value card's chart; below it stays under the table.
@@ -411,10 +523,25 @@ function DashboardContent({
   );
   const initialPathname = usePathname();
   const [bellOpen, setBellOpen] = useState(false);
-  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
-  const [settingsEntry, setSettingsEntry] = useState({ n: 0, section: typeof window !== 'undefined' && window.location.hash ? window.location.hash.slice(1) : 'account' });
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(
+    null,
+  );
+  const [settingsEntry, setSettingsEntry] = useState({
+    n: 0,
+    section:
+      typeof window !== 'undefined' && window.location.hash
+        ? window.location.hash.slice(1)
+        : 'account',
+  });
   const [tab, setTabState] = useState(() =>
-    allowTab(tabFromPathname(typeof window !== 'undefined' ? window.location.pathname : initialPathname), isAdmin),
+    allowTab(
+      tabFromPathname(
+        typeof window !== 'undefined'
+          ? window.location.pathname
+          : initialPathname,
+      ),
+      isAdmin,
+    ),
   );
   const [companyTicker, setCompanyTicker] = useState(() =>
     companyFromPathname(initialPathname),
@@ -429,9 +556,7 @@ function DashboardContent({
   }
   useEffect(() => {
     function onPopState() {
-      setTabState(
-        allowTab(tabFromPathname(window.location.pathname), isAdmin),
-      );
+      setTabState(allowTab(tabFromPathname(window.location.pathname), isAdmin));
       setCompanyTicker(companyFromPathname(window.location.pathname));
     }
     window.addEventListener('popstate', onPopState);
@@ -448,10 +573,25 @@ function DashboardContent({
     [fees, setFees] = useState(0),
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
-    [ahlStatement, setAhlStatement] = useState<{ statement: AhlLedgerStatement; fileName: string } | null>(null),
-    [finqalabReview, setFinqalabReview] = useState<{ rows: FinqalabTrade[]; fileName: string } | null>(null),
-    [brokerReview, setBrokerReview] = useState<{ statement: BrokerStatement; fileName: string; format: BrokerFormat | null; hash: string; method: 'ai' | 'saved' } | null>(null),
-    [ipoReview, setIpoReview] = useState<{ items: IpoAllotment[]; fileName: string } | null>(null),
+    [ahlStatement, setAhlStatement] = useState<{
+      statement: AhlLedgerStatement;
+      fileName: string;
+    } | null>(null),
+    [finqalabReview, setFinqalabReview] = useState<{
+      rows: FinqalabTrade[];
+      fileName: string;
+    } | null>(null),
+    [brokerReview, setBrokerReview] = useState<{
+      statement: BrokerStatement;
+      fileName: string;
+      format: BrokerFormat | null;
+      hash: string;
+      method: 'ai' | 'saved';
+    } | null>(null),
+    [ipoReview, setIpoReview] = useState<{
+      items: IpoAllotment[];
+      fileName: string;
+    } | null>(null),
     [editing, setEditing] = useState<string | null>(null),
     [stockSplit, setStockSplit] = useState<StockSplit | null>(null),
     [editingStockSplit, setEditingStockSplit] = useState<string | null>(null),
@@ -476,25 +616,42 @@ function DashboardContent({
       costUsd: number;
     } | null>(null),
     [pendingCompanies, setPendingCompanies] = useState<string[]>([]),
-    [encryptedRestore, setEncryptedRestore] = useState<BackupPackage | null>(null);
+    [encryptedRestore, setEncryptedRestore] = useState<BackupPackage | null>(
+      null,
+    );
   // Add Company: the ticker is the only typed identity field; name and sector come from the shared directory.
   const txNewTicker =
-    !p || !trade || editing || editingDividend || editingStockSplit || txType === 'sell' || txType === 'dividend' || txType === 'split' ||
+    !p ||
+    !trade ||
+    editing ||
+    editingDividend ||
+    editingStockSplit ||
+    txType === 'sell' ||
+    txType === 'dividend' ||
+    txType === 'split' ||
     p.companies.some((c) => c.ticker === trade.ticker)
       ? ''
       : trade.ticker;
   const txLookup = useCompanyLookup(txNewTicker);
-  const companyLookup = useCompanyLookup(creatingCompany && company ? company.ticker : '');
+  const companyLookup = useCompanyLookup(
+    creatingCompany && company ? company.ticker : '',
+  );
   useEffect(() => {
     if (!creatingCompany) return;
     const name = companyLookup.company?.name ?? '';
     const sector = companyLookup.company?.sector ?? '';
-    setCompany((c) => (c && (c.name !== name || c.sector !== sector) ? { ...c, name, sector } : c));
+    setCompany((c) =>
+      c && (c.name !== name || c.sector !== sector)
+        ? { ...c, name, sector }
+        : c,
+    );
   }, [creatingCompany, companyLookup.company]);
   useEffect(() => {
     const name = txLookup.company?.name ?? '';
     const sector = txLookup.company?.sector ?? '';
-    setTxCompany((c) => (c.name === name && c.sector === sector ? c : { name, sector }));
+    setTxCompany((c) =>
+      c.name === name && c.sector === sector ? c : { name, sector },
+    );
   }, [txLookup.company]);
   const [holdingsSort, setHoldingsSort] = useState<{
       key: HoldingsSortKey;
@@ -533,20 +690,47 @@ function DashboardContent({
     showToast(s, error);
   }
   /** Applies refreshed prices locally. They are already in the shared cache the next load merges in, so no save is needed. */
-  function applyQuotes(quotes: Portfolio['quotes'], stale: Record<string, string> = {}) {
+  function applyQuotes(
+    quotes: Portfolio['quotes'],
+    stale: Record<string, string> = {},
+  ) {
     setP((current) => {
       if (current?.[DISPLAY_PARTS]) {
-        const parts = current[DISPLAY_PARTS]!.map((part)=>({...part,portfolio:{...part.portfolio,quotes:{...part.portfolio.quotes,...Object.fromEntries(Object.entries(quotes).filter(([ticker,q])=>part.portfolio.companies.some((c)=>c.ticker===ticker) && isValidQuote(q) && quoteSupersedes(q,part.portfolio.quotes[ticker])))}}}));
-        return dashboardPortfolio({kind:'sipwise-portfolio-account',version:1,portfolios:parts});
+        const parts = current[DISPLAY_PARTS]!.map((part) => ({
+          ...part,
+          portfolio: {
+            ...part.portfolio,
+            quotes: {
+              ...part.portfolio.quotes,
+              ...Object.fromEntries(
+                Object.entries(quotes).filter(
+                  ([ticker, q]) =>
+                    part.portfolio.companies.some((c) => c.ticker === ticker) &&
+                    isValidQuote(q) &&
+                    quoteSupersedes(q, part.portfolio.quotes[ticker]),
+                ),
+              ),
+            },
+          },
+        }));
+        return dashboardPortfolio({
+          kind: 'sipwise-portfolio-account',
+          version: 1,
+          portfolios: parts,
+        });
       }
       if (!current) return current;
       const fresh = Object.fromEntries(
         Object.entries(quotes).filter(
           ([ticker, quote]) =>
-            isValidQuote(quote) && !(stale[ticker] && current.quotes[ticker]) && quoteSupersedes(quote, current.quotes[ticker]),
+            isValidQuote(quote) &&
+            !(stale[ticker] && current.quotes[ticker]) &&
+            quoteSupersedes(quote, current.quotes[ticker]),
         ),
       );
-      return Object.keys(fresh).length ? { ...current, quotes: { ...current.quotes, ...fresh } } : current;
+      return Object.keys(fresh).length
+        ? { ...current, quotes: { ...current.quotes, ...fresh } }
+        : current;
     });
   }
   /** POST starts (or joins) a refresh; GET with `since` (even empty) only reads its state. */
@@ -559,7 +743,9 @@ function DashboardContent({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tickers }),
           })
-        : await fetch(`/api/quotes?tickers=${tickers.join(',')}${since ? `&since=${encodeURIComponent(since)}` : ''}`);
+        : await fetch(
+            `/api/quotes?tickers=${tickers.join(',')}${since ? `&since=${encodeURIComponent(since)}` : ''}`,
+          );
     const d = (await readJson(r)) as QuotesResponse & { error?: string };
     if (!r.ok) throw Error(d.error);
     return d;
@@ -582,10 +768,21 @@ function DashboardContent({
     if (!tickers.length) return;
     try {
       notify('Import saved. Refreshing PSX prices…');
-      const result = await refreshImportQuotes({start:()=>quoteCall(tickers),poll:(since)=>quoteCall(tickers,since??''),cancelled:()=>!quoteAlive.current,onPending:(d)=>applyQuotes(d.quotes,d.stale)});
-      if (quoteAlive.current) { applyQuotes(result.quotes,result.stale); notify('Import saved. PSX prices refreshed.'); }
+      const result = await refreshImportQuotes({
+        start: () => quoteCall(tickers),
+        poll: (since) => quoteCall(tickers, since ?? ''),
+        cancelled: () => !quoteAlive.current,
+        onPending: (d) => applyQuotes(d.quotes, d.stale),
+      });
+      if (quoteAlive.current) {
+        applyQuotes(result.quotes, result.stale);
+        notify('Import saved. PSX prices refreshed.');
+      }
+    } catch (e) {
+      setImportRefreshError(
+        e instanceof Error ? e.message : 'PSX prices could not be refreshed.',
+      );
     }
-    catch (e) { setImportRefreshError(e instanceof Error ? e.message : 'PSX prices could not be refreshed.'); }
   }
   async function refresh() {
     if (!p || quoteRunning.current) return;
@@ -594,9 +791,15 @@ function DashboardContent({
     try {
       notify(QUOTE_MESSAGES.pending);
       void pulseRef.current?.refresh();
-      await followRefresh(p.companies.map((c) => c.ticker), true);
+      await followRefresh(
+        p.companies.map((c) => c.ticker),
+        true,
+      );
     } catch (e) {
-      notify(e instanceof Error && e.message ? e.message : QUOTE_MESSAGES.failed, true);
+      notify(
+        e instanceof Error && e.message ? e.message : QUOTE_MESSAGES.failed,
+        true,
+      );
     } finally {
       quoteRunning.current = false;
       setBusy(false);
@@ -621,12 +824,28 @@ function DashboardContent({
     setBusy(true);
     try {
       // Decrypts locally, then overlays the shared public caches (quotes, announcements, face values).
-      const d = isAll ? await loadAccountView(vault!.session, webPublicData, true).then((out)=>({portfolio:dashboardPortfolio(out.account),revision:out.revision,pendingCompanies:[],announcements:[],faceValues:{}})) : await loadPortfolioView(vault!.session, webPublicData, target);
+      const d = isAll
+        ? await loadAccountView(vault!.session, webPublicData, true).then(
+            (out) => ({
+              portfolio: dashboardPortfolio(out.account),
+              revision: out.revision,
+              pendingCompanies: [],
+              announcements: [],
+              faceValues: {},
+            }),
+          )
+        : await loadPortfolioView(vault!.session, webPublicData, target);
       setP(d.portfolio);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
       void resumeRefresh(d.portfolio.companies.map((c) => c.ticker));
-      if (!isAll && !locked && !target?.name) await recordAutoDividends(d.portfolio, d.revision, d.announcements ?? [], d.faceValues ?? {});
+      if (!isAll && !locked && !target?.name)
+        await recordAutoDividends(
+          d.portfolio,
+          d.revision,
+          d.announcements ?? [],
+          d.faceValues ?? {},
+        );
     } catch (e) {
       // A lock mid-load is not an error to show: the unlock screen takes over.
       if (!(e instanceof VaultLockedError)) notify(String(e), true);
@@ -652,7 +871,9 @@ function DashboardContent({
       {
         save: async (next, revision) => {
           try {
-            return { revision: await vault!.session.save(next, revision, target) };
+            return {
+              revision: await vault!.session.save(next, revision, target),
+            };
           } catch (e) {
             if (e instanceof ConflictError) return { conflict: true };
             throw e;
@@ -660,7 +881,11 @@ function DashboardContent({
         },
         reload: async () => {
           try {
-            const d = await loadPortfolioView(vault!.session, webPublicData, target);
+            const d = await loadPortfolioView(
+              vault!.session,
+              webPublicData,
+              target,
+            );
             return { portfolio: d.portfolio, revision: d.revision };
           } catch {
             return null;
@@ -695,8 +920,31 @@ function DashboardContent({
       if (isAll) {
         const changed = change(p!.notifications ?? []);
         const account = vault!.session.account;
-        await vault!.session.saveAccount({...account,portfolios:account.portfolios.map((part)=>part.locked ? part : {...part,portfolio:{...part.portfolio,notifications:changed.filter((n)=>n.id.startsWith(part.id+'::')).map((n)=>({...n,id:n.id.slice(part.id.length+2),title:n.title.replace(part.name+' · ','')}))}})},revision);
-        await load(); return;
+        await vault!.session.saveAccount(
+          {
+            ...account,
+            portfolios: account.portfolios.map((part) =>
+              part.locked
+                ? part
+                : {
+                    ...part,
+                    portfolio: {
+                      ...part.portfolio,
+                      notifications: changed
+                        .filter((n) => n.id.startsWith(part.id + '::'))
+                        .map((n) => ({
+                          ...n,
+                          id: n.id.slice(part.id.length + 2),
+                          title: n.title.replace(part.name + ' · ', ''),
+                        })),
+                    },
+                  },
+            ),
+          },
+          revision,
+        );
+        await load();
+        return;
       }
       const next = clone(p!);
       next.notifications = change(next.notifications ?? []);
@@ -723,25 +971,53 @@ function DashboardContent({
   async function save(
     next: Portfolio,
     success = 'Saved to your private portfolio.',
-    options: { createCompanies?: string[]; target?: import('@/lib/portfolio-account').PortfolioTarget } = {},
+    options: {
+      createCompanies?: string[];
+      target?: import('@/lib/portfolio-account').PortfolioTarget;
+    } = {},
   ) {
-    if (!mounted.current) throw Error('This portfolio view was closed. Reopen it before saving.');
-    if (busy)
-      throw Error('Wait for the current operation to finish.');
-    if (target?.name && !importActive.current) throw Error('Save the import first to create this portfolio.');
+    if (!mounted.current)
+      throw Error('This portfolio view was closed. Reopen it before saving.');
+    if (busy) throw Error('Wait for the current operation to finish.');
+    if (target?.name && !importActive.current)
+      throw Error('Save the import first to create this portfolio.');
     const saveTarget = options.target ?? (isAll ? undefined : target);
-    if (!saveTarget || saveTarget.id === ALL_PORTFOLIOS) throw Error('Choose a portfolio before saving.');
+    if (!saveTarget || saveTarget.id === ALL_PORTFOLIOS)
+      throw Error('Choose a portfolio before saving.');
     const wasImport = importActive.current;
     validate(next);
     if (importActive.current && target) {
-      const matches = importMatches(vault!.session.account, target.id, next, importHash.current);
-      if (matches.length && !await confirm({ title: 'This import appears in another portfolio', description: `Matching records were found in ${matches.map((p) => p.name).join(', ')}. Importing here too will count them twice in All portfolios.`, confirmLabel: 'Import here anyway' })) throw Error('Import cancelled. Nothing was saved.');
-      if (importHash.current) next.brokerFileHashes = [...new Set([...(next.brokerFileHashes ?? []), importHash.current])];
+      const matches = importMatches(
+        vault!.session.account,
+        target.id,
+        next,
+        importHash.current,
+      );
+      if (
+        matches.length &&
+        !(await confirm({
+          title: 'This import appears in another portfolio',
+          description: `Matching records were found in ${matches.map((p) => p.name).join(', ')}. Importing here too will count them twice in All portfolios.`,
+          confirmLabel: 'Import here anyway',
+        }))
+      )
+        throw Error('Import cancelled. Nothing was saved.');
+      if (importHash.current)
+        next.brokerFileHashes = [
+          ...new Set([...(next.brokerFileHashes ?? []), importHash.current]),
+        ];
     }
     setBusy(true);
     try {
       // Validates, fills company details from the public directory, encrypts here and stores ciphertext only.
-      const d = await savePortfolioView(vault!.session, webPublicData, next, revision, options.createCompanies, saveTarget);
+      const d = await savePortfolioView(
+        vault!.session,
+        webPublicData,
+        next,
+        revision,
+        options.createCompanies,
+        saveTarget,
+      );
       // Show the name and sector filled in from the company directory.
       for (const detail of d.details ?? []) {
         const company = next.companies.find((c) => c.ticker === detail.ticker);
@@ -750,19 +1026,33 @@ function DashboardContent({
           company.sector = detail.sector;
         }
       }
-      if (isAll) await load(); else setP(next);
+      if (isAll) await load();
+      else setP(next);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
-      if (importActive.current) { importActive.current = false; importHash.current = undefined; workspace?.onSaved(); }
-      if (wasImport) void refreshImported(next.companies.map((c)=>c.ticker));
+      if (importActive.current) {
+        importActive.current = false;
+        importHash.current = undefined;
+        workspace?.onSaved();
+      }
+      if (wasImport) void refreshImported(next.companies.map((c) => c.ticker));
       notify(
         d.pendingCompanies?.length
           ? `${success} Company details for ${d.pendingCompanies.join(', ')} are still being looked up; your transactions are saved and the details will fill in on a later load.`
           : success,
       );
     } catch (e) {
-      if (e instanceof ConflictError) { importActive.current = false; importHash.current = undefined; setAhlStatement(null); setFinqalabReview(null); setBrokerReview(null); setIpoReview(null); await load(); }
-      if (!(e instanceof VaultLockedError)) notify(e instanceof Error ? e.message : String(e), true);
+      if (e instanceof ConflictError) {
+        importActive.current = false;
+        importHash.current = undefined;
+        setAhlStatement(null);
+        setFinqalabReview(null);
+        setBrokerReview(null);
+        setIpoReview(null);
+        await load();
+      }
+      if (!(e instanceof VaultLockedError))
+        notify(e instanceof Error ? e.message : String(e), true);
       throw e;
     } finally {
       setBusy(false);
@@ -787,44 +1077,107 @@ function DashboardContent({
   useEffect(() => {
     const context = (
       document as unknown as {
-        modelContext?: { registerTool: (tool: unknown, opts: unknown) => Promise<void> | void };
+        modelContext?: {
+          registerTool: (tool: unknown, opts: unknown) => Promise<void> | void;
+        };
       }
     ).modelContext;
     if (!context?.registerTool || !p) return;
     const abort = new AbortController();
     try {
-      Promise.resolve(context.registerTool(
-        {
-          name: 'read_psx_portfolio',
-          description:
-            'Read holdings, quote dates and monthly SIP plan. Does not place orders or modify records.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              month: { type: 'string', pattern: '^\\d{4}-(0[1-9]|1[0-2])$' },
+      Promise.resolve(
+        context.registerTool(
+          {
+            name: 'read_psx_portfolio',
+            description:
+              'Read holdings, quote dates and monthly SIP plan. Does not place orders or modify records.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                month: { type: 'string', pattern: '^\\d{4}-(0[1-9]|1[0-2])$' },
+              },
+              required: ['month'],
+              additionalProperties: false,
             },
-            required: ['month'],
-            additionalProperties: false,
+            annotations: { readOnlyHint: true, untrustedContentHint: true },
+            execute: (input: unknown) => {
+              const m = (input as { month: string })?.month;
+              if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m))
+                throw Error('Invalid month');
+              return {
+                holdings: holdings(p),
+                plan: plan(p, m, fees, allowOld),
+              };
+            },
           },
-          annotations: { readOnlyHint: true, untrustedContentHint: true },
-          execute: (input: unknown) => {
-            const m = (input as { month: string })?.month;
-            if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m))
-              throw Error('Invalid month');
-            return { holdings: holdings(p), plan: plan(p, m, fees, allowOld) };
-          },
-        },
-        { signal: abort.signal },
-      )).catch(() => {});
+          { signal: abort.signal },
+        ),
+      ).catch(() => {});
     } catch {}
     return () => abort.abort();
   }, [p, fees, allowOld]);
   const workspaceBusy = workspace?.onBusy;
   useEffect(() => {
-    workspaceBusy?.(busy || readingImport || !!ahlStatement || !!finqalabReview || !!brokerReview || !!ipoReview || !!trade || !!company || !!receipt || targetsOpen || !!quoteTicker);
-  }, [workspaceBusy, busy, readingImport, ahlStatement, finqalabReview, brokerReview, ipoReview, trade, company, receipt, targetsOpen, quoteTicker]);
+    workspaceBusy?.(
+      busy ||
+        readingImport ||
+        !!ahlStatement ||
+        !!finqalabReview ||
+        !!brokerReview ||
+        !!ipoReview ||
+        !!trade ||
+        !!company ||
+        !!receipt ||
+        targetsOpen ||
+        !!quoteTicker,
+    );
+  }, [
+    workspaceBusy,
+    busy,
+    readingImport,
+    ahlStatement,
+    finqalabReview,
+    brokerReview,
+    ipoReview,
+    trade,
+    company,
+    receipt,
+    targetsOpen,
+    quoteTicker,
+  ]);
   const metalRates = useMetalRates(
-    !!(isAll ? p?.[DISPLAY_PARTS]?.some((part) => part.portfolio.assets?.length) : p?.assets?.length),
+    !!(isAll
+      ? p?.[DISPLAY_PARTS]?.some((part) =>
+          part.portfolio.assets?.some((a) => a.kind === 'metal'),
+        )
+      : p?.assets?.some((a) => a.kind === 'metal')),
+  );
+  const [assetAdd, setAssetAdd] = useState<{
+    kind: 'metal' | 'plan' | 'fund';
+    n: number;
+  }>({ kind: 'metal', n: 0 });
+  const fundData = useFundCatalog(
+    !!(isAll
+      ? p?.[DISPLAY_PARTS]?.some((part) =>
+          part.portfolio.assets?.some((a) => a.kind === 'fund'),
+        )
+      : p?.assets?.some((a) => a.kind === 'fund')) || tab === 'holdings',
+  );
+  const planNavData = usePlanNavs(
+    (isAll
+      ? (p?.[DISPLAY_PARTS]?.flatMap((part) => part.portfolio.assets ?? []) ??
+        [])
+      : (p?.assets ?? [])
+    ).some((a) => a.kind === 'plan' && !!a.subFund),
+  );
+  const planNavs = planNavData.navs;
+  const tracking = useTrackFunds(
+    (isAll
+      ? (p?.[DISPLAY_PARTS]?.flatMap((part) => part.portfolio.assets ?? []) ??
+        [])
+      : (p?.assets ?? [])
+    ).flatMap((a) => (a.kind === 'fund' ? [a.mufapId] : [])),
+    fundData.reload,
   );
   if (!p && email && !(failed && message))
     return (
@@ -838,35 +1191,39 @@ function DashboardContent({
       </main>
     );
   if (!p && !email) return <SignIn returnTo={initialPathname || '/'} />;
-  if (!p)
-    return <LoadError message={message} busy={busy} onRetry={load} />;
+  if (!p) return <LoadError message={message} busy={busy} onRetry={load} />;
   // The market pulse sends only these tickers to the server; names and saved quotes are merged back in locally.
   const pulseWatch = {
     tickers: watchTickers(p),
     names: Object.fromEntries(p.companies.map((c) => [c.ticker, c.name])),
     saved: p.quotes,
   };
-  const destinationName = target?.name ?? vault?.session.account?.portfolios.find((entry) => entry.id === target?.id)?.name ?? 'My Portfolio';
+  const destinationName =
+    target?.name ??
+    vault?.session.account?.portfolios.find((entry) => entry.id === target?.id)
+      ?.name ??
+    'My Portfolio';
   function restoreBackup(f: File) {
     attempt(async () => {
       // Either an encrypted package (asks for its password) or a readable ledger from an older version. Both are
       // decrypted/validated here and re-encrypted into the current vault; nothing readable is uploaded.
       try {
         const parsed = parseBackup(await f.text());
-        if (parsed.type === 'encrypted') return setEncryptedRestore(parsed.backup);
-        if (parsed.type === 'account') throw Error('Restore this collection from All portfolios.');
+        if (parsed.type === 'encrypted')
+          return setEncryptedRestore(parsed.backup);
+        if (parsed.type === 'account')
+          throw Error('Restore this collection from All portfolios.');
         await save(parsed.portfolio, 'Portfolio backup restored.');
-      } finally { importActive.current = false; }
+      } finally {
+        importActive.current = false;
+      }
     });
   }
   const runCdc = async (raw: unknown) => {
-    const result = importCdcDividends(
-      raw,
-      p.companies,
-      p.dividends ?? [],
-    );
+    const result = importCdcDividends(raw, p.companies, p.dividends ?? []);
     if (!result.imported) {
-      if (result.skippedDuplicate) void refreshImported(p.companies.map((c)=>c.ticker));
+      if (result.skippedDuplicate)
+        void refreshImported(p.companies.map((c) => c.ticker));
       notify(
         `No dividends imported. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
         true,
@@ -899,11 +1256,15 @@ function DashboardContent({
         }),
       ),
     ]);
-    next.dividends = [
-      ...(next.dividends ?? []),
-      ...result.dividends,
-    ];
-    if (!await confirm({ title: 'Review CDC import', description: `${result.imported} paid dividends will be added to ${destinationName}; ${superseded} PSX estimates will be replaced.`, confirmLabel: 'Import dividends' })) return;
+    next.dividends = [...(next.dividends ?? []), ...result.dividends];
+    if (
+      !(await confirm({
+        title: 'Review CDC import',
+        description: `${result.imported} paid dividends will be added to ${destinationName}; ${superseded} PSX estimates will be replaced.`,
+        confirmLabel: 'Import dividends',
+      }))
+    )
+      return;
     await save(
       next,
       `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
@@ -917,7 +1278,8 @@ function DashboardContent({
     const rows = parseAhlHistory(raw);
     const result = importAhlTrades(p, rows);
     if (!result.imported) {
-      if (result.skippedDuplicate || result.skippedManualMatch) void refreshImported(p.companies.map((c)=>c.ticker));
+      if (result.skippedDuplicate || result.skippedManualMatch)
+        void refreshImported(p.companies.map((c) => c.ticker));
       notify(
         `No AHL trades imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.`,
         true,
@@ -927,91 +1289,170 @@ function DashboardContent({
     const next = clone(p);
     next.companies = result.companies;
     for (const trade of next.trades) {
-      if (result.voidedTradeIds.includes(trade.id))
-        trade.voided = true;
+      if (result.voidedTradeIds.includes(trade.id)) trade.voided = true;
     }
     next.trades = [...next.trades, ...result.trades];
-    if (!await confirm({ title: 'Review AHL import', description: `${result.imported} trades and ${result.addedCompanies} companies will be added to ${destinationName}. ${result.skippedDuplicate} duplicates will be skipped.`, confirmLabel: 'Import trades' })) return;
+    if (
+      !(await confirm({
+        title: 'Review AHL import',
+        description: `${result.imported} trades and ${result.addedCompanies} companies will be added to ${destinationName}. ${result.skippedDuplicate} duplicates will be skipped.`,
+        confirmLabel: 'Import trades',
+      }))
+    )
+      return;
     await save(
       next,
       `${result.imported} AHL trade${result.imported === 1 ? '' : 's'} imported. Skipped: ${result.skippedDuplicate} already imported, ${result.skippedManualMatch} matching manual entries.${result.voidedTradeIds.length ? ` Reconciled ${result.voidedTradeIds.length} duplicate opening balance${result.voidedTradeIds.length === 1 ? '' : 's'}.` : ''}${result.addedCompanies ? ` Added ${result.addedCompanies} unapproved compan${result.addedCompanies === 1 ? 'y' : 'ies'}.` : ''}${unknownCostWarning(next)}`,
     );
   };
   /** One entry point for every import file: works out what it is, then opens that import's review. */
-  const importFile = (f: File, expected?: ImportKind) => workspace ? workspace.requestImport(f, expected) : processImportFile(f, expected);
+  const importFile = (f: File, expected?: ImportKind) =>
+    workspace
+      ? workspace.requestImport(f, expected)
+      : processImportFile(f, expected);
   function processImportFile(f: File, expected?: ImportKind) {
     if (!p) return;
     attempt(async () => {
       setReadingImport(true);
       let reviewing = false;
       try {
-      const bytes = await f.arrayBuffer();
-      const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
-      if (!mounted.current) return;
-      importHash.current = hash; importActive.current = true;
-      if (p.brokerFileHashes?.includes(hash)) { notify('This statement was already imported. Refreshing PSX prices…'); void refreshImported(p.companies.map((c)=>c.ticker)); return; }
-      let kind: ImportKind | null;
-      let pdf: { text: string; pages: number } | null = null;
-      let raw: unknown;
-      let table: BrokerTable | null = null;
-      let unknownText = '';
-      if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
-        // Read locally, then review: nothing is saved until the preview is confirmed.
-        pdf = await extractPdfText(new Uint8Array(bytes));
-        kind = detectPdfImport(pdf.text);
-        unknownText = pdf.text;
-      } else if (/\.(csv|xlsx)$/i.test(f.name)) {
-        table = await readBrokerTable(f);
-        kind = null;
-        unknownText = table.text;
-        const saved = (p.brokerFormats ?? []).find((format) => format.signature === table!.signature &&
-          new RegExp(format.broker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(`${f.name} ${table!.text.slice(0, 500)}`));
-        if (saved) {
+        const bytes = await f.arrayBuffer();
+        const hash = Array.from(
+          new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+          (b) => b.toString(16).padStart(2, '0'),
+        ).join('');
+        if (!mounted.current) return;
+        importHash.current = hash;
+        importActive.current = true;
+        if (p.brokerFileHashes?.includes(hash)) {
+          notify('This statement was already imported. Refreshing PSX prices…');
+          void refreshImported(p.companies.map((c) => c.ticker));
+          return;
+        }
+        let kind: ImportKind | null;
+        let pdf: { text: string; pages: number } | null = null;
+        let raw: unknown;
+        let table: BrokerTable | null = null;
+        let unknownText = '';
+        if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+          // Read locally, then review: nothing is saved until the preview is confirmed.
+          pdf = await extractPdfText(new Uint8Array(bytes));
+          kind = detectPdfImport(pdf.text);
+          unknownText = pdf.text;
+        } else if (/\.(csv|xlsx)$/i.test(f.name)) {
+          table = await readBrokerTable(f);
+          kind = null;
+          unknownText = table.text;
+          const saved = (p.brokerFormats ?? []).find(
+            (format) =>
+              format.signature === table!.signature &&
+              new RegExp(
+                format.broker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+                'i',
+              ).test(`${f.name} ${table!.text.slice(0, 500)}`),
+          );
+          if (saved) {
+            try {
+              reviewing = true;
+              setBrokerReview({
+                statement: parseSavedFormat(table, saved),
+                fileName: f.name,
+                format: null,
+                hash,
+                method: 'saved',
+              });
+              return;
+            } catch {
+              /* A changed layout needs fresh extraction and review. */
+            }
+          }
+        } else {
           try {
-            reviewing = true;
-            setBrokerReview({ statement: parseSavedFormat(table, saved), fileName: f.name, format: null, hash, method: 'saved' });
-            return;
-          } catch { /* A changed layout needs fresh extraction and review. */ }
+            raw = JSON.parse(await f.text());
+            kind = detectJsonImport(raw);
+            unknownText = JSON.stringify(raw);
+          } catch {
+            throw Error(UNSUPPORTED_FILE);
+          }
         }
-      } else {
-        try {
-          raw = JSON.parse(await f.text());
-          kind = detectJsonImport(raw);
-          unknownText = JSON.stringify(raw);
-        } catch {
-          throw Error(UNSUPPORTED_FILE);
+        if (!kind) {
+          if (expected) throw Error(UNSUPPORTED_FILE);
+          if (!unknownText.trim())
+            throw Error(
+              'No readable text was found. Scanned statements are not supported yet.',
+            );
+          const ok = await confirm({
+            title: 'Read this statement with AI?',
+            description:
+              'Statement text will be sent to the app’s configured AI provider for extraction. It may contain personal details. Your saved portfolio stays on this device, and nothing is added until you review the result.',
+            confirmLabel: 'Read statement',
+          });
+          if (!ok) return;
+          const response = await fetch('/api/broker-import/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: redactBrokerText(unknownText) }),
+            credentials: 'same-origin',
+          });
+          const data = (await response.json()) as {
+            statement?: unknown;
+            error?: string;
+          };
+          if (!response.ok)
+            throw Error(data.error ?? 'Statement extraction failed.');
+          const statement = validateBrokerStatement(data.statement);
+          reviewing = true;
+          setBrokerReview({
+            statement,
+            fileName: f.name,
+            format: table ? formatFromReviewed(table, statement) : null,
+            hash,
+            method: 'ai',
+          });
+          return;
         }
+        if (!isAdmin && (kind === 'cdc' || kind === 'ipo'))
+          throw Error(
+            'IPO and dividend imports are available to super admins only.',
+          );
+        if (expected && kind !== expected)
+          throw Error(
+            `That looks like a ${IMPORT_LABEL[kind]} file, not ${IMPORT_LABEL[expected]}. Use the matching card, or the drop box, which picks the right import itself.`,
+          );
+        if (kind === 'finqalab') {
+          reviewing = true;
+          runFinqalab(pdf!.text, f.name);
+        } else if (kind === 'ahl' && pdf) {
+          reviewing = true;
+          setAhlStatement({
+            statement: await parseAhlLedgerText(pdf.text, pdf.pages),
+            fileName: f.name,
+          });
+        } else if (kind === 'ahl') await runAhlJson(raw);
+        else if (kind === 'cdc') await runCdc(raw);
+        else {
+          reviewing = true;
+          setIpoReview({ items: parseIpoList(raw), fileName: f.name });
+        }
+      } finally {
+        if (!reviewing) {
+          importActive.current = false;
+          importHash.current = undefined;
+        }
+        setReadingImport(false);
       }
-      if (!kind) {
-        if (expected) throw Error(UNSUPPORTED_FILE);
-        if (!unknownText.trim()) throw Error('No readable text was found. Scanned statements are not supported yet.');
-        const ok = await confirm({ title: 'Read this statement with AI?', description: 'Statement text will be sent to the app’s configured AI provider for extraction. It may contain personal details. Your saved portfolio stays on this device, and nothing is added until you review the result.', confirmLabel: 'Read statement' });
-        if (!ok) return;
-        const response = await fetch('/api/broker-import/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: redactBrokerText(unknownText) }), credentials: 'same-origin' });
-        const data = await response.json() as { statement?: unknown; error?: string };
-        if (!response.ok) throw Error(data.error ?? 'Statement extraction failed.');
-        const statement = validateBrokerStatement(data.statement);
-        reviewing = true;
-        setBrokerReview({ statement, fileName: f.name, format: table ? formatFromReviewed(table, statement) : null, hash, method: 'ai' });
-        return;
-      }
-      if (!isAdmin && (kind === 'cdc' || kind === 'ipo'))
-        throw Error('IPO and dividend imports are available to super admins only.');
-      if (expected && kind !== expected)
-        throw Error(`That looks like a ${IMPORT_LABEL[kind]} file, not ${IMPORT_LABEL[expected]}. Use the matching card, or the drop box, which picks the right import itself.`);
-      if (kind === 'finqalab') { reviewing = true; runFinqalab(pdf!.text, f.name); }
-      else if (kind === 'ahl' && pdf) { reviewing = true; setAhlStatement({ statement: await parseAhlLedgerText(pdf.text, pdf.pages), fileName: f.name }); }
-      else if (kind === 'ahl') await runAhlJson(raw);
-      else if (kind === 'cdc') await runCdc(raw);
-      else { reviewing = true; setIpoReview({ items: parseIpoList(raw), fileName: f.name }); }
-      } finally { if (!reviewing) { importActive.current = false; importHash.current = undefined; } setReadingImport(false); }
     });
   }
   const exportEncryptedBackup = () =>
     attempt(async () => {
       const pkg = await vault!.session.backupPackage();
-      download(`sipwise-backup-${today()}.encrypted.json`, JSON.stringify(pkg, null, 2));
-      notify('Encrypted backup downloaded. It opens only with your vault password or recovery key.');
+      download(
+        `sipwise-backup-${today()}.encrypted.json`,
+        JSON.stringify(pkg, null, 2),
+      );
+      notify(
+        'Encrypted backup downloaded. It opens only with your vault password or recovery key.',
+      );
     });
   const exportBackup = () =>
     void confirm({
@@ -1026,12 +1467,18 @@ function DashboardContent({
     download(
       `psx-portfolio-${today()}.json`,
       JSON.stringify(
-        isAll ? {kind:'sipwise-portfolio-account-backup',schemaVersion:1,account:vault!.session.account} : {
-          schemaVersion: 1,
-          kind: 'psx-portfolio-ledger',
-          exportedAt: new Date().toISOString(),
-          portfolio: p,
-        },
+        isAll
+          ? {
+              kind: 'sipwise-portfolio-account-backup',
+              schemaVersion: 1,
+              account: vault!.session.account,
+            }
+          : {
+              schemaVersion: 1,
+              kind: 'psx-portfolio-ledger',
+              exportedAt: new Date().toISOString(),
+              portfolio: p,
+            },
         null,
         2,
       ),
@@ -1057,13 +1504,37 @@ function DashboardContent({
       .slice()
       .sort((a, b) => (b.value ?? -1) - (a.value ?? -1)),
     held = hs.filter((h) => h.shares > 0),
-    { value, cost, gain, missingPrice: missing, unknownCost: unknown } =
-      portfolioSummary(hs);
+    {
+      value,
+      cost,
+      gain,
+      missingPrice: missing,
+      unknownCost: unknown,
+    } = portfolioSummary(hs);
   const overviewParts = isAll ? p[DISPLAY_PARTS] : undefined;
-  const ownedMetals: OwnedMetal[] = isAll
-    ? (overviewParts ?? []).flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioId: part.id, portfolioName: part.name })))
-    : (p.assets ?? []).map((asset) => ({ asset }));
-  const hasAssets = ownedMetals.length > 0;
+  const allAssets = isAll
+    ? (overviewParts ?? []).flatMap((part) =>
+        (part.portfolio.assets ?? []).map((asset) => ({
+          asset,
+          portfolioId: part.id,
+          portfolioName: part.name,
+        })),
+      )
+    : (p.assets ?? []).map((asset) => ({
+        asset,
+        portfolioId: undefined,
+        portfolioName: undefined,
+      }));
+  const ownedMetals: OwnedMetal[] = allAssets.flatMap((o) =>
+    o.asset.kind === 'metal' ? [{ ...o, asset: o.asset }] : [],
+  );
+  const ownedPlans: OwnedPlan[] = allAssets.flatMap((o) =>
+    o.asset.kind === 'plan' ? [{ ...o, asset: o.asset }] : [],
+  );
+  const ownedFunds: OwnedFund[] = allAssets.flatMap((o) =>
+    o.asset.kind === 'fund' ? [{ ...o, asset: o.asset }] : [],
+  );
+  const hasAssets = allAssets.length > 0;
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -1142,36 +1613,31 @@ function DashboardContent({
         <MoreHorizontal size={16} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => openCompany(h.ticker)}
-        >
+        <DropdownMenuItem onClick={() => openCompany(h.ticker)}>
           View company
         </DropdownMenuItem>
         {h.shares > 0 && (
           <DropdownMenuItem
-            onClick={() =>
-              openTx('sell', h.ticker, h.quote?.price ?? null)
-            }
+            onClick={() => openTx('sell', h.ticker, h.quote?.price ?? null)}
           >
             Sell
           </DropdownMenuItem>
         )}
         {h.shares > 0 && (
-          <DropdownMenuItem
-            onClick={() => openTx('dividend', h.ticker)}
-          >
+          <DropdownMenuItem onClick={() => openTx('dividend', h.ticker)}>
             Dividend
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
           onClick={() => {
-            if (isAll) {setNamedAction(true);return;}
+            if (isAll) {
+              setNamedAction(true);
+              return;
+            }
             if (locked) return;
             setCreatingCompany(false);
             setCompany({
-              ...p.companies.find(
-                (c) => c.ticker === h.ticker,
-              )!,
+              ...p.companies.find((c) => c.ticker === h.ticker)!,
             });
           }}
         >
@@ -1191,19 +1657,30 @@ function DashboardContent({
     tab === 'settings' || tab === 'company' || tab === 'notifications';
   const taxedDividends = taxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
-    buildEntries({
-      trades: p.trades.filter((t) => !ticker || t.ticker === ticker),
-      dividends: (p.dividends ?? []).filter((d) => !ticker || d.ticker === ticker),
-      splits: (p.stockSplits ?? []).filter((x) => !ticker || x.ticker === ticker),
-      taxed: taxedDividends,
-      onCorrectTrade: correctTrade,
-      onCorrectDividend: correctDividend,
-      onCorrectSplit: correctStockSplit,
-      onConfirmDividend: openReceipt,
-    });
+    [
+      ...buildAssetEntries(ticker ? [] : allAssets, () => setTab('holdings')),
+      ...buildEntries({
+        trades: p.trades.filter((t) => !ticker || t.ticker === ticker),
+        dividends: (p.dividends ?? []).filter(
+          (d) => !ticker || d.ticker === ticker,
+        ),
+        splits: (p.stockSplits ?? []).filter(
+          (x) => !ticker || x.ticker === ticker,
+        ),
+        taxed: taxedDividends,
+        onCorrectTrade: correctTrade,
+        onCorrectDividend: correctDividend,
+        onCorrectSplit: correctStockSplit,
+        onConfirmDividend: openReceipt,
+      }),
+    ].sort(
+      (a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key),
+    );
   const companySummary = (ticker: string) => {
     const h = hs.find((x) => x.ticker === ticker);
-    const div = taxedDividends.filter((d) => d.ticker === ticker && d.status === 'received');
+    const div = taxedDividends.filter(
+      (d) => d.ticker === ticker && d.status === 'received',
+    );
     const dividendGross = round(div.reduce((a, d) => a + d.grossAmount, 0));
     const dividendNet = div.some((d) => d.netAmount === null)
       ? null
@@ -1224,20 +1701,35 @@ function DashboardContent({
     setCompanyTicker(ticker);
     const path = '/company/' + encodeURIComponent(ticker);
     setTabState('company');
-    if (window.location.pathname !== path) window.history.pushState(null, '', path);
+    if (window.location.pathname !== path)
+      window.history.pushState(null, '', path);
     window.scrollTo({ top: 0 });
+  }
+  function pickAsset(kind: AssetPick) {
+    if (kind === 'stock') openTx('buy');
+    else setAssetAdd((s) => ({ kind, n: s.n + 1 }));
   }
   /** Opens the one Add transaction dialog, preset to a type and (optionally) a company. */
   function openTx(type: TxType, ticker = '', price: number | null = null) {
-    if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
-    setTxDestination(isAll ? '' : target?.id ?? '');
+    if (locked) {
+      notify(
+        'This portfolio is locked. Unlock it in Settings → Portfolios.',
+        true,
+      );
+      return;
+    }
+    setTxDestination(isAll ? '' : (target?.id ?? ''));
     setEditing(null);
     setEditingDividend(null);
     setEditingStockSplit(null);
     setTxType(type);
     setTxCompany({ name: '', sector: '' });
     setTrade(
-      blankTrade(ticker, type === 'sell' || type === 'opening' ? type : 'buy', price),
+      blankTrade(
+        ticker,
+        type === 'sell' || type === 'opening' ? type : 'buy',
+        price,
+      ),
     );
     setDividend(blankDividend(ticker));
     setStockSplit(blankStockSplit(ticker));
@@ -1255,7 +1747,9 @@ function DashboardContent({
     setTrade((t) => t && { ...t, shares: pick.shares, month: queue.month });
   }
   function recordPicks(picks: PickBuy[], pickMonth: string) {
-    const valid = picks.filter((x) => x.price !== null && x.price > 0 && x.shares > 0);
+    const valid = picks.filter(
+      (x) => x.price !== null && x.price > 0 && x.shares > 0,
+    );
     if (valid.length) openPick({ picks: valid, month: pickMonth, index: 0 }, 0);
   }
   function closeTx() {
@@ -1298,21 +1792,56 @@ function DashboardContent({
   }
   function correctTrade(t: Trade) {
     if (isAll) {
-      const owner = p![DISPLAY_PARTS]?.find((part)=>t.id.startsWith(part.id+'::'));
-      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
-      const original = owner.portfolio.trades?.find((row)=>owner.id+'::'+row.id===t.id);
+      const owner = p![DISPLAY_PARTS]?.find((part) =>
+        t.id.startsWith(part.id + '::'),
+      );
+      if (
+        !owner ||
+        workspace?.account.portfolios.find((part) => part.id === owner.id)
+          ?.locked
+      ) {
+        notify(
+          'This portfolio is locked. Unlock it in Settings → Portfolios.',
+          true,
+        );
+        return;
+      }
+      const original = owner.portfolio.trades?.find(
+        (row) => owner.id + '::' + row.id === t.id,
+      );
       if (!original) return;
-      setTxDestination(owner.id); t=original;
-    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      setTxDestination(owner.id);
+      t = original;
+    } else if (locked) {
+      notify(
+        'This portfolio is locked. Unlock it in Settings → Portfolios.',
+        true,
+      );
+      return;
+    }
     if (t.kind === 'adjustment') {
-      void confirm({ title: 'Void this holding adjustment?', description: 'The original adjustment stays in the audit history. Re-import the corrected statement to add a replacement.', confirmLabel: 'Void', destructive: true }).then((ok) => {
+      void confirm({
+        title: 'Void this holding adjustment?',
+        description:
+          'The original adjustment stays in the audit history. Re-import the corrected statement to add a replacement.',
+        confirmLabel: 'Void',
+        destructive: true,
+      }).then((ok) => {
         if (!ok) return;
         attempt(async () => {
-          const owner = isAll ? p![DISPLAY_PARTS]?.find((part)=>part.portfolio.trades.some((row)=>row===t)) : undefined;
+          const owner = isAll
+            ? p![DISPLAY_PARTS]?.find((part) =>
+                part.portfolio.trades.some((row) => row === t),
+              )
+            : undefined;
           const next = clone(owner?.portfolio ?? p!);
           const entry = next.trades.find((x) => x.id === t.id);
           if (entry) entry.voided = true;
-          await save(next, 'Holding adjustment voided.', owner ? {target:{id:owner.id}} : {});
+          await save(
+            next,
+            'Holding adjustment voided.',
+            owner ? { target: { id: owner.id } } : {},
+          );
         });
       });
       return;
@@ -1323,12 +1852,33 @@ function DashboardContent({
   }
   function correctDividend(d: Dividend) {
     if (isAll) {
-      const owner = p![DISPLAY_PARTS]?.find((part)=>d.id.startsWith(part.id+'::'));
-      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
-      const original = owner.portfolio.dividends?.find((row)=>owner.id+'::'+row.id===d.id);
+      const owner = p![DISPLAY_PARTS]?.find((part) =>
+        d.id.startsWith(part.id + '::'),
+      );
+      if (
+        !owner ||
+        workspace?.account.portfolios.find((part) => part.id === owner.id)
+          ?.locked
+      ) {
+        notify(
+          'This portfolio is locked. Unlock it in Settings → Portfolios.',
+          true,
+        );
+        return;
+      }
+      const original = owner.portfolio.dividends?.find(
+        (row) => owner.id + '::' + row.id === d.id,
+      );
       if (!original) return;
-      setTxDestination(owner.id); d=original;
-    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      setTxDestination(owner.id);
+      d = original;
+    } else if (locked) {
+      notify(
+        'This portfolio is locked. Unlock it in Settings → Portfolios.',
+        true,
+      );
+      return;
+    }
     setEditingDividend(d.id);
     setTxType('dividend');
     setDividend(
@@ -1350,12 +1900,33 @@ function DashboardContent({
   }
   function openReceipt(d: Dividend) {
     if (isAll) {
-      const owner = p![DISPLAY_PARTS]?.find((part)=>d.id.startsWith(part.id+'::'));
-      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
-      const original = owner.portfolio.dividends?.find((row)=>owner.id+'::'+row.id===d.id);
+      const owner = p![DISPLAY_PARTS]?.find((part) =>
+        d.id.startsWith(part.id + '::'),
+      );
+      if (
+        !owner ||
+        workspace?.account.portfolios.find((part) => part.id === owner.id)
+          ?.locked
+      ) {
+        notify(
+          'This portfolio is locked. Unlock it in Settings → Portfolios.',
+          true,
+        );
+        return;
+      }
+      const original = owner.portfolio.dividends?.find(
+        (row) => owner.id + '::' + row.id === d.id,
+      );
       if (!original) return;
-      setTxDestination(owner.id); d=original;
-    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      setTxDestination(owner.id);
+      d = original;
+    } else if (locked) {
+      notify(
+        'This portfolio is locked. Unlock it in Settings → Portfolios.',
+        true,
+      );
+      return;
+    }
     setReceipt({ dividend: d, paymentDate: today(), gross: '', tax: '' });
   }
   async function confirmReceipt(e: { preventDefault: () => void }) {
@@ -1364,9 +1935,13 @@ function DashboardContent({
     const next = clone(transactionPortfolio());
     const target = next.dividends?.find((d) => d.id === receipt.dividend.id);
     if (!target) return;
-    const gross = receipt.gross.trim() === '' ? undefined : Number(receipt.gross);
+    const gross =
+      receipt.gross.trim() === '' ? undefined : Number(receipt.gross);
     const tax = receipt.tax.trim() === '' ? undefined : Number(receipt.tax);
-    if ((gross !== undefined && !(gross >= 0)) || (tax !== undefined && !(tax >= 0)))
+    if (
+      (gross !== undefined && !(gross >= 0)) ||
+      (tax !== undefined && !(tax >= 0))
+    )
       throw Error('Enter amounts as positive numbers, or leave them blank.');
     Object.assign(
       target,
@@ -1376,24 +1951,51 @@ function DashboardContent({
         taxWithheld: tax,
       }),
     );
-    await save(next, `${target.ticker} dividend marked as received.`, isAll ? {target:{id:txDestination}} : {});
+    await save(
+      next,
+      `${target.ticker} dividend marked as received.`,
+      isAll ? { target: { id: txDestination } } : {},
+    );
     setReceipt(null);
   }
   function correctStockSplit(entry: StockSplit) {
     if (isAll) {
-      const owner = p![DISPLAY_PARTS]?.find((part)=>entry.id.startsWith(part.id+'::'));
-      if (!owner || workspace?.account.portfolios.find((part)=>part.id===owner.id)?.locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
-      const original = owner.portfolio.stockSplits?.find((row)=>owner.id+'::'+row.id===entry.id);
+      const owner = p![DISPLAY_PARTS]?.find((part) =>
+        entry.id.startsWith(part.id + '::'),
+      );
+      if (
+        !owner ||
+        workspace?.account.portfolios.find((part) => part.id === owner.id)
+          ?.locked
+      ) {
+        notify(
+          'This portfolio is locked. Unlock it in Settings → Portfolios.',
+          true,
+        );
+        return;
+      }
+      const original = owner.portfolio.stockSplits?.find(
+        (row) => owner.id + '::' + row.id === entry.id,
+      );
       if (!original) return;
-      setTxDestination(owner.id); entry=original;
-    } else if (locked) { notify('This portfolio is locked. Unlock it in Settings → Portfolios.',true); return; }
+      setTxDestination(owner.id);
+      entry = original;
+    } else if (locked) {
+      notify(
+        'This portfolio is locked. Unlock it in Settings → Portfolios.',
+        true,
+      );
+      return;
+    }
     setEditingStockSplit(entry.id);
     setTxType('split');
     setStockSplit({ ...entry });
   }
   function transactionPortfolio(): Portfolio {
     if (!isAll) return p!;
-    const part = p?.[DISPLAY_PARTS]?.find((entry)=>entry.id===txDestination);
+    const part = p?.[DISPLAY_PARTS]?.find(
+      (entry) => entry.id === txDestination,
+    );
     if (!part) throw Error('Choose a destination portfolio.');
     return part.portfolio;
   }
@@ -1407,7 +2009,9 @@ function DashboardContent({
       if (!/^[A-Z0-9]{2,12}$/.test(trade.ticker))
         throw Error('Enter a valid PSX symbol (2-12 letters or digits).');
       if (!lookupReady(txLookup, trade.ticker))
-        throw Error('Wait for the company details to be found before saving a new company.');
+        throw Error(
+          'Wait for the company details to be found before saving a new company.',
+        );
       next.companies.push({
         ticker: trade.ticker,
         name: txLookup.company!.name,
@@ -1432,7 +2036,10 @@ function DashboardContent({
       editing
         ? 'Correction saved. Previous entry retained as voided.'
         : `${isNew ? `${trade.ticker} added to your companies. ` : ''}Transaction saved as a new line item. Holdings and average cost updated.`,
-      { ...(isNew ? {createCompanies:[trade.ticker]} : {}), ...(isAll ? {target:{id:txDestination}} : {}) },
+      {
+        ...(isNew ? { createCompanies: [trade.ticker] } : {}),
+        ...(isAll ? { target: { id: txDestination } } : {}),
+      },
     );
     if (isNew) void queueQuoteRefresh([trade.ticker]);
     closeTx();
@@ -1441,7 +2048,11 @@ function DashboardContent({
   async function recordStockSplit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!stockSplit) return;
-    if (!transactionPortfolio().companies.some((c) => c.ticker === stockSplit.ticker))
+    if (
+      !transactionPortfolio().companies.some(
+        (c) => c.ticker === stockSplit.ticker,
+      )
+    )
       throw Error('Choose a company you own.');
     const next = clone(transactionPortfolio());
     next.stockSplits ??= [];
@@ -1463,14 +2074,18 @@ function DashboardContent({
       editingStockSplit
         ? 'Stock split correction saved. Previous entry retained as voided.'
         : 'Stock split saved. Shares and average costs were recalculated.',
-      isAll ? {target:{id:txDestination}} : {},
+      isAll ? { target: { id: txDestination } } : {},
     );
     closeTx();
   }
   async function recordDividend(e: React.FormEvent) {
     e.preventDefault();
     if (!dividend) return;
-    if (!transactionPortfolio().companies.some((c) => c.ticker === dividend.ticker))
+    if (
+      !transactionPortfolio().companies.some(
+        (c) => c.ticker === dividend.ticker,
+      )
+    )
       throw Error('Choose a company you own.');
     const next = clone(transactionPortfolio());
     next.dividends = next.dividends ?? [];
@@ -1499,7 +2114,7 @@ function DashboardContent({
       editingDividend
         ? 'Correction saved. Previous dividend record retained as voided.'
         : 'Dividend recorded.',
-      isAll ? {target:{id:txDestination}} : {},
+      isAll ? { target: { id: txDestination } } : {},
     );
     closeTx();
   }
@@ -1509,7 +2124,9 @@ function DashboardContent({
     const { from } = renaming;
     const to = renaming.to.trim().toUpperCase();
     // Strict create: the new symbol must exist in the PSX directory, so a typo can't be saved.
-    await save(renameTicker(p!, from, to), `${from} is now ${to}.`, { createCompanies: [to] });
+    await save(renameTicker(p!, from, to), `${from} is now ${to}.`, {
+      createCompanies: [to],
+    });
     void queueQuoteRefresh([to]);
     setRenaming(null);
     if (companyTicker === from) openCompany(to);
@@ -1520,18 +2137,25 @@ function DashboardContent({
     const next = clone(p!);
     const at = next.companies.findIndex((c) => c.ticker === company.ticker);
     if (creatingCompany) {
-      if (at >= 0) throw Error(`${company.ticker} is already in your portfolio.`);
+      if (at >= 0)
+        throw Error(`${company.ticker} is already in your portfolio.`);
       if (!lookupReady(companyLookup, company.ticker))
         throw Error('Wait for the company details to be found before saving.');
     }
     const entry = creatingCompany
-      ? { ...company, name: companyLookup.company!.name, sector: companyLookup.company!.sector }
+      ? {
+          ...company,
+          name: companyLookup.company!.name,
+          sector: companyLookup.company!.sector,
+        }
       : company;
     if (at >= 0) next.companies[at] = entry;
     else next.companies.push(entry);
     await save(
       next,
-      creatingCompany ? `${company.ticker} added to your portfolio.` : undefined,
+      creatingCompany
+        ? `${company.ticker} added to your portfolio.`
+        : undefined,
       creatingCompany ? { createCompanies: [company.ticker] } : {},
     );
     if (creatingCompany) void queueQuoteRefresh([company.ticker]);
@@ -1540,1538 +2164,2044 @@ function DashboardContent({
   }
   return (
     <CompanyNavProvider value={openCompany}>
-    <main className="desk">
-      <ImportRequestRunner request={workspace?.importRequest ?? null} busy={busy} onRequest={(request) => {
-        if (request.restore) { importActive.current = true; restoreBackup(request.file); }
-        else processImportFile(request.file, request.expected);
-      }} />
-      <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-      <header className={'app-header' + (chromeless ? ' no-tabs' : '')}>
-        <div className="header-brand-group">
-        <button
-          type="button"
-          data-slot="brand"
-          className="brand"
-          onClick={() => setTab('holdings')}
-        >
-          <LogoMark size={28} />
-          <Wordmark />
-        </button>
-        {workspace?.selector}
-        </div>
-        <div className="header-right">
-          <button
-            type="button"
-            data-slot="hdr"
-            className="hdr-btn"
-            disabled={busy}
-            aria-label="Refresh PSX prices"
-            onClick={refresh}
-          >
-            <RefreshCw size={18} />
-            <span className="hdr-label">Refresh PSX prices</span>
-          </button>
-          <button
-            type="button"
-            data-slot="hdr"
-            className="hdr-btn"
-            disabled={busy}
-            aria-label="Add transaction"
-            onClick={() =>
-              openTx('buy', tab === 'company' ? companyTicker : '')
-            }
-          >
-            <Plus size={18} />
-            <span className="hdr-label">Add transaction</span>
-          </button>
-          <Popover
-            open={bellOpen}
-            onOpenChange={(next) => {
-              // Phones skip the popover (it can't fit): go straight to the page.
-              if (next && window.matchMedia('(max-width:760px)').matches) {
-                setTab('notifications');
-                return;
-              }
-              setBellOpen(next);
-            }}
-          >
-            <PopoverTrigger
-              className="bell-trigger hdr-btn"
-              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
-            >
-              <Bell size={18} />
-              <span className="hdr-label">Notifications</span>
-              {unreadCount > 0 && (
-                <span className="bell-badge">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </PopoverTrigger>
-            <PopoverContent align="end" className="notice-panel">
-              <div className="notice-head">
-                <strong>Notifications</strong>
-                <span className="row">
-                  <button
-                    type="button"
-                    data-slot="link"
-                    className="link-button"
-                    disabled={busy || !unreadCount}
-                    onClick={() =>
-                      updateNotifications((list) =>
-                        list.map((n) => ({ ...n, read: true })),
-                      )
-                    }
-                  >
-                    Mark all read
-                  </button>
-                  <button
-                    type="button"
-                    data-slot="link"
-                    className="link-button"
-                    disabled={busy || !notifications.length}
-                    onClick={() => {
-                      const at = new Date().toISOString();
-                      updateNotifications((list) =>
-                        list.map((n) =>
-                          n.clearedAt ? n : { ...n, read: true, clearedAt: at },
-                        ),
-                      );
-                    }}
-                  >
-                    Clear
-                  </button>
-                </span>
-              </div>
-              {notifications.length === 0 ? (
-                <p className="muted notice-empty">
-                  Nothing yet. Dividends recorded from PSX announcements and
-                  new payout announcements for your holdings appear here.
-                </p>
-              ) : (
-                <ul className="notice-list">
-                  {notifications.map((n) => (
-                    <li key={n.id} className={n.read ? '' : 'unread'}>
+      <main className="desk">
+        <ImportRequestRunner
+          request={workspace?.importRequest ?? null}
+          busy={busy}
+          onRequest={(request) => {
+            if (request.restore) {
+              importActive.current = true;
+              restoreBackup(request.file);
+            } else processImportFile(request.file, request.expected);
+          }}
+        />
+        <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+          <header className={'app-header' + (chromeless ? ' no-tabs' : '')}>
+            <div className="header-brand-group">
+              <button
+                type="button"
+                data-slot="brand"
+                className="brand"
+                onClick={() => setTab('holdings')}
+              >
+                <LogoMark size={28} />
+                <Wordmark />
+              </button>
+              {workspace?.selector}
+            </div>
+            <div className="header-right">
+              <button
+                type="button"
+                data-slot="hdr"
+                className="hdr-btn"
+                disabled={busy}
+                aria-label="Refresh PSX prices"
+                onClick={refresh}
+              >
+                <RefreshCw size={18} />
+                <span className="hdr-label">Refresh PSX prices</span>
+              </button>
+              <button
+                type="button"
+                data-slot="hdr"
+                className="hdr-btn"
+                disabled={busy}
+                aria-label="Add transaction"
+                onClick={() =>
+                  openTx('buy', tab === 'company' ? companyTicker : '')
+                }
+              >
+                <Plus size={18} />
+                <span className="hdr-label">Add transaction</span>
+              </button>
+              <Popover
+                open={bellOpen}
+                onOpenChange={(next) => {
+                  // Phones skip the popover (it can't fit): go straight to the page.
+                  if (next && window.matchMedia('(max-width:760px)').matches) {
+                    setTab('notifications');
+                    return;
+                  }
+                  setBellOpen(next);
+                }}
+              >
+                <PopoverTrigger
+                  className="bell-trigger hdr-btn"
+                  aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+                >
+                  <Bell size={18} />
+                  <span className="hdr-label">Notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="bell-badge">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </PopoverTrigger>
+                <PopoverContent align="end" className="notice-panel">
+                  <div className="notice-head">
+                    <strong>Notifications</strong>
+                    <span className="row">
                       <button
                         type="button"
                         data-slot="link"
-                        className="notice-item"
+                        className="link-button"
+                        disabled={busy || !unreadCount}
+                        onClick={() =>
+                          updateNotifications((list) =>
+                            list.map((n) => ({ ...n, read: true })),
+                          )
+                        }
+                      >
+                        Mark all read
+                      </button>
+                      <button
+                        type="button"
+                        data-slot="link"
+                        className="link-button"
+                        disabled={busy || !notifications.length}
                         onClick={() => {
-                          if (!n.read)
-                            updateNotifications((list) =>
-                              list.map((x) =>
-                                x.id === n.id ? { ...x, read: true } : x,
-                              ),
-                            );
+                          const at = new Date().toISOString();
+                          updateNotifications((list) =>
+                            list.map((n) =>
+                              n.clearedAt
+                                ? n
+                                : { ...n, read: true, clearedAt: at },
+                            ),
+                          );
                         }}
                       >
-                        <strong>{n.title}</strong>
-                        <span>{n.body}</span>
-                        <small>{new Date(n.at).toLocaleString()}</small>
+                        Clear
                       </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="notice-foot">
-                <button
-                  type="button"
-                  data-slot="link"
-                  className="link-button"
-                  onClick={() => {
-                    setBellOpen(false);
-                    setTab('notifications');
-                  }}
-                >
-                  View all notifications
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-          {email && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className="account-trigger">
-                <UserAvatar name={name} email={email} picture={picture} />
-                <ChevronDown size={14} className="account-chevron" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="account-menu">
-                <div className="account-menu-header">
-                  <UserAvatar
-                    name={name}
-                    email={email}
-                    picture={picture}
-                    large
-                  />
-                  <div>
-                    {name && <span className="account-menu-name">{name}</span>}
-                    <span className="account-menu-email">{email}</span>
+                    </span>
                   </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTab('settings')}>
-                  <Settings size={15} /> Settings
-                </DropdownMenuItem>
-                {vault && (
-                  <DropdownMenuItem onClick={vault.lock}>
-                    <LockKeyhole size={15} /> Lock vault
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => {
-                    window.location.href = '/api/auth/logout';
-                  }}
-                >
-                  <LogOut size={15} /> Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-        {!chromeless && (
-          <TabsList variant="line">
-            <TabsTrigger value="holdings">
-              <Wallet className="tab-icon" aria-hidden="true" />
-              <span className="tab-long">Holdings</span>
-              <span className="tab-short">Holdings</span>
-            </TabsTrigger>
-            <TabsTrigger value="reports">
-              <BarChart3 className="tab-icon" aria-hidden="true" />
-              <span className="tab-long">Reports</span>
-              <span className="tab-short">Reports</span>
-            </TabsTrigger>
-            <TabsTrigger value="history">
-              <ScrollText className="tab-icon" aria-hidden="true" />
-              <span className="tab-long">Activity</span>
-              <span className="tab-short">Activity</span>
-            </TabsTrigger>
-            <TabsTrigger value="sip">
-              <Sparkles className="tab-icon" aria-hidden="true" />
-              <span className="tab-long">Monthly Picks</span>
-              <span className="tab-short">Picks</span>
-            </TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="research-desk">
-                <FlaskConical className="tab-icon" aria-hidden="true" />
-                <span className="tab-long">Research desk</span>
-                <span className="tab-short">Research</span>
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="ai-lab">
-                <Microscope className="tab-icon" aria-hidden="true" />
-                <span className="tab-long">AI Lab</span>
-                <span className="tab-short">AI Lab</span>
-              </TabsTrigger>
-            )}
-          </TabsList>
-        )}
-      </header>
-        <TabsContent value="holdings">
-          {p.companies.length === 0 && !hasAssets ? (
-            <div className="panel empty-holdings">
-              <span className="empty-holdings-icon" aria-hidden="true">
-                <Briefcase size={26} />
-              </span>
-              <h2>No holdings yet</h2>
-              <p>Record your first purchase, or import your broker history, to start tracking your portfolio.</p>
-              <div className="empty-holdings-actions">
-                <button disabled={busy} onClick={() => openTx('buy')}>
-                  <Plus size={16} /> Add your first transaction
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={busy}
-                  onClick={() => emptyImportRef.current?.click()}
-                >
-                  <Upload size={16} /> Import from your broker
-                </button>
-                <input
-                  ref={emptyImportRef}
-                  type="file"
-                  accept="application/pdf,.pdf,application/json,.json,text/csv,.csv,.xlsx"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (file) importFile(file);
-                  }}
-                />
-              </div>
-              <small className="empty-holdings-hint">
-                Already have a broker statement? Choose it to review your holdings and history before saving.
-              </small>
-            </div>
-          ) : (
-          <>
-          {pendingCompanies.length > 0 && (
-            <p className="notice" role="status">
-              Company details for {pendingCompanies.join(', ')} are still being looked up. Your transactions are saved;
-              names and sectors fill in automatically once PSX details are found. If PSX renamed a symbol since you
-              bought it, change it here:{' '}
-              {pendingCompanies.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className="secondary compact"
-                  disabled={busy}
-                  onClick={() => setRenaming({ from: t, to: '' })}
-                >
-                  Change {t}
-                </button>
-              ))}{' '}
-              <button type="button" className="secondary compact" disabled={busy} onClick={() => void load()}>
-                Check again
-              </button>
-            </p>
-          )}
-          {overviewParts && overviewParts.length > 1 ? (
-            <AccountOverview
-              parts={overviewParts}
-              asOf={today()}
-              metalRates={metalRates.rates}
-              onOpenPortfolio={(id) => workspace?.choose(id)}
-              onOpenCompany={openCompany}
-              onSeeAll={() => document.getElementById('all-companies')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} /> : undefined}
-              chart={
-                <PortfolioValueCard
-                  chartOnly
-                  p={p}
-                  value={value}
-                  cost={cost}
-                  gain={gain}
-                  heldCount={held.length}
-                  missingCount={missing.length}
-                  unknownCount={unknown.length}
-                  newBuys={newBuys}
-                />
-              }
-            />
-          ) : (
-          <PortfolioValueCard
-            p={p}
-            value={value}
-            cost={cost}
-            gain={gain}
-            heldCount={held.length}
-            missingCount={missing.length}
-            unknownCount={unknown.length}
-            newBuys={newBuys}
-            aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} /> : undefined}
-          />
-          )}
-          <div className="holdings-head" id="all-companies">
-            <h2>
-              {overviewParts && overviewParts.length > 1 ? 'All companies' : 'Your companies'}
-              <span className="count-badge">
-                {held.length} {held.length === 1 ? 'holding' : 'holdings'}
-              </span>
-            </h2>
-            <button
-              className="secondary compact holdings-add holdings-targets"
-              disabled={busy || locked} onClick={() => isAll ? setNamedAction(true) : setTargetsOpen(true)}
-            >
-              Targets
-            </button>
-            <button
-              className="secondary compact holdings-add"
-              disabled={busy}
-              aria-label="Add company"
-              onClick={() => {
-                if (isAll) {setNamedAction(true);return;}
-                if (locked) return;
-                setCreatingCompany(true);
-                setCompany({
-                  ticker: '',
-                  name: '',
-                  sector: '',
-                  target: 0,
-                  approved: false,
-                  screenDate: '',
-                  note: '',
-                });
-              }}
-            >
-              <Plus size={15} /> <span className="holdings-add__label">Add company</span>
-            </button>
-            <select
-              className="holdings-filter"
-              aria-label="Filter companies"
-              value={sectorFilter}
-              onChange={(e) => setSectorFilter(e.target.value)}
-            >
-              <option value="">All sectors</option>
-              <option value={SHORTLISTED}>Shortlisted only</option>
-              {sectorsInUse.map((sector) => (
-                <option key={sector} value={sector}>
-                  {sector}
-                </option>
-              ))}
-            </select>
-            <div className="holdings-sort">
-              <select
-                aria-label="Sort holdings"
-                value={holdingsSort?.key ?? ''}
-                onChange={(e) => {
-                  const key = e.target.value as HoldingsSortKey | '';
-                  if (!key) setHoldingsSort(null);
-                  else if (holdingsSort?.key !== key) toggleHoldingsSort(key);
-                }}
-              >
-                <option value="">Sort: market value</option>
-                {(
-                  [
-                    ['name', 'Company'],
-                    ['value', 'Market value'],
-                    ['gain', 'Gain / loss'],
-                    ['shares', 'Shares'],
-                    ['average', 'Avg. cost'],
-                    ['price', 'Latest price'],
-                    ['weight', 'Portfolio weight'],
-                  ] as [HoldingsSortKey, string][]
-                ).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    Sort: {label}
-                  </option>
-                ))}
-              </select>
-              {holdingsSort && (
-                <button
-                  type="button"
-                  className="secondary compact"
-                  aria-label="Reverse sort order"
-                  onClick={() => toggleHoldingsSort(holdingsSort.key)}
-                >
-                  {holdingsSort.dir === 'asc' ? '▲' : '▼'}
-                </button>
+                  {notifications.length === 0 ? (
+                    <p className="muted notice-empty">
+                      Nothing yet. Dividends recorded from PSX announcements and
+                      new payout announcements for your holdings appear here.
+                    </p>
+                  ) : (
+                    <ul className="notice-list">
+                      {notifications.map((n) => (
+                        <li key={n.id} className={n.read ? '' : 'unread'}>
+                          <button
+                            type="button"
+                            data-slot="link"
+                            className="notice-item"
+                            onClick={() => {
+                              if (!n.read)
+                                updateNotifications((list) =>
+                                  list.map((x) =>
+                                    x.id === n.id ? { ...x, read: true } : x,
+                                  ),
+                                );
+                            }}
+                          >
+                            <strong>{n.title}</strong>
+                            <span>{n.body}</span>
+                            <small>{new Date(n.at).toLocaleString()}</small>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="notice-foot">
+                    <button
+                      type="button"
+                      data-slot="link"
+                      className="link-button"
+                      onClick={() => {
+                        setBellOpen(false);
+                        setTab('notifications');
+                      }}
+                    >
+                      View all notifications
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {email && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="account-trigger">
+                    <UserAvatar name={name} email={email} picture={picture} />
+                    <ChevronDown size={14} className="account-chevron" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="account-menu">
+                    <div className="account-menu-header">
+                      <UserAvatar
+                        name={name}
+                        email={email}
+                        picture={picture}
+                        large
+                      />
+                      <div>
+                        {name && (
+                          <span className="account-menu-name">{name}</span>
+                        )}
+                        <span className="account-menu-email">{email}</span>
+                      </div>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setTab('settings')}>
+                      <Settings size={15} /> Settings
+                    </DropdownMenuItem>
+                    {vault && (
+                      <DropdownMenuItem onClick={vault.lock}>
+                        <LockKeyhole size={15} /> Lock vault
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => {
+                        window.location.href = '/api/auth/logout';
+                      }}
+                    >
+                      <LogOut size={15} /> Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
-            {soldOut.length > 0 && (
-              <label className="check-row holdings-soldout">
-                <Checkbox
-                  checked={showSoldOut}
-                  onCheckedChange={(v) => setShowSoldOut(!!v)}
-                />{' '}
-                Show sold out ({soldOut.length})
-              </label>
+            {!chromeless && (
+              <TabsList variant="line">
+                <TabsTrigger value="holdings">
+                  <Wallet className="tab-icon" aria-hidden="true" />
+                  <span className="tab-long">Holdings</span>
+                  <span className="tab-short">Holdings</span>
+                </TabsTrigger>
+                <TabsTrigger value="reports">
+                  <BarChart3 className="tab-icon" aria-hidden="true" />
+                  <span className="tab-long">Reports</span>
+                  <span className="tab-short">Reports</span>
+                </TabsTrigger>
+                <TabsTrigger value="history">
+                  <ScrollText className="tab-icon" aria-hidden="true" />
+                  <span className="tab-long">Activity</span>
+                  <span className="tab-short">Activity</span>
+                </TabsTrigger>
+                <TabsTrigger value="sip">
+                  <Sparkles className="tab-icon" aria-hidden="true" />
+                  <span className="tab-long">Monthly Picks</span>
+                  <span className="tab-short">Picks</span>
+                </TabsTrigger>
+                {isAdmin && (
+                  <TabsTrigger value="research-desk">
+                    <FlaskConical className="tab-icon" aria-hidden="true" />
+                    <span className="tab-long">Research desk</span>
+                    <span className="tab-short">Research</span>
+                  </TabsTrigger>
+                )}
+                {isAdmin && (
+                  <TabsTrigger value="ai-lab">
+                    <Microscope className="tab-icon" aria-hidden="true" />
+                    <span className="tab-long">AI Lab</span>
+                    <span className="tab-short">AI Lab</span>
+                  </TabsTrigger>
+                )}
+              </TabsList>
             )}
-          </div>
-          <div className="holdings-cards">
-            {displayedHoldings.map((h) => (
-              <article className="holding-card" key={h.ticker}>
-                <div className="holding-card__head">
+          </header>
+          <TabsContent value="holdings">
+            {p.companies.length === 0 && !hasAssets ? (
+              <div className="panel empty-holdings">
+                <span className="empty-holdings-icon" aria-hidden="true">
+                  <Briefcase size={26} />
+                </span>
+                <h2>Start your portfolio</h2>
+                <p>
+                  A portfolio can hold stocks, mutual funds, gold or silver and
+                  savings plans. Choose what to add first; you can add the
+                  others any time from the + button.
+                </p>
+                <StartTiles
+                  disabled={busy}
+                  onPick={pickAsset}
+                  only={isAll || locked ? ['stock'] : undefined}
+                />
+                <div className="empty-holdings-actions">
                   <button
                     type="button"
-                    className="holding-card__title"
-                    onClick={() => openCompany(h.ticker)}
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => emptyImportRef.current?.click()}
                   >
-                    <b className="ticker">
-                      {h.ticker}
-                    </b>
-                    <small>{h.name}</small>
+                    <Upload size={16} /> Import stocks from your broker
                   </button>
-                  {holdingActions(h)}
+                  <input
+                    ref={emptyImportRef}
+                    type="file"
+                    accept="application/pdf,.pdf,application/json,.json,text/csv,.csv,.xlsx"
+                    hidden
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (file) importFile(file);
+                    }}
+                  />
                 </div>
-                <dl className="holding-card__grid">
-                  <div>
-                    <dt>Value</dt>
-                    <dd className="amount">
-                      {h.value === null ? '—' : moneyShort(h.value)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Gain</dt>
-                    <dd className={gainClass(h)}>
-                      {h.gain === null ? '—' : moneyShort(h.gain)}
-                      {gainPct(h) !== null && <small>{gainText(h)}</small>}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Shares @ avg cost</dt>
-                    <dd>
-                      {h.shares.toLocaleString()}
-                      <small>
-                        @ {h.average === null ? '—' : money(h.average)}
-                      </small>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Price</dt>
-                    <dd>
+                <small className="empty-holdings-hint">
+                  Already have a broker statement? Choose it to review your
+                  holdings and history before saving.
+                </small>
+              </div>
+            ) : (
+              <>
+                {pendingCompanies.length > 0 && (
+                  <p className="notice" role="status">
+                    Company details for {pendingCompanies.join(', ')} are still
+                    being looked up. Your transactions are saved; names and
+                    sectors fill in automatically once PSX details are found. If
+                    PSX renamed a symbol since you bought it, change it here:{' '}
+                    {pendingCompanies.map((t) => (
                       <button
+                        key={t}
                         type="button"
-                        className="quote-btn"
-                        onClick={() => openQuoteEntry(h)}
+                        className="secondary compact"
+                        disabled={busy}
+                        onClick={() => setRenaming({ from: t, to: '' })}
                       >
-                        {h.quote ? money(h.quote.price) : 'Add price'}
+                        Change {t}
                       </button>
-                      {h.quote && (
-                        <small>
-                          {h.quote.date}
-                          {h.quote.manual ? ' · manual' : ''}
-                          {h.quote.date !== today() ? ' · older quote' : ''}
-                        </small>
-                      )}
-                    </dd>
+                    ))}{' '}
+                    <button
+                      type="button"
+                      className="secondary compact"
+                      disabled={busy}
+                      onClick={() => void load()}
+                    >
+                      Check again
+                    </button>
+                  </p>
+                )}
+                {!isAll && !locked && (
+                  <div className="add-asset">
+                    <AddAssetMenu onPick={pickAsset} disabled={busy} />
                   </div>
-                </dl>
-              </article>
-            ))}
-          </div>
-          <section className="panel table-panel holdings-table">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {(
-                    [
-                      ['name', 'Company'],
-                      ['shares', 'Shares'],
-                      ['average', 'Avg. cost'],
-                      ['price', 'Latest price'],
-                      ['value', 'Market value'],
-                      ['gain', 'Gain / loss'],
-                      ['weight', 'Portfolio weight'],
-                    ] as [HoldingsSortKey, string][]
-                  ).map(([key, label]) => (
-                    <TableHead key={key}>
-                      <button
-                        type="button"
-                        className="sort-head"
-                        onClick={() => toggleHoldingsSort(key)}
-                      >
-                        {label}
-                        {sortIndicator(key)}
-                      </button>
-                    </TableHead>
-                  ))}
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {displayedHoldings.map((h) => (
-                  <TableRow key={h.ticker}>
-                    <TableCell>
-                      <button
-                        className="quote-btn ticker"
-                        onClick={() => openCompany(h.ticker)}
-                      >
-                        {h.ticker}
-                      </button>
-                      {h.target > 0 && (
-                        <span
-                          className="shortlist-dot"
-                          title="On SIP shortlist"
-                          aria-label="On SIP shortlist"
+                )}
+                {overviewParts && overviewParts.length > 1 ? (
+                  <AccountOverview
+                    parts={overviewParts}
+                    asOf={today()}
+                    metalRates={metalRates.rates}
+                    fundNavs={fundData.navs}
+                    planNavs={planNavs}
+                    onOpenPortfolio={(id) => workspace?.choose(id)}
+                    aside={
+                      widePulse ? (
+                        <PsxMarketPulse
+                          ref={pulseRef}
+                          onOpenShortlist={() => setTab('sip')}
+                          {...pulseWatch}
                         />
-                      )}
-                      <small>
-                        {h.name}
-                        {h.sector ? ` · ${h.sector}` : ''}
-                      </small>
-                      {h.target > 0 && (
-                        <span
-                          className="shortlist-dot"
-                          title="On SIP shortlist"
-                          aria-label="On SIP shortlist"
+                      ) : undefined
+                    }
+                    chart={
+                      <PortfolioValueCard
+                        chartOnly
+                        p={p}
+                        value={value}
+                        cost={cost}
+                        gain={gain}
+                        heldCount={held.length}
+                        missingCount={missing.length}
+                        unknownCount={unknown.length}
+                        newBuys={newBuys}
+                      />
+                    }
+                  />
+                ) : p.companies.length > 0 ? (
+                  <PortfolioValueCard
+                    p={p}
+                    value={value}
+                    cost={cost}
+                    gain={gain}
+                    heldCount={held.length}
+                    missingCount={missing.length}
+                    unknownCount={unknown.length}
+                    newBuys={newBuys}
+                    aside={
+                      widePulse ? (
+                        <PsxMarketPulse
+                          ref={pulseRef}
+                          onOpenShortlist={() => setTab('sip')}
+                          {...pulseWatch}
                         />
-                      )}
-                    </TableCell>
-                    <TableCell className="amount">
-                      {h.shares.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {h.average === null ? '—' : money(h.average)}
-                    </TableCell>
-                    <TableCell>
+                      ) : undefined
+                    }
+                  />
+                ) : null}
+                {p.companies.length > 0 && (
+                  <CollapsiblePanel
+                    id="stocks"
+                    title={
+                      overviewParts && overviewParts.length > 1
+                        ? 'All companies'
+                        : 'Your companies'
+                    }
+                    badge={`${held.length} ${held.length === 1 ? 'holding' : 'holdings'}`}
+                    figures={[
+                      {
+                        label: 'Market value',
+                        value:
+                          missing.length && !value
+                            ? 'Prices needed'
+                            : moneyShort(value),
+                      },
+                      {
+                        label: 'Remaining cost',
+                        value: unknown.length
+                          ? 'Not yet known'
+                          : moneyShort(cost),
+                      },
+                      {
+                        label: 'Gain / loss',
+                        value:
+                          gain === null ? 'Not yet known' : moneyShort(gain),
+                        tone:
+                          gain === null
+                            ? ''
+                            : gain >= 0
+                              ? 'pos-text'
+                              : 'neg-text',
+                      },
+                    ]}
+                  >
+                    <div className="holdings-head holdings-head--inline">
                       <button
-                        className="quote-btn"
+                        className="secondary compact holdings-add holdings-targets"
+                        disabled={busy || locked}
+                        onClick={() =>
+                          isAll ? setNamedAction(true) : setTargetsOpen(true)
+                        }
+                      >
+                        Targets
+                      </button>
+                      <button
+                        className="secondary compact holdings-add"
+                        disabled={busy}
+                        aria-label="Add company"
                         onClick={() => {
-                          setQuoteTicker(h.ticker);
-                          setQuotePrice(h.quote?.price.toString() ?? '');
-                          setQuoteDate(h.quote?.date ?? today());
+                          if (isAll) {
+                            setNamedAction(true);
+                            return;
+                          }
+                          if (locked) return;
+                          setCreatingCompany(true);
+                          setCompany({
+                            ticker: '',
+                            name: '',
+                            sector: '',
+                            target: 0,
+                            approved: false,
+                            screenDate: '',
+                            note: '',
+                          });
                         }}
                       >
-                        {h.quote ? money(h.quote.price) : 'Add price'}
+                        <Plus size={15} />{' '}
+                        <span className="holdings-add__label">Add company</span>
                       </button>
-                      {h.quote && (
-                        <small>
-                          {h.quote.date}
-                          {h.quote.manual ? ' · manual' : ''}
-                          {h.quote.date !== today() ? ' · older quote' : ''}
-                        </small>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {h.value === null ? '—' : moneyShort(h.value)}
-                    </TableCell>
-                    <TableCell className={gainClass(h)}>
-                      {h.gain === null ? '—' : moneyShort(h.gain)}
-                      {gainPct(h) !== null && <small>{gainText(h)}</small>}
-                    </TableCell>
-                    <TableCell>
-                      {!missing.length && value > 0 ? (
-                        <>
-                          <span>
-                            {(((h.value ?? 0) / value) * 100).toFixed(1)}%
-                          </span>
-                          <div className="bar">
-                            <i
-                              style={{
-                                width: `${((h.value ?? 0) / value) * 100}%`,
-                              }}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {holdingActions(h)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <p className="table-note">
-              A dash means unknown, not zero. Quotes may be delayed. Market
-              values exclude cash and unrecorded corporate actions.
-            </p>
-          </section>
-          {widePulse === false && <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} />}
-          </>
-          )}
-          <GoldSilverSection
-            owned={ownedMetals}
-            rates={metalRates.rates}
-            ratesError={metalRates.error}
-            canEdit={!isAll && !locked}
-            busy={busy}
-            onChange={(assets, message) => save({ ...clone(p), assets }, message)}
-          />
-        </TabsContent>
-        <TabsContent value="reports">
-          <PortfolioReports portfolio={p} />
-        </TabsContent>
-        <TabsContent value="sip">
-          {isAll ? p[DISPLAY_PARTS]?.map((part)=><section key={part.id} className="account-plan-section"><div className="row"><h2>{part.name}</h2><button className="secondary compact" onClick={()=>workspace?.choose(part.id)}>Open portfolio to plan</button></div><MonthlyPicks portfolio={part.portfolio} month={month} setMonth={setMonth} feePct={fees} setFeePct={setFees} busy={true} onSave={async()=>{throw Error('Choose a portfolio to edit its plan.')}} onRecordBuys={()=>workspace?.choose(part.id)} onRefreshPrices={refresh} onOpenCompany={openCompany} onManualPrice={()=>workspace?.choose(part.id)} /></section>) : (<MonthlyPicks
-            portfolio={p}
-            month={month}
-            setMonth={setMonth}
-            feePct={fees}
-            setFeePct={setFees}
-            busy={busy || locked}
-            onSave={save}
-            onRecordBuys={recordPicks}
-            onRefreshPrices={refresh}
-            onOpenCompany={openCompany}
-            onManualPrice={(ticker) => {
-              setQuoteTicker(ticker);
-              setQuotePrice(String(p.quotes[ticker]?.price ?? ''));
-              setQuoteDate(p.quotes[ticker]?.date ?? today());
-            }}
-          />)}
-        </TabsContent>
-        <TabsContent value="history">
-          <div className="activity-head">
-            <h2>Activity</h2>
-            <button
-              className="compact"
-              disabled={busy}
-              onClick={() => openTx('buy')}
-            >
-              <Plus size={15} /> Add transaction
-            </button>
-            <p>Every buy, sale, dividend and split, newest first.</p>
-          </div>
-          <LedgerTimeline
-            portfolio={p}
-            entries={ledgerEntries(undefined)}
-            onOpenCompany={openCompany}
-          />
-        </TabsContent>
-        <TabsContent value="company">
-          {companyTicker && (
-            <CompanyDetail
-              portfolio={p}
-              ticker={companyTicker}
-              holding={hs.find((h) => h.ticker === companyTicker)}
-              summary={companySummary(companyTicker)}
-              taxed={taxedDividends}
-              busy={busy}
-              onBack={() => setTab('holdings')}
-              onAddPurchase={() => openTx('buy', companyTicker)}
-              onSell={() =>
-                openTx(
-                  'sell',
-                  companyTicker,
-                  hs.find((h) => h.ticker === companyTicker)?.quote?.price ?? null,
-                )
-              }
-              onDividend={() => openTx('dividend', companyTicker)}
-              onSplit={() => openTx('split', companyTicker)}
-              onEdit={() => {
-                const c = p.companies.find((x) => x.ticker === companyTicker);
-                if (!c) return;
-                setCreatingCompany(false);
-                setCompany({ ...c });
-              }}
-              onChangeTicker={() => setRenaming({ from: companyTicker, to: '' })}
-              onCorrectTrade={correctTrade}
-              onCorrectDividend={correctDividend}
-              onCorrectSplit={correctStockSplit}
-              onConfirmDividend={openReceipt}
-            />
-          )}
-        </TabsContent>
-        {isAdmin && (
-          <TabsContent value="research-desk">
-            <ResearchDesk
-              portfolio={p}
-              onSave={save}
-              onOpenSettings={() => setTab('settings')}
-            />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="ai-lab">
-            <AiLab portfolio={p} busy={busy} onSave={save} onOpenCompany={openCompany} />
-          </TabsContent>
-        )}
-        <TabsContent value="settings">
-          <SettingsView
-            key={settingsEntry.n}
-            initialSection={settingsEntry.section}
-            name={name}
-            email={email!}
-            picture={picture}
-            role={role}
-            busy={busy}
-            usage={usage}
-            filerStatus={p.taxProfile?.filerStatus ?? ''}
-            researchSettings={p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS}
-            portfolios={workspace?.manager}
-            onBack={() => setTab('holdings')}
-            onFilerStatus={saveFilerStatus}
-            onResearchSettings={saveResearchSettings}
-            onExport={exportBackup}
-            onExportEncrypted={exportEncryptedBackup}
-            onClearLedger={async () => {
-              if (!vault || vault.session.revision === null) throw Error('Unlock your account first.');
-              await vault.session.saveAccount(accountFromPortfolio(), vault.session.revision, { replaceAll: true });
-            }}
-            onRestore={(file) => workspace ? workspace.requestImport(file, undefined, true) : restoreBackup(file)}
-            security={vault ? <VaultSecurity session={vault.session} onLock={vault.lock} /> : undefined}
-            onImportFile={importFile}
-            importSummary={summarizeImports(p)}
-            dividendSync={
-              <DividendSyncView
-                portfolio={p}
-                revision={revision}
-                busy={busy}
-                onSave={async (next, message) => { await save(next, message); }}
-              />
-            }
-          />
-        </TabsContent>
-        <TabsContent value="notifications">
-          <NotificationsView
-            notifications={allNotifications}
-            busy={busy}
-            onChange={updateNotifications}
-            onBack={() => setTab('holdings')}
-          />
-        </TabsContent>
-      </Tabs>
-      {locked ? <p className="notice">This portfolio is locked. Unlock it in Settings → Portfolios to make changes.</p> : null}
-      {importRefreshError ? <p className="notice error">Your import is saved. {importRefreshError} <button className="secondary compact" onClick={()=>void refreshImported(p.companies.map((c)=>c.ticker))}>Retry refresh</button></p> : null}
-      <footer>
-        <div className="row">
-          <span>All amounts in PKR · Private saved ledger</span>
-        </div>
-      </footer>
-      {confirmDialog}
-      <EncryptedRestoreDialog
-        backup={encryptedRestore}
-        onCancel={() => setEncryptedRestore(null)}
-        onRestore={async (portfolio) => {
-          await vault!.session.saveAccount(portfolio, vault!.session.revision, { replaceAll: true });
-          await load();
-          setEncryptedRestore(null);
-        }}
-      />
-      {ahlStatement && (
-        <AhlImportDialog
-          statement={ahlStatement.statement}
-          fileName={`${ahlStatement.fileName} · ${destinationName}`}
-          portfolio={p}
-          revision={revision}
-          busy={busy}
-          onCancel={() => { importActive.current = false; importHash.current = undefined; setAhlStatement(null); }}
-          onCommit={async (next, message) => {
-            await save(next, message + unknownCostWarning(next));
-            setAhlStatement(null);
-          }}
-        />
-      )}
-      {finqalabReview && (
-        <FinqalabImportDialog
-          rows={finqalabReview.rows}
-          fileName={`${finqalabReview.fileName} · ${destinationName}`}
-          portfolio={p}
-          revision={revision}
-          busy={busy}
-          onCancel={() => { importActive.current = false; importHash.current = undefined; setFinqalabReview(null); }}
-          onCommit={async (next, message) => {
-            await save(next, message + unknownCostWarning(next));
-            setFinqalabReview(null);
-          }}
-        />
-      )}
-      {brokerReview && (
-        <BrokerImportDialog
-          statement={brokerReview.statement}
-          fileName={`${brokerReview.fileName} · ${destinationName}`}
-          portfolio={p}
-          revision={revision}
-          busy={busy}
-          method={brokerReview.method}
-          mappingReady={!!brokerReview.format}
-          onCancel={() => { importActive.current = false; importHash.current = undefined; setBrokerReview(null); }}
-          onCommit={async (next, message, broker) => {
-            if (brokerReview.format && !(next.brokerFormats ?? []).some((f) => f.signature === brokerReview.format!.signature && f.broker === broker))
-              next.brokerFormats = [...(next.brokerFormats ?? []), { ...brokerReview.format, broker }];
-            next.brokerFileHashes = [...(next.brokerFileHashes ?? []), brokerReview.hash];
-            await save(next, message + unknownCostWarning(next));
-            setBrokerReview(null);
-          }}
-        />
-      )}
-      {ipoReview && (
-        <IpoImportDialog
-          items={ipoReview.items}
-          fileName={`${ipoReview.fileName} · ${destinationName}`}
-          portfolio={p}
-          revision={revision}
-          busy={busy}
-          onCancel={() => { importActive.current = false; importHash.current = undefined; setIpoReview(null); }}
-          onCommit={async (next, message) => {
-            await save(next, message + unknownCostWarning(next));
-            setIpoReview(null);
-          }}
-        />
-      )}
-      <Dialog
-        open={!!(trade || dividend || stockSplit)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPickQueue(null);
-            closeTx();
-          }
-        }}
-      >
-        <DialogContent className="form-dialog tx-dialog">
-          {(() => {
-            const txP = isAll && txDestination ? transactionPortfolio() : p;
-            const correcting = !!(editing || editingDividend || editingStockSplit);
-            const t = trade,
-              d = dividend,
-              sp = stockSplit;
-            const ticker =
-              txType === 'dividend' ? d?.ticker : txType === 'split' ? sp?.ticker : t?.ticker;
-            const owned = !!ticker && txP.companies.some((c) => c.ticker === ticker);
-            const isTrade = txType === 'buy' || txType === 'sell' || txType === 'opening';
-            const addNew =
-              !correcting && isTrade && txType !== 'sell' && !!ticker && !owned &&
-              /^[A-Z0-9]{2,12}$/.test(ticker);
-            const date = (isTrade ? t?.date : txType === 'dividend' ? d?.date : sp?.date) ?? '';
-            const title = correcting
-              ? txType === 'dividend'
-                ? 'Correct dividend'
-                : txType === 'split'
-                  ? 'Correct stock split'
-                  : 'Correct transaction'
-              : 'Add transaction';
-            const description = {
-              buy: 'Record the shares and actual price from your broker confirmation.',
-              sell: 'Record the shares and actual price from your broker confirmation.',
-              opening:
-                'Enter the original average purchase cost if known. The statement date remains the opening snapshot date.',
-              dividend:
-                'Enter the per-share amount from your dividend notice. The gross amount is computed from the shares you held on the payment date.',
-              split:
-                'A split or bonus issue changes the number of shares held before its effective date. Total purchase cost stays unchanged. A 1 for 4 bonus is 4 old shares becoming 5 new.',
-            }[txType];
-            const voidEntry = async () => {
-              const ok = () =>
-                confirm({
-                  title: `Void this ${editing ? 'entry' : editingDividend ? 'dividend record' : 'stock split'}?`,
-                  description: 'Its audit record will remain.',
-                  confirmLabel: 'Void',
-                  destructive: true,
-                });
-              if (editing) {
-                if (!(await ok())) return;
-                attempt(async () => {
-                  const next = clone(txP);
-                  next.trades.find((x) => x.id === editing)!.voided = true;
-                  await save(next, 'Entry voided.', isAll ? { target: { id: txDestination } } : {});
-                  closeTx();
-                });
-              } else if (editingDividend) {
-                if (!(await ok())) return;
-                attempt(async () => {
-                  const next = clone(txP);
-                  next.dividends!.find((x) => x.id === editingDividend)!.voided = true;
-                  await save(next, 'Dividend record voided.', isAll ? { target: { id: txDestination } } : {});
-                  closeTx();
-                });
-              } else if (editingStockSplit) {
-                if (!(await ok())) return;
-                attempt(async () => {
-                  const next = clone(txP);
-                  next.stockSplits!.find((x) => x.id === editingStockSplit)!.voided = true;
-                  await save(next, 'Stock split voided.', isAll ? { target: { id: txDestination } } : {});
-                  closeTx();
-                });
-              }
-            };
-            return (
-              <>
-                <DialogTitle>{pickQueue ? `Pick ${pickQueue.index + 1} of ${pickQueue.picks.length} · ${title}` : title}</DialogTitle>
-                <DialogDescription>{description}</DialogDescription>
-                {workspace && workspace.account.portfolios.length>1 && !correcting ? <label className="tx-destination">Portfolio<select aria-label="Transaction portfolio" value={txDestination} disabled={busy} required onChange={(e)=>{setTxDestination(e.target.value);patchTx({ticker:''});}}><option value="" disabled>Choose portfolio</option>{workspace.account.portfolios.map((entry)=><option key={entry.id} value={entry.id} disabled={entry.locked}>{entry.name}{entry.locked ? ' · locked' : ''}</option>)}</select></label> : null}
-                <form
-                  onSubmit={(e) =>
-                    attempt(() =>
-                      txType === 'dividend'
-                        ? recordDividend(e)
-                        : txType === 'split'
-                          ? recordStockSplit(e)
-                          : record(e),
-                    )
-                  }
-                >
-                  <fieldset disabled={busy || locked || (isAll && !txDestination)} className="tx-fields">
-                  {!correcting && (
-                    <fieldset className="tx-types">
-                      <legend className="sr-only">Transaction type</legend>
-                      {TX_TYPES.map((x) => (
-                        <button
-                          key={x.type}
-                          type="button"
-                          aria-pressed={txType === x.type}
-                          className={txType === x.type ? 'compact' : 'secondary compact'}
-                          onClick={() => switchTx(x.type)}
-                        >
-                          {x.label}
-                        </button>
-                      ))}
-                    </fieldset>
-                  )}
-                  <div className="form-grid">
-                    <div className="wide tx-field">
-                      <span>Company</span>
-                      <TickerPicker
-                        key={txType}
-                        value={ticker ?? ''}
-                        companies={txP.companies}
-                        allowNew={!correcting && isTrade && txType !== 'sell'}
-                        disabled={correcting && !isTrade}
-                        onChange={(v) => patchTx({ ticker: v })}
-                      />
-                    </div>
-                    {addNew && (
-                      <div className="wide tx-newco">
-                        <p>
-                          <b>Add {ticker} to your companies</b>
-                          <span>
-                            {' '}
-                            It is not in your portfolio yet. Its name and sector come from the shared
-                            PSX company directory; the company and this entry are saved together.
-                          </span>
-                        </p>
-                        <CompanyLookupNote lookup={txLookup} ticker={ticker ?? ''} />
-                        <div className="form-grid">
-                          <label>
-                            Company name
-                            <input readOnly value={lookupReady(txLookup, ticker ?? '') ? txCompany.name : ''} placeholder="Found from the PSX directory" />
-                          </label>
-                          <label>
-                            Sector
-                            <input readOnly value={lookupReady(txLookup, ticker ?? '') ? txCompany.sector : ''} placeholder="Found from the PSX directory" />
-                          </label>
-                        </div>
-                      </div>
-                    )}
-                    <label>
-                      {txType === 'opening'
-                        ? 'Opening snapshot date'
-                        : txType === 'dividend'
-                          ? 'Payment date'
-                          : txType === 'split'
-                            ? 'Effective date'
-                            : 'Trade date'}
-                      <input
-                        type="date"
-                        max={today()}
-                        required
-                        value={date}
-                        onChange={(e) => patchTx({ date: e.target.value })}
-                      />
-                    </label>
-                    {isTrade && t && (
-                      <>
-                        <label>
-                          Number of shares
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min="1"
-                            step="1"
-                            required
-                            value={t.shares || ''}
-                            onChange={(e) => setTrade({ ...t, shares: Number(e.target.value) })}
-                          />
-                        </label>
-                        <label>
-                          {txType === 'opening'
-                            ? 'Average cost per share (optional)'
-                            : 'Price per share (PKR)'}
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0.0001"
-                            step="any"
-                            required={txType !== 'opening'}
-                            value={t.price ?? ''}
-                            onChange={(e) =>
-                              setTrade({
-                                ...t,
-                                price: e.target.value === '' ? null : Number(e.target.value),
-                              })
-                            }
-                          />
-                        </label>
-                        <label>
-                          Fees (PKR)
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            placeholder="0"
-                            value={t.fees || ''}
-                            onChange={(e) => setTrade({ ...t, fees: Number(e.target.value) })}
-                          />
-                        </label>
-                        {txType === 'buy' && (
-                          <label>
-                            SIP month (optional)
-                            <input
-                              type="month"
-                              value={t.month}
-                              onChange={(e) => setTrade({ ...t, month: e.target.value })}
-                            />
-                          </label>
-                        )}
-                      </>
-                    )}
-                    {txType === 'dividend' && d && (
-                      <label>
-                        Dividend per share (PKR)
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="any"
-                          required
-                          value={d.perShare || ''}
-                          onChange={(e) => setDividend({ ...d, perShare: Number(e.target.value) })}
-                        />
-                      </label>
-                    )}
-                    {txType === 'split' && sp && (
-                      <>
-                        <label>
-                          Old shares
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min="1"
-                            step="1"
-                            required
-                            placeholder="e.g. 4"
-                            value={sp.oldShares || ''}
-                            onChange={(e) =>
-                              setStockSplit({ ...sp, oldShares: Number(e.target.value) })
-                            }
-                          />
-                        </label>
-                        <label>
-                          New shares
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={sp.oldShares + 1}
-                            step="1"
-                            required
-                            placeholder="e.g. 5"
-                            value={sp.newShares || ''}
-                            onChange={(e) =>
-                              setStockSplit({ ...sp, newShares: Number(e.target.value) })
-                            }
-                          />
-                        </label>
-                      </>
-                    )}
-                    <label className="wide">
-                      Note
-                      <textarea
-                        maxLength={2000}
-                        placeholder={
-                          txType === 'split'
-                            ? 'For example: 25% bonus, or face value changed from PKR 10 to PKR 2.'
-                            : undefined
-                        }
-                        value={(isTrade ? t?.note : txType === 'dividend' ? d?.note : sp?.note) ?? ''}
-                        onChange={(e) => patchTx({ note: e.target.value })}
-                      />
-                    </label>
-                  </div>
-                  {isTrade && t && (
-                    <p>
-                      {txType === 'opening' && t.price === null
-                        ? 'Cost remains unknown.'
-                        : t.shares > 0 && t.price !== null
-                          ? `Cash ${txType === 'sell' ? 'received' : txType === 'opening' ? 'cost' : 'invested'}: ${money(t.shares * t.price + (txType === 'sell' ? -t.fees : t.fees))}${t.fees ? ' incl. fees' : ''}`
-                          : 'Enter shares and price to see the cash total.'}
-                    </p>
-                  )}
-                  {txType === 'dividend' && d && (() => {
-                    const shares = d.ticker ? sharesHeldOn(txP, d.ticker, d.date) : 0;
-                    const gross = round((d.perShare ?? 0) * shares);
-                    const rate = txP.taxProfile
-                      ? txP.taxProfile.filerStatus === 'filer'
-                        ? 0.15
-                        : 0.3
-                      : null;
-                    return (
-                      <p>
-                        {shares} shares held on {d.date} · Gross {money(gross)}
-                        {rate === null
-                          ? ' · Set your filer status in Settings to estimate tax.'
-                          : ` · Tax ${money(round(gross * rate))} · Net ${money(round(gross * (1 - rate)))}`}
-                      </p>
-                    );
-                  })()}
-                  {txType === 'split' && sp && (() => {
-                    if (!sp.ticker || sp.oldShares <= 0 || sp.newShares <= 0)
-                      return (
-                        <p className="muted">
-                          Pick a company and enter the old and new share counts to see a preview.
-                        </p>
-                      );
-                    try {
-                      const base = clone(txP);
-                      if (editingStockSplit) {
-                        const old = (base.stockSplits ?? []).find((x) => x.id === editingStockSplit);
-                        if (old) old.voided = true;
-                      }
-                      const before = sharesHeldBefore(base, sp.ticker, sp.date);
-                      const after = (before * sp.newShares) / sp.oldShares;
-                      const preview = clone(base);
-                      preview.stockSplits ??= [];
-                      preview.stockSplits.push(sp);
-                      validate(preview);
-                      const result = holdings(preview).find((x) => x.ticker === sp.ticker);
-                      return (
-                        <div className="mini-stat split-preview">
-                          <span>Preview</span>
-                          <b>
-                            {before.toLocaleString()} → {after.toLocaleString()} shares on {sp.date}
-                          </b>
-                          <small>
-                            Current: {result?.shares.toLocaleString() ?? '—'} shares · Total cost{' '}
-                            {result?.cost === null ? 'unknown' : money(result?.cost ?? null)} · Average{' '}
-                            {result?.average === null ? 'unknown' : money(result?.average ?? null)}
-                          </small>
-                        </div>
-                      );
-                    } catch (error) {
-                      return (
-                        <p className="notice error">
-                          {error instanceof Error ? error.message : String(error)}
-                        </p>
-                      );
-                    }
-                  })()}
-                  <div className="row tx-actions">
-                    <button disabled={busy || (addNew && !lookupReady(txLookup, ticker ?? ''))} type="submit">
-                      {txType === 'sell'
-                        ? 'Save sale'
-                        : txType === 'dividend'
-                          ? 'Save dividend'
-                          : txType === 'split'
-                            ? 'Save stock split'
-                            : 'Save entry'}
-                    </button>
-                    {pickQueue && (
-                      <button
-                        className="secondary"
-                        type="button"
-                        disabled={busy}
-                        onClick={() => openPick(pickQueue, pickQueue.index + 1)}
+                      <select
+                        className="holdings-filter"
+                        aria-label="Filter companies"
+                        value={sectorFilter}
+                        onChange={(e) => setSectorFilter(e.target.value)}
                       >
-                        Skip
-                      </button>
-                    )}
-                    {correcting && (
-                      <button
-                        className="secondary"
-                        type="button"
-                        disabled={busy}
-                        onClick={voidEntry}
-                      >
-                        Void entry
-                      </button>
-                    )}
-                  </div>
-                  </fieldset>
-                </form>
-              </>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!receipt}
-        onOpenChange={(open) => {
-          if (!open) setReceipt(null);
-        }}
-      >
-        <DialogContent className="form-dialog">
-          <DialogTitle>Mark dividend as received</DialogTitle>
-          <DialogDescription>
-            Confirm that the cash arrived. Leave the amounts blank to keep PSX&apos;s
-            expected figure with estimated tax, or enter what your broker / CDC
-            statement shows.
-          </DialogDescription>
-          {receipt && (
-            <form onSubmit={(e) => attempt(() => confirmReceipt(e))}>
-              <div className="form-grid">
-                <label>
-                  Company symbol
-                  <input disabled value={receipt.dividend.ticker} />
-                </label>
-                <label>
-                  Payment date
-                  <input
-                    type="date"
-                    required
-                    max={today()}
-                    value={receipt.paymentDate}
-                    onChange={(e) => setReceipt({ ...receipt, paymentDate: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Actual gross amount (PKR, optional)
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={receipt.gross}
-                    onChange={(e) => setReceipt({ ...receipt, gross: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Tax withheld (PKR, optional)
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={receipt.tax}
-                    onChange={(e) => setReceipt({ ...receipt, tax: e.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="row">
-                <button disabled={busy} type="submit">
-                  Mark received
-                </button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!company}
-        onOpenChange={(open) => {
-          if (!open) {
-            setCompany(null);
-            setCreatingCompany(false);
-          }
-        }}
-      >
-        <DialogContent className="form-dialog">
-          <DialogTitle>Company & SIP settings</DialogTitle>
-          <DialogDescription>
-            Targets are long-term portfolio weights. Confirm screening
-            separately from AI analysis.
-          </DialogDescription>
-          {company && (
-            <form onSubmit={(e) => attempt(() => saveCompany(e))}>
-              <div className="form-grid">
-                <label>
-                  PSX symbol
-                  <input
-                    required
-                    pattern="[A-Z0-9]{2,12}"
-                    value={company.ticker}
-                    readOnly={!creatingCompany}
-                    onChange={(e) =>
-                      setCompany({
-                        ...company,
-                        ticker: e.target.value.toUpperCase(),
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Company name
-                  {creatingCompany ? (
-                    <input readOnly value={lookupReady(companyLookup, company.ticker) ? company.name : ''} placeholder="Found from the PSX directory" />
-                  ) : (
-                    <input
-                      required
-                      maxLength={150}
-                      value={company.name}
-                      onChange={(e) =>
-                        setCompany({ ...company, name: e.target.value })
-                      }
-                    />
-                  )}
-                </label>
-                <label>
-                  Sector
-                  {creatingCompany ? (
-                    <input readOnly value={lookupReady(companyLookup, company.ticker) ? company.sector : ''} placeholder="Found from the PSX directory" />
-                  ) : (
-                    <select
-                      required
-                      value={company.sector ?? ''}
-                      onChange={(e) =>
-                        setCompany({
-                          ...company,
-                          sector: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="" disabled>
-                        Select sector
-                      </option>
-                      {Array.from(new Set([...SECTORS, ...sectorsInUse, ...(company.sector ? [company.sector] : [])]))
-                        .sort()
-                        .map((sector) => (
+                        <option value="">All sectors</option>
+                        <option value={SHORTLISTED}>Shortlisted only</option>
+                        {sectorsInUse.map((sector) => (
                           <option key={sector} value={sector}>
                             {sector}
                           </option>
                         ))}
-                    </select>
-                  )}
-                </label>
-                {creatingCompany && (
-                  <div className="wide">
-                    <CompanyLookupNote lookup={companyLookup} ticker={company.ticker} />
-                  </div>
+                      </select>
+                      <div className="holdings-sort">
+                        <select
+                          aria-label="Sort holdings"
+                          value={holdingsSort?.key ?? ''}
+                          onChange={(e) => {
+                            const key = e.target.value as HoldingsSortKey | '';
+                            if (!key) setHoldingsSort(null);
+                            else if (holdingsSort?.key !== key)
+                              toggleHoldingsSort(key);
+                          }}
+                        >
+                          <option value="">Sort: market value</option>
+                          {(
+                            [
+                              ['name', 'Company'],
+                              ['value', 'Market value'],
+                              ['gain', 'Gain / loss'],
+                              ['shares', 'Shares'],
+                              ['average', 'Avg. cost'],
+                              ['price', 'Latest price'],
+                              ['weight', 'Portfolio weight'],
+                            ] as [HoldingsSortKey, string][]
+                          ).map(([key, label]) => (
+                            <option key={key} value={key}>
+                              Sort: {label}
+                            </option>
+                          ))}
+                        </select>
+                        {holdingsSort && (
+                          <button
+                            type="button"
+                            className="secondary compact"
+                            aria-label="Reverse sort order"
+                            onClick={() => toggleHoldingsSort(holdingsSort.key)}
+                          >
+                            {holdingsSort.dir === 'asc' ? '▲' : '▼'}
+                          </button>
+                        )}
+                      </div>
+                      {soldOut.length > 0 && (
+                        <label className="check-row holdings-soldout">
+                          <Checkbox
+                            checked={showSoldOut}
+                            onCheckedChange={(v) => setShowSoldOut(!!v)}
+                          />{' '}
+                          Show sold out ({soldOut.length})
+                        </label>
+                      )}
+                    </div>
+                    <div className="holdings-cards">
+                      {displayedHoldings.map((h) => (
+                        <article className="holding-card" key={h.ticker}>
+                          <div className="holding-card__head">
+                            <button
+                              type="button"
+                              className="holding-card__title"
+                              onClick={() => openCompany(h.ticker)}
+                            >
+                              <b className="ticker">{h.ticker}</b>
+                              <small>{h.name}</small>
+                            </button>
+                            {holdingActions(h)}
+                          </div>
+                          <dl className="holding-card__grid">
+                            <div>
+                              <dt>Value</dt>
+                              <dd className="amount">
+                                {h.value === null ? '—' : moneyShort(h.value)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Gain</dt>
+                              <dd className={gainClass(h)}>
+                                {h.gain === null ? '—' : moneyShort(h.gain)}
+                                {gainPct(h) !== null && (
+                                  <small>{gainText(h)}</small>
+                                )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Shares @ avg cost</dt>
+                              <dd>
+                                {h.shares.toLocaleString()}
+                                <small>
+                                  @{' '}
+                                  {h.average === null ? '—' : money(h.average)}
+                                </small>
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Price</dt>
+                              <dd>
+                                <button
+                                  type="button"
+                                  className="quote-btn"
+                                  onClick={() => openQuoteEntry(h)}
+                                >
+                                  {h.quote ? money(h.quote.price) : 'Add price'}
+                                </button>
+                                {h.quote && (
+                                  <small>
+                                    {h.quote.date}
+                                    {h.quote.manual ? ' · manual' : ''}
+                                    {h.quote.date !== today()
+                                      ? ' · older quote'
+                                      : ''}
+                                  </small>
+                                )}
+                              </dd>
+                            </div>
+                          </dl>
+                        </article>
+                      ))}
+                    </div>
+                    <section className="panel table-panel holdings-table">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {(
+                              [
+                                ['name', 'Company'],
+                                ['shares', 'Shares'],
+                                ['average', 'Avg. cost'],
+                                ['price', 'Latest price'],
+                                ['value', 'Market value'],
+                                ['gain', 'Gain / loss'],
+                                ['weight', 'Portfolio weight'],
+                              ] as [HoldingsSortKey, string][]
+                            ).map(([key, label]) => (
+                              <TableHead key={key}>
+                                <button
+                                  type="button"
+                                  className="sort-head"
+                                  onClick={() => toggleHoldingsSort(key)}
+                                >
+                                  {label}
+                                  {sortIndicator(key)}
+                                </button>
+                              </TableHead>
+                            ))}
+                            <TableHead />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {displayedHoldings.map((h) => (
+                            <TableRow key={h.ticker}>
+                              <TableCell>
+                                <button
+                                  className="quote-btn ticker"
+                                  onClick={() => openCompany(h.ticker)}
+                                >
+                                  {h.ticker}
+                                </button>
+                                {h.target > 0 && (
+                                  <span
+                                    className="shortlist-dot"
+                                    title="On SIP shortlist"
+                                    aria-label="On SIP shortlist"
+                                  />
+                                )}
+                                <small>
+                                  {h.name}
+                                  {h.sector ? ` · ${h.sector}` : ''}
+                                </small>
+                                {h.target > 0 && (
+                                  <span
+                                    className="shortlist-dot"
+                                    title="On SIP shortlist"
+                                    aria-label="On SIP shortlist"
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className="amount">
+                                {h.shares.toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                {h.average === null ? '—' : money(h.average)}
+                              </TableCell>
+                              <TableCell>
+                                <button
+                                  className="quote-btn"
+                                  onClick={() => {
+                                    setQuoteTicker(h.ticker);
+                                    setQuotePrice(
+                                      h.quote?.price.toString() ?? '',
+                                    );
+                                    setQuoteDate(h.quote?.date ?? today());
+                                  }}
+                                >
+                                  {h.quote ? money(h.quote.price) : 'Add price'}
+                                </button>
+                                {h.quote && (
+                                  <small>
+                                    {h.quote.date}
+                                    {h.quote.manual ? ' · manual' : ''}
+                                    {h.quote.date !== today()
+                                      ? ' · older quote'
+                                      : ''}
+                                  </small>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {h.value === null ? '—' : moneyShort(h.value)}
+                              </TableCell>
+                              <TableCell className={gainClass(h)}>
+                                {h.gain === null ? '—' : moneyShort(h.gain)}
+                                {gainPct(h) !== null && (
+                                  <small>{gainText(h)}</small>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {!missing.length && value > 0 ? (
+                                  <>
+                                    <span>
+                                      {(((h.value ?? 0) / value) * 100).toFixed(
+                                        1,
+                                      )}
+                                      %
+                                    </span>
+                                    <div className="bar">
+                                      <i
+                                        style={{
+                                          width: `${((h.value ?? 0) / value) * 100}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </>
+                                ) : (
+                                  '—'
+                                )}
+                              </TableCell>
+                              <TableCell>{holdingActions(h)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <p className="table-note">
+                        A dash means unknown, not zero. Quotes may be delayed.
+                        Market values exclude cash and unrecorded corporate
+                        actions.
+                      </p>
+                    </section>
+                  </CollapsiblePanel>
                 )}
-                <label>
-                  Target weight (%)
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    required
-                    value={company.target}
-                    onChange={(e) =>
-                      setCompany({ ...company, target: Number(e.target.value) })
-                    }
+                {widePulse === false && (
+                  <PsxMarketPulse
+                    ref={pulseRef}
+                    onOpenShortlist={() => setTab('sip')}
+                    {...pulseWatch}
                   />
+                )}
+              </>
+            )}
+            <GoldSilverSection
+              addRequest={assetAdd.kind === 'metal' ? assetAdd.n : 0}
+              owned={ownedMetals}
+              rates={metalRates.rates}
+              ratesError={metalRates.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(assets, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'metal'),
+                      ...assets,
+                    ],
+                  },
+                  message,
+                )
+              }
+            />
+            <SavingsPlansSection
+              addRequest={assetAdd.kind === 'plan' ? assetAdd.n : 0}
+              owned={ownedPlans}
+              planNavs={planNavs}
+              planNavsError={planNavData.loaded ? planNavData.error : ''}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(plans, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'plan'),
+                      ...plans,
+                    ],
+                  },
+                  message,
+                )
+              }
+            />
+            <MutualFundsSection
+              addRequest={assetAdd.kind === 'fund' ? assetAdd.n : 0}
+              owned={ownedFunds}
+              catalog={fundData.funds}
+              navs={fundData.navs}
+              catalogError={fundData.error || tracking.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(funds, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'fund'),
+                      ...funds,
+                    ],
+                  },
+                  message,
+                )
+              }
+            />
+          </TabsContent>
+          <TabsContent value="reports">
+            <PortfolioReports portfolio={p} />
+          </TabsContent>
+          <TabsContent value="sip">
+            {isAll ? (
+              p[DISPLAY_PARTS]?.map((part) => (
+                <section key={part.id} className="account-plan-section">
+                  <div className="row">
+                    <h2>{part.name}</h2>
+                    <button
+                      className="secondary compact"
+                      onClick={() => workspace?.choose(part.id)}
+                    >
+                      Open portfolio to plan
+                    </button>
+                  </div>
+                  <MonthlyPicks
+                    portfolio={part.portfolio}
+                    month={month}
+                    setMonth={setMonth}
+                    feePct={fees}
+                    setFeePct={setFees}
+                    busy={true}
+                    onSave={async () => {
+                      throw Error('Choose a portfolio to edit its plan.');
+                    }}
+                    onRecordBuys={() => workspace?.choose(part.id)}
+                    onRefreshPrices={refresh}
+                    onOpenCompany={openCompany}
+                    onManualPrice={() => workspace?.choose(part.id)}
+                  />
+                </section>
+              ))
+            ) : (
+              <MonthlyPicks
+                portfolio={p}
+                month={month}
+                setMonth={setMonth}
+                feePct={fees}
+                setFeePct={setFees}
+                busy={busy || locked}
+                onSave={save}
+                onRecordBuys={recordPicks}
+                onRefreshPrices={refresh}
+                onOpenCompany={openCompany}
+                onManualPrice={(ticker) => {
+                  setQuoteTicker(ticker);
+                  setQuotePrice(String(p.quotes[ticker]?.price ?? ''));
+                  setQuoteDate(p.quotes[ticker]?.date ?? today());
+                }}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="history">
+            <div className="activity-head">
+              <h2>Activity</h2>
+              <button
+                className="compact"
+                disabled={busy}
+                onClick={() => openTx('buy')}
+              >
+                <Plus size={15} /> Add transaction
+              </button>
+              <p>
+                Every buy, sale, dividend and split, including gold, savings
+                plans and mutual funds, newest first.
+              </p>
+            </div>
+            <LedgerTimeline
+              portfolio={p}
+              entries={ledgerEntries(undefined)}
+              onOpenCompany={openCompany}
+            />
+          </TabsContent>
+          <TabsContent value="company">
+            {companyTicker && (
+              <CompanyDetail
+                portfolio={p}
+                ticker={companyTicker}
+                holding={hs.find((h) => h.ticker === companyTicker)}
+                summary={companySummary(companyTicker)}
+                taxed={taxedDividends}
+                busy={busy}
+                onBack={() => setTab('holdings')}
+                onAddPurchase={() => openTx('buy', companyTicker)}
+                onSell={() =>
+                  openTx(
+                    'sell',
+                    companyTicker,
+                    hs.find((h) => h.ticker === companyTicker)?.quote?.price ??
+                      null,
+                  )
+                }
+                onDividend={() => openTx('dividend', companyTicker)}
+                onSplit={() => openTx('split', companyTicker)}
+                onEdit={() => {
+                  const c = p.companies.find((x) => x.ticker === companyTicker);
+                  if (!c) return;
+                  setCreatingCompany(false);
+                  setCompany({ ...c });
+                }}
+                onChangeTicker={() =>
+                  setRenaming({ from: companyTicker, to: '' })
+                }
+                onCorrectTrade={correctTrade}
+                onCorrectDividend={correctDividend}
+                onCorrectSplit={correctStockSplit}
+                onConfirmDividend={openReceipt}
+              />
+            )}
+          </TabsContent>
+          {isAdmin && (
+            <TabsContent value="research-desk">
+              <ResearchDesk
+                portfolio={p}
+                onSave={save}
+                onOpenSettings={() => setTab('settings')}
+              />
+            </TabsContent>
+          )}
+          {isAdmin && (
+            <TabsContent value="ai-lab">
+              <AiLab
+                portfolio={p}
+                busy={busy}
+                onSave={save}
+                onOpenCompany={openCompany}
+              />
+            </TabsContent>
+          )}
+          <TabsContent value="settings">
+            <SettingsView
+              key={settingsEntry.n}
+              initialSection={settingsEntry.section}
+              name={name}
+              email={email!}
+              picture={picture}
+              role={role}
+              busy={busy}
+              usage={usage}
+              filerStatus={p.taxProfile?.filerStatus ?? ''}
+              researchSettings={p.researchSettings ?? DEFAULT_RESEARCH_SETTINGS}
+              portfolios={workspace?.manager}
+              onBack={() => setTab('holdings')}
+              onFilerStatus={saveFilerStatus}
+              onResearchSettings={saveResearchSettings}
+              onExport={exportBackup}
+              onExportEncrypted={exportEncryptedBackup}
+              onClearLedger={async () => {
+                if (!vault || vault.session.revision === null)
+                  throw Error('Unlock your account first.');
+                await vault.session.saveAccount(
+                  accountFromPortfolio(),
+                  vault.session.revision,
+                  { replaceAll: true },
+                );
+              }}
+              onRestore={(file) =>
+                workspace
+                  ? workspace.requestImport(file, undefined, true)
+                  : restoreBackup(file)
+              }
+              security={
+                vault ? (
+                  <VaultSecurity session={vault.session} onLock={vault.lock} />
+                ) : undefined
+              }
+              onImportFile={importFile}
+              importSummary={summarizeImports(p)}
+              dividendSync={
+                <DividendSyncView
+                  portfolio={p}
+                  revision={revision}
+                  busy={busy}
+                  onSave={async (next, message) => {
+                    await save(next, message);
+                  }}
+                />
+              }
+            />
+          </TabsContent>
+          <TabsContent value="notifications">
+            <NotificationsView
+              notifications={allNotifications}
+              busy={busy}
+              onChange={updateNotifications}
+              onBack={() => setTab('holdings')}
+            />
+          </TabsContent>
+        </Tabs>
+        {locked ? (
+          <p className="notice">
+            This portfolio is locked. Unlock it in Settings → Portfolios to make
+            changes.
+          </p>
+        ) : null}
+        {importRefreshError ? (
+          <p className="notice error">
+            Your import is saved. {importRefreshError}{' '}
+            <button
+              className="secondary compact"
+              onClick={() =>
+                void refreshImported(p.companies.map((c) => c.ticker))
+              }
+            >
+              Retry refresh
+            </button>
+          </p>
+        ) : null}
+        <footer>
+          <div className="row">
+            <span>All amounts in PKR · Private saved ledger</span>
+          </div>
+        </footer>
+        {confirmDialog}
+        <EncryptedRestoreDialog
+          backup={encryptedRestore}
+          onCancel={() => setEncryptedRestore(null)}
+          onRestore={async (portfolio) => {
+            await vault!.session.saveAccount(
+              portfolio,
+              vault!.session.revision,
+              { replaceAll: true },
+            );
+            await load();
+            setEncryptedRestore(null);
+          }}
+        />
+        {ahlStatement && (
+          <AhlImportDialog
+            statement={ahlStatement.statement}
+            fileName={`${ahlStatement.fileName} · ${destinationName}`}
+            portfolio={p}
+            revision={revision}
+            busy={busy}
+            onCancel={() => {
+              importActive.current = false;
+              importHash.current = undefined;
+              setAhlStatement(null);
+            }}
+            onCommit={async (next, message) => {
+              await save(next, message + unknownCostWarning(next));
+              setAhlStatement(null);
+            }}
+          />
+        )}
+        {finqalabReview && (
+          <FinqalabImportDialog
+            rows={finqalabReview.rows}
+            fileName={`${finqalabReview.fileName} · ${destinationName}`}
+            portfolio={p}
+            revision={revision}
+            busy={busy}
+            onCancel={() => {
+              importActive.current = false;
+              importHash.current = undefined;
+              setFinqalabReview(null);
+            }}
+            onCommit={async (next, message) => {
+              await save(next, message + unknownCostWarning(next));
+              setFinqalabReview(null);
+            }}
+          />
+        )}
+        {brokerReview && (
+          <BrokerImportDialog
+            statement={brokerReview.statement}
+            fileName={`${brokerReview.fileName} · ${destinationName}`}
+            portfolio={p}
+            revision={revision}
+            busy={busy}
+            method={brokerReview.method}
+            mappingReady={!!brokerReview.format}
+            onCancel={() => {
+              importActive.current = false;
+              importHash.current = undefined;
+              setBrokerReview(null);
+            }}
+            onCommit={async (next, message, broker) => {
+              if (
+                brokerReview.format &&
+                !(next.brokerFormats ?? []).some(
+                  (f) =>
+                    f.signature === brokerReview.format!.signature &&
+                    f.broker === broker,
+                )
+              )
+                next.brokerFormats = [
+                  ...(next.brokerFormats ?? []),
+                  { ...brokerReview.format, broker },
+                ];
+              next.brokerFileHashes = [
+                ...(next.brokerFileHashes ?? []),
+                brokerReview.hash,
+              ];
+              await save(next, message + unknownCostWarning(next));
+              setBrokerReview(null);
+            }}
+          />
+        )}
+        {ipoReview && (
+          <IpoImportDialog
+            items={ipoReview.items}
+            fileName={`${ipoReview.fileName} · ${destinationName}`}
+            portfolio={p}
+            revision={revision}
+            busy={busy}
+            onCancel={() => {
+              importActive.current = false;
+              importHash.current = undefined;
+              setIpoReview(null);
+            }}
+            onCommit={async (next, message) => {
+              await save(next, message + unknownCostWarning(next));
+              setIpoReview(null);
+            }}
+          />
+        )}
+        <Dialog
+          open={!!(trade || dividend || stockSplit)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPickQueue(null);
+              closeTx();
+            }
+          }}
+        >
+          <DialogContent className="form-dialog tx-dialog">
+            {(() => {
+              const txP = isAll && txDestination ? transactionPortfolio() : p;
+              const correcting = !!(
+                editing ||
+                editingDividend ||
+                editingStockSplit
+              );
+              const t = trade,
+                d = dividend,
+                sp = stockSplit;
+              const ticker =
+                txType === 'dividend'
+                  ? d?.ticker
+                  : txType === 'split'
+                    ? sp?.ticker
+                    : t?.ticker;
+              const owned =
+                !!ticker && txP.companies.some((c) => c.ticker === ticker);
+              const isTrade =
+                txType === 'buy' || txType === 'sell' || txType === 'opening';
+              const addNew =
+                !correcting &&
+                isTrade &&
+                txType !== 'sell' &&
+                !!ticker &&
+                !owned &&
+                /^[A-Z0-9]{2,12}$/.test(ticker);
+              const date =
+                (isTrade
+                  ? t?.date
+                  : txType === 'dividend'
+                    ? d?.date
+                    : sp?.date) ?? '';
+              const title = correcting
+                ? txType === 'dividend'
+                  ? 'Correct dividend'
+                  : txType === 'split'
+                    ? 'Correct stock split'
+                    : 'Correct transaction'
+                : 'Add transaction';
+              const description = {
+                buy: 'Record the shares and actual price from your broker confirmation.',
+                sell: 'Record the shares and actual price from your broker confirmation.',
+                opening:
+                  'Enter the original average purchase cost if known. The statement date remains the opening snapshot date.',
+                dividend:
+                  'Enter the per-share amount from your dividend notice. The gross amount is computed from the shares you held on the payment date.',
+                split:
+                  'A split or bonus issue changes the number of shares held before its effective date. Total purchase cost stays unchanged. A 1 for 4 bonus is 4 old shares becoming 5 new.',
+              }[txType];
+              const voidEntry = async () => {
+                const ok = () =>
+                  confirm({
+                    title: `Void this ${editing ? 'entry' : editingDividend ? 'dividend record' : 'stock split'}?`,
+                    description: 'Its audit record will remain.',
+                    confirmLabel: 'Void',
+                    destructive: true,
+                  });
+                if (editing) {
+                  if (!(await ok())) return;
+                  attempt(async () => {
+                    const next = clone(txP);
+                    next.trades.find((x) => x.id === editing)!.voided = true;
+                    await save(
+                      next,
+                      'Entry voided.',
+                      isAll ? { target: { id: txDestination } } : {},
+                    );
+                    closeTx();
+                  });
+                } else if (editingDividend) {
+                  if (!(await ok())) return;
+                  attempt(async () => {
+                    const next = clone(txP);
+                    next.dividends!.find(
+                      (x) => x.id === editingDividend,
+                    )!.voided = true;
+                    await save(
+                      next,
+                      'Dividend record voided.',
+                      isAll ? { target: { id: txDestination } } : {},
+                    );
+                    closeTx();
+                  });
+                } else if (editingStockSplit) {
+                  if (!(await ok())) return;
+                  attempt(async () => {
+                    const next = clone(txP);
+                    next.stockSplits!.find(
+                      (x) => x.id === editingStockSplit,
+                    )!.voided = true;
+                    await save(
+                      next,
+                      'Stock split voided.',
+                      isAll ? { target: { id: txDestination } } : {},
+                    );
+                    closeTx();
+                  });
+                }
+              };
+              return (
+                <>
+                  <DialogTitle>
+                    {pickQueue
+                      ? `Pick ${pickQueue.index + 1} of ${pickQueue.picks.length} · ${title}`
+                      : title}
+                  </DialogTitle>
+                  <DialogDescription>{description}</DialogDescription>
+                  {workspace &&
+                  workspace.account.portfolios.length > 1 &&
+                  !correcting ? (
+                    <label className="tx-destination">
+                      Portfolio
+                      <select
+                        aria-label="Transaction portfolio"
+                        value={txDestination}
+                        disabled={busy}
+                        required
+                        onChange={(e) => {
+                          setTxDestination(e.target.value);
+                          patchTx({ ticker: '' });
+                        }}
+                      >
+                        <option value="" disabled>
+                          Choose portfolio
+                        </option>
+                        {workspace.account.portfolios.map((entry) => (
+                          <option
+                            key={entry.id}
+                            value={entry.id}
+                            disabled={entry.locked}
+                          >
+                            {entry.name}
+                            {entry.locked ? ' · locked' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  <form
+                    onSubmit={(e) =>
+                      attempt(() =>
+                        txType === 'dividend'
+                          ? recordDividend(e)
+                          : txType === 'split'
+                            ? recordStockSplit(e)
+                            : record(e),
+                      )
+                    }
+                  >
+                    <fieldset
+                      disabled={busy || locked || (isAll && !txDestination)}
+                      className="tx-fields"
+                    >
+                      {!correcting && (
+                        <fieldset className="tx-types">
+                          <legend className="sr-only">Transaction type</legend>
+                          {TX_TYPES.map((x) => (
+                            <button
+                              key={x.type}
+                              type="button"
+                              aria-pressed={txType === x.type}
+                              className={
+                                txType === x.type
+                                  ? 'compact'
+                                  : 'secondary compact'
+                              }
+                              onClick={() => switchTx(x.type)}
+                            >
+                              {x.label}
+                            </button>
+                          ))}
+                        </fieldset>
+                      )}
+                      <div className="form-grid">
+                        <div className="wide tx-field">
+                          <span>Company</span>
+                          <TickerPicker
+                            key={txType}
+                            value={ticker ?? ''}
+                            companies={txP.companies}
+                            allowNew={
+                              !correcting && isTrade && txType !== 'sell'
+                            }
+                            disabled={correcting && !isTrade}
+                            onChange={(v) => patchTx({ ticker: v })}
+                          />
+                        </div>
+                        {addNew && (
+                          <div className="wide tx-newco">
+                            <p>
+                              <b>Add {ticker} to your companies</b>
+                              <span>
+                                {' '}
+                                It is not in your portfolio yet. Its name and
+                                sector come from the shared PSX company
+                                directory; the company and this entry are saved
+                                together.
+                              </span>
+                            </p>
+                            <CompanyLookupNote
+                              lookup={txLookup}
+                              ticker={ticker ?? ''}
+                            />
+                            <div className="form-grid">
+                              <label>
+                                Company name
+                                <input
+                                  readOnly
+                                  value={
+                                    lookupReady(txLookup, ticker ?? '')
+                                      ? txCompany.name
+                                      : ''
+                                  }
+                                  placeholder="Found from the PSX directory"
+                                />
+                              </label>
+                              <label>
+                                Sector
+                                <input
+                                  readOnly
+                                  value={
+                                    lookupReady(txLookup, ticker ?? '')
+                                      ? txCompany.sector
+                                      : ''
+                                  }
+                                  placeholder="Found from the PSX directory"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                        <label>
+                          {txType === 'opening'
+                            ? 'Opening snapshot date'
+                            : txType === 'dividend'
+                              ? 'Payment date'
+                              : txType === 'split'
+                                ? 'Effective date'
+                                : 'Trade date'}
+                          <input
+                            type="date"
+                            max={today()}
+                            required
+                            value={date}
+                            onChange={(e) => patchTx({ date: e.target.value })}
+                          />
+                        </label>
+                        {isTrade && t && (
+                          <>
+                            <label>
+                              Number of shares
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min="1"
+                                step="1"
+                                required
+                                value={t.shares || ''}
+                                onChange={(e) =>
+                                  setTrade({
+                                    ...t,
+                                    shares: Number(e.target.value),
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              {txType === 'opening'
+                                ? 'Average cost per share (optional)'
+                                : 'Price per share (PKR)'}
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0.0001"
+                                step="any"
+                                required={txType !== 'opening'}
+                                value={t.price ?? ''}
+                                onChange={(e) =>
+                                  setTrade({
+                                    ...t,
+                                    price:
+                                      e.target.value === ''
+                                        ? null
+                                        : Number(e.target.value),
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              Fees (PKR)
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                value={t.fees || ''}
+                                onChange={(e) =>
+                                  setTrade({
+                                    ...t,
+                                    fees: Number(e.target.value),
+                                  })
+                                }
+                              />
+                            </label>
+                            {txType === 'buy' && (
+                              <label>
+                                SIP month (optional)
+                                <input
+                                  type="month"
+                                  value={t.month}
+                                  onChange={(e) =>
+                                    setTrade({ ...t, month: e.target.value })
+                                  }
+                                />
+                              </label>
+                            )}
+                          </>
+                        )}
+                        {txType === 'dividend' && d && (
+                          <label>
+                            Dividend per share (PKR)
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="any"
+                              required
+                              value={d.perShare || ''}
+                              onChange={(e) =>
+                                setDividend({
+                                  ...d,
+                                  perShare: Number(e.target.value),
+                                })
+                              }
+                            />
+                          </label>
+                        )}
+                        {txType === 'split' && sp && (
+                          <>
+                            <label>
+                              Old shares
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min="1"
+                                step="1"
+                                required
+                                placeholder="e.g. 4"
+                                value={sp.oldShares || ''}
+                                onChange={(e) =>
+                                  setStockSplit({
+                                    ...sp,
+                                    oldShares: Number(e.target.value),
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              New shares
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min={sp.oldShares + 1}
+                                step="1"
+                                required
+                                placeholder="e.g. 5"
+                                value={sp.newShares || ''}
+                                onChange={(e) =>
+                                  setStockSplit({
+                                    ...sp,
+                                    newShares: Number(e.target.value),
+                                  })
+                                }
+                              />
+                            </label>
+                          </>
+                        )}
+                        <label className="wide">
+                          Note
+                          <textarea
+                            maxLength={2000}
+                            placeholder={
+                              txType === 'split'
+                                ? 'For example: 25% bonus, or face value changed from PKR 10 to PKR 2.'
+                                : undefined
+                            }
+                            value={
+                              (isTrade
+                                ? t?.note
+                                : txType === 'dividend'
+                                  ? d?.note
+                                  : sp?.note) ?? ''
+                            }
+                            onChange={(e) => patchTx({ note: e.target.value })}
+                          />
+                        </label>
+                      </div>
+                      {isTrade && t && (
+                        <p>
+                          {txType === 'opening' && t.price === null
+                            ? 'Cost remains unknown.'
+                            : t.shares > 0 && t.price !== null
+                              ? `Cash ${txType === 'sell' ? 'received' : txType === 'opening' ? 'cost' : 'invested'}: ${money(t.shares * t.price + (txType === 'sell' ? -t.fees : t.fees))}${t.fees ? ' incl. fees' : ''}`
+                              : 'Enter shares and price to see the cash total.'}
+                        </p>
+                      )}
+                      {txType === 'dividend' &&
+                        d &&
+                        (() => {
+                          const shares = d.ticker
+                            ? sharesHeldOn(txP, d.ticker, d.date)
+                            : 0;
+                          const gross = round((d.perShare ?? 0) * shares);
+                          const rate = txP.taxProfile
+                            ? txP.taxProfile.filerStatus === 'filer'
+                              ? 0.15
+                              : 0.3
+                            : null;
+                          return (
+                            <p>
+                              {shares} shares held on {d.date} · Gross{' '}
+                              {money(gross)}
+                              {rate === null
+                                ? ' · Set your filer status in Settings to estimate tax.'
+                                : ` · Tax ${money(round(gross * rate))} · Net ${money(round(gross * (1 - rate)))}`}
+                            </p>
+                          );
+                        })()}
+                      {txType === 'split' &&
+                        sp &&
+                        (() => {
+                          if (
+                            !sp.ticker ||
+                            sp.oldShares <= 0 ||
+                            sp.newShares <= 0
+                          )
+                            return (
+                              <p className="muted">
+                                Pick a company and enter the old and new share
+                                counts to see a preview.
+                              </p>
+                            );
+                          try {
+                            const base = clone(txP);
+                            if (editingStockSplit) {
+                              const old = (base.stockSplits ?? []).find(
+                                (x) => x.id === editingStockSplit,
+                              );
+                              if (old) old.voided = true;
+                            }
+                            const before = sharesHeldBefore(
+                              base,
+                              sp.ticker,
+                              sp.date,
+                            );
+                            const after =
+                              (before * sp.newShares) / sp.oldShares;
+                            const preview = clone(base);
+                            preview.stockSplits ??= [];
+                            preview.stockSplits.push(sp);
+                            validate(preview);
+                            const result = holdings(preview).find(
+                              (x) => x.ticker === sp.ticker,
+                            );
+                            return (
+                              <div className="mini-stat split-preview">
+                                <span>Preview</span>
+                                <b>
+                                  {before.toLocaleString()} →{' '}
+                                  {after.toLocaleString()} shares on {sp.date}
+                                </b>
+                                <small>
+                                  Current:{' '}
+                                  {result?.shares.toLocaleString() ?? '—'}{' '}
+                                  shares · Total cost{' '}
+                                  {result?.cost === null
+                                    ? 'unknown'
+                                    : money(result?.cost ?? null)}{' '}
+                                  · Average{' '}
+                                  {result?.average === null
+                                    ? 'unknown'
+                                    : money(result?.average ?? null)}
+                                </small>
+                              </div>
+                            );
+                          } catch (error) {
+                            return (
+                              <p className="notice error">
+                                {error instanceof Error
+                                  ? error.message
+                                  : String(error)}
+                              </p>
+                            );
+                          }
+                        })()}
+                      <div className="row tx-actions">
+                        <button
+                          disabled={
+                            busy ||
+                            (addNew && !lookupReady(txLookup, ticker ?? ''))
+                          }
+                          type="submit"
+                        >
+                          {txType === 'sell'
+                            ? 'Save sale'
+                            : txType === 'dividend'
+                              ? 'Save dividend'
+                              : txType === 'split'
+                                ? 'Save stock split'
+                                : 'Save entry'}
+                        </button>
+                        {pickQueue && (
+                          <button
+                            className="secondary"
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              openPick(pickQueue, pickQueue.index + 1)
+                            }
+                          >
+                            Skip
+                          </button>
+                        )}
+                        {correcting && (
+                          <button
+                            className="secondary"
+                            type="button"
+                            disabled={busy}
+                            onClick={voidEntry}
+                          >
+                            Void entry
+                          </button>
+                        )}
+                      </div>
+                    </fieldset>
+                  </form>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={!!receipt}
+          onOpenChange={(open) => {
+            if (!open) setReceipt(null);
+          }}
+        >
+          <DialogContent className="form-dialog">
+            <DialogTitle>Mark dividend as received</DialogTitle>
+            <DialogDescription>
+              Confirm that the cash arrived. Leave the amounts blank to keep
+              PSX&apos;s expected figure with estimated tax, or enter what your
+              broker / CDC statement shows.
+            </DialogDescription>
+            {receipt && (
+              <form onSubmit={(e) => attempt(() => confirmReceipt(e))}>
+                <div className="form-grid">
+                  <label>
+                    Company symbol
+                    <input disabled value={receipt.dividend.ticker} />
+                  </label>
+                  <label>
+                    Payment date
+                    <input
+                      type="date"
+                      required
+                      max={today()}
+                      value={receipt.paymentDate}
+                      onChange={(e) =>
+                        setReceipt({ ...receipt, paymentDate: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Actual gross amount (PKR, optional)
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={receipt.gross}
+                      onChange={(e) =>
+                        setReceipt({ ...receipt, gross: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Tax withheld (PKR, optional)
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={receipt.tax}
+                      onChange={(e) =>
+                        setReceipt({ ...receipt, tax: e.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="row">
+                  <button disabled={busy} type="submit">
+                    Mark received
+                  </button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={!!company}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCompany(null);
+              setCreatingCompany(false);
+            }
+          }}
+        >
+          <DialogContent className="form-dialog">
+            <DialogTitle>Company & SIP settings</DialogTitle>
+            <DialogDescription>
+              Targets are long-term portfolio weights. Confirm screening
+              separately from AI analysis.
+            </DialogDescription>
+            {company && (
+              <form onSubmit={(e) => attempt(() => saveCompany(e))}>
+                <div className="form-grid">
+                  <label>
+                    PSX symbol
+                    <input
+                      required
+                      pattern="[A-Z0-9]{2,12}"
+                      value={company.ticker}
+                      readOnly={!creatingCompany}
+                      onChange={(e) =>
+                        setCompany({
+                          ...company,
+                          ticker: e.target.value.toUpperCase(),
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Company name
+                    {creatingCompany ? (
+                      <input
+                        readOnly
+                        value={
+                          lookupReady(companyLookup, company.ticker)
+                            ? company.name
+                            : ''
+                        }
+                        placeholder="Found from the PSX directory"
+                      />
+                    ) : (
+                      <input
+                        required
+                        maxLength={150}
+                        value={company.name}
+                        onChange={(e) =>
+                          setCompany({ ...company, name: e.target.value })
+                        }
+                      />
+                    )}
+                  </label>
+                  <label>
+                    Sector
+                    {creatingCompany ? (
+                      <input
+                        readOnly
+                        value={
+                          lookupReady(companyLookup, company.ticker)
+                            ? company.sector
+                            : ''
+                        }
+                        placeholder="Found from the PSX directory"
+                      />
+                    ) : (
+                      <select
+                        required
+                        value={company.sector ?? ''}
+                        onChange={(e) =>
+                          setCompany({
+                            ...company,
+                            sector: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="" disabled>
+                          Select sector
+                        </option>
+                        {Array.from(
+                          new Set([
+                            ...SECTORS,
+                            ...sectorsInUse,
+                            ...(company.sector ? [company.sector] : []),
+                          ]),
+                        )
+                          .sort()
+                          .map((sector) => (
+                            <option key={sector} value={sector}>
+                              {sector}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </label>
+                  {creatingCompany && (
+                    <div className="wide">
+                      <CompanyLookupNote
+                        lookup={companyLookup}
+                        ticker={company.ticker}
+                      />
+                    </div>
+                  )}
+                  <label>
+                    Target weight (%)
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      required
+                      value={company.target}
+                      onChange={(e) =>
+                        setCompany({
+                          ...company,
+                          target: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Face value (Rs)
+                    <input
+                      type="number"
+                      min="0.01"
+                      max="1000"
+                      step="0.01"
+                      placeholder="10"
+                      value={company.faceValue ?? ''}
+                      onChange={(e) =>
+                        setCompany({
+                          ...company,
+                          faceValue: e.target.value
+                            ? Number(e.target.value)
+                            : undefined,
+                          // A value typed here is the account's own, no longer an assumption.
+                          faceValueAssumed: undefined,
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Screening effective date
+                    <input
+                      type="date"
+                      max={today()}
+                      value={company.screenDate}
+                      onChange={(e) =>
+                        setCompany({ ...company, screenDate: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="check-row wide">
+                    <Checkbox
+                      checked={company.approved}
+                      onCheckedChange={(v) =>
+                        setCompany({ ...company, approved: !!v })
+                      }
+                    />{' '}
+                    Enable new SIP purchases under the recorded Shariah screen
+                  </label>
+                  <label className="wide">
+                    Research / screening note
+                    <textarea
+                      maxLength={2000}
+                      value={company.note}
+                      onChange={(e) =>
+                        setCompany({ ...company, note: e.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+                <p className="muted">
+                  {creatingCompany
+                    ? 'Enter the PSX symbol; the company name and sector come from the shared PSX company directory and cannot be edited.'
+                    : 'This existing symbol has already been created in your portfolio.'}{' '}
+                  Screens older than 183 days pause new allocations. Total
+                  targets must equal 100%; calculator caps new exposure at 20%
+                  per company.
+                </p>
+                <button
+                  disabled={
+                    busy ||
+                    (creatingCompany &&
+                      !lookupReady(companyLookup, company.ticker))
+                  }
+                >
+                  Save company
+                </button>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={!!renaming}
+          onOpenChange={(open) => {
+            if (!open) setRenaming(null);
+          }}
+        >
+          <DialogContent className="form-dialog">
+            <DialogTitle>Change PSX symbol</DialogTitle>
+            <DialogDescription>
+              Use this when a company is listed under a new symbol, for example
+              WPFL became WAHDAT after its IPO. All of its trades, splits and
+              dividends move to the new symbol.
+            </DialogDescription>
+            {renaming && (
+              <form onSubmit={(e) => attempt(() => saveTickerRename(e))}>
+                <label>
+                  Current symbol
+                  <input readOnly value={renaming.from} />
                 </label>
                 <label>
-                  Face value (Rs)
+                  New symbol
                   <input
-                    type="number"
-                    min="0.01"
-                    max="1000"
-                    step="0.01"
-                    placeholder="10"
-                    value={company.faceValue ?? ''}
+                    required
+                    autoFocus
+                    pattern="[A-Z0-9]{2,12}"
+                    value={renaming.to}
                     onChange={(e) =>
-                      setCompany({
-                        ...company,
-                        faceValue: e.target.value
-                          ? Number(e.target.value)
-                          : undefined,
-                        // A value typed here is the account's own, no longer an assumption.
-                        faceValueAssumed: undefined,
+                      setRenaming({
+                        ...renaming,
+                        to: e.target.value.toUpperCase(),
                       })
                     }
                   />
                 </label>
-                <label>
-                  Screening effective date
-                  <input
-                    type="date"
-                    max={today()}
-                    value={company.screenDate}
-                    onChange={(e) =>
-                      setCompany({ ...company, screenDate: e.target.value })
-                    }
-                  />
-                </label>
-                <label className="check-row wide">
-                  <Checkbox
-                    checked={company.approved}
-                    onCheckedChange={(v) =>
-                      setCompany({ ...company, approved: !!v })
-                    }
-                  />{' '}
-                  Enable new SIP purchases under the recorded Shariah screen
-                </label>
-                <label className="wide">
-                  Research / screening note
-                  <textarea
-                    maxLength={2000}
-                    value={company.note}
-                    onChange={(e) =>
-                      setCompany({ ...company, note: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              <p className="muted">
-                {creatingCompany
-                  ? 'Enter the PSX symbol; the company name and sector come from the shared PSX company directory and cannot be edited.'
-                  : 'This existing symbol has already been created in your portfolio.'}{' '}
-                Screens older than 183 days pause new allocations. Total targets
-                must equal 100%; calculator caps new exposure at 20% per
-                company.
-              </p>
-              <button disabled={busy || (creatingCompany && !lookupReady(companyLookup, company.ticker))}>Save company</button>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={!!renaming} onOpenChange={(open) => { if (!open) setRenaming(null); }}>
-        <DialogContent className="form-dialog">
-          <DialogTitle>Change PSX symbol</DialogTitle>
-          <DialogDescription>
-            Use this when a company is listed under a new symbol, for example WPFL became WAHDAT after its IPO. All
-            of its trades, splits and dividends move to the new symbol.
-          </DialogDescription>
-          {renaming && (
-            <form onSubmit={(e) => attempt(() => saveTickerRename(e))}>
+                <p className="muted">
+                  The new symbol must exist in the PSX company directory.
+                </p>
+                <button disabled={busy || !renaming.to}>Change symbol</button>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+        <Dialog open={namedAction} onOpenChange={setNamedAction}>
+          <DialogContent className="form-dialog">
+            <DialogTitle>Choose a portfolio</DialogTitle>
+            <DialogDescription>
+              Open a portfolio to change its companies or SIP settings.
+            </DialogDescription>
+            <div className="portfolio-action-choices">
+              {workspace?.account.portfolios.map((part) => (
+                <button
+                  key={part.id}
+                  className="secondary"
+                  disabled={part.locked}
+                  onClick={() => workspace.choose(part.id)}
+                >
+                  {part.name}
+                  {part.locked ? ' · locked' : ''}
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+        <TargetsEditor
+          portfolio={p}
+          open={targetsOpen}
+          busy={busy}
+          onOpenChange={setTargetsOpen}
+          onSave={(next, message) => save(next, message)}
+        />
+        <Dialog
+          open={!!quoteTicker}
+          onOpenChange={(open) => {
+            if (!open) setQuoteTicker('');
+          }}
+        >
+          <DialogContent>
+            <DialogTitle>{quoteTicker} price</DialogTitle>
+            <DialogDescription>
+              Enter a verified market price and its actual date.
+            </DialogDescription>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                attempt(async () => {
+                  await save({
+                    ...p,
+                    quotes: {
+                      ...p.quotes,
+                      [quoteTicker]: {
+                        price: Number(quotePrice),
+                        date: quoteDate,
+                        asOf: quoteDate + ' · manually entered',
+                        manual: true,
+                        source: 'https://dps.psx.com.pk/company/' + quoteTicker,
+                        fetchedAt: new Date().toISOString(),
+                      },
+                    },
+                  });
+                  setQuoteTicker('');
+                });
+              }}
+            >
               <label>
-                Current symbol
-                <input readOnly value={renaming.from} />
-              </label>
-              <label>
-                New symbol
+                Price per share (PKR)
                 <input
                   required
-                  autoFocus
-                  pattern="[A-Z0-9]{2,12}"
-                  value={renaming.to}
-                  onChange={(e) => setRenaming({ ...renaming, to: e.target.value.toUpperCase() })}
+                  type="number"
+                  min="0.0001"
+                  step="any"
+                  value={quotePrice}
+                  onChange={(e) => setQuotePrice(e.target.value)}
                 />
               </label>
-              <p className="muted">The new symbol must exist in the PSX company directory.</p>
-              <button disabled={busy || !renaming.to}>Change symbol</button>
+              <label>
+                Quote date
+                <input
+                  required
+                  type="date"
+                  max={today()}
+                  value={quoteDate}
+                  onChange={(e) => setQuoteDate(e.target.value)}
+                />
+              </label>
+              <p>
+                <a
+                  target="_blank"
+                  rel="noreferrer"
+                  href={'https://dps.psx.com.pk/company/' + quoteTicker}
+                >
+                  Check official PSX quote ↗
+                </a>
+              </p>
+              <button disabled={busy}>Save manual price</button>
             </form>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={namedAction} onOpenChange={setNamedAction}><DialogContent className="form-dialog"><DialogTitle>Choose a portfolio</DialogTitle><DialogDescription>Open a portfolio to change its companies or SIP settings.</DialogDescription><div className="portfolio-action-choices">{workspace?.account.portfolios.map((part)=><button key={part.id} className="secondary" disabled={part.locked} onClick={()=>workspace.choose(part.id)}>{part.name}{part.locked ? ' · locked' : ''}</button>)}</div></DialogContent></Dialog>
-      <TargetsEditor
-        portfolio={p}
-        open={targetsOpen}
-        busy={busy}
-        onOpenChange={setTargetsOpen}
-        onSave={(next, message) => save(next, message)}
-      />
-      <Dialog
-        open={!!quoteTicker}
-        onOpenChange={(open) => {
-          if (!open) setQuoteTicker('');
-        }}
-      >
-        <DialogContent>
-          <DialogTitle>{quoteTicker} price</DialogTitle>
-          <DialogDescription>
-            Enter a verified market price and its actual date.
-          </DialogDescription>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              attempt(async () => {
-                await save({
-                  ...p,
-                  quotes: {
-                    ...p.quotes,
-                    [quoteTicker]: {
-                      price: Number(quotePrice),
-                      date: quoteDate,
-                      asOf: quoteDate + ' · manually entered',
-                      manual: true,
-                      source: 'https://dps.psx.com.pk/company/' + quoteTicker,
-                      fetchedAt: new Date().toISOString(),
-                    },
-                  },
-                });
-                setQuoteTicker('');
-              });
-            }}
-          >
-            <label>
-              Price per share (PKR)
-              <input
-                required
-                type="number"
-                min="0.0001"
-                step="any"
-                value={quotePrice}
-                onChange={(e) => setQuotePrice(e.target.value)}
-              />
-            </label>
-            <label>
-              Quote date
-              <input
-                required
-                type="date"
-                max={today()}
-                value={quoteDate}
-                onChange={(e) => setQuoteDate(e.target.value)}
-              />
-            </label>
-            <p>
-              <a
-                target="_blank"
-                rel="noreferrer"
-                href={'https://dps.psx.com.pk/company/' + quoteTicker}
-              >
-                Check official PSX quote ↗
-              </a>
-            </p>
-            <button disabled={busy}>Save manual price</button>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </main>
-    <Toaster />
+          </DialogContent>
+        </Dialog>
+      </main>
+      <Toaster />
     </CompanyNavProvider>
   );
 }

@@ -53,6 +53,10 @@ test('gold page parser needs both prices and rejects a mismatch', () => {
   const ok = '<h3>24K per Tola</h3><p>Rs. 436,000.00</p><h3>24K per 10 Gram</h3><p>Rs. 373,810.00</p>';
   assert.deepEqual(parseGoldPage(ok), { pkrPerTola: 436000 });
   assert.equal(parseGoldPage(ok.replace('373,810', '300,000')), null);
+  const labelFirst = '<div>24 Karat Gold Rate (1 Tola)</div><b>Rs. 436000.00</b><div>24 Karat Gold Rate (10 Gram)</div><b>Rs. 373810.00</b>';
+  assert.deepEqual(parseGoldPage(labelFirst), { pkrPerTola: 436000 });
+  const amountFirst = '<b>Rs. 436000.00</b><span>24 Karat Gold Rate (1 Tola)</span><b>Rs. 373810.00</b><span>24 Karat Gold Rate (10 Gram)</span>';
+  assert.deepEqual(parseGoldPage(amountFirst), { pkrPerTola: 436000 });
   assert.equal(parseGoldPage('<p>nothing</p>'), null);
   assert.ok(Math.abs(tolaFromSpot(4173.3, 280) - 438_000) < 15_000);
 });

@@ -7,12 +7,15 @@ import { soldOutPositions } from '@/data/derive';
 import { shortDate, signedMoney, signedPercent } from '@/data/format';
 import { HOLDING_SORTS, filterBySector, holdingFlags, pricedLine, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '@/data/holdings-view';
 import { useMetalRates } from '@/data/useMetalRates';
+import { useFundNavs } from '@/data/useFundNavs';
+import { MutualFunds } from '@/ui/MutualFunds';
 import { usePortfolio } from '@/data/usePortfolio';
 import { Insights } from '@/screens/Insights';
 import { useTheme } from '@/theme/ThemeProvider';
 import { AccountOverview } from '@/ui/AccountOverview';
 import { AppBar } from '@/ui/AppBar';
 import { GoldSilver } from '@/ui/GoldSilver';
+import { SavingsPlans } from '@/ui/SavingsPlans';
 import { Icon } from '@/ui/Icon';
 import { Amount, Avatar, Button, Chip, EmptyState, ListRow, Loading, Notice, Screen, Segmented, SectionLabel, Sheet, StatusChip, useKitStyles } from '@/ui/kit';
 
@@ -46,8 +49,14 @@ export default function Portfolio() {
   const total = open.reduce((a, h) => a + (h.value ?? 0), 0);
 
   const overviewParts = p.isAll ? p.portfolio?.[DISPLAY_PARTS] : undefined;
-  const ownedMetals = (overviewParts ? overviewParts.flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioName: part.name }))) : (p.portfolio?.assets ?? []).map((asset) => ({ asset })));
+  const allAssets = overviewParts
+    ? overviewParts.flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioName: part.name })))
+    : (p.portfolio?.assets ?? []).map((asset) => ({ asset, portfolioName: undefined }));
+  const ownedMetals = allAssets.flatMap((o) => (o.asset.kind === 'metal' ? [{ ...o, asset: o.asset }] : []));
+  const ownedPlans = allAssets.flatMap((o) => (o.asset.kind === 'plan' ? [{ ...o, asset: o.asset }] : []));
+  const ownedFunds = allAssets.flatMap((o) => (o.asset.kind === 'fund' ? [{ ...o, asset: o.asset }] : []));
   const metal = useMetalRates(ownedMetals.length > 0);
+  const fundNavs = useFundNavs(ownedFunds.length > 0);
   const bar = <AppBar title="Portfolio" />;
   const switcher = <Segmented label="Portfolio view" value={segment} onChange={setSegment} options={[{ key: 'holdings', label: 'Holdings' }, { key: 'insights', label: 'Insights' }]} />;
 
@@ -94,7 +103,7 @@ export default function Portfolio() {
         <Insights />
       ) : (
         <>
-          {overviewParts && overviewParts.length > 1 ? <AccountOverview parts={overviewParts} rates={metal.rates} onOpenPortfolio={(id) => p.select(id)} /> : null}
+          {overviewParts && overviewParts.length > 1 ? <AccountOverview parts={overviewParts} rates={metal.rates} fundNavs={fundNavs.navs} onOpenPortfolio={(id) => p.select(id)} /> : null}
           {overviewParts && overviewParts.length > 1 ? <SectionLabel>All companies</SectionLabel> : null}
           {line ? (
             <View style={styles.row} accessible accessibilityLabel={`${line}. Market value ${totals.value ? moneyShort(totals.value) : 'not available'}.`}>
@@ -190,6 +199,8 @@ export default function Portfolio() {
           )}
 
           <GoldSilver owned={ownedMetals} rates={metal.rates} ratesError={metal.error} />
+          <SavingsPlans owned={ownedPlans} />
+          <MutualFunds owned={ownedFunds} navs={fundNavs.navs} navsError={fundNavs.error} />
 
           {showSoldOut && soldOut.length ? (
             <>

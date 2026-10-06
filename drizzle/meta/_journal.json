@@ -204,6 +204,27 @@
       "when": 1791294166016,
       "tag": "0028_metal_rates",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1791295000620,
+      "tag": "0029_mutual_funds",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1791309802936,
+      "tag": "0030_tracked_funds",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1791310192051,
+      "tag": "0031_plan_navs",
+      "breakpoints": true
     }
   ]
 }

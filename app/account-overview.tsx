@@ -1,5 +1,7 @@
 'use client';
 
+import type { FundNavRow } from '@/lib/mufap';
+import type { PlanNavRow } from '@/lib/plans';
 import { useMemo, type ReactNode } from 'react';
 import { Bar, BarChart, Pie, PieChart, XAxis } from 'recharts';
 import {
@@ -56,25 +58,25 @@ export default function AccountOverview({
   parts,
   asOf,
   metalRates,
+  fundNavs = [],
+  planNavs = [],
   chart,
   onOpenPortfolio,
-  onOpenCompany,
-  onSeeAll,
   aside,
 }: {
   parts: (DisplayPart & { locked?: boolean })[];
   asOf: string;
   metalRates: MetalRateRow[];
+  fundNavs?: FundNavRow[];
+  planNavs?: PlanNavRow[];
   /** The value-over-time chart, rendered by the page because it loads price history itself. */
   chart: ReactNode;
   onOpenPortfolio: (id: string) => void;
-  onOpenCompany: (ticker: string) => void;
-  onSeeAll: () => void;
   aside?: ReactNode;
 }) {
   const o = useMemo(
-    () => accountOverview(parts, asOf, { metalRates }),
-    [parts, asOf, metalRates],
+    () => accountOverview(parts, asOf, { metalRates, fundNavs, planNavs }),
+    [parts, asOf, metalRates, fundNavs, planNavs],
   );
   const { total, returns, income } = o;
   const staleDays = total.oldestQuoteDate
@@ -161,6 +163,10 @@ export default function AccountOverview({
         {aside && <div className="overview-hero__aside">{aside}</div>}
       </section>
 
+      <section className="panel overview-panel" aria-label="Value over time">
+        {chart}
+      </section>
+
       <div className="overview-grid">
         <section className="panel overview-panel" aria-label="Asset mix">
           <div className="report-heading">
@@ -238,103 +244,6 @@ export default function AccountOverview({
           )}
         </section>
 
-        <section className="panel overview-panel" aria-label="Portfolios">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">PORTFOLIOS</p>
-              <h3>Each portfolio</h3>
-            </div>
-            <span>Share of net worth</span>
-          </div>
-          <ul className="overview-portfolios">
-            {o.portfolios.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className="overview-portfolio"
-                  onClick={() => onOpenPortfolio(p.id)}
-                >
-                  <span className="overview-portfolio__name">
-                    <b>{p.name}</b>
-                    <small>
-                      {p.heldCount} {p.heldCount === 1 ? 'holding' : 'holdings'}
-                      {p.locked ? ' · locked' : ''}
-                      {p.missingPrice
-                        ? ` · ${p.missingPrice} need a price`
-                        : ''}
-                    </small>
-                  </span>
-                  <span className="overview-portfolio__value amount">
-                    {moneyShort(p.value)}
-                    <small className={tone(p.gain)}>
-                      {p.gain === null
-                        ? 'gain not known'
-                        : `${signed(p.gain)}${pct(p.gainPercent) ? ` · ${pct(p.gainPercent)}` : ''}`}
-                    </small>
-                  </span>
-                  <span className="bar" aria-hidden="true">
-                    <i style={{ width: `${Math.min(100, p.share)}%` }} />
-                  </span>
-                  <span className="overview-portfolio__share">
-                    {p.share.toFixed(1)}%
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      <section className="panel overview-panel" aria-label="Largest holdings">
-        <div className="report-heading">
-          <div>
-            <p className="eyebrow">STOCKS</p>
-            <h3>Largest holdings</h3>
-          </div>
-          <button
-            type="button"
-            className="secondary compact"
-            onClick={onSeeAll}
-          >
-            See all {o.holdingCount} companies
-          </button>
-        </div>
-        {o.topHoldings.length ? (
-          <ul className="overview-top">
-            {o.topHoldings.map((h) => (
-              <li key={h.ticker}>
-                <button
-                  type="button"
-                  className="overview-top__row"
-                  onClick={() => onOpenCompany(h.ticker)}
-                >
-                  <span className="overview-top__name">
-                    <b className="ticker">{h.ticker}</b>
-                    <small>
-                      {h.name}
-                      {h.portfolios.length > 1
-                        ? ` · in ${h.portfolios.length} portfolios`
-                        : ` · ${h.portfolios[0]}`}
-                    </small>
-                  </span>
-                  <span className="amount">
-                    {moneyShort(h.value)}
-                    <small>{h.share.toFixed(1)}% of net worth</small>
-                  </span>
-                  <span className={`amount ${tone(h.gain)}`}>
-                    {h.gain === null ? '—' : signed(h.gain)}
-                    {pct(h.gainPercent) && <small>{pct(h.gainPercent)}</small>}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="report-empty">No priced holdings yet.</p>
-        )}
-      </section>
-
-      <div className="overview-grid">
         <section className="panel overview-panel" aria-label="Sectors">
           <div className="report-heading">
             <div>
@@ -368,6 +277,52 @@ export default function AccountOverview({
               Add prices and sectors to see the split.
             </p>
           )}
+        </section>
+      </div>
+
+      <div className="overview-grid">
+        <section className="panel overview-panel" aria-label="Portfolios">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">PORTFOLIOS</p>
+              <h3>Each portfolio</h3>
+            </div>
+            <span>Share of net worth</span>
+          </div>
+          <ul className="overview-portfolios">
+            {o.portfolios.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="overview-portfolio"
+                  onClick={() => onOpenPortfolio(p.id)}
+                >
+                  <span className="overview-portfolio__top">
+                    <b>{p.name}</b>
+                    <span className="overview-portfolio__share">
+                      {p.share.toFixed(1)}%
+                    </span>
+                  </span>
+                  <span className="overview-portfolio__value amount">
+                    {moneyShort(p.value)}
+                  </span>
+                  <span className={`overview-portfolio__gain ${tone(p.gain)}`}>
+                    {p.gain === null
+                      ? 'Gain not known'
+                      : `${signed(p.gain)}${pct(p.gainPercent) ? ` · ${pct(p.gainPercent)}` : ''}`}
+                  </span>
+                  <span className="bar" aria-hidden="true">
+                    <i style={{ width: `${Math.min(100, p.share)}%` }} />
+                  </span>
+                  <small>
+                    {p.heldCount} {p.heldCount === 1 ? 'holding' : 'holdings'}
+                    {p.locked ? ' · locked' : ''}
+                    {p.missingPrice ? ` · ${p.missingPrice} need a price` : ''}
+                  </small>
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className="panel overview-panel" aria-label="Income">
@@ -421,10 +376,6 @@ export default function AccountOverview({
           </p>
         </section>
       </div>
-
-      <section className="panel overview-panel" aria-label="Value over time">
-        {chart}
-      </section>
     </div>
   );
 }

@@ -466,3 +466,42 @@ export const metalRates = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] })],
 );
+
+// Shared mutual fund directory and daily prices from MUFAP. Public data only; written by scripts/mufap-nav-scrape.mjs.
+export const fundCatalog = sqliteTable('fund_catalog', {
+  mufapId: text('mufap_id').primaryKey(),
+  amc: text('amc').notNull(),
+  fundName: text('fund_name').notNull(),
+  category: text('category').notNull(),
+  sector: text('sector').notNull(),
+  inceptionDate: text('inception_date'),
+  updatedAt: text('updated_at').notNull(),
+});
+/** Funds somebody has added to a portfolio: the only funds whose nightly price is stored. Public ids, no user. */
+export const trackedFunds = sqliteTable('tracked_funds', {
+  mufapId: text('mufap_id').primaryKey(),
+  firstSeen: text('first_seen').notNull(),
+});
+/** Pak-Qatar sub-fund unit prices, one row per fund per day (public data). */
+export const planNavs = sqliteTable(
+  'plan_navs',
+  {
+    fundId: text('fund_id').notNull(),
+    date: text('date').notNull(),
+    nav: real('nav').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.fundId, t.date] })],
+);
+export const fundNavs = sqliteTable(
+  'fund_navs',
+  {
+    mufapId: text('mufap_id').notNull(),
+    date: text('date').notNull(),
+    nav: real('nav').notNull(),
+    offer: real('offer').notNull(),
+    repurchase: real('repurchase').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.mufapId, t.date] })],
+);

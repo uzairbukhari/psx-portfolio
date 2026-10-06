@@ -1,0 +1,30 @@
+name: MUFAP fund NAVs
+
+# Stores the mutual fund directory and each fund's latest NAV in the shared D1 `fund_catalog` and `fund_navs` tables
+# (public data only).
+on:
+  # Fund prices are fetched daily by the Cloudflare cron Worker (workers/quote-refresh): MUFAP blocks GitHub's runners with 403.
+  # This workflow is kept for manual runs from another network only.
+  workflow_dispatch:
+
+concurrency:
+  group: mufap-navs
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment: prod
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh fund_catalog and fund_navs
+        run: node scripts/mufap-nav-scrape.mjs
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

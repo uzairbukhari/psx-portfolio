@@ -65,3 +65,5 @@ jobs:
         # Staging cannot dispatch the production-writing directory workflow, so its directory is
         # filled here, aimed at the staging database (D1_DATABASE_ID above).
         run: node scripts/psx-directory-scrape.mjs --mode=bootstrap --limit=80
+      - name: Scrape gold rates
+        run: node scripts/metal-rates-scrape.mjs
