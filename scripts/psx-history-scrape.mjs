@@ -21,23 +21,62 @@ async function storedAges() {
   return new Map(rows.map((r) => [r.ticker, r.eod_fetched_at]));
 }
 
+const CONCURRENCY = 4;
+
+/** Runs `worker` over `items` with at most `limit` in flight. */
+async function pool(items, limit, worker) {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) await worker(items[next++]);
+    }),
+  );
+}
+
+/**
+ * Drops symbols the company directory knows are not listed, and (once the directory is populated) symbols it has
+ * never seen, such as half-typed searches. An empty directory filters nothing.
+ */
+async function listedOnly(tickers) {
+  if (dryRun) return { kept: tickers, skipped: [] };
+  const rows = await d1('SELECT ticker, listing_status FROM security_catalog').catch(() => []);
+  if (!rows.length) return { kept: tickers, skipped: [] };
+  const listed = new Set(rows.filter((r) => r.listing_status !== 'delisted').map((r) => r.ticker));
+  return { kept: tickers.filter((t) => listed.has(t)), skipped: tickers.filter((t) => !listed.has(t)) };
+}
+
 async function main() {
-  const tickers = await trackedTickers(tickerArg);
+  const { kept, skipped } = await listedOnly(await trackedTickers(tickerArg));
+  const tickers = kept;
   const ages = await storedAges();
   const now = new Date();
   const failed = [];
   let ok = 0;
-  // KSE100 rides along for the market-pulse sparkline (needs a token from any company page).
-  if (!tickerArg && tickers.length) tickers.push('KSE100');
-  for (const ticker of tickers) {
+  // One page token serves every request in a run; refresh it once if PSX rejects it.
+  let token = tickers.length ? await fetchPsxToken(tickers[0]) : '';
+  let tokenRefresh = null;
+  const refreshToken = (stale) => {
+    if (token !== stale) return Promise.resolve(token);
+    tokenRefresh ??= fetchPsxToken(tickers[0]).then((fresh) => ((token = fresh), fresh)).finally(() => (tokenRefresh = null));
+    return tokenRefresh;
+  };
+  const series = async (ticker, kind) => {
+    const used = token;
     try {
-      const token = await fetchPsxToken(ticker === 'KSE100' ? tickers[0] : ticker);
-      const intraday = parseIntraday(await fetchPsxTimeseries(ticker, 'int', token));
+      return await fetchPsxTimeseries(ticker, kind, used);
+    } catch (error) {
+      if (!/^40[134] /.test(error instanceof Error ? error.message : '')) throw error;
+      return fetchPsxTimeseries(ticker, kind, await refreshToken(used));
+    }
+  };
+  // KSE100 rides along for the market-pulse sparkline.
+  if (!tickerArg && tickers.length) tickers.push('KSE100');
+  await pool(tickers, CONCURRENCY, async (ticker) => {
+    try {
+      const intraday = parseIntraday(await series(ticker, 'int'));
       const eodAt = ages.get(ticker);
       const stale = !eodAt || now - new Date(eodAt) > EOD_MAX_AGE_MS;
-      const eod = stale
-        ? parseEod(await fetchPsxTimeseries(ticker, 'eod', token)).slice(-eodKeep(ticker))
-        : null;
+      const eod = stale ? parseEod(await series(ticker, 'eod')).slice(-eodKeep(ticker)) : null;
       if (dryRun) {
         console.log(`  ${ticker}: ${intraday.length} intraday, ${eod ? eod.length + ' eod' : 'eod fresh'}`);
       } else {
@@ -56,9 +95,11 @@ async function main() {
     } catch (error) {
       failed.push(`${ticker}: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
+  });
   console.log(
-    `PSX history: ${ok}/${tickers.length} tickers` + (failed.length ? `. Failed: ${failed.join('; ')}` : '.'),
+    `PSX history: ${ok}/${tickers.length} tickers` +
+      (skipped.length ? ` (skipped unlisted: ${skipped.join(', ')})` : '') +
+      (failed.length ? `. Failed: ${failed.join('; ')}` : '.'),
   );
   process.exitCode = scrapeExitCode(tickers.length, failed.length);
 }

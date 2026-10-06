@@ -112,18 +112,36 @@ export async function fetchPsxTimeseries(
   token: string,
   budget?: FetchBudget,
 ): Promise<number[][]> {
-  if (budget) {
-    if (budget.left <= 0) throw Error('PSX request budget exhausted for this refresh');
-    budget.left--;
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    if (budget) {
+      if (budget.left <= 0)
+        throw lastError ?? Error('PSX request budget exhausted for this refresh');
+      budget.left--;
+    }
+    let response: Response;
+    try {
+      response = await fetch(`https://dps.psx.com.pk/timeseries/${kind}/${ticker}`, {
+        headers: { ...UA, 'X-Req-Id': token, 'X-Requested-With': 'XMLHttpRequest' },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(TIMEOUT),
+      });
+    } catch (error) {
+      // Timeouts and network errors are retried like a transient 5xx.
+      lastError = error;
+      if (attempt < RETRIES) await sleep(RETRY_DELAY_MS * (attempt + 1));
+      continue;
+    }
+    if (!response.ok) {
+      lastError = Error(`${response.status} from PSX`);
+      if (!retryable(response.status)) throw lastError;
+      if (attempt < RETRIES) await sleep(RETRY_DELAY_MS * (attempt + 1));
+      continue;
+    }
+    const body = (await response.json()) as { status: number; data: number[][] };
+    if (body.status !== 1 || !Array.isArray(body.data))
+      throw Error('Unexpected PSX timeseries response');
+    return body.data;
   }
-  const response = await fetch(`https://dps.psx.com.pk/timeseries/${kind}/${ticker}`, {
-    headers: { ...UA, 'X-Req-Id': token, 'X-Requested-With': 'XMLHttpRequest' },
-    cache: 'no-store',
-    signal: AbortSignal.timeout(TIMEOUT),
-  });
-  if (!response.ok) throw Error(`${response.status} from PSX`);
-  const body = (await response.json()) as { status: number; data: number[][] };
-  if (body.status !== 1 || !Array.isArray(body.data))
-    throw Error('Unexpected PSX timeseries response');
-  return body.data;
+  throw lastError;
 }
