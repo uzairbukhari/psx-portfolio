@@ -175,3 +175,11 @@ test('recording a trade keeps gold and silver assets untouched', () => {
   assert.deepEqual(next.assets, p.assets);
   validate(next);
 });
+
+test('recording a trade keeps savings plans untouched', () => {
+  const p = base();
+  p.assets = [{ id: 'p1', kind: 'plan', name: 'Mahana Bachat', provider: 'pak-qatar-mbp', note: '', entries: [{ id: 'e1', type: 'contribution', date: '2026-01-05', amount: 50000, note: '' }], valuations: [], rules: [] }];
+  const next = recordTrade(p, buy(10, 100));
+  assert.deepEqual(next.assets, p.assets);
+  validate(next);
+});

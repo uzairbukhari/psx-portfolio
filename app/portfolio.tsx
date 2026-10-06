@@ -90,6 +90,7 @@ import PortfolioReports from './portfolio-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
 import GoldSilverSection, { type OwnedMetal } from './gold-silver';
+import SavingsPlansSection, { type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
 import CompanyDetail from './company-detail';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
@@ -824,7 +825,7 @@ function DashboardContent({
     workspaceBusy?.(busy || readingImport || !!ahlStatement || !!finqalabReview || !!brokerReview || !!ipoReview || !!trade || !!company || !!receipt || targetsOpen || !!quoteTicker);
   }, [workspaceBusy, busy, readingImport, ahlStatement, finqalabReview, brokerReview, ipoReview, trade, company, receipt, targetsOpen, quoteTicker]);
   const metalRates = useMetalRates(
-    !!(isAll ? p?.[DISPLAY_PARTS]?.some((part) => part.portfolio.assets?.length) : p?.assets?.length),
+    !!(isAll ? p?.[DISPLAY_PARTS]?.some((part) => part.portfolio.assets?.some((a) => a.kind === 'metal')) : p?.assets?.some((a) => a.kind === 'metal')),
   );
   if (!p && email && !(failed && message))
     return (
@@ -1060,10 +1061,12 @@ function DashboardContent({
     { value, cost, gain, missingPrice: missing, unknownCost: unknown } =
       portfolioSummary(hs);
   const overviewParts = isAll ? p[DISPLAY_PARTS] : undefined;
-  const ownedMetals: OwnedMetal[] = isAll
+  const allAssets = isAll
     ? (overviewParts ?? []).flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioId: part.id, portfolioName: part.name })))
-    : (p.assets ?? []).map((asset) => ({ asset }));
-  const hasAssets = ownedMetals.length > 0;
+    : (p.assets ?? []).map((asset) => ({ asset, portfolioId: undefined, portfolioName: undefined }));
+  const ownedMetals: OwnedMetal[] = allAssets.flatMap((o) => (o.asset.kind === 'metal' ? [{ ...o, asset: o.asset }] : []));
+  const ownedPlans: OwnedPlan[] = allAssets.flatMap((o) => (o.asset.kind === 'plan' ? [{ ...o, asset: o.asset }] : []));
+  const hasAssets = allAssets.length > 0;
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -2149,7 +2152,13 @@ function DashboardContent({
             ratesError={metalRates.error}
             canEdit={!isAll && !locked}
             busy={busy}
-            onChange={(assets, message) => save({ ...clone(p), assets }, message)}
+            onChange={(assets, message) => save({ ...clone(p), assets: [...(p.assets ?? []).filter((a) => a.kind !== 'metal'), ...assets] }, message)}
+          />
+          <SavingsPlansSection
+            owned={ownedPlans}
+            canEdit={!isAll && !locked}
+            busy={busy}
+            onChange={(plans, message) => save({ ...clone(p), assets: [...(p.assets ?? []).filter((a) => a.kind !== 'plan'), ...plans] }, message)}
           />
         </TabsContent>
         <TabsContent value="reports">

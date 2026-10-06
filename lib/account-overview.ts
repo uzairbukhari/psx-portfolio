@@ -3,7 +3,7 @@
 // Every portfolio is calculated on its own first (`consolidatedAccount`), and only then added together, so cost
 // basis is never mixed across portfolios. A figure that cannot be known (a missing price or an unknown cost)
 // is reported as null with a reason, never as zero.
-import { metalFlows, metalUnknownCost, valueMetal } from './assets.ts';
+import { valueAsset } from './assets.ts';
 import type { MetalRateRow } from './metal-rates.ts';
 import {
   moneyInFlows,
@@ -130,15 +130,16 @@ export function accountOverview(
   const summary = consolidated.summary;
   const stockValue = summary.value;
 
-  // Gold and silver coins and bars, valued per asset and added up by metal.
+  // Every other asset (gold and silver, savings plans), valued per asset and added up by class.
   const rates = options.metalRates ?? [];
-  const metals = parts.flatMap((part) =>
-    (part.portfolio.assets ?? [])
-      .filter((a) => a.kind === 'metal')
-      .map((asset) => ({ asset, v: valueMetal(asset, rates, asOf) })),
+  const assetValues = parts.flatMap((part) =>
+    (part.portfolio.assets ?? []).map((asset) => ({
+      asset,
+      v: valueAsset(asset, rates, asOf),
+    })),
   );
-  const metalClass = (metal: 'gold' | 'silver'): ClassTotal | null => {
-    const mine = metals.filter((m) => m.asset.metal === metal);
+  const assetClass = (key: AssetClassKey): ClassTotal | null => {
+    const mine = assetValues.filter((m) => m.v.classKey === key);
     if (!mine.length) return null;
     const value = round(mine.reduce((n, m) => n + (m.v.value ?? 0), 0));
     const cost = sumKnown(mine.map((m) => m.v.cost));
@@ -147,21 +148,22 @@ export function accountOverview(
         ? null
         : round(value - cost);
     return {
-      key: metal,
-      label: ASSET_CLASS_LABELS[metal],
+      key,
+      label: ASSET_CLASS_LABELS[key],
       value,
       share: 0,
       cost,
       gain,
       gainPercent: percent(gain, cost),
-      count: mine.filter((m) => m.v.grams > 0).length,
+      count: mine.filter((m) => m.v.open).length,
       incomplete: mine.some((m) => m.v.value === null || m.v.cost === null),
     };
   };
-  const goldClass = metalClass('gold');
-  const silverClass = metalClass('silver');
+  const otherClasses = (['gold', 'silver', 'plans', 'funds'] as const)
+    .map(assetClass)
+    .filter((c): c is ClassTotal => c !== null);
   const total = round(
-    stockValue + (goldClass?.value ?? 0) + (silverClass?.value ?? 0),
+    stockValue + otherClasses.reduce((n, c) => n + c.value, 0),
   );
 
   const classes: ClassTotal[] = [
@@ -176,12 +178,13 @@ export function accountOverview(
       count: summary.heldCount,
       incomplete: summary.incomplete.length > 0,
     },
-    ...(goldClass ? [goldClass] : []),
-    ...(silverClass ? [silverClass] : []),
+    ...otherClasses,
   ].map((c): ClassTotal => ({ ...c, share: share(c.value, total) }));
 
   const portfolios: PortfolioTotal[] = consolidated.breakdown.map((entry) => {
-    const own = metals.filter((m) => entry.portfolio.assets?.includes(m.asset));
+    const own = assetValues.filter((m) =>
+      entry.portfolio.assets?.includes(m.asset),
+    );
     const value = round(
       entry.summary.value + own.reduce((n, m) => n + (m.v.value ?? 0), 0),
     );
@@ -204,8 +207,7 @@ export function accountOverview(
       gain,
       gainPercent: percent(gain, cost),
       share: share(value, total),
-      heldCount:
-        entry.summary.heldCount + own.filter((m) => m.v.grams > 0).length,
+      heldCount: entry.summary.heldCount + own.filter((m) => m.v.open).length,
       missingPrice:
         entry.summary.missingPrice.length +
         own.filter((m) => m.v.value === null).length,
@@ -282,17 +284,16 @@ export function accountOverview(
       `Needs the cost of ${summary.unknownCost.length} ${summary.unknownCost.length === 1 ? 'holding' : 'holdings'}.`,
     );
 
-  const metalMissing = metals.filter((m) => m.v.value === null);
-  const metalUnknown = metals.filter((m) => metalUnknownCost(m.asset));
+  const metalMissing = assetValues.filter((m) => m.v.value === null);
+  const metalUnknown = assetValues.filter((m) => m.v.unknownCost);
   if (metalMissing.length)
     incomplete.push(
-      `Needs a ${[...new Set(metalMissing.map((m) => m.asset.metal))].join(' and ')} rate.`,
+      `Needs a ${[...new Set(metalMissing.map((m) => (m.asset.kind === 'metal' ? m.asset.metal : 'price')))].join(' and ')} rate.`,
     );
   if (metalUnknown.length)
     incomplete.push(
       `Needs the cost of ${metalUnknown.length} gold or silver ${metalUnknown.length === 1 ? 'item' : 'items'}.`,
     );
-  const otherClasses = classes.filter((c) => c.key !== 'stocks');
   const totalCost = sumKnown([
     summary.cost,
     ...otherClasses.map((c) => c.cost),
@@ -308,7 +309,7 @@ export function accountOverview(
     ...consolidated.breakdown.flatMap(
       (entry) => moneyInFlows(entry.portfolio).flows,
     ),
-    ...metals.flatMap((m) => metalFlows(m.asset)),
+    ...assetValues.flatMap((m) => m.v.flows),
     ...dividendFlows,
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const unknownCostFlows = consolidated.breakdown.some(

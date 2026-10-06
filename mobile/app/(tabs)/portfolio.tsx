@@ -13,6 +13,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { AccountOverview } from '@/ui/AccountOverview';
 import { AppBar } from '@/ui/AppBar';
 import { GoldSilver } from '@/ui/GoldSilver';
+import { SavingsPlans } from '@/ui/SavingsPlans';
 import { Icon } from '@/ui/Icon';
 import { Amount, Avatar, Button, Chip, EmptyState, ListRow, Loading, Notice, Screen, Segmented, SectionLabel, Sheet, StatusChip, useKitStyles } from '@/ui/kit';
 
@@ -46,7 +47,11 @@ export default function Portfolio() {
   const total = open.reduce((a, h) => a + (h.value ?? 0), 0);
 
   const overviewParts = p.isAll ? p.portfolio?.[DISPLAY_PARTS] : undefined;
-  const ownedMetals = (overviewParts ? overviewParts.flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioName: part.name }))) : (p.portfolio?.assets ?? []).map((asset) => ({ asset })));
+  const allAssets = overviewParts
+    ? overviewParts.flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioName: part.name })))
+    : (p.portfolio?.assets ?? []).map((asset) => ({ asset, portfolioName: undefined }));
+  const ownedMetals = allAssets.flatMap((o) => (o.asset.kind === 'metal' ? [{ ...o, asset: o.asset }] : []));
+  const ownedPlans = allAssets.flatMap((o) => (o.asset.kind === 'plan' ? [{ ...o, asset: o.asset }] : []));
   const metal = useMetalRates(ownedMetals.length > 0);
   const bar = <AppBar title="Portfolio" />;
   const switcher = <Segmented label="Portfolio view" value={segment} onChange={setSegment} options={[{ key: 'holdings', label: 'Holdings' }, { key: 'insights', label: 'Insights' }]} />;
@@ -190,6 +195,7 @@ export default function Portfolio() {
           )}
 
           <GoldSilver owned={ownedMetals} rates={metal.rates} ratesError={metal.error} />
+          <SavingsPlans owned={ownedPlans} />
 
           {showSoldOut && soldOut.length ? (
             <>

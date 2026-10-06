@@ -12,6 +12,7 @@ import {
   type Metal,
   type MetalRateRow,
 } from './metal-rates.ts';
+import { planFlows, planValue, validatePlan, type PlanAsset } from './plans.ts';
 
 export type MetalEntry = {
   id: string;
@@ -37,7 +38,7 @@ export type MetalAsset = {
   note: string;
   entries: MetalEntry[];
 };
-export type Asset = MetalAsset;
+export type Asset = MetalAsset | PlanAsset;
 
 export const MAX_ASSETS = 200;
 export const MAX_ENTRIES = 5000;
@@ -191,7 +192,8 @@ export function validateAssets(
     throw new Error('Invalid assets.');
   const ids = new Set<string>();
   for (const a of assets as Asset[]) {
-    if (!a || a.kind !== 'metal') throw new Error('Unsupported asset type.');
+    if (!a || (a.kind !== 'metal' && a.kind !== 'plan'))
+      throw new Error('Unsupported asset type.');
     if (
       typeof a.id !== 'string' ||
       !/^[a-zA-Z0-9_-]{1,100}$/.test(a.id) ||
@@ -203,6 +205,10 @@ export function validateAssets(
       throw new Error('Asset names must be 1 to 80 characters.');
     if (typeof a.note !== 'string' || a.note.length > 2000)
       throw new Error('Asset note is too long.');
+    if (a.kind === 'plan') {
+      validatePlan(a, today);
+      continue;
+    }
     if (a.metal !== 'gold' && a.metal !== 'silver')
       throw new Error('Choose gold or silver.');
     if (![24, 22, 21, 18].includes(a.karat))
@@ -263,3 +269,50 @@ export const describePieces = (
   }
   return g(e.grams);
 };
+
+export type AssetClassKey = 'gold' | 'silver' | 'plans' | 'funds';
+/** One asset reduced to what the totals need: its class, value, cost and money flows. Null means "not known", never zero. */
+export type AssetValue = {
+  classKey: AssetClassKey;
+  value: number | null;
+  /** Net money still in. Null while any cost is unknown. */
+  cost: number | null;
+  gain: number | null;
+  /** Still held (grams left, plan not closed). */
+  open: boolean;
+  unknownCost: boolean;
+  /** The value is calculated between statements, not read from one. */
+  estimated: boolean;
+  flows: { date: string; amount: number }[];
+};
+
+export function valueAsset(
+  asset: Asset,
+  rates: MetalRateRow[],
+  asOf: string,
+): AssetValue {
+  if (asset.kind === 'plan') {
+    const v = planValue(asset, asOf);
+    return {
+      classKey: 'plans',
+      value: v.value,
+      cost: v.cost,
+      gain: v.gain,
+      open: v.value > 0 || !asset.closed,
+      unknownCost: false,
+      estimated: v.source !== 'statement',
+      flows: planFlows(asset),
+    };
+  }
+  const v = valueMetal(asset, rates, asOf);
+  return {
+    classKey: asset.metal,
+    value: v.value,
+    cost: v.cost,
+    gain: v.gain,
+    open: v.grams > 0,
+    unknownCost: metalUnknownCost(asset),
+    estimated: false,
+    flows: metalFlows(asset),
+  };
+}

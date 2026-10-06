@@ -47,6 +47,7 @@ const SHARED = [
   'vault-backup',
   'portfolio-view',
   'assets',
+  'plans',
   'metal-rates',
   'public-data-client',
   'psx-market',
