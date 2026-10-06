@@ -1,16 +1,16 @@
 import { positionTimeline, type Portfolio } from './portfolio.ts';
 
 export type PricePoint = [number, number];
-export type HistoryRange = 'today' | '7d' | '1m' | '1y';
+export type HistoryRange = 'today' | '7d' | '1m' | '1y' | '3y' | '5y';
 
 const DAY = 86_400;
 
-/** Daily closes kept per ticker; the KSE-100 keeps about ten years so the benchmark can reach further back. */
-export const EOD_KEEP = 420;
+/** Daily closes kept per ticker (about five and a half years, for the 5Y chart); the KSE-100 keeps about ten years so the benchmark can reach further back. */
+export const EOD_KEEP = 1400;
 export const INDEX_EOD_KEEP = 2500;
 export const eodKeep = (ticker: string) => (ticker === 'KSE100' ? INDEX_EOD_KEEP : EOD_KEEP);
 
-const RANGE_DAYS: Record<Exclude<HistoryRange, 'today'>, number> = { '7d': 7, '1m': 31, '1y': 366 };
+const RANGE_DAYS: Record<Exclude<HistoryRange, 'today'>, number> = { '7d': 7, '1m': 31, '1y': 366, '3y': 1096, '5y': 1827 };
 
 /** Newest-first PSX eod rows -> chronological [sec, close] pairs, bad rows dropped. */
 export function parseEod(rows: number[][]): PricePoint[] {

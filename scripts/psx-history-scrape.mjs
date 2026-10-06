@@ -1,11 +1,12 @@
 // Refreshes the shared `price_history` table (company-page chart) from outside
 // Cloudflare (PSX drops Cloudflare egress; see psx-quote-scrape.mjs). For every
 // tracked ticker it stores today's intraday ticks (every run) and
-// daily closes (when the stored copy is over 12 hours old). Companies keep 420 trading days; the KSE100 index
+// daily closes (when the stored copy is over 12 hours old). Companies keep 1,400 trading days (5Y chart); the KSE100 index
 // row (used by the mobile benchmark) keeps 2,500 (lib/price-history.ts#eodKeep).
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
-// Usage: node scripts/psx-history-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
+// Usage: node scripts/psx-history-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK] [--refresh-eod]
+// --refresh-eod re-fetches daily closes for every ticker regardless of age (backfill after raising the retention).
 import { d1, trackedTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsxToken, fetchPsxTimeseries } from '../lib/psx-fetch.ts';
@@ -13,6 +14,7 @@ import { eodKeep, parseEod, parseIntraday } from '../lib/price-history.ts';
 
 const EOD_MAX_AGE_MS = 12 * 3_600_000;
 const dryRun = process.argv.includes('--dry-run');
+const refreshEod = process.argv.includes('--refresh-eod');
 const tickerArg = process.argv.find((arg) => arg.startsWith('--tickers='));
 
 async function storedAges() {
@@ -75,7 +77,7 @@ async function main() {
     try {
       const intraday = parseIntraday(await series(ticker, 'int'));
       const eodAt = ages.get(ticker);
-      const stale = !eodAt || now - new Date(eodAt) > EOD_MAX_AGE_MS;
+      const stale = refreshEod || !eodAt || now - new Date(eodAt) > EOD_MAX_AGE_MS;
       const eod = stale ? parseEod(await series(ticker, 'eod')).slice(-eodKeep(ticker)) : null;
       if (dryRun) {
         console.log(`  ${ticker}: ${intraday.length} intraday, ${eod ? eod.length + ' eod' : 'eod fresh'}`);

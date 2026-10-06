@@ -20,6 +20,8 @@ const RANGES: { key: HistoryRange; label: string; spoken: string }[] = [
   { key: '7d', label: '1W', spoken: 'One week' },
   { key: '1m', label: '1M', spoken: 'One month' },
   { key: '1y', label: '1Y', spoken: 'One year' },
+  { key: '3y', label: '3Y', spoken: 'Three years' },
+  { key: '5y', label: '5Y', spoken: 'Five years' },
 ];
 type Tab = 'ledger' | 'dividends';
 

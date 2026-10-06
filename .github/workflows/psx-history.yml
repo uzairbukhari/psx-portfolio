@@ -9,6 +9,11 @@ on:
     - cron: '*/15 4-11 * * 1-5'
     - cron: '10 12 * * 1-5'
   workflow_dispatch:
+    inputs:
+      refresh_eod:
+        description: 'Re-fetch daily closes for every ticker (backfill)'
+        type: boolean
+        default: false
 
 concurrency:
   group: psx-history
@@ -28,7 +33,7 @@ jobs:
         with:
           node-version: 24
       - name: Refresh price_history from PSX
-        run: node scripts/psx-history-scrape.mjs
+        run: node scripts/psx-history-scrape.mjs ${{ inputs.refresh_eod && '--refresh-eod' || '' }}
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
