@@ -156,6 +156,7 @@ export default function MutualFundsSection({
       }}
     />
   ) : null;
+  // A class you never used is not shown; one you have sold out stays, for its history.
   if (rows.length === 0) return dialog;
 
   return (

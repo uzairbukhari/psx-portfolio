@@ -10,7 +10,13 @@ const dryRun = process.argv.includes('--dry-run');
 const URL_ = 'https://www.mufap.com.pk/Industry/IndustryStatDaily?tab=3';
 const MIN_FUNDS = 50; // far fewer than the real list means the page changed: fail loudly instead of storing a fragment
 
-const response = await fetch(URL_, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; psx-portfolio-fund-navs)' }, signal: AbortSignal.timeout(60_000) });
+const response = await fetch(URL_, { headers: {
+    // MUFAP answers a bare script user agent from a datacenter with 403, so ask the way a browser does.
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    Referer: 'https://www.mufap.com.pk/',
+  }, signal: AbortSignal.timeout(60_000) });
 if (!response.ok) throw Error(`${response.status} from mufap.com.pk`);
 const { catalog, navs } = parseMufapNavs(await response.text());
 if (catalog.length < MIN_FUNDS) throw Error(`Only ${catalog.length} funds could be read from MUFAP; the page layout may have changed.`);

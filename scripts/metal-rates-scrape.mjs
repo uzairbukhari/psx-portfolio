@@ -9,7 +9,7 @@ import { d1 } from './d1-rest.mjs';
 import { parseGoldPage, tolaFromSpot } from '../lib/metal-rates.ts';
 
 const dryRun = process.argv.includes('--dry-run');
-const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; psx-portfolio-metal-rates)' };
+const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.9' };
 const pktToday = () => new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
 const getJson = async (url) => {
   const response = await fetch(url, { headers: UA, signal: AbortSignal.timeout(30_000) });

@@ -117,19 +117,33 @@ export function parseGoldPage(html: string): { pkrPerTola: number } | null {
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ');
-  const tola =
-    /24\s*K[^0-9]{0,40}per\s*Tola[^0-9]{0,20}Rs\.?\s*([\d,]+(?:\.\d+)?)/i.exec(
-      text,
-    );
-  const ten =
-    /24\s*K[^0-9]{0,40}per\s*10\s*Gram[^0-9]{0,20}Rs\.?\s*([\d,]+(?:\.\d+)?)/i.exec(
-      text,
-    );
-  if (!tola || !ten) return null;
-  const perTola = num(tola[1]);
-  const perTen = num(ten[1]);
-  if (!(perTola > 50_000 && perTola < 5_000_000)) return null;
-  const expected = (perTen * TOLA_GRAMS) / 10;
-  if (Math.abs(expected - perTola) / perTola > 0.01) return null;
-  return { pkrPerTola: perTola };
+  // gold.pk labels its rates "24 Karat Gold Rate (1 Tola)" and "(10 Gram)" with the amount beside the label (the older
+  // layout read "24K ... per Tola Rs ..."). The amount may sit just after or just before its label, so collect both
+  // and keep the one pair whose tola and 10-gram prices agree with each other.
+  const amounts = (label: RegExp): number[] => {
+    const m = label.exec(text);
+    if (!m) return [];
+    const rs = () => /Rs\.?\s*([\d,]+(?:\.\d+)?)/gi;
+    const end = m.index + m[0].length;
+    const after = rs().exec(text.slice(end, end + 60));
+    const before = [
+      ...text.slice(Math.max(0, m.index - 60), m.index).matchAll(rs()),
+    ].at(-1);
+    return [after?.[1], before?.[1]].flatMap((x) => (x ? [num(x)] : []));
+  };
+  const tolas = amounts(
+    /24\s*K(?:arat)?\s*(?:Gold\s*)?(?:Rate\s*)?\(?\s*(?:per\s*|1\s*)Tola\s*\)?/i,
+  );
+  const tens = amounts(
+    /24\s*K(?:arat)?\s*(?:Gold\s*)?(?:Rate\s*)?\(?\s*(?:per\s*)?10\s*Gram(?:s)?\s*\)?/i,
+  );
+  for (const perTola of tolas) {
+    if (!(perTola > 50_000 && perTola < 5_000_000)) continue;
+    for (const perTen of tens) {
+      const expected = (perTen * TOLA_GRAMS) / 10;
+      if (Math.abs(expected - perTola) / perTola <= 0.01)
+        return { pkrPerTola: perTola };
+    }
+  }
+  return null;
 }
