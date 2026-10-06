@@ -31,3 +31,11 @@ test('the tab layout lists the four tabs and hides the legacy ones', () => {
   for (const name of ['index', 'portfolio', 'plan', 'activity']) assert.match(layout, new RegExp(`name="${name}" options=\\{\\{ title`));
   for (const name of ['sip', 'alerts', 'account']) assert.match(layout, new RegExp(`name="${name}" options=\\{\\{ href: null`));
 });
+
+test('Add transaction picks the SIP month instead of typing it, and closes without a blank screen', () => {
+  const source = readFileSync(app('transaction.tsx'), 'utf8');
+  assert.match(source, /<MonthPicker /);
+  assert.doesNotMatch(source, /YYYY-MM\)"/);
+  assert.match(source, /router\.canGoBack\(\)/);
+  assert.doesNotMatch(source, /behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
+});

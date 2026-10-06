@@ -12,6 +12,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { splitPreview, tradeTotals } from '@/data/entry-form';
 import { CompanyPicker, NEW_COMPANY } from '@/ui/CompanyPicker';
 import { DatePicker } from '@/ui/DatePicker';
+import { MonthPicker } from '@/ui/MonthPicker';
 import { useToast } from '@/ui/Toast';
 import { Button, Card, Chip, Input, Muted, Notice, SectionLabel, useKitStyles } from '@/ui/kit';
 
@@ -55,6 +56,12 @@ function Chips<T extends string>({ items, value, onChange, disabled }: { items: 
       ))}
     </View>
   );
+}
+
+/** Closes the sheet; if it was opened with nothing behind it (a deep link), go home instead of leaving a blank screen. */
+function closeScreen() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
 }
 
 export default function Transaction() {
@@ -211,7 +218,7 @@ export default function Transaction() {
           toast.show({ message: 'Undone. Your portfolio is back as it was.' });
         },
       });
-      router.back();
+      closeScreen();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.');
     } finally {
@@ -239,7 +246,7 @@ export default function Transaction() {
                 toast.show({ message: 'Undone. The entry counts again.' });
               },
             });
-            router.back();
+            closeScreen();
           } catch (e) {
             setError(e instanceof Error ? e.message : 'Could not void.');
           } finally {
@@ -264,7 +271,7 @@ export default function Transaction() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
       <Stack.Screen options={{ title: editing ? 'Edit entry' : 'Add transaction' }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
           {selection.account && selection.account.portfolios.length>1 && !editing ? <Card><SectionLabel>Portfolio</SectionLabel><Chips items={selection.account.portfolios.filter((entry)=>!entry.locked).map((entry)=>({key:entry.id,label:entry.name}))} value={p.targetId ?? ''} disabled={busy} onChange={(id)=>{setDestination(id);setTicker('');}} />{p.isAll ? <Muted>Choose a portfolio to enter this transaction.</Muted> : null}</Card> : null}
           <View pointerEvents={p.isAll ? 'none' : 'auto'} style={{opacity:p.isAll ? 0.4 : 1}}>
@@ -310,7 +317,7 @@ export default function Transaction() {
                 keyboard="decimal-pad"
               />
               <Field label="Fees (PKR)" value={fees} onChangeText={setFees} keyboard="decimal-pad" placeholder="0" />
-              {kind === 'buy' ? <Field label="SIP month (optional, YYYY-MM)" value={month} onChangeText={setMonth} placeholder="2026-10" /> : null}
+              {kind === 'buy' ? <MonthPicker label="SIP month (optional)" value={month} onChange={setMonth} disabled={busy} /> : null}
             </>
           )}
           {totals ? (
