@@ -6,6 +6,7 @@ import './ledger.css';
 import './picks.css';
 import './ai-lab.css';
 import './reports.css';
+import './account-overview.css';
 import './settings.css';
 
 const geistSans = Geist({

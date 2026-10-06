@@ -8,6 +8,8 @@ const SHARED = [
   'api-types',
   'portfolio',
   'portfolio-account',
+  'account-overview',
+  'performance',
   'portfolio-reports',
   'allocation',
   'psx-calendar',

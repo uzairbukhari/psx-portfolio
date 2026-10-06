@@ -50,6 +50,7 @@ export default function PortfolioValueCard({
   unknownCount,
   newBuys,
   aside,
+  chartOnly,
 }: {
   p: Portfolio;
   value: number;
@@ -61,6 +62,8 @@ export default function PortfolioValueCard({
   newBuys: number;
   /** Sits beside the chart (30%) on wide screens; the page renders it elsewhere otherwise. */
   aside?: ReactNode;
+  /** Hide the headline numbers; the page already shows them (All portfolios dashboard). */
+  chartOnly?: boolean;
 }) {
   const [range, setRange] = useState<ValueRange>('all');
   const [attempt, setAttempt] = useState(0);
@@ -146,10 +149,10 @@ export default function PortfolioValueCard({
   const rangeLabel = range === 'all' ? 'all time' : RANGES.find(([v]) => v === range)![1];
 
   return (
-    <section className="panel value-card">
+    <section className={chartOnly ? 'value-card value-card--chart-only' : 'panel value-card'}>
       <div className="value-card-body">
       <div className="value-card-left">
-      <div className="value-card-top">
+      {!chartOnly && <div className="value-card-top">
         <div>
           <span className="value-card-label">
             {missingCount ? 'Priced holdings · incomplete' : 'Portfolio market value'}
@@ -187,7 +190,7 @@ export default function PortfolioValueCard({
               : 'Market value less remaining cost, including buy fees'}
           </small>
         </div>
-      </div>
+      </div>}
       <div className="value-card-chart">
       <div className="company-chart-head">
         <div>
