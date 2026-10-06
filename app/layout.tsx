@@ -21,6 +21,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Sipwise',
+  description:
+    'Track PSX stocks, mutual funds, gold, silver and savings plans in one private, encrypted ledger. Plan your monthly SIP.',
   icons: { icon: '/favicon.svg' },
 };
 
