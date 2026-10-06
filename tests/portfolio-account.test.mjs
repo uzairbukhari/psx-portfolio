@@ -128,3 +128,22 @@ test('old web/mobile clients are refused before any collection read or write', (
   assert.match(v2, /GET = \(\) => upgradeRequired/); assert.match(v2, /PUT = \(\) => upgradeRequired/);
   for (const file of ['../app/vault-transport.ts', '../mobile/src/vault/transport.ts']) assert.match(readFileSync(new URL(file, import.meta.url), 'utf8'), /\/api\/v3\/portfolio/);
 });
+
+test('a stored ledger that fails today\'s strict validation still unlocks; backups stay strict', async () => {
+  const { session, transport } = await seed();
+  const legacy = { ...ledger(), research: 'not-an-array' };
+  assert.throws(() => normalizeAccount(legacy), /research/i);
+  await session.saveAccount(normalizeAccount(legacy, false), 1);
+  const reopened = await c.unlockVault(transport, await c.loadVaultStatus(transport), { password: PASSWORD });
+  assert.equal(reopened.account.portfolios.length, 1);
+  assert.throws(() => parseBackup(JSON.stringify({ kind: 'sipwise-portfolio-account-backup', schemaVersion: 1, account: accountFromPortfolio(legacy) })), /research/i);
+});
+
+test('portfolio locks block ordinary saves but not an explicit replace-everything', async () => {
+  const { session } = await seed();
+  const locked = { ...account(), portfolios: account().portfolios.map((p) => (p.id === 'ahl' ? { ...p, locked: true } : p)) };
+  await session.saveAccount(locked, 1);
+  await assert.rejects(session.saveAccount(accountFromPortfolio(), 2), /locked/);
+  await session.saveAccount(accountFromPortfolio(), 2, { replaceAll: true });
+  assert.equal(session.account.portfolios.length, 1);
+});
