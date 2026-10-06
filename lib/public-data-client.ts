@@ -61,7 +61,9 @@ export function createPublicData(call: PublicCall): PublicData {
       );
     },
     async trackFunds(mufapIds) {
-      await call('/api/public-data/funds', 'POST', { mufapIds });
+      return await call<{ error?: string }>('/api/public-data/funds', 'POST', {
+        mufapIds,
+      });
     },
     fundHistory: (mufapId) =>
       call<FundHistoryResponse>(
