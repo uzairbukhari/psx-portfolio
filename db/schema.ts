@@ -477,6 +477,11 @@ export const fundCatalog = sqliteTable('fund_catalog', {
   inceptionDate: text('inception_date'),
   updatedAt: text('updated_at').notNull(),
 });
+/** Funds somebody has added to a portfolio: the only funds whose nightly price is stored. Public ids, no user. */
+export const trackedFunds = sqliteTable('tracked_funds', {
+  mufapId: text('mufap_id').primaryKey(),
+  firstSeen: text('first_seen').notNull(),
+});
 export const fundNavs = sqliteTable(
   'fund_navs',
   {

@@ -67,5 +67,3 @@ jobs:
         run: node scripts/psx-directory-scrape.mjs --mode=bootstrap --limit=80
       - name: Scrape gold rates
         run: node scripts/metal-rates-scrape.mjs
-      - name: Scrape mutual fund prices
-        run: node scripts/mufap-nav-scrape.mjs

@@ -54,6 +54,9 @@ export function createPublicData(call: PublicCall): PublicData {
         .rates;
     },
     funds: () => call<FundCatalogResponse>('/api/public-data/funds'),
+    async trackFunds(mufapIds) {
+      await call('/api/public-data/funds', 'POST', { mufapIds });
+    },
     fundHistory: (mufapId) =>
       call<FundHistoryResponse>(
         `/api/public-data/funds?fund=${encodeURIComponent(mufapId)}`,

@@ -1,13 +1,10 @@
 name: MUFAP fund NAVs
 
 # Stores the mutual fund directory and each fund's latest NAV in the shared D1 `fund_catalog` and `fund_navs` tables
-# (public data only). MUFAP publishes the NAVs after the market closes; Cloudflare itself never fetches the page.
+# (public data only).
 on:
-  schedule:
-    # 19:30 and 22:30 PKT, Monday to Saturday (prices for the day can post late).
-    - cron: '30 14,17 * * 1-6'
-    # A morning catch-up for a missed evening.
-    - cron: '30 3 * * 1-6'
+  # Fund prices are fetched daily by the Cloudflare cron Worker (workers/quote-refresh): MUFAP blocks GitHub's runners with 403.
+  # This workflow is kept for manual runs from another network only.
   workflow_dispatch:
 
 concurrency:

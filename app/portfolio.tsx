@@ -96,7 +96,7 @@ import GoldSilverSection, { type OwnedMetal } from './gold-silver';
 import SavingsPlansSection, { type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
 import MutualFundsSection, { type OwnedFund } from './mutual-funds';
-import { useFundCatalog } from './use-fund-data';
+import { useFundCatalog, useTrackFunds } from './use-fund-data';
 import CollapsiblePanel from './collapsible-panel';
 import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
 import CompanyDetail from './company-detail';
@@ -1162,6 +1162,13 @@ function DashboardContent({
           part.portfolio.assets?.some((a) => a.kind === 'fund'),
         )
       : p?.assets?.some((a) => a.kind === 'fund')) || tab === 'holdings',
+  );
+  useTrackFunds(
+    (isAll
+      ? (p?.[DISPLAY_PARTS]?.flatMap((part) => part.portfolio.assets ?? []) ??
+        [])
+      : (p?.assets ?? [])
+    ).flatMap((a) => (a.kind === 'fund' ? [a.mufapId] : [])),
   );
   if (!p && email && !(failed && message))
     return (

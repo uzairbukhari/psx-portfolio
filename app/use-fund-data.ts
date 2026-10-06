@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FundCatalogResponse, FundNavRow } from '@/lib/mufap';
 import { webPublicData } from './vault-transport';
 
@@ -18,6 +18,12 @@ export function useFundCatalog(enabled: boolean) {
     let live = true;
     webPublicData
       .funds?.()
+      // An empty directory means the nightly run has not happened yet: ask for it once, then read it again.
+      .then(async (r) => {
+        if (r.funds.length || !webPublicData.trackFunds) return r;
+        await webPublicData.trackFunds([]);
+        return (await webPublicData.funds?.()) ?? r;
+      })
       .then(
         (r) => live && setState({ funds: r.funds, error: '', loaded: true }),
       )
@@ -67,4 +73,17 @@ export function useFundHistory(mufapId: string, enabled: boolean) {
     if (enabled && !state.loaded) load();
   }, [enabled, state.loaded, load]);
   return state;
+}
+
+/** Tells the server which funds are held (public MUFAP ids only, once per set) so their price is stored nightly. */
+export function useTrackFunds(mufapIds: string[]) {
+  const sent = useRef('');
+  const key = [...new Set(mufapIds)].sort().join(',');
+  useEffect(() => {
+    if (!key || sent.current === key) return;
+    sent.current = key;
+    webPublicData.trackFunds?.(key.split(',')).catch(() => {
+      sent.current = '';
+    });
+  }, [key]);
 }
