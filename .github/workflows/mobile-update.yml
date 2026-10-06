@@ -1,7 +1,7 @@
 name: Mobile OTA update
 
-# Publishes the Expo app's JavaScript to the `staging` channel over the air whenever a merge to main
-# changes the app or the shared lib/ modules it bundles. This is `eas update`, never `eas build`: it
+# Publishes the Expo app's JavaScript to the `staging` and then the `production` channel over the air
+# whenever a merge to main changes the app or the shared lib/ modules it bundles. This is `eas update`, never `eas build`: it
 # uses no build from the free tier's monthly allowance. A native change (new native module, app.config
 # plugins, permissions) still needs one manual `eas build`; installed apps only take updates whose
 # runtimeVersion (the app version) matches.
@@ -12,6 +12,10 @@ on:
   push:
     branches: [main]
     paths: ['mobile/**', 'lib/**', '.github/workflows/mobile-update.yml']
+  # Same-repo PRs to main publish to staging only, like the web staging deploy; fork PRs get no secrets.
+  pull_request:
+    branches: [main]
+    paths: ['mobile/**', 'lib/**', '.github/workflows/mobile-update.yml']
   workflow_dispatch:
     inputs:
       message:
@@ -19,7 +23,7 @@ on:
         required: false
         default: ''
       channel:
-        description: 'Channel to publish to (merges to main always publish to staging)'
+        description: 'Channel to publish to (merges to main publish to both staging and production)'
         type: choice
         options: [staging, production]
         default: staging
@@ -33,7 +37,10 @@ jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: prod
+    # Merges and manual runs use `prod`; PRs use `staging`, so PR code never sees the production secrets.
+    # The `staging` GitHub environment needs its own EXPO_TOKEN (without it a PR run skips cleanly).
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    environment: ${{ github.event_name == 'pull_request' && 'staging' || 'prod' }}
     defaults:
       run:
         working-directory: mobile
@@ -74,8 +81,11 @@ jobs:
       - name: Publish over the air
         if: steps.token.outputs.present == 'true'
         env:
-          MESSAGE: ${{ inputs.message || github.event.head_commit.message }}
-          CHANNEL: ${{ inputs.channel || 'staging' }}
+          MESSAGE: ${{ inputs.message || github.event.head_commit.message || github.event.pull_request.title }}
+          # A merge to main publishes to both channels (staging first); a PR only to staging; a manual run to the chosen one.
+          CHANNELS: ${{ github.event_name == 'pull_request' && 'staging' || inputs.channel || 'staging production' }}
         run: |
           subject="$(printf '%s' "$MESSAGE" | head -n1 | cut -c1-100)"
-          npm run "update:$CHANNEL" -- --non-interactive --message "${subject:-Update from main} (${GITHUB_SHA::7})"
+          for channel in $CHANNELS; do
+            npm run "update:$channel" -- --non-interactive --message "${subject:-Update from main} (${GITHUB_SHA::7})"
+          done
