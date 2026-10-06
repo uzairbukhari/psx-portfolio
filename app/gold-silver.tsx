@@ -24,6 +24,8 @@ import {
   type MetalRateRow,
 } from '@/lib/metal-rates';
 import { money, moneyShort, today } from '@/lib/portfolio';
+import AssetHistory, { type HistoryRow } from './asset-history';
+import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedMetal = {
   asset: MetalAsset;
@@ -43,6 +45,51 @@ const dateText = (date: string) =>
   });
 const OTHER = 'other';
 
+function historyRows(
+  asset: MetalAsset,
+  v: ReturnType<typeof valueMetal>,
+  canEdit: boolean,
+  busy: boolean,
+  toggleVoid: (assetId: string, entryId: string) => Promise<void>,
+): HistoryRow[] {
+  return [...asset.entries]
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .map((e) => {
+      const h = v.history.find((x) => x.id === e.id);
+      const sale = e.type === 'sell';
+      return {
+        id: e.id,
+        date: dateText(e.date),
+        tag: e.type === 'sell' ? 'sell' : e.type === 'buy' ? 'buy' : 'neutral',
+        tagLabel:
+          e.type === 'opening'
+            ? 'Opening'
+            : e.type === 'buy'
+              ? 'Bought'
+              : 'Sold',
+        title: `${describePieces(e)}${e.form ? ` · ${e.form}` : ''}`,
+        note: e.note || undefined,
+        amount:
+          e.amount === null
+            ? 'Cost unknown'
+            : `${sale ? '+' : '−'}${money(e.amount)}`,
+        amountTone: sale ? 'pos-text' : '',
+        meta: [
+          h ? `Holding ${grams(h.heldAfter)}` : '',
+          h?.realizedGain != null ? `Gain ${signed(h.realizedGain)}` : '',
+        ].filter(Boolean),
+        voided: !!e.voided,
+        action: canEdit
+          ? {
+              label: e.voided ? 'Restore' : 'Void',
+              disabled: busy,
+              onClick: () => void toggleVoid(asset.id, e.id),
+            }
+          : undefined,
+      } satisfies HistoryRow;
+    });
+}
+
 /**
  * Gold and silver coins and bars: current value, and the full history of every purchase and sale. Values come from
  * public rates and are calculated here, on the device. In the All view it is read-only (open a portfolio to edit).
@@ -53,6 +100,7 @@ export default function GoldSilverSection({
   ratesError,
   canEdit,
   busy,
+  addRequest = 0,
   onChange,
 }: {
   owned: OwnedMetal[];
@@ -60,6 +108,8 @@ export default function GoldSilverSection({
   ratesError: string;
   canEdit: boolean;
   busy: boolean;
+  /** Bumped by the page's + menu to open the add dialog. */
+  addRequest?: number;
   /** Receives this portfolio's complete asset list after an add, sale or void. */
   onChange: (assets: MetalAsset[], message: string) => Promise<void>;
 }) {
@@ -74,6 +124,24 @@ export default function GoldSilverSection({
     [owned, rates, asOf],
   );
   const assets = owned.map((o) => o.asset);
+  // Open the add dialog when the page's + menu asks for it (set during render, not in an effect).
+  const [seenRequest, setSeenRequest] = useState(addRequest);
+  if (addRequest !== seenRequest) {
+    setSeenRequest(addRequest);
+    if (addRequest > 0 && canEdit) setOpen({ type: 'buy' });
+  }
+  const totals = useMemo(() => {
+    const known = rows.every((r) => r.v.value !== null);
+    const gainKnown = rows.every((r) => r.v.gain !== null);
+    return {
+      value: known ? rows.reduce((a, r) => a + (r.v.value ?? 0), 0) : null,
+      gain: gainKnown ? rows.reduce((a, r) => a + (r.v.gain ?? 0), 0) : null,
+      cost: rows.every((r) => r.v.cost !== null)
+        ? rows.reduce((a, r) => a + (r.v.cost ?? 0), 0)
+        : null,
+      held: rows.filter((r) => r.v.grams > 0).length,
+    };
+  }, [rows]);
 
   async function toggleVoid(assetId: string, entryId: string) {
     const next = assets.map((a) =>
@@ -91,50 +159,74 @@ export default function GoldSilverSection({
     );
   }
 
+  const dialog = open ? (
+    <MetalEntryDialog
+      initialType={open.type}
+      assets={assets}
+      busy={busy}
+      onClose={() => setOpen(null)}
+      onSave={async (next, message) => {
+        await onChange(next, message);
+        setOpen(null);
+      }}
+    />
+  ) : null;
+  if (rows.length === 0) return dialog;
+
   return (
-    <section className="panel metal-section" aria-label="Gold and silver">
-      <div className="holdings-head">
-        <h2>
-          Gold and silver
-          <span className="count-badge">
-            {rows.filter((r) => r.v.grams > 0).length} held
-          </span>
-        </h2>
-        {canEdit && (
-          <>
-            <button
-              type="button"
-              className="secondary compact"
-              disabled={busy}
-              onClick={() => setOpen({ type: 'sell' })}
-            >
-              Record a sale
-            </button>
-            <button
-              type="button"
-              className="secondary compact holdings-add"
-              disabled={busy}
-              onClick={() => setOpen({ type: 'buy' })}
-            >
-              <Plus size={15} />{' '}
-              <span className="holdings-add__label">Add gold or silver</span>
-            </button>
-          </>
+    <>
+      <CollapsiblePanel
+        id="gold-silver"
+        title="Gold and silver"
+        badge={`${totals.held} held`}
+        figures={[
+          {
+            label: 'Value',
+            value:
+              totals.value === null ? 'Rate needed' : moneyShort(totals.value),
+          },
+          {
+            label: 'Remaining cost',
+            value:
+              totals.cost === null ? 'Not yet known' : moneyShort(totals.cost),
+          },
+          {
+            label: 'Gain / loss',
+            value: totals.gain === null ? 'Not yet known' : signed(totals.gain),
+            tone: tone(totals.gain),
+          },
+        ]}
+        actions={
+          canEdit && (
+            <>
+              <button
+                type="button"
+                className="secondary compact"
+                disabled={busy}
+                onClick={() => setOpen({ type: 'sell' })}
+              >
+                Record a sale
+              </button>
+              <button
+                type="button"
+                className="secondary compact holdings-add"
+                disabled={busy}
+                onClick={() => setOpen({ type: 'buy' })}
+              >
+                <Plus size={15} />{' '}
+                <span className="holdings-add__label">Add gold or silver</span>
+              </button>
+            </>
+          )
+        }
+      >
+        {ratesError && (
+          <p className="notice">
+            Could not load today&apos;s rates: {ratesError}
+          </p>
         )}
-      </div>
-      {ratesError && (
-        <p className="notice">
-          Could not load today&apos;s rates: {ratesError}
-        </p>
-      )}
-      {error && <p className="notice error">{error}</p>}
-      {rows.length === 0 ? (
-        <p className="muted">
-          No gold or silver recorded yet. Add the coins and bars you own, then
-          record each purchase and sale.
-        </p>
-      ) : (
-        rows.map(({ asset, v, portfolioName }) => (
+        {error && <p className="notice error">{error}</p>}
+        {rows.map(({ asset, v, portfolioName }) => (
           <article
             className="metal-asset"
             key={`${asset.id}-${portfolioName ?? ''}`}
@@ -196,97 +288,15 @@ export default function GoldSilverSection({
                 ? `Priced at ${money(v.rate.pkrPerTola)} per tola of 24K ${asset.metal} · ${v.rate.kind === 'local' ? 'dealer rate' : 'international estimate converted to rupees'} · ${dateText(v.rate.date)}${v.rate.fellBack ? ' (the dealer rate is more than 2 days old)' : ''}${v.rate.stale ? ' · STALE' : ''}`
                 : 'No rate available yet, so the value is not shown.'}
             </p>
-            <details className="metal-history">
-              <summary>
-                History ({v.history.length}{' '}
-                {v.history.length === 1 ? 'entry' : 'entries'}
-                {asset.entries.some((e) => e.voided)
-                  ? `, ${asset.entries.filter((e) => e.voided).length} voided`
-                  : ''}
-                )
-              </summary>
-              <div className="scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Weight</th>
-                      <th>Amount</th>
-                      <th>Held after</th>
-                      <th>Gain on sale</th>
-                      {canEdit && <th aria-label="Actions" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...asset.entries]
-                      .sort((a, b) =>
-                        a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
-                      )
-                      .map((e) => {
-                        const h = v.history.find((x) => x.id === e.id);
-                        return (
-                          <tr
-                            key={e.id}
-                            className={e.voided ? 'voided' : undefined}
-                          >
-                            <td>{dateText(e.date)}</td>
-                            <td>
-                              {e.type === 'opening'
-                                ? 'Opening balance'
-                                : e.type === 'buy'
-                                  ? 'Bought'
-                                  : 'Sold'}
-                              {e.form ? ` (${e.form})` : ''}
-                              {e.voided ? ' · voided' : ''}
-                            </td>
-                            <td>{describePieces(e)}</td>
-                            <td className="amount">
-                              {e.amount === null ? 'unknown' : money(e.amount)}
-                            </td>
-                            <td>{h ? grams(h.heldAfter) : '—'}</td>
-                            <td className={tone(h?.realizedGain ?? null)}>
-                              {h?.realizedGain == null
-                                ? '—'
-                                : signed(h.realizedGain)}
-                            </td>
-                            {canEdit && (
-                              <td>
-                                <button
-                                  type="button"
-                                  className="secondary compact"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    void toggleVoid(asset.id, e.id)
-                                  }
-                                >
-                                  {e.voided ? 'Restore' : 'Void'}
-                                </button>
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-            </details>
+            <AssetHistory
+              summary={`${v.history.length} ${v.history.length === 1 ? 'entry' : 'entries'}${asset.entries.some((e) => e.voided) ? `, ${asset.entries.filter((e) => e.voided).length} voided` : ''}`}
+              rows={historyRows(asset, v, canEdit, busy, toggleVoid)}
+            />
           </article>
-        ))
-      )}
-      {open && (
-        <MetalEntryDialog
-          initialType={open.type}
-          assets={assets}
-          busy={busy}
-          onClose={() => setOpen(null)}
-          onSave={async (next, message) => {
-            await onChange(next, message);
-            setOpen(null);
-          }}
-        />
-      )}
-    </section>
+        ))}
+      </CollapsiblePanel>
+      {dialog}
+    </>
   );
 }
 

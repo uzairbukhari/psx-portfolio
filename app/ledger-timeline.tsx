@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { ChevronDown, Pencil, Search } from 'lucide-react';
+import { describePieces, metalPosition, type Asset } from '@/lib/assets';
+import { fundPosition } from '@/lib/funds';
 import {
   money,
   realizedSales,
@@ -12,8 +14,14 @@ import {
   type Trade,
 } from '@/lib/portfolio';
 
-type EntryType = 'buy' | 'sell' | 'opening' | 'adjustment' | 'dividend' | 'split';
-type Filter = 'all' | 'buy' | 'sell' | 'dividend' | 'split';
+type EntryType =
+  | 'buy'
+  | 'sell'
+  | 'opening'
+  | 'adjustment'
+  | 'dividend'
+  | 'split';
+type Filter = 'all' | 'buy' | 'sell' | 'dividend' | 'split' | 'asset';
 
 export type LedgerEntry = {
   key: string;
@@ -31,6 +39,12 @@ export type LedgerEntry = {
   voided: boolean;
   /** An announced dividend that is not yet confirmed as received. */
   expected?: boolean;
+  /** Set on gold, savings plan and fund entries: the kind of asset, shown as a chip beside its name. */
+  assetKind?: 'Gold' | 'Silver' | 'Plan' | 'Fund';
+  /** Gain on this sale worked out with the asset's own rules; undefined means "look it up in the stock ledger". */
+  realizedGain?: number | null;
+  /** True for money taken out of a savings plan: it is cash back, not a sale with a profit. */
+  noGain?: boolean;
   correct: () => void;
   /** Present on expected dividends: opens the confirm-receipt form. */
   confirm?: () => void;
@@ -42,6 +56,7 @@ const FILTERS: [Filter, string][] = [
   ['sell', 'Sells'],
   ['dividend', 'Dividends'],
   ['split', 'Splits'],
+  ['asset', 'Other assets'],
 ];
 
 const cents = (n: number) => Math.round(n * 100) / 100;
@@ -106,9 +121,9 @@ export function buildEntries({
           ? 'Opening'
           : t.kind === 'adjustment'
             ? 'Holding adjustment'
-          : t.kind === 'sell'
-            ? 'Sale'
-            : 'Purchase',
+            : t.kind === 'sell'
+              ? 'Sale'
+              : 'Purchase',
       detail:
         `${t.shares.toLocaleString()} sh` +
         (t.price === null ? '' : ` @ ${money(t.price)}`),
@@ -178,6 +193,115 @@ export function buildEntries({
   );
 }
 
+/**
+ * Gold, savings plan and mutual fund purchases, sales, redemptions and dividends, in the same shape as the stock
+ * entries so Activity shows everything in one list. Statement values are not transactions and are left out.
+ */
+export function buildAssetEntries(
+  assets: { asset: Asset; portfolioName?: string }[],
+  onOpenAssets: () => void,
+): LedgerEntry[] {
+  const out: LedgerEntry[] = [];
+  for (const { asset, portfolioName } of assets) {
+    const where = portfolioName ? ` · ${portfolioName}` : '';
+    const key = (id: string) => `a${portfolioName ?? ''}${asset.id}${id}`;
+    try {
+      if (asset.kind === 'metal') {
+        const gains = new Map(
+          metalPosition(asset).history.map((h) => [h.id, h.realizedGain]),
+        );
+        for (const e of asset.entries) {
+          out.push({
+            key: key(e.id),
+            date: e.date,
+            ticker: asset.name,
+            type: e.type,
+            label:
+              e.type === 'opening'
+                ? 'Opening'
+                : e.type === 'sell'
+                  ? 'Sale'
+                  : 'Purchase',
+            detail: `${describePieces(e)}${e.form ? ` · ${e.form}` : ''}${where}`,
+            fees: null,
+            amount: e.amount,
+            inflow: e.type === 'sell',
+            voided: !!e.voided,
+            assetKind: asset.metal === 'gold' ? 'Gold' : 'Silver',
+            realizedGain:
+              e.type === 'sell' ? (gains.get(e.id) ?? null) : undefined,
+            correct: onOpenAssets,
+          });
+        }
+      } else if (asset.kind === 'plan') {
+        for (const e of asset.entries) {
+          const paidIn = e.type === 'contribution';
+          out.push({
+            key: key(e.id),
+            date: e.date,
+            ticker: asset.name,
+            type: paidIn ? 'buy' : 'sell',
+            label: paidIn ? 'Paid in' : 'Redeemed',
+            detail: `${paidIn ? 'Contribution to the plan' : 'Cash taken out of the plan'}${where}`,
+            fees: null,
+            amount: e.amount,
+            inflow: !paidIn,
+            voided: !!e.voided,
+            assetKind: 'Plan',
+            noGain: !paidIn,
+            correct: onOpenAssets,
+          });
+        }
+      } else {
+        const gains = new Map(
+          fundPosition(asset).history.map((h) => [h.id, h.realizedGain]),
+        );
+        for (const e of asset.entries) {
+          const units =
+            e.units === undefined
+              ? ''
+              : `${Math.round(e.units * 10000) / 10000} units`;
+          out.push({
+            key: key(e.id),
+            date: e.date,
+            ticker: asset.name,
+            type:
+              e.type === 'redeem'
+                ? 'sell'
+                : e.type === 'dividend' || e.type === 'reinvest'
+                  ? 'dividend'
+                  : e.type === 'opening'
+                    ? 'opening'
+                    : 'buy',
+            label:
+              e.type === 'opening'
+                ? 'Opening'
+                : e.type === 'redeem'
+                  ? 'Redemption'
+                  : e.type === 'dividend'
+                    ? 'Dividend'
+                    : e.type === 'reinvest'
+                      ? 'Reinvested'
+                      : 'Purchase',
+            detail: `${units || 'Cash payout'}${e.type === 'reinvest' ? ' · dividend reinvested' : ''}${where}`,
+            fees: null,
+            amount: e.amount,
+            inflow: e.type === 'redeem' || e.type === 'dividend',
+            voided: !!e.voided,
+            assetKind: 'Fund',
+            realizedGain:
+              e.type === 'redeem' ? (gains.get(e.id) ?? null) : undefined,
+            correct: onOpenAssets,
+          });
+        }
+      }
+    } catch {
+      // An asset with an invalid history is reported on its own card; skip it here rather than break Activity.
+    }
+  }
+  return out;
+}
+
 export default function LedgerTimeline({
   portfolio,
   entries,
@@ -206,7 +330,8 @@ export default function LedgerTimeline({
   const gains = useMemo(() => {
     const out = new Map<string, number | null>();
     try {
-      for (const s of realizedSales(portfolio)) out.set('t' + s.tradeId, s.realizedGain);
+      for (const s of realizedSales(portfolio))
+        out.set('t' + s.tradeId, s.realizedGain);
     } catch {
       // An invalid ledger is reported elsewhere; skip gains rather than break Activity.
     }
@@ -222,7 +347,7 @@ export default function LedgerTimeline({
     (e) =>
       (showVoided || !e.voided) &&
       (filter === 'all' ||
-        e.type === filter ||
+        (filter === 'asset' ? !!e.assetKind : e.type === filter) ||
         (filter === 'buy' && e.type === 'opening')) &&
       matchesSearch(e),
   );
@@ -233,11 +358,14 @@ export default function LedgerTimeline({
       .filter((e) => types.includes(e.type) && !e.expected)
       .reduce((a, e) => a + (e.amount ?? 0), 0);
   const fees = live.reduce((a, e) => a + (e.fees ?? 0), 0);
-  const sales = live.filter((e) => e.type === 'sell');
-  const pnlKnown = sales.filter((e) => gains.get(e.key) != null);
-  const pnl = cents(pnlKnown.reduce((a, e) => a + (gains.get(e.key) ?? 0), 0));
+  const gainOf = (e: LedgerEntry) =>
+    e.realizedGain !== undefined ? e.realizedGain : (gains.get(e.key) ?? null);
+  const sales = live.filter((e) => e.type === 'sell' && !e.noGain);
+  const pnlKnown = sales.filter((e) => gainOf(e) != null);
+  const pnl = cents(pnlKnown.reduce((a, e) => a + (gainOf(e) ?? 0), 0));
   const pnlUnknown = sales.length - pnlKnown.length;
-  const signed = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '') + money(Math.abs(n));
+  const signed = (n: number) =>
+    (n > 0 ? '+' : n < 0 ? '−' : '') + money(Math.abs(n));
 
   const groups: [string, LedgerEntry[]][] = [];
   for (const e of visible) {
@@ -261,35 +389,41 @@ export default function LedgerTimeline({
   return (
     <div className="ledger">
       {!hideKpis && (
-      <div className="ledger-kpis">
-        <div>
-          <span>Invested</span>
-          <b>{money(cents(sum(['buy', 'opening'])))}</b>
+        <div className="ledger-kpis">
+          <div>
+            <span>Invested</span>
+            <b>{money(cents(sum(['buy', 'opening'])))}</b>
+          </div>
+          <div>
+            <span>Sold</span>
+            <b>{money(cents(sum(['sell'])))}</b>
+          </div>
+          <div>
+            <span>Realized profit / loss</span>
+            {sales.length === 0 ? (
+              <b>—</b>
+            ) : (
+              <b
+                className={
+                  pnl > 0 ? 'pos-text' : pnl < 0 ? 'neg-text' : undefined
+                }
+              >
+                {signed(pnl)}
+              </b>
+            )}
+            {pnlUnknown > 0 && (
+              <small>{pnlUnknown} sale(s) without a cost basis</small>
+            )}
+          </div>
+          <div>
+            <span>Dividends received</span>
+            <b className="pos-text">{money(cents(sum(['dividend'])))}</b>
+          </div>
+          <div>
+            <span>Fees paid</span>
+            <b>{money(cents(fees))}</b>
+          </div>
         </div>
-        <div>
-          <span>Sold</span>
-          <b>{money(cents(sum(['sell'])))}</b>
-        </div>
-        <div>
-          <span>Realized profit / loss</span>
-          {sales.length === 0 ? (
-            <b>—</b>
-          ) : (
-            <b className={pnl > 0 ? 'pos-text' : pnl < 0 ? 'neg-text' : undefined}>
-              {signed(pnl)}
-            </b>
-          )}
-          {pnlUnknown > 0 && <small>{pnlUnknown} sale(s) without a cost basis</small>}
-        </div>
-        <div>
-          <span>Dividends received</span>
-          <b className="pos-text">{money(cents(sum(['dividend'])))}</b>
-        </div>
-        <div>
-          <span>Fees paid</span>
-          <b>{money(cents(fees))}</b>
-        </div>
-      </div>
       )}
       <div className="ledger-bar">
         <div className="seg" aria-label="Entry type">
@@ -385,10 +519,17 @@ export default function LedgerTimeline({
                           <button
                             type="button"
                             className="quote-btn ticker"
-                            onClick={() => onOpenCompany?.(e.ticker)}
+                            onClick={() =>
+                              e.assetKind
+                                ? e.correct()
+                                : onOpenCompany?.(e.ticker)
+                            }
                           >
                             {e.ticker}
                           </button>
+                        )}
+                        {e.assetKind && (
+                          <span className="ledger-sip">{e.assetKind}</span>
                         )}
                         {e.sipMonth && (
                           <span className="ledger-sip">
@@ -398,15 +539,21 @@ export default function LedgerTimeline({
                       </span>
                       <small>
                         {e.detail}
-                        {e.type === 'sell' && !e.voided && gains.get(e.key) != null && (
-                          <>
-                            {' · '}
-                            <span className={gains.get(e.key)! >= 0 ? 'pos-text' : 'neg-text'}>
-                              {gains.get(e.key)! >= 0 ? 'Profit ' : 'Loss '}
-                              {money(Math.abs(gains.get(e.key)!))}
-                            </span>
-                          </>
-                        )}
+                        {e.type === 'sell' &&
+                          !e.voided &&
+                          gainOf(e) != null && (
+                            <>
+                              {' · '}
+                              <span
+                                className={
+                                  gainOf(e)! >= 0 ? 'pos-text' : 'neg-text'
+                                }
+                              >
+                                {gainOf(e)! >= 0 ? 'Profit ' : 'Loss '}
+                                {money(Math.abs(gainOf(e)!))}
+                              </span>
+                            </>
+                          )}
                         {e.voided ? ' · voided' : ''}
                       </small>
                       {!e.voided && e.confirm && (
@@ -434,7 +581,11 @@ export default function LedgerTimeline({
                       <button
                         type="button"
                         className="secondary compact ledger-edit"
-                        aria-label={`Correct ${e.label.toLowerCase()} for ${e.ticker}`}
+                        aria-label={
+                          e.assetKind
+                            ? `Open ${e.ticker} in Holdings to correct it`
+                            : `Correct ${e.label.toLowerCase()} for ${e.ticker}`
+                        }
                         onClick={e.correct}
                       >
                         <Pencil size={13} />

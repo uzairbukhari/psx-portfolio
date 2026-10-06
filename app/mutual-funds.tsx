@@ -24,6 +24,8 @@ import { dueEntries } from '@/lib/plans';
 import type { FundCatalogResponse, FundNavRow } from '@/lib/mufap';
 import { money, moneyShort, today } from '@/lib/portfolio';
 import { useFundHistory } from './use-fund-data';
+import AssetHistory, { type HistoryRow } from './asset-history';
+import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedFund = { asset: FundAsset; portfolioName?: string };
 type Catalog = FundCatalogResponse['funds'];
@@ -78,6 +80,7 @@ export default function MutualFundsSection({
   catalogError,
   canEdit,
   busy,
+  addRequest = 0,
   onChange,
 }: {
   owned: OwnedFund[];
@@ -86,6 +89,8 @@ export default function MutualFundsSection({
   catalogError: string;
   canEdit: boolean;
   busy: boolean;
+  /** Bumped by the page's + menu to open the add dialog. */
+  addRequest?: number;
   onChange: (funds: FundAsset[], message: string) => Promise<void>;
 }) {
   const asOf = today();
@@ -102,6 +107,27 @@ export default function MutualFundsSection({
     [owned, navs, asOf],
   );
 
+  // Open the add dialog when the page's + menu asks for it (set during render, not in an effect).
+  const [seenRequest, setSeenRequest] = useState(addRequest);
+  if (addRequest !== seenRequest) {
+    setSeenRequest(addRequest);
+    if (addRequest > 0 && canEdit) setMode({ kind: 'add' });
+  }
+  const totals = useMemo(() => {
+    const known = rows.every((r) => r.v.value !== null);
+    return {
+      value: known ? rows.reduce((a, r) => a + (r.v.value ?? 0), 0) : null,
+      cost: rows.every((r) => r.v.cost !== null)
+        ? rows.reduce((a, r) => a + (r.v.cost ?? 0), 0)
+        : null,
+      gain: rows.every((r) => r.v.gain !== null)
+        ? rows.reduce((a, r) => a + (r.v.gain ?? 0), 0)
+        : null,
+      dividends: rows.reduce((a, r) => a + r.v.dividends, 0),
+      held: rows.filter((r) => r.v.units > 0).length,
+    };
+  }, [rows]);
+
   async function update(
     fundId: string,
     change: (f: FundAsset) => FundAsset,
@@ -116,38 +142,65 @@ export default function MutualFundsSection({
     );
   }
 
+  const dialog = mode ? (
+    <FundDialog
+      mode={mode}
+      funds={funds}
+      catalog={catalog}
+      navs={navs}
+      busy={busy}
+      onClose={() => setMode(null)}
+      onSave={async (next, message) => {
+        await onChange(next, message);
+        setMode(null);
+      }}
+    />
+  ) : null;
+  if (rows.length === 0) return dialog;
+
   return (
-    <section className="panel metal-section" aria-label="Mutual funds">
-      <div className="holdings-head">
-        <h2>
-          Mutual funds
-          <span className="count-badge">
-            {rows.filter((r) => r.v.units > 0).length} held
-          </span>
-        </h2>
-        {canEdit && (
-          <button
-            type="button"
-            className="secondary compact holdings-add"
-            disabled={busy}
-            onClick={() => setMode({ kind: 'add' })}
-          >
-            <Plus size={15} />{' '}
-            <span className="holdings-add__label">Add a mutual fund</span>
-          </button>
+    <>
+      <CollapsiblePanel
+        id="mutual-funds"
+        title="Mutual funds"
+        badge={`${totals.held} held`}
+        figures={[
+          {
+            label: 'Value',
+            value:
+              totals.value === null ? 'Price needed' : moneyShort(totals.value),
+          },
+          {
+            label: 'Remaining cost',
+            value:
+              totals.cost === null ? 'Not yet known' : moneyShort(totals.cost),
+          },
+          {
+            label: 'Gain / loss',
+            value: totals.gain === null ? 'Not yet known' : signed(totals.gain),
+            tone: tone(totals.gain),
+          },
+          { label: 'Dividends', value: moneyShort(totals.dividends) },
+        ]}
+        actions={
+          canEdit && (
+            <button
+              type="button"
+              className="secondary compact holdings-add"
+              disabled={busy}
+              onClick={() => setMode({ kind: 'add' })}
+            >
+              <Plus size={15} />{' '}
+              <span className="holdings-add__label">Add a mutual fund</span>
+            </button>
+          )
+        }
+      >
+        {catalogError && (
+          <p className="notice">Could not load fund prices: {catalogError}</p>
         )}
-      </div>
-      {catalogError && (
-        <p className="notice">Could not load fund prices: {catalogError}</p>
-      )}
-      {error && <p className="notice error">{error}</p>}
-      {rows.length === 0 ? (
-        <p className="muted">
-          Pick any fund from any company (Al Meezan, MCB, NBP, HBL and the
-          rest), then record each purchase, redemption and dividend.
-        </p>
-      ) : (
-        rows.map(({ asset, v, due, portfolioName }) => (
+        {error && <p className="notice error">{error}</p>}
+        {rows.map(({ asset, v, due, portfolioName }) => (
           <article
             className="metal-asset"
             key={`${asset.id}-${portfolioName ?? ''}`}
@@ -367,23 +420,10 @@ export default function MutualFundsSection({
               }
             />
           </article>
-        ))
-      )}
-      {mode && (
-        <FundDialog
-          mode={mode}
-          funds={funds}
-          catalog={catalog}
-          navs={navs}
-          busy={busy}
-          onClose={() => setMode(null)}
-          onSave={async (next, message) => {
-            await onChange(next, message);
-            setMode(null);
-          }}
-        />
-      )}
-    </section>
+        ))}
+      </CollapsiblePanel>
+      {dialog}
+    </>
   );
 }
 
@@ -406,15 +446,55 @@ function FundHistory({
     date: n.date,
     nav: n.repurchase > 0 ? n.repurchase : n.nav,
   }));
+  const rows: HistoryRow[] = [...asset.entries]
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .map((e) => {
+      const h = v.history.find((x) => x.id === e.id);
+      const inflow = e.type === 'redeem' || e.type === 'dividend';
+      return {
+        id: e.id,
+        date: dateText(e.date),
+        tag:
+          e.type === 'redeem'
+            ? 'sell'
+            : e.type === 'dividend' || e.type === 'reinvest'
+              ? 'income'
+              : e.type === 'buy'
+                ? 'buy'
+                : 'neutral',
+        tagLabel: TYPE_LABEL[e.type],
+        title:
+          e.units === undefined ? 'Cash payout' : `${units(e.units)} units`,
+        note: e.taxWithheld
+          ? `Tax withheld ${money(e.taxWithheld)}`
+          : e.note || undefined,
+        amount:
+          e.amount === null
+            ? 'Cost unknown'
+            : e.type === 'reinvest'
+              ? money(e.amount)
+              : `${inflow ? '+' : '−'}${money(e.amount)}`,
+        amountTone: inflow ? 'pos-text' : '',
+        meta: [
+          h ? `Holding ${units(h.heldAfter)} units` : '',
+          h?.realizedGain != null ? `Gain ${signed(h.realizedGain)}` : '',
+        ].filter(Boolean),
+        voided: !!e.voided,
+        action: canEdit
+          ? {
+              label: e.voided ? 'Restore' : 'Void',
+              disabled: busy,
+              onClick: () => onToggle(e.id),
+            }
+          : undefined,
+      } satisfies HistoryRow;
+    });
   return (
-    <details
-      className="metal-history"
-      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+    <AssetHistory
+      rows={rows}
+      onOpenChange={setOpen}
+      summary={`${v.history.length} ${v.history.length === 1 ? 'entry' : 'entries'} and price chart`}
     >
-      <summary>
-        History and price chart ({v.history.length}{' '}
-        {v.history.length === 1 ? 'entry' : 'entries'})
-      </summary>
       {data.length > 1 ? (
         <ChartContainer
           config={{
@@ -457,67 +537,13 @@ function FundHistory({
             />
           </LineChart>
         </ChartContainer>
-      ) : open ? (
+      ) : (
         <p className="report-source">
           {history.error ||
             'The price chart builds up day by day from when this feature started; there is nothing older to show yet.'}
         </p>
-      ) : null}
-      <div className="scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Units</th>
-              <th>Amount</th>
-              <th>Held after</th>
-              <th>Gain on sale</th>
-              {canEdit && <th aria-label="Actions" />}
-            </tr>
-          </thead>
-          <tbody>
-            {[...asset.entries]
-              .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-              .map((e) => {
-                const h = v.history.find((x) => x.id === e.id);
-                return (
-                  <tr key={e.id} className={e.voided ? 'voided' : undefined}>
-                    <td>{dateText(e.date)}</td>
-                    <td>
-                      {TYPE_LABEL[e.type]}
-                      {e.voided ? ' · voided' : ''}
-                      {e.taxWithheld ? (
-                        <small>tax withheld {money(e.taxWithheld)}</small>
-                      ) : null}
-                    </td>
-                    <td>{e.units === undefined ? '—' : units(e.units)}</td>
-                    <td className="amount">
-                      {e.amount === null ? 'unknown' : money(e.amount)}
-                    </td>
-                    <td>{h ? units(h.heldAfter) : '—'}</td>
-                    <td className={tone(h?.realizedGain ?? null)}>
-                      {h?.realizedGain == null ? '—' : signed(h.realizedGain)}
-                    </td>
-                    {canEdit && (
-                      <td>
-                        <button
-                          type="button"
-                          className="secondary compact"
-                          disabled={busy}
-                          onClick={() => onToggle(e.id)}
-                        >
-                          {e.voided ? 'Restore' : 'Void'}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
-    </details>
+      )}
+    </AssetHistory>
   );
 }
 

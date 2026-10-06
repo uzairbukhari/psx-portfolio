@@ -18,6 +18,8 @@ import {
   type PlanAsset,
 } from '@/lib/plans';
 import { money, moneyShort, today } from '@/lib/portfolio';
+import AssetHistory, { type HistoryRow } from './asset-history';
+import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedPlan = { asset: PlanAsset; portfolioName?: string };
 type Mode =
@@ -40,6 +42,80 @@ const monthText = (month: string) =>
     year: 'numeric',
     timeZone: 'UTC',
   });
+function planHistoryRows(
+  asset: PlanAsset,
+  canEdit: boolean,
+  busy: boolean,
+  update: (
+    planId: string,
+    change: (plan: PlanAsset) => PlanAsset,
+    message: string,
+  ) => Promise<void>,
+): HistoryRow[] {
+  const toggle = (kind: 'entry' | 'value', key: string) =>
+    void update(
+      asset.id,
+      (p) =>
+        kind === 'entry'
+          ? {
+              ...p,
+              entries: p.entries.map((e) =>
+                e.id === key ? { ...e, voided: !e.voided } : e,
+              ),
+            }
+          : {
+              ...p,
+              valuations: p.valuations.map((x) =>
+                x.id === key ? { ...x, voided: !x.voided } : x,
+              ),
+            },
+      'Record updated.',
+    );
+  const rows: (HistoryRow & { sort: string })[] = [
+    ...asset.entries.map((e) => ({
+      id: e.id,
+      sort: e.date,
+      date: dateText(e.date),
+      tag: e.type === 'contribution' ? ('buy' as const) : ('sell' as const),
+      tagLabel: e.type === 'contribution' ? 'Paid in' : 'Redeemed',
+      title:
+        e.type === 'contribution'
+          ? 'Contribution to the plan'
+          : 'Cash taken out',
+      note: e.note || undefined,
+      amount: `${e.type === 'contribution' ? '−' : '+'}${money(e.amount)}`,
+      amountTone: e.type === 'contribution' ? '' : 'pos-text',
+      voided: !!e.voided,
+      action: canEdit
+        ? {
+            label: e.voided ? 'Restore' : 'Void',
+            disabled: busy,
+            onClick: () => toggle('entry', e.id),
+          }
+        : undefined,
+    })),
+    ...asset.valuations.map((x) => ({
+      id: x.id,
+      sort: x.date,
+      date: dateText(x.date),
+      tag: 'value' as const,
+      tagLabel: 'Statement',
+      title: 'Value from your statement',
+      note: x.note || undefined,
+      amount: money(x.value),
+      voided: !!x.voided,
+      action: canEdit
+        ? {
+            label: x.voided ? 'Restore' : 'Void',
+            disabled: busy,
+            onClick: () => toggle('value', x.id),
+          }
+        : undefined,
+    })),
+  ];
+  return rows.sort((a, b) => (a.sort < b.sort ? 1 : a.sort > b.sort ? -1 : 0));
+}
+
 const id = () =>
   `r-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 
@@ -52,11 +128,14 @@ export default function SavingsPlansSection({
   owned,
   canEdit,
   busy,
+  addRequest = 0,
   onChange,
 }: {
   owned: OwnedPlan[];
   canEdit: boolean;
   busy: boolean;
+  /** Bumped by the page's + menu to open the add dialog. */
+  addRequest?: number;
   /** Receives this portfolio's complete plan list after any change. */
   onChange: (plans: PlanAsset[], message: string) => Promise<void>;
 }) {
@@ -74,6 +153,22 @@ export default function SavingsPlansSection({
     [owned, asOf],
   );
 
+  // Open the add dialog when the page's + menu asks for it (set during render, not in an effect).
+  const [seenRequest, setSeenRequest] = useState(addRequest);
+  if (addRequest !== seenRequest) {
+    setSeenRequest(addRequest);
+    if (addRequest > 0 && canEdit) setMode({ kind: 'plan' });
+  }
+  const totals = useMemo(
+    () => ({
+      value: rows.reduce((a, r) => a + r.v.value, 0),
+      cost: rows.reduce((a, r) => a + r.v.cost, 0),
+      gain: rows.reduce((a, r) => a + r.v.gain, 0),
+      active: rows.filter((r) => !r.asset.closed).length,
+    }),
+    [rows],
+  );
+
   async function update(
     planId: string,
     change: (plan: PlanAsset) => PlanAsset,
@@ -88,36 +183,51 @@ export default function SavingsPlansSection({
     );
   }
 
+  const dialog = mode ? (
+    <PlanDialog
+      mode={mode}
+      plans={plans}
+      busy={busy}
+      onClose={() => setMode(null)}
+      onSave={async (next, message) => {
+        await onChange(next, message);
+        setMode(null);
+      }}
+    />
+  ) : null;
+  if (rows.length === 0) return dialog;
+
   return (
-    <section className="panel metal-section" aria-label="Savings plans">
-      <div className="holdings-head">
-        <h2>
-          Savings plans
-          <span className="count-badge">
-            {rows.filter((r) => !r.asset.closed).length} active
-          </span>
-        </h2>
-        {canEdit && (
-          <button
-            type="button"
-            className="secondary compact holdings-add"
-            disabled={busy}
-            onClick={() => setMode({ kind: 'plan' })}
-          >
-            <Plus size={15} />{' '}
-            <span className="holdings-add__label">Add a savings plan</span>
-          </button>
-        )}
-      </div>
-      {error && <p className="notice error">{error}</p>}
-      {rows.length === 0 ? (
-        <p className="muted">
-          Track Pak-Qatar Mahana Bachat or any plan where you pay in and the
-          provider reports a value. Gains stay inside the plan; cash you redeem
-          is recorded.
-        </p>
-      ) : (
-        rows.map(({ asset, v, due, portfolioName }) => (
+    <>
+      <CollapsiblePanel
+        id="savings-plans"
+        title="Savings plans"
+        badge={`${totals.active} active`}
+        figures={[
+          { label: 'Value', value: moneyShort(totals.value) },
+          { label: 'Still in', value: moneyShort(totals.cost) },
+          {
+            label: 'Gain (incl. redeemed)',
+            value: signed(totals.gain),
+            tone: tone(totals.gain),
+          },
+        ]}
+        actions={
+          canEdit && (
+            <button
+              type="button"
+              className="secondary compact holdings-add"
+              disabled={busy}
+              onClick={() => setMode({ kind: 'plan' })}
+            >
+              <Plus size={15} />{' '}
+              <span className="holdings-add__label">Add a savings plan</span>
+            </button>
+          )
+        }
+      >
+        {error && <p className="notice error">{error}</p>}
+        {rows.map(({ asset, v, due, portfolioName }) => (
           <article
             className="metal-asset"
             key={`${asset.id}-${portfolioName ?? ''}`}
@@ -302,117 +412,15 @@ export default function SavingsPlansSection({
                   )}
                 </p>
               ))}
-            <details className="metal-history">
-              <summary>
-                History ({asset.entries.length + asset.valuations.length}{' '}
-                records)
-              </summary>
-              <div className="scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Record</th>
-                      <th>Amount</th>
-                      {canEdit && <th aria-label="Actions" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      ...asset.entries.map((e) => ({
-                        key: e.id,
-                        date: e.date,
-                        label:
-                          e.type === 'contribution'
-                            ? 'Paid in'
-                            : 'Cash redeemed',
-                        amount: e.amount,
-                        voided: !!e.voided,
-                        note: e.note,
-                        kind: 'entry' as const,
-                      })),
-                      ...asset.valuations.map((x) => ({
-                        key: x.id,
-                        date: x.date,
-                        label: 'Statement value',
-                        amount: x.value,
-                        voided: !!x.voided,
-                        note: x.note,
-                        kind: 'value' as const,
-                      })),
-                    ]
-                      .sort((a, b) =>
-                        a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
-                      )
-                      .map((row) => (
-                        <tr
-                          key={row.key}
-                          className={row.voided ? 'voided' : undefined}
-                        >
-                          <td>{dateText(row.date)}</td>
-                          <td>
-                            {row.label}
-                            {row.voided ? ' · voided' : ''}
-                            {row.note ? <small>{row.note}</small> : null}
-                          </td>
-                          <td className="amount">{money(row.amount)}</td>
-                          {canEdit && (
-                            <td>
-                              <button
-                                type="button"
-                                className="secondary compact"
-                                disabled={busy}
-                                onClick={() =>
-                                  void update(
-                                    asset.id,
-                                    (p) =>
-                                      row.kind === 'entry'
-                                        ? {
-                                            ...p,
-                                            entries: p.entries.map((e) =>
-                                              e.id === row.key
-                                                ? { ...e, voided: !e.voided }
-                                                : e,
-                                            ),
-                                          }
-                                        : {
-                                            ...p,
-                                            valuations: p.valuations.map((x) =>
-                                              x.id === row.key
-                                                ? { ...x, voided: !x.voided }
-                                                : x,
-                                            ),
-                                          },
-                                    'Record updated.',
-                                  )
-                                }
-                              >
-                                {row.voided ? 'Restore' : 'Void'}
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
+            <AssetHistory
+              summary={`${asset.entries.length + asset.valuations.length} records`}
+              rows={planHistoryRows(asset, canEdit, busy, update)}
+            />
           </article>
-        ))
-      )}
-      {mode && (
-        <PlanDialog
-          mode={mode}
-          plans={plans}
-          busy={busy}
-          onClose={() => setMode(null)}
-          onSave={async (next, message) => {
-            await onChange(next, message);
-            setMode(null);
-          }}
-        />
-      )}
-    </section>
+        ))}
+      </CollapsiblePanel>
+      {dialog}
+    </>
   );
 }
 

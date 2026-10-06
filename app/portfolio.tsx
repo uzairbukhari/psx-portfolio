@@ -97,8 +97,13 @@ import SavingsPlansSection, { type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
 import MutualFundsSection, { type OwnedFund } from './mutual-funds';
 import { useFundCatalog } from './use-fund-data';
+import CollapsiblePanel from './collapsible-panel';
+import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
 import CompanyDetail from './company-detail';
-import LedgerTimeline, { buildEntries } from './ledger-timeline';
+import LedgerTimeline, {
+  buildAssetEntries,
+  buildEntries,
+} from './ledger-timeline';
 import { CompanyNavProvider } from './ticker-link';
 import ResearchDesk from './research-desk';
 import AiLab from './ai-lab';
@@ -1147,6 +1152,10 @@ function DashboardContent({
         )
       : p?.assets?.some((a) => a.kind === 'metal')),
   );
+  const [assetAdd, setAssetAdd] = useState<{
+    kind: 'metal' | 'plan' | 'fund';
+    n: number;
+  }>({ kind: 'metal', n: 0 });
   const fundData = useFundCatalog(
     !!(isAll
       ? p?.[DISPLAY_PARTS]?.some((part) =>
@@ -1632,20 +1641,25 @@ function DashboardContent({
     tab === 'settings' || tab === 'company' || tab === 'notifications';
   const taxedDividends = taxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
-    buildEntries({
-      trades: p.trades.filter((t) => !ticker || t.ticker === ticker),
-      dividends: (p.dividends ?? []).filter(
-        (d) => !ticker || d.ticker === ticker,
-      ),
-      splits: (p.stockSplits ?? []).filter(
-        (x) => !ticker || x.ticker === ticker,
-      ),
-      taxed: taxedDividends,
-      onCorrectTrade: correctTrade,
-      onCorrectDividend: correctDividend,
-      onCorrectSplit: correctStockSplit,
-      onConfirmDividend: openReceipt,
-    });
+    [
+      ...buildAssetEntries(ticker ? [] : allAssets, () => setTab('holdings')),
+      ...buildEntries({
+        trades: p.trades.filter((t) => !ticker || t.ticker === ticker),
+        dividends: (p.dividends ?? []).filter(
+          (d) => !ticker || d.ticker === ticker,
+        ),
+        splits: (p.stockSplits ?? []).filter(
+          (x) => !ticker || x.ticker === ticker,
+        ),
+        taxed: taxedDividends,
+        onCorrectTrade: correctTrade,
+        onCorrectDividend: correctDividend,
+        onCorrectSplit: correctStockSplit,
+        onConfirmDividend: openReceipt,
+      }),
+    ].sort(
+      (a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key),
+    );
   const companySummary = (ticker: string) => {
     const h = hs.find((x) => x.ticker === ticker);
     const div = taxedDividends.filter(
@@ -1674,6 +1688,10 @@ function DashboardContent({
     if (window.location.pathname !== path)
       window.history.pushState(null, '', path);
     window.scrollTo({ top: 0 });
+  }
+  function pickAsset(kind: AssetPick) {
+    if (kind === 'stock') openTx('buy');
+    else setAssetAdd((s) => ({ kind, n: s.n + 1 }));
   }
   /** Opens the one Add transaction dialog, preset to a type and (optionally) a company. */
   function openTx(type: TxType, ticker = '', price: number | null = null) {
@@ -2373,22 +2391,25 @@ function DashboardContent({
                 <span className="empty-holdings-icon" aria-hidden="true">
                   <Briefcase size={26} />
                 </span>
-                <h2>No holdings yet</h2>
+                <h2>Start your portfolio</h2>
                 <p>
-                  Record your first purchase, or import your broker history, to
-                  start tracking your portfolio.
+                  A portfolio can hold stocks, mutual funds, gold or silver and
+                  savings plans. Choose what to add first; you can add the
+                  others any time from the + button.
                 </p>
+                <StartTiles
+                  disabled={busy}
+                  onPick={pickAsset}
+                  only={isAll || locked ? ['stock'] : undefined}
+                />
                 <div className="empty-holdings-actions">
-                  <button disabled={busy} onClick={() => openTx('buy')}>
-                    <Plus size={16} /> Add your first transaction
-                  </button>
                   <button
                     type="button"
                     className="secondary"
                     disabled={busy}
                     onClick={() => emptyImportRef.current?.click()}
                   >
-                    <Upload size={16} /> Import from your broker
+                    <Upload size={16} /> Import stocks from your broker
                   </button>
                   <input
                     ref={emptyImportRef}
@@ -2436,6 +2457,11 @@ function DashboardContent({
                     </button>
                   </p>
                 )}
+                {!isAll && !locked && (
+                  <div className="add-asset">
+                    <AddAssetMenu onPick={pickAsset} disabled={busy} />
+                  </div>
+                )}
                 {overviewParts && overviewParts.length > 1 ? (
                   <AccountOverview
                     parts={overviewParts}
@@ -2443,12 +2469,6 @@ function DashboardContent({
                     metalRates={metalRates.rates}
                     fundNavs={fundData.navs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
-                    onOpenCompany={openCompany}
-                    onSeeAll={() =>
-                      document
-                        .getElementById('all-companies')
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }
                     aside={
                       widePulse ? (
                         <PsxMarketPulse
@@ -2472,7 +2492,7 @@ function DashboardContent({
                       />
                     }
                   />
-                ) : (
+                ) : p.companies.length > 0 ? (
                   <PortfolioValueCard
                     p={p}
                     value={value}
@@ -2492,299 +2512,336 @@ function DashboardContent({
                       ) : undefined
                     }
                   />
-                )}
-                <div className="holdings-head" id="all-companies">
-                  <h2>
-                    {overviewParts && overviewParts.length > 1
-                      ? 'All companies'
-                      : 'Your companies'}
-                    <span className="count-badge">
-                      {held.length} {held.length === 1 ? 'holding' : 'holdings'}
-                    </span>
-                  </h2>
-                  <button
-                    className="secondary compact holdings-add holdings-targets"
-                    disabled={busy || locked}
-                    onClick={() =>
-                      isAll ? setNamedAction(true) : setTargetsOpen(true)
+                ) : null}
+                {p.companies.length > 0 && (
+                  <CollapsiblePanel
+                    id="stocks"
+                    title={
+                      overviewParts && overviewParts.length > 1
+                        ? 'All companies'
+                        : 'Your companies'
                     }
+                    badge={`${held.length} ${held.length === 1 ? 'holding' : 'holdings'}`}
+                    figures={[
+                      {
+                        label: 'Market value',
+                        value:
+                          missing.length && !value
+                            ? 'Prices needed'
+                            : moneyShort(value),
+                      },
+                      {
+                        label: 'Remaining cost',
+                        value: unknown.length
+                          ? 'Not yet known'
+                          : moneyShort(cost),
+                      },
+                      {
+                        label: 'Gain / loss',
+                        value:
+                          gain === null ? 'Not yet known' : moneyShort(gain),
+                        tone:
+                          gain === null
+                            ? ''
+                            : gain >= 0
+                              ? 'pos-text'
+                              : 'neg-text',
+                      },
+                    ]}
                   >
-                    Targets
-                  </button>
-                  <button
-                    className="secondary compact holdings-add"
-                    disabled={busy}
-                    aria-label="Add company"
-                    onClick={() => {
-                      if (isAll) {
-                        setNamedAction(true);
-                        return;
-                      }
-                      if (locked) return;
-                      setCreatingCompany(true);
-                      setCompany({
-                        ticker: '',
-                        name: '',
-                        sector: '',
-                        target: 0,
-                        approved: false,
-                        screenDate: '',
-                        note: '',
-                      });
-                    }}
-                  >
-                    <Plus size={15} />{' '}
-                    <span className="holdings-add__label">Add company</span>
-                  </button>
-                  <select
-                    className="holdings-filter"
-                    aria-label="Filter companies"
-                    value={sectorFilter}
-                    onChange={(e) => setSectorFilter(e.target.value)}
-                  >
-                    <option value="">All sectors</option>
-                    <option value={SHORTLISTED}>Shortlisted only</option>
-                    {sectorsInUse.map((sector) => (
-                      <option key={sector} value={sector}>
-                        {sector}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="holdings-sort">
-                    <select
-                      aria-label="Sort holdings"
-                      value={holdingsSort?.key ?? ''}
-                      onChange={(e) => {
-                        const key = e.target.value as HoldingsSortKey | '';
-                        if (!key) setHoldingsSort(null);
-                        else if (holdingsSort?.key !== key)
-                          toggleHoldingsSort(key);
-                      }}
-                    >
-                      <option value="">Sort: market value</option>
-                      {(
-                        [
-                          ['name', 'Company'],
-                          ['value', 'Market value'],
-                          ['gain', 'Gain / loss'],
-                          ['shares', 'Shares'],
-                          ['average', 'Avg. cost'],
-                          ['price', 'Latest price'],
-                          ['weight', 'Portfolio weight'],
-                        ] as [HoldingsSortKey, string][]
-                      ).map(([key, label]) => (
-                        <option key={key} value={key}>
-                          Sort: {label}
-                        </option>
-                      ))}
-                    </select>
-                    {holdingsSort && (
+                    <div className="holdings-head holdings-head--inline">
                       <button
-                        type="button"
-                        className="secondary compact"
-                        aria-label="Reverse sort order"
-                        onClick={() => toggleHoldingsSort(holdingsSort.key)}
+                        className="secondary compact holdings-add holdings-targets"
+                        disabled={busy || locked}
+                        onClick={() =>
+                          isAll ? setNamedAction(true) : setTargetsOpen(true)
+                        }
                       >
-                        {holdingsSort.dir === 'asc' ? '▲' : '▼'}
+                        Targets
                       </button>
-                    )}
-                  </div>
-                  {soldOut.length > 0 && (
-                    <label className="check-row holdings-soldout">
-                      <Checkbox
-                        checked={showSoldOut}
-                        onCheckedChange={(v) => setShowSoldOut(!!v)}
-                      />{' '}
-                      Show sold out ({soldOut.length})
-                    </label>
-                  )}
-                </div>
-                <div className="holdings-cards">
-                  {displayedHoldings.map((h) => (
-                    <article className="holding-card" key={h.ticker}>
-                      <div className="holding-card__head">
-                        <button
-                          type="button"
-                          className="holding-card__title"
-                          onClick={() => openCompany(h.ticker)}
-                        >
-                          <b className="ticker">{h.ticker}</b>
-                          <small>{h.name}</small>
-                        </button>
-                        {holdingActions(h)}
-                      </div>
-                      <dl className="holding-card__grid">
-                        <div>
-                          <dt>Value</dt>
-                          <dd className="amount">
-                            {h.value === null ? '—' : moneyShort(h.value)}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Gain</dt>
-                          <dd className={gainClass(h)}>
-                            {h.gain === null ? '—' : moneyShort(h.gain)}
-                            {gainPct(h) !== null && (
-                              <small>{gainText(h)}</small>
-                            )}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Shares @ avg cost</dt>
-                          <dd>
-                            {h.shares.toLocaleString()}
-                            <small>
-                              @ {h.average === null ? '—' : money(h.average)}
-                            </small>
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Price</dt>
-                          <dd>
-                            <button
-                              type="button"
-                              className="quote-btn"
-                              onClick={() => openQuoteEntry(h)}
-                            >
-                              {h.quote ? money(h.quote.price) : 'Add price'}
-                            </button>
-                            {h.quote && (
-                              <small>
-                                {h.quote.date}
-                                {h.quote.manual ? ' · manual' : ''}
-                                {h.quote.date !== today()
-                                  ? ' · older quote'
-                                  : ''}
-                              </small>
-                            )}
-                          </dd>
-                        </div>
-                      </dl>
-                    </article>
-                  ))}
-                </div>
-                <section className="panel table-panel holdings-table">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {(
-                          [
-                            ['name', 'Company'],
-                            ['shares', 'Shares'],
-                            ['average', 'Avg. cost'],
-                            ['price', 'Latest price'],
-                            ['value', 'Market value'],
-                            ['gain', 'Gain / loss'],
-                            ['weight', 'Portfolio weight'],
-                          ] as [HoldingsSortKey, string][]
-                        ).map(([key, label]) => (
-                          <TableHead key={key}>
-                            <button
-                              type="button"
-                              className="sort-head"
-                              onClick={() => toggleHoldingsSort(key)}
-                            >
-                              {label}
-                              {sortIndicator(key)}
-                            </button>
-                          </TableHead>
+                      <button
+                        className="secondary compact holdings-add"
+                        disabled={busy}
+                        aria-label="Add company"
+                        onClick={() => {
+                          if (isAll) {
+                            setNamedAction(true);
+                            return;
+                          }
+                          if (locked) return;
+                          setCreatingCompany(true);
+                          setCompany({
+                            ticker: '',
+                            name: '',
+                            sector: '',
+                            target: 0,
+                            approved: false,
+                            screenDate: '',
+                            note: '',
+                          });
+                        }}
+                      >
+                        <Plus size={15} />{' '}
+                        <span className="holdings-add__label">Add company</span>
+                      </button>
+                      <select
+                        className="holdings-filter"
+                        aria-label="Filter companies"
+                        value={sectorFilter}
+                        onChange={(e) => setSectorFilter(e.target.value)}
+                      >
+                        <option value="">All sectors</option>
+                        <option value={SHORTLISTED}>Shortlisted only</option>
+                        {sectorsInUse.map((sector) => (
+                          <option key={sector} value={sector}>
+                            {sector}
+                          </option>
                         ))}
-                        <TableHead />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                      </select>
+                      <div className="holdings-sort">
+                        <select
+                          aria-label="Sort holdings"
+                          value={holdingsSort?.key ?? ''}
+                          onChange={(e) => {
+                            const key = e.target.value as HoldingsSortKey | '';
+                            if (!key) setHoldingsSort(null);
+                            else if (holdingsSort?.key !== key)
+                              toggleHoldingsSort(key);
+                          }}
+                        >
+                          <option value="">Sort: market value</option>
+                          {(
+                            [
+                              ['name', 'Company'],
+                              ['value', 'Market value'],
+                              ['gain', 'Gain / loss'],
+                              ['shares', 'Shares'],
+                              ['average', 'Avg. cost'],
+                              ['price', 'Latest price'],
+                              ['weight', 'Portfolio weight'],
+                            ] as [HoldingsSortKey, string][]
+                          ).map(([key, label]) => (
+                            <option key={key} value={key}>
+                              Sort: {label}
+                            </option>
+                          ))}
+                        </select>
+                        {holdingsSort && (
+                          <button
+                            type="button"
+                            className="secondary compact"
+                            aria-label="Reverse sort order"
+                            onClick={() => toggleHoldingsSort(holdingsSort.key)}
+                          >
+                            {holdingsSort.dir === 'asc' ? '▲' : '▼'}
+                          </button>
+                        )}
+                      </div>
+                      {soldOut.length > 0 && (
+                        <label className="check-row holdings-soldout">
+                          <Checkbox
+                            checked={showSoldOut}
+                            onCheckedChange={(v) => setShowSoldOut(!!v)}
+                          />{' '}
+                          Show sold out ({soldOut.length})
+                        </label>
+                      )}
+                    </div>
+                    <div className="holdings-cards">
                       {displayedHoldings.map((h) => (
-                        <TableRow key={h.ticker}>
-                          <TableCell>
+                        <article className="holding-card" key={h.ticker}>
+                          <div className="holding-card__head">
                             <button
-                              className="quote-btn ticker"
+                              type="button"
+                              className="holding-card__title"
                               onClick={() => openCompany(h.ticker)}
                             >
-                              {h.ticker}
+                              <b className="ticker">{h.ticker}</b>
+                              <small>{h.name}</small>
                             </button>
-                            {h.target > 0 && (
-                              <span
-                                className="shortlist-dot"
-                                title="On SIP shortlist"
-                                aria-label="On SIP shortlist"
-                              />
-                            )}
-                            <small>
-                              {h.name}
-                              {h.sector ? ` · ${h.sector}` : ''}
-                            </small>
-                            {h.target > 0 && (
-                              <span
-                                className="shortlist-dot"
-                                title="On SIP shortlist"
-                                aria-label="On SIP shortlist"
-                              />
-                            )}
-                          </TableCell>
-                          <TableCell className="amount">
-                            {h.shares.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            {h.average === null ? '—' : money(h.average)}
-                          </TableCell>
-                          <TableCell>
-                            <button
-                              className="quote-btn"
-                              onClick={() => {
-                                setQuoteTicker(h.ticker);
-                                setQuotePrice(h.quote?.price.toString() ?? '');
-                                setQuoteDate(h.quote?.date ?? today());
-                              }}
-                            >
-                              {h.quote ? money(h.quote.price) : 'Add price'}
-                            </button>
-                            {h.quote && (
-                              <small>
-                                {h.quote.date}
-                                {h.quote.manual ? ' · manual' : ''}
-                                {h.quote.date !== today()
-                                  ? ' · older quote'
-                                  : ''}
-                              </small>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {h.value === null ? '—' : moneyShort(h.value)}
-                          </TableCell>
-                          <TableCell className={gainClass(h)}>
-                            {h.gain === null ? '—' : moneyShort(h.gain)}
-                            {gainPct(h) !== null && (
-                              <small>{gainText(h)}</small>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {!missing.length && value > 0 ? (
-                              <>
-                                <span>
-                                  {(((h.value ?? 0) / value) * 100).toFixed(1)}%
-                                </span>
-                                <div className="bar">
-                                  <i
-                                    style={{
-                                      width: `${((h.value ?? 0) / value) * 100}%`,
-                                    }}
-                                  />
-                                </div>
-                              </>
-                            ) : (
-                              '—'
-                            )}
-                          </TableCell>
-                          <TableCell>{holdingActions(h)}</TableCell>
-                        </TableRow>
+                            {holdingActions(h)}
+                          </div>
+                          <dl className="holding-card__grid">
+                            <div>
+                              <dt>Value</dt>
+                              <dd className="amount">
+                                {h.value === null ? '—' : moneyShort(h.value)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Gain</dt>
+                              <dd className={gainClass(h)}>
+                                {h.gain === null ? '—' : moneyShort(h.gain)}
+                                {gainPct(h) !== null && (
+                                  <small>{gainText(h)}</small>
+                                )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Shares @ avg cost</dt>
+                              <dd>
+                                {h.shares.toLocaleString()}
+                                <small>
+                                  @{' '}
+                                  {h.average === null ? '—' : money(h.average)}
+                                </small>
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Price</dt>
+                              <dd>
+                                <button
+                                  type="button"
+                                  className="quote-btn"
+                                  onClick={() => openQuoteEntry(h)}
+                                >
+                                  {h.quote ? money(h.quote.price) : 'Add price'}
+                                </button>
+                                {h.quote && (
+                                  <small>
+                                    {h.quote.date}
+                                    {h.quote.manual ? ' · manual' : ''}
+                                    {h.quote.date !== today()
+                                      ? ' · older quote'
+                                      : ''}
+                                  </small>
+                                )}
+                              </dd>
+                            </div>
+                          </dl>
+                        </article>
                       ))}
-                    </TableBody>
-                  </Table>
-                  <p className="table-note">
-                    A dash means unknown, not zero. Quotes may be delayed.
-                    Market values exclude cash and unrecorded corporate actions.
-                  </p>
-                </section>
+                    </div>
+                    <section className="panel table-panel holdings-table">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {(
+                              [
+                                ['name', 'Company'],
+                                ['shares', 'Shares'],
+                                ['average', 'Avg. cost'],
+                                ['price', 'Latest price'],
+                                ['value', 'Market value'],
+                                ['gain', 'Gain / loss'],
+                                ['weight', 'Portfolio weight'],
+                              ] as [HoldingsSortKey, string][]
+                            ).map(([key, label]) => (
+                              <TableHead key={key}>
+                                <button
+                                  type="button"
+                                  className="sort-head"
+                                  onClick={() => toggleHoldingsSort(key)}
+                                >
+                                  {label}
+                                  {sortIndicator(key)}
+                                </button>
+                              </TableHead>
+                            ))}
+                            <TableHead />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {displayedHoldings.map((h) => (
+                            <TableRow key={h.ticker}>
+                              <TableCell>
+                                <button
+                                  className="quote-btn ticker"
+                                  onClick={() => openCompany(h.ticker)}
+                                >
+                                  {h.ticker}
+                                </button>
+                                {h.target > 0 && (
+                                  <span
+                                    className="shortlist-dot"
+                                    title="On SIP shortlist"
+                                    aria-label="On SIP shortlist"
+                                  />
+                                )}
+                                <small>
+                                  {h.name}
+                                  {h.sector ? ` · ${h.sector}` : ''}
+                                </small>
+                                {h.target > 0 && (
+                                  <span
+                                    className="shortlist-dot"
+                                    title="On SIP shortlist"
+                                    aria-label="On SIP shortlist"
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className="amount">
+                                {h.shares.toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                {h.average === null ? '—' : money(h.average)}
+                              </TableCell>
+                              <TableCell>
+                                <button
+                                  className="quote-btn"
+                                  onClick={() => {
+                                    setQuoteTicker(h.ticker);
+                                    setQuotePrice(
+                                      h.quote?.price.toString() ?? '',
+                                    );
+                                    setQuoteDate(h.quote?.date ?? today());
+                                  }}
+                                >
+                                  {h.quote ? money(h.quote.price) : 'Add price'}
+                                </button>
+                                {h.quote && (
+                                  <small>
+                                    {h.quote.date}
+                                    {h.quote.manual ? ' · manual' : ''}
+                                    {h.quote.date !== today()
+                                      ? ' · older quote'
+                                      : ''}
+                                  </small>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {h.value === null ? '—' : moneyShort(h.value)}
+                              </TableCell>
+                              <TableCell className={gainClass(h)}>
+                                {h.gain === null ? '—' : moneyShort(h.gain)}
+                                {gainPct(h) !== null && (
+                                  <small>{gainText(h)}</small>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {!missing.length && value > 0 ? (
+                                  <>
+                                    <span>
+                                      {(((h.value ?? 0) / value) * 100).toFixed(
+                                        1,
+                                      )}
+                                      %
+                                    </span>
+                                    <div className="bar">
+                                      <i
+                                        style={{
+                                          width: `${((h.value ?? 0) / value) * 100}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </>
+                                ) : (
+                                  '—'
+                                )}
+                              </TableCell>
+                              <TableCell>{holdingActions(h)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <p className="table-note">
+                        A dash means unknown, not zero. Quotes may be delayed.
+                        Market values exclude cash and unrecorded corporate
+                        actions.
+                      </p>
+                    </section>
+                  </CollapsiblePanel>
+                )}
                 {widePulse === false && (
                   <PsxMarketPulse
                     ref={pulseRef}
@@ -2795,6 +2852,7 @@ function DashboardContent({
               </>
             )}
             <GoldSilverSection
+              addRequest={assetAdd.kind === 'metal' ? assetAdd.n : 0}
               owned={ownedMetals}
               rates={metalRates.rates}
               ratesError={metalRates.error}
@@ -2814,6 +2872,7 @@ function DashboardContent({
               }
             />
             <SavingsPlansSection
+              addRequest={assetAdd.kind === 'plan' ? assetAdd.n : 0}
               owned={ownedPlans}
               canEdit={!isAll && !locked}
               busy={busy}
@@ -2831,6 +2890,7 @@ function DashboardContent({
               }
             />
             <MutualFundsSection
+              addRequest={assetAdd.kind === 'fund' ? assetAdd.n : 0}
               owned={ownedFunds}
               catalog={fundData.funds}
               navs={fundData.navs}
@@ -2914,7 +2974,10 @@ function DashboardContent({
               >
                 <Plus size={15} /> Add transaction
               </button>
-              <p>Every buy, sale, dividend and split, newest first.</p>
+              <p>
+                Every buy, sale, dividend and split, including gold, savings
+                plans and mutual funds, newest first.
+              </p>
             </div>
             <LedgerTimeline
               portfolio={p}
