@@ -286,6 +286,20 @@ export function accountOverview(
       });
     }
 
+  // Cash dividends from mutual funds are income too. Their cash-back flows are already part of the fund's flows.
+  for (const { asset } of assetValues) {
+    if (asset.kind !== 'fund') continue;
+    for (const e of asset.entries) {
+      if (e.type !== 'dividend' || e.voided || e.date > asOf || !e.amount)
+        continue;
+      receivedTotal += e.amount;
+      if (taxYearOf(e.date) === taxYear) received += e.amount;
+      const month = e.date.slice(0, 7);
+      if (byMonth.has(month))
+        byMonth.set(month, (byMonth.get(month) ?? 0) + e.amount);
+    }
+  }
+
   const incomplete: string[] = [];
   if (summary.missingPrice.length)
     incomplete.push(

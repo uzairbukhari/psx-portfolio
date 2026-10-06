@@ -234,3 +234,24 @@ test('a fund load stays inside the amount paid and must be smaller than it', () 
     /load/,
   );
 });
+
+test('a fund cash dividend counts as income on the All dashboard while the NAV drop stays a price move', () => {
+  const ledger = {
+    ...blankPortfolio(),
+    assets: [
+      fund({
+        entries: [
+          e('1', 'buy', '2026-06-01', 100, 5615),
+          e('2', 'dividend', '2026-06-20', undefined, 300),
+        ],
+      }),
+    ],
+  };
+  const o = accountOverview(
+    [{ id: 'a', name: 'Funds', portfolio: ledger }],
+    '2026-10-06',
+    { fundNavs: [nav('2026-10-05', 51.43)] },
+  );
+  assert.equal(o.total.value, 5143);
+  assert.equal(o.income.receivedTotal, 300);
+});
