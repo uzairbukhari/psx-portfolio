@@ -1,5 +1,6 @@
 'use client';
 
+import type { FundNavRow } from '@/lib/mufap';
 import { useMemo, type ReactNode } from 'react';
 import { Bar, BarChart, Pie, PieChart, XAxis } from 'recharts';
 import {
@@ -56,6 +57,7 @@ export default function AccountOverview({
   parts,
   asOf,
   metalRates,
+  fundNavs = [],
   chart,
   onOpenPortfolio,
   onOpenCompany,
@@ -65,6 +67,7 @@ export default function AccountOverview({
   parts: (DisplayPart & { locked?: boolean })[];
   asOf: string;
   metalRates: MetalRateRow[];
+  fundNavs?: FundNavRow[];
   /** The value-over-time chart, rendered by the page because it loads price history itself. */
   chart: ReactNode;
   onOpenPortfolio: (id: string) => void;
@@ -73,8 +76,8 @@ export default function AccountOverview({
   aside?: ReactNode;
 }) {
   const o = useMemo(
-    () => accountOverview(parts, asOf, { metalRates }),
-    [parts, asOf, metalRates],
+    () => accountOverview(parts, asOf, { metalRates, fundNavs }),
+    [parts, asOf, metalRates, fundNavs],
   );
   const { total, returns, income } = o;
   const staleDays = total.oldestQuoteDate

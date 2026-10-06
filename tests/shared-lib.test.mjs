@@ -48,6 +48,8 @@ const SHARED = [
   'portfolio-view',
   'assets',
   'plans',
+  'funds',
+  'mufap',
   'metal-rates',
   'public-data-client',
   'psx-market',

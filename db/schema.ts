@@ -466,3 +466,26 @@ export const metalRates = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] })],
 );
+
+// Shared mutual fund directory and daily prices from MUFAP. Public data only; written by scripts/mufap-nav-scrape.mjs.
+export const fundCatalog = sqliteTable('fund_catalog', {
+  mufapId: text('mufap_id').primaryKey(),
+  amc: text('amc').notNull(),
+  fundName: text('fund_name').notNull(),
+  category: text('category').notNull(),
+  sector: text('sector').notNull(),
+  inceptionDate: text('inception_date'),
+  updatedAt: text('updated_at').notNull(),
+});
+export const fundNavs = sqliteTable(
+  'fund_navs',
+  {
+    mufapId: text('mufap_id').notNull(),
+    date: text('date').notNull(),
+    nav: real('nav').notNull(),
+    offer: real('offer').notNull(),
+    repurchase: real('repurchase').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.mufapId, t.date] })],
+);

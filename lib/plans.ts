@@ -153,7 +153,14 @@ const addMonth = (month: string) => {
 };
 
 /** Monthly contributions that have come due (up to `asOf`) and are neither confirmed nor skipped. */
-export function dueEntries(plan: PlanAsset, asOf: string): DueEntry[] {
+export function dueEntries(
+  plan: {
+    rules: PlanRule[];
+    entries: { date: string; recurringId?: string; voided?: boolean }[];
+    closed?: boolean;
+  },
+  asOf: string,
+): DueEntry[] {
   if (plan.closed) return [];
   const out: DueEntry[] = [];
   for (const rule of plan.rules) {

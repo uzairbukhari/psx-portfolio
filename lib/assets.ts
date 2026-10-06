@@ -12,6 +12,14 @@ import {
   type Metal,
   type MetalRateRow,
 } from './metal-rates.ts';
+import {
+  fundFlows,
+  fundUnknownCost,
+  validateFund,
+  valueFund,
+  type FundAsset,
+} from './funds.ts';
+import type { FundNavRow } from './mufap.ts';
 import { planFlows, planValue, validatePlan, type PlanAsset } from './plans.ts';
 
 export type MetalEntry = {
@@ -38,7 +46,7 @@ export type MetalAsset = {
   note: string;
   entries: MetalEntry[];
 };
-export type Asset = MetalAsset | PlanAsset;
+export type Asset = MetalAsset | PlanAsset | FundAsset;
 
 export const MAX_ASSETS = 200;
 export const MAX_ENTRIES = 5000;
@@ -192,7 +200,7 @@ export function validateAssets(
     throw new Error('Invalid assets.');
   const ids = new Set<string>();
   for (const a of assets as Asset[]) {
-    if (!a || (a.kind !== 'metal' && a.kind !== 'plan'))
+    if (!a || (a.kind !== 'metal' && a.kind !== 'plan' && a.kind !== 'fund'))
       throw new Error('Unsupported asset type.');
     if (
       typeof a.id !== 'string' ||
@@ -207,6 +215,10 @@ export function validateAssets(
       throw new Error('Asset note is too long.');
     if (a.kind === 'plan') {
       validatePlan(a, today);
+      continue;
+    }
+    if (a.kind === 'fund') {
+      validateFund(a, today);
       continue;
     }
     if (a.metal !== 'gold' && a.metal !== 'silver')
@@ -290,7 +302,21 @@ export function valueAsset(
   asset: Asset,
   rates: MetalRateRow[],
   asOf: string,
+  navs: FundNavRow[] = [],
 ): AssetValue {
+  if (asset.kind === 'fund') {
+    const v = valueFund(asset, navs, asOf);
+    return {
+      classKey: 'funds',
+      value: v.value,
+      cost: v.cost,
+      gain: v.gain,
+      open: v.units > 0 && !asset.closed,
+      unknownCost: fundUnknownCost(asset),
+      estimated: !!v.price?.stale,
+      flows: fundFlows(asset),
+    };
+  }
   if (asset.kind === 'plan') {
     const v = planValue(asset, asOf);
     return {

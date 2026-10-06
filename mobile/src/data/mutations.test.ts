@@ -183,3 +183,11 @@ test('recording a trade keeps savings plans untouched', () => {
   assert.deepEqual(next.assets, p.assets);
   validate(next);
 });
+
+test('recording a trade keeps mutual funds untouched', () => {
+  const p = base();
+  p.assets = [{ id: 'f1', kind: 'fund', name: 'Meezan Islamic Fund', mufapId: '5', amc: 'Al Meezan', fundName: 'Meezan Islamic Fund', category: 'Equity', note: '', entries: [{ id: 'e1', type: 'buy', date: '2026-01-05', units: 100, amount: 5000, note: '' }], manualNavs: [], rules: [] }];
+  const next = recordTrade(p, buy(10, 100));
+  assert.deepEqual(next.assets, p.assets);
+  validate(next);
+});

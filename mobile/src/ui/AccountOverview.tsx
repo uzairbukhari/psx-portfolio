@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { accountOverview, type AssetClassKey } from '@shared/account-overview.ts';
+import type { FundNavRow } from '@shared/mufap.ts';
 import type { MetalRateRow } from '@shared/metal-rates.ts';
 import { moneyShort, today, type DisplayPart } from '@shared/portfolio.ts';
 import { signedMoney, signedPercent } from '@/data/format';
@@ -16,10 +17,10 @@ const CLASS_COLORS: Record<AssetClassKey, string> = {
 };
 
 /** The All portfolios dashboard on the phone: net worth, asset mix, each portfolio and the largest holdings. */
-export function AccountOverview({ parts, rates, onOpenPortfolio }: { parts: (DisplayPart & { locked?: boolean })[]; rates: MetalRateRow[]; onOpenPortfolio: (id: string) => void }) {
+export function AccountOverview({ parts, rates, fundNavs = [], onOpenPortfolio }: { parts: (DisplayPart & { locked?: boolean })[]; rates: MetalRateRow[]; fundNavs?: FundNavRow[]; onOpenPortfolio: (id: string) => void }) {
   const styles = useKitStyles();
   const { colors } = useTheme();
-  const o = accountOverview(parts, today(), { metalRates: rates });
+  const o = accountOverview(parts, today(), { metalRates: rates, fundNavs });
   const { total, returns, income } = o;
   return (
     <>

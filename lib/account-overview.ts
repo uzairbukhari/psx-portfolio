@@ -5,6 +5,7 @@
 // is reported as null with a reason, never as zero.
 import { valueAsset } from './assets.ts';
 import type { MetalRateRow } from './metal-rates.ts';
+import type { FundNavRow } from './mufap.ts';
 import {
   moneyInFlows,
   moneyWeightedReturn,
@@ -120,7 +121,7 @@ const sumKnown = (values: (number | null)[]) =>
 export function accountOverview(
   parts: (DisplayPart & { locked?: boolean })[],
   asOf: string,
-  options: { metalRates?: MetalRateRow[] } = {},
+  options: { metalRates?: MetalRateRow[]; fundNavs?: FundNavRow[] } = {},
 ): AccountOverview {
   const consolidated = consolidatedAccount({
     kind: 'sipwise-portfolio-account',
@@ -135,7 +136,7 @@ export function accountOverview(
   const assetValues = parts.flatMap((part) =>
     (part.portfolio.assets ?? []).map((asset) => ({
       asset,
-      v: valueAsset(asset, rates, asOf),
+      v: valueAsset(asset, rates, asOf, options.fundNavs ?? []),
     })),
   );
   const assetClass = (key: AssetClassKey): ClassTotal | null => {
@@ -288,11 +289,11 @@ export function accountOverview(
   const metalUnknown = assetValues.filter((m) => m.v.unknownCost);
   if (metalMissing.length)
     incomplete.push(
-      `Needs a ${[...new Set(metalMissing.map((m) => (m.asset.kind === 'metal' ? m.asset.metal : 'price')))].join(' and ')} rate.`,
+      `Needs a ${[...new Set(metalMissing.map((m) => (m.asset.kind === 'metal' ? `${m.asset.metal} rate` : 'fund price')))].join(' and ')}.`,
     );
   if (metalUnknown.length)
     incomplete.push(
-      `Needs the cost of ${metalUnknown.length} gold or silver ${metalUnknown.length === 1 ? 'item' : 'items'}.`,
+      `Needs the cost of ${metalUnknown.length} ${metalUnknown.length === 1 ? 'investment' : 'investments'} outside stocks.`,
     );
   const totalCost = sumKnown([
     summary.cost,
