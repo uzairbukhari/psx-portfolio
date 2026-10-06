@@ -88,6 +88,7 @@ import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
 import PortfolioValueCard from './portfolio-value-card';
+import AccountOverview from './account-overview';
 import CompanyDetail from './company-detail';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
 import { CompanyNavProvider } from './ticker-link';
@@ -1053,6 +1054,7 @@ function DashboardContent({
     held = hs.filter((h) => h.shares > 0),
     { value, cost, gain, missingPrice: missing, unknownCost: unknown } =
       portfolioSummary(hs);
+  const overviewParts = isAll ? p[DISPLAY_PARTS] : undefined;
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -1815,6 +1817,29 @@ function DashboardContent({
               </button>
             </p>
           )}
+          {overviewParts && overviewParts.length > 1 ? (
+            <AccountOverview
+              parts={overviewParts}
+              asOf={today()}
+              onOpenPortfolio={(id) => workspace?.choose(id)}
+              onOpenCompany={openCompany}
+              onSeeAll={() => document.getElementById('all-companies')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} /> : undefined}
+              chart={
+                <PortfolioValueCard
+                  chartOnly
+                  p={p}
+                  value={value}
+                  cost={cost}
+                  gain={gain}
+                  heldCount={held.length}
+                  missingCount={missing.length}
+                  unknownCount={unknown.length}
+                  newBuys={newBuys}
+                />
+              }
+            />
+          ) : (
           <PortfolioValueCard
             p={p}
             value={value}
@@ -1826,9 +1851,10 @@ function DashboardContent({
             newBuys={newBuys}
             aside={widePulse ? <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} /> : undefined}
           />
-          <div className="holdings-head">
+          )}
+          <div className="holdings-head" id="all-companies">
             <h2>
-              Your companies
+              {overviewParts && overviewParts.length > 1 ? 'All companies' : 'Your companies'}
               <span className="count-badge">
                 {held.length} {held.length === 1 ? 'holding' : 'holdings'}
               </span>
