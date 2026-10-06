@@ -3,6 +3,7 @@
 // request. Only ticker symbols ever leave the device through here.
 import type { CompaniesResponse, CompanyLookup, PublicDataResponse } from './api-types.ts';
 import type { PublicData } from './portfolio-view.ts';
+import type { MetalRateRow } from './metal-rates.ts';
 
 export type PublicCall = <T>(path: string, method?: string, body?: unknown) => Promise<T>;
 
@@ -23,6 +24,9 @@ export function createPublicData(call: PublicCall): PublicData {
     async companies(tickers): Promise<CompanyLookup[]> {
       const parts = await Promise.all(chunks(tickers, 50).map((part) => call<CompaniesResponse>(`/api/companies?tickers=${encodeURIComponent(part.join(','))}`)));
       return parts.flatMap((p) => p.companies);
+    },
+    async metalRates() {
+      return (await call<{ rates: MetalRateRow[] }>('/api/public-data/metals')).rates;
     },
     async requestLookup(tickers) {
       for (const part of chunks(tickers, 25)) await call('/api/companies', 'POST', { tickers: part });

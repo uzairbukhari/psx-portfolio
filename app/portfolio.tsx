@@ -89,6 +89,8 @@ import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
+import GoldSilverSection, { type OwnedMetal } from './gold-silver';
+import { useMetalRates } from './use-metal-rates';
 import CompanyDetail from './company-detail';
 import LedgerTimeline, { buildEntries } from './ledger-timeline';
 import { CompanyNavProvider } from './ticker-link';
@@ -821,6 +823,9 @@ function DashboardContent({
   useEffect(() => {
     workspaceBusy?.(busy || readingImport || !!ahlStatement || !!finqalabReview || !!brokerReview || !!ipoReview || !!trade || !!company || !!receipt || targetsOpen || !!quoteTicker);
   }, [workspaceBusy, busy, readingImport, ahlStatement, finqalabReview, brokerReview, ipoReview, trade, company, receipt, targetsOpen, quoteTicker]);
+  const metalRates = useMetalRates(
+    !!(isAll ? p?.[DISPLAY_PARTS]?.some((part) => part.portfolio.assets?.length) : p?.assets?.length),
+  );
   if (!p && email && !(failed && message))
     return (
       <main className="app-loading">
@@ -1055,6 +1060,10 @@ function DashboardContent({
     { value, cost, gain, missingPrice: missing, unknownCost: unknown } =
       portfolioSummary(hs);
   const overviewParts = isAll ? p[DISPLAY_PARTS] : undefined;
+  const ownedMetals: OwnedMetal[] = isAll
+    ? (overviewParts ?? []).flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioId: part.id, portfolioName: part.name })))
+    : (p.assets ?? []).map((asset) => ({ asset }));
+  const hasAssets = ownedMetals.length > 0;
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -1759,7 +1768,7 @@ function DashboardContent({
         )}
       </header>
         <TabsContent value="holdings">
-          {p.companies.length === 0 ? (
+          {p.companies.length === 0 && !hasAssets ? (
             <div className="panel empty-holdings">
               <span className="empty-holdings-icon" aria-hidden="true">
                 <Briefcase size={26} />
@@ -1821,6 +1830,7 @@ function DashboardContent({
             <AccountOverview
               parts={overviewParts}
               asOf={today()}
+              metalRates={metalRates.rates}
               onOpenPortfolio={(id) => workspace?.choose(id)}
               onOpenCompany={openCompany}
               onSeeAll={() => document.getElementById('all-companies')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -2133,6 +2143,14 @@ function DashboardContent({
           {widePulse === false && <PsxMarketPulse ref={pulseRef} onOpenShortlist={() => setTab('sip')} {...pulseWatch} />}
           </>
           )}
+          <GoldSilverSection
+            owned={ownedMetals}
+            rates={metalRates.rates}
+            ratesError={metalRates.error}
+            canEdit={!isAll && !locked}
+            busy={busy}
+            onChange={(assets, message) => save({ ...clone(p), assets }, message)}
+          />
         </TabsContent>
         <TabsContent value="reports">
           <PortfolioReports portfolio={p} />

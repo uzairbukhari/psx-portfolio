@@ -167,3 +167,11 @@ test('setFilerStatus writes the web taxProfile field without touching the origin
   validate(next);
   assert.deepEqual(setFilerStatus(next, 'filer').taxProfile, { filerStatus: 'filer' });
 });
+
+test('recording a trade keeps gold and silver assets untouched', () => {
+  const p = base();
+  p.assets = [{ id: 'g1', kind: 'metal', name: 'Gold 24K', metal: 'gold', karat: 24, note: '', entries: [{ id: 'e1', type: 'buy', date: '2026-01-05', grams: 11.6638, amount: 400000, note: '' }] }];
+  const next = recordTrade(p, buy(10, 100));
+  assert.deepEqual(next.assets, p.assets);
+  validate(next);
+});

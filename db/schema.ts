@@ -450,3 +450,19 @@ export const aiResearchRequests = sqliteTable('ai_research_requests', {
   finishedAt: text('finished_at'),
   error: text('error'),
 });
+
+// Shared gold and silver prices (rupees per tola of pure metal). `local` is the Pakistani dealer rate, `international`
+// the world spot price converted to rupees. Public data only; written by scripts/metal-rates-scrape.mjs.
+export const metalRates = sqliteTable(
+  'metal_rates',
+  {
+    date: text('date').notNull(),
+    metal: text('metal').notNull(),
+    kind: text('kind').notNull(),
+    pkrPerTola: real('pkr_per_tola').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    sourceLabel: text('source_label'),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] })],
+);

@@ -86,3 +86,12 @@ test('markers in every private field never reach the server: not in requests, no
   assert.equal(reopened.portfolio.companies[0].ticker, MARKERS[0]);
   assert.equal(reopened.portfolio.budgets['2026-10'], 777123);
 });
+
+test('the gold and silver rate route takes no input and no asset field is ever sent to the server', () => {
+  const route = read(join(root, 'app/api/public-data/metals/route.ts'));
+  assert.ok(!/searchParams|req\.json|request\.json/.test(route), 'the metals route must not read query or body input');
+  const store = read(join(root, 'lib/metal-rates-store.ts'));
+  assert.ok(!/\.assets|grams|entries/.test(store), 'the rate store must know nothing about holdings');
+  const client = read(join(root, 'lib/public-data-client.ts'));
+  assert.ok(/call<\{ rates: MetalRateRow\[\] \}>\('\/api\/public-data\/metals'\)/.test(client), 'the rates call carries no parameters');
+});

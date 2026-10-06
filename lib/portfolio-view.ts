@@ -20,6 +20,8 @@ export type PublicData = {
   companies(tickers: string[]): Promise<CompanyLookup[]>;
   /** Asks the server to look up symbols it does not know yet (best effort). */
   requestLookup(tickers: string[]): Promise<void>;
+  /** Public gold and silver rates (no parameters). */
+  metalRates?(): Promise<import('./metal-rates.ts').MetalRateRow[]>;
 };
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));

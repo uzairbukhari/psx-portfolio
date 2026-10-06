@@ -10,6 +10,7 @@ import {
 import { money, moneyShort, type DisplayPart } from '@/lib/portfolio';
 import { accountOverview, type AssetClassKey } from '@/lib/account-overview';
 import { daysBetween } from '@/lib/performance';
+import type { MetalRateRow } from '@/lib/metal-rates';
 
 const CLASS_COLORS: Record<AssetClassKey, string> = {
   stocks: '#3987e5',
@@ -54,6 +55,7 @@ const dateLabel = (date: string) =>
 export default function AccountOverview({
   parts,
   asOf,
+  metalRates,
   chart,
   onOpenPortfolio,
   onOpenCompany,
@@ -62,6 +64,7 @@ export default function AccountOverview({
 }: {
   parts: (DisplayPart & { locked?: boolean })[];
   asOf: string;
+  metalRates: MetalRateRow[];
   /** The value-over-time chart, rendered by the page because it loads price history itself. */
   chart: ReactNode;
   onOpenPortfolio: (id: string) => void;
@@ -69,7 +72,10 @@ export default function AccountOverview({
   onSeeAll: () => void;
   aside?: ReactNode;
 }) {
-  const o = useMemo(() => accountOverview(parts, asOf), [parts, asOf]);
+  const o = useMemo(
+    () => accountOverview(parts, asOf, { metalRates }),
+    [parts, asOf, metalRates],
+  );
   const { total, returns, income } = o;
   const staleDays = total.oldestQuoteDate
     ? daysBetween(total.oldestQuoteDate, asOf)
