@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Alert, InteractionManager, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { QuotesResponse } from '@shared/api-types.ts';
@@ -60,8 +60,13 @@ function Chips<T extends string>({ items, value, onChange, disabled }: { items: 
 
 /** Closes the sheet; if it was opened with nothing behind it (a deep link), go home instead of leaving a blank screen. */
 function closeScreen() {
-  if (router.canGoBack()) router.back();
-  else router.replace('/');
+  // Hide the keyboard and let the save's re-render settle before leaving, so Android does not pop the
+  // sheet mid-layout (the suspected cause of the blank screen after saving).
+  Keyboard.dismiss();
+  InteractionManager.runAfterInteractions(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  });
 }
 
 export default function Transaction() {
