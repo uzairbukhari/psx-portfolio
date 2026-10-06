@@ -102,6 +102,9 @@ export async function fetchPsxToken(ticker: string, budget?: FetchBudget): Promi
   return token;
 }
 
+/** PSX answered a well-formed "no data" for a series (a new listing has no price history yet). */
+export class PsxNoSeriesError extends Error {}
+
 /**
  * `/timeseries/eod|int/<TICKER>` answers 404 unless marked as AJAX and given the
  * page token. Returns rows newest-first: eod [sec, close, volume, open], int [sec, price, volume].
@@ -140,7 +143,7 @@ export async function fetchPsxTimeseries(
     }
     const body = (await response.json()) as { status: number; data: number[][] };
     if (body.status !== 1 || !Array.isArray(body.data))
-      throw Error('Unexpected PSX timeseries response');
+      throw new PsxNoSeriesError('Unexpected PSX timeseries response');
     return body.data;
   }
   throw lastError;
