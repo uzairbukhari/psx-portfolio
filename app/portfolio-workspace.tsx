@@ -69,6 +69,7 @@ export default function PortfolioWorkspace({
   const [name, setName] = useState('');
   const [editing, setEditing] = useState<'create' | 'rename' | null>(null);
   const [busy, setBusy] = useState(false);
+  const [version, setVersion] = useState(0);
   const [childBusy, setChildBusy] = useState(false);
   const [error, setError] = useState('');
   const [restore, setRestore] = useState<
@@ -90,11 +91,13 @@ export default function PortfolioWorkspace({
     setChildBusy(false);
     setSelected(id);
   }
-  async function mutate(next: PortfolioAccount) {
+  async function mutate(next: PortfolioAccount, replaceAll = false) {
     setBusy(true);
     setError('');
     try {
-      await session.saveAccount(next, session.revision);
+      await session.saveAccount(next, session.revision, { replaceAll });
+      // The dashboard holds its own copy of the revision; remount it so the next save starts from this one.
+      setVersion((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       await session.reload().catch(() => {});
@@ -110,13 +113,16 @@ export default function PortfolioWorkspace({
       else {
         const id = crypto.randomUUID();
         await mutate(
-          normalizeAccount({
-            ...account,
-            portfolios: [
-              ...account.portfolios,
-              { id, name: portfolioName(name), portfolio: blankPortfolio() },
-            ],
-          }),
+          normalizeAccount(
+            {
+              ...account,
+              portfolios: [
+                ...account.portfolios,
+                { id, name: portfolioName(name), portfolio: blankPortfolio() },
+              ],
+            },
+            false,
+          ),
         );
         choose(id);
       }
@@ -150,7 +156,7 @@ export default function PortfolioWorkspace({
                 `Replace every portfolio with these ${parsed.account.portfolios.length} portfolios: ${parsed.account.portfolios.map((p) => p.name).join(', ')}?`,
               )
             )
-              void mutate(parsed.account)
+              void mutate(parsed.account, true)
                 .then(() => choose(ALL_PORTFOLIOS))
                 .catch(() => {});
           } else setQueued({ file, token: crypto.randomUUID(), restore: true });
@@ -286,7 +292,7 @@ export default function PortfolioWorkspace({
   );
   return (
     <>
-      <div key={target.id}>
+      <div key={`${target.id}:${version}`}>
         {children({
           target,
           selected,
@@ -417,7 +423,7 @@ export default function PortfolioWorkspace({
             )
           )
             return;
-          await mutate(next);
+          await mutate(next, true);
           setRestore(null);
           choose(ALL_PORTFOLIOS);
         }}

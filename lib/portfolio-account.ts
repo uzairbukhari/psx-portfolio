@@ -42,8 +42,25 @@ export function accountFromPortfolio(
   };
 }
 
+/**
+ * Opening and re-saving what is already stored uses the old shape check only: a ledger that predates today's
+ * stricter `validate` must still open. Strict validation runs for incoming edits (savePortfolioView) and backups.
+ */
+function checkLedger(portfolio: Portfolio, strict: boolean) {
+  if (strict) return validate(portfolio);
+  if (
+    !portfolio ||
+    !Array.isArray(portfolio.companies) ||
+    !Array.isArray(portfolio.trades)
+  )
+    throw new Error('The decrypted portfolio is not readable.');
+}
+
 /** Old ledgers are wrapped without changing a single financial record. No migration writes on unlock. */
-export function normalizeAccount(value: unknown): PortfolioAccount {
+export function normalizeAccount(
+  value: unknown,
+  strict = true,
+): PortfolioAccount {
   if (!value || typeof value !== 'object')
     throw new Error('The decrypted portfolio is not readable.');
   if ('kind' in value && value.kind === 'sipwise-portfolio-account') {
@@ -75,11 +92,11 @@ export function normalizeAccount(value: unknown): PortfolioAccount {
       names.add(entry.name.toLowerCase());
       if (entry.locked !== undefined && typeof entry.locked !== 'boolean')
         throw Error('Invalid portfolio lock.');
-      validate(entry.portfolio);
+      checkLedger(entry.portfolio, strict);
     }
     return account;
   }
-  validate(value as Portfolio);
+  checkLedger(value as Portfolio, strict);
   return accountFromPortfolio(value as Portfolio);
 }
 
@@ -116,7 +133,7 @@ export function replacePortfolio(
           { id, name: portfolioName(target!.name!), portfolio },
         ],
   };
-  return normalizeAccount(next);
+  return normalizeAccount(next, false);
 }
 
 export function hasFinancialRecords(portfolio: Portfolio): boolean {
@@ -134,12 +151,15 @@ export function renamePortfolio(
 ): PortfolioAccount {
   if (!account.portfolios.some((p) => p.id === id))
     throw new Error('That portfolio no longer exists.');
-  return normalizeAccount({
-    ...account,
-    portfolios: account.portfolios.map((p) =>
-      p.id === id ? { ...p, name: portfolioName(name) } : p,
-    ),
-  });
+  return normalizeAccount(
+    {
+      ...account,
+      portfolios: account.portfolios.map((p) =>
+        p.id === id ? { ...p, name: portfolioName(name) } : p,
+      ),
+    },
+    false,
+  );
 }
 
 export function removePortfolio(

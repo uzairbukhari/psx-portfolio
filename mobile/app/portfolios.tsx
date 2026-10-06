@@ -115,17 +115,20 @@ export default function Portfolios() {
           void change(async () => {
             const next = editing
               ? renamePortfolio(session.account, editing, name)
-              : normalizeAccount({
-                  ...session.account,
-                  portfolios: [
-                    ...session.account.portfolios,
-                    {
-                      id: Crypto.randomUUID(),
-                      name: portfolioName(name),
-                      portfolio: blankPortfolio(),
-                    },
-                  ],
-                });
+              : normalizeAccount(
+                  {
+                    ...session.account,
+                    portfolios: [
+                      ...session.account.portfolios,
+                      {
+                        id: Crypto.randomUUID(),
+                        name: portfolioName(name),
+                        portfolio: blankPortfolio(),
+                      },
+                    ],
+                  },
+                  false,
+                );
             await session.saveAccount(next, p.revision);
             setEditing(null);
             setName('');

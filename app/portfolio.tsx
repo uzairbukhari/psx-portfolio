@@ -2216,7 +2216,7 @@ function DashboardContent({
             onExportEncrypted={exportEncryptedBackup}
             onClearLedger={async () => {
               if (!vault || vault.session.revision === null) throw Error('Unlock your account first.');
-              await vault.session.saveAccount(accountFromPortfolio(), vault.session.revision);
+              await vault.session.saveAccount(accountFromPortfolio(), vault.session.revision, { replaceAll: true });
             }}
             onRestore={(file) => workspace ? workspace.requestImport(file, undefined, true) : restoreBackup(file)}
             security={vault ? <VaultSecurity session={vault.session} onLock={vault.lock} /> : undefined}
@@ -2253,7 +2253,7 @@ function DashboardContent({
         backup={encryptedRestore}
         onCancel={() => setEncryptedRestore(null)}
         onRestore={async (portfolio) => {
-          await vault!.session.saveAccount(portfolio, revision);
+          await vault!.session.saveAccount(portfolio, vault!.session.revision, { replaceAll: true });
           await load();
           setEncryptedRestore(null);
         }}
@@ -2373,7 +2373,7 @@ function DashboardContent({
                 attempt(async () => {
                   const next = clone(txP);
                   next.trades.find((x) => x.id === editing)!.voided = true;
-                  await save(next, 'Entry voided.');
+                  await save(next, 'Entry voided.', isAll ? { target: { id: txDestination } } : {});
                   closeTx();
                 });
               } else if (editingDividend) {
@@ -2381,7 +2381,7 @@ function DashboardContent({
                 attempt(async () => {
                   const next = clone(txP);
                   next.dividends!.find((x) => x.id === editingDividend)!.voided = true;
-                  await save(next, 'Dividend record voided.');
+                  await save(next, 'Dividend record voided.', isAll ? { target: { id: txDestination } } : {});
                   closeTx();
                 });
               } else if (editingStockSplit) {
@@ -2389,7 +2389,7 @@ function DashboardContent({
                 attempt(async () => {
                   const next = clone(txP);
                   next.stockSplits!.find((x) => x.id === editingStockSplit)!.voided = true;
-                  await save(next, 'Stock split voided.');
+                  await save(next, 'Stock split voided.', isAll ? { target: { id: txDestination } } : {});
                   closeTx();
                 });
               }

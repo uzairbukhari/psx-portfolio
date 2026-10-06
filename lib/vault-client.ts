@@ -188,7 +188,7 @@ export async function openWithKey(
 }
 
 function parseAccount(text: string): PortfolioAccount {
-  try { return normalizeAccount(JSON.parse(text)); }
+  try { return normalizeAccount(JSON.parse(text), false); }
   catch (error) { throw new VaultError('invalid', error instanceof Error ? error.message : 'The decrypted portfolio is not readable.'); }
 }
 
@@ -325,11 +325,12 @@ export class VaultSession {
   }
 
   /** Saves the complete collection atomically; every portfolio shares the same revision. */
-  async saveAccount(next: PortfolioAccount, expectedRevision: number): Promise<number> {
+  async saveAccount(next: PortfolioAccount, expectedRevision: number, options: { replaceAll?: boolean } = {}): Promise<number> {
     return this.guarded(async () => {
       if (expectedRevision !== this.revision) throw new ConflictError();
-      normalizeAccount(next);
-      assertAccountWritable(this.account, next);
+      normalizeAccount(next, false);
+      // An explicit, confirmed "replace everything" (restore, delete all data) is allowed past portfolio locks.
+      if (!options.replaceAll) assertAccountWritable(this.account, next);
       const key = this.requireKey();
       const epoch = this.epoch;
       const envelope = await encryptPortfolio(key, this.material.vaultId, this.material.keyVersion, expectedRevision + 1, JSON.stringify(next));

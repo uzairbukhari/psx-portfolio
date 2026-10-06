@@ -98,7 +98,7 @@ export default function Restore() {
             ? { id: randomUUID(), name: portfolioName(newName) }
             : { id: destination };
         await p.save(legacy, { target, expectedRevision: baseRevision });
-      } else await session.saveAccount(preview!, baseRevision);
+      } else await session.saveAccount(preview!, baseRevision, { replaceAll: true });
       await cache.invalidateQueries({ queryKey: ['portfolio-account'] });
       setPreview(null);
       setBackup(null);
