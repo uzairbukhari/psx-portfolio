@@ -37,5 +37,6 @@ test('Add transaction picks the SIP month instead of typing it, and closes witho
   assert.match(source, /<MonthPicker /);
   assert.doesNotMatch(source, /YYYY-MM\)"/);
   assert.match(source, /router\.canGoBack\(\)/);
+  assert.match(source, /Keyboard\.dismiss\(\)/);
   assert.doesNotMatch(source, /behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
 });

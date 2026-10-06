@@ -20,6 +20,8 @@ export function MonthPicker({ label, value, onChange, disabled }: { label: strin
 
   function openPicker() {
     setYear((selected ?? now).year);
+    // Opening an empty field selects the current month, so one tap on "Use" (or just closing) keeps it.
+    if (!selected) onChange(monthValue(now));
     setOpen(true);
   }
   const step = (delta: number) => onChange(monthValue(shiftYearMonth(selected ?? now, delta)));
