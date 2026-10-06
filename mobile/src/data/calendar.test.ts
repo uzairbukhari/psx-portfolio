@@ -31,3 +31,13 @@ test('spokenDate names the weekday and clampDate bounds a date', () => {
   assert.equal(clampDate('2026-09-01', '2026-09-15'), '2026-09-15');
   assert.equal(clampDate('2026-09-20', '2026-09-15', '2026-10-01'), '2026-09-20');
 });
+
+test('month values round-trip between YYYY-MM and year/month', async () => {
+  const { isMonthValue, monthValue, parseMonthValue, shiftYearMonth } = await import('./calendar.ts');
+  assert.deepEqual(parseMonthValue('2026-11'), { year: 2026, month: 11 });
+  assert.equal(monthValue({ year: 2026, month: 3 }), '2026-03');
+  assert.equal(monthValue(shiftYearMonth({ year: 2026, month: 12 }, 1)), '2027-01');
+  assert.equal(parseMonthValue('2026-13'), null);
+  assert.equal(parseMonthValue(''), null);
+  assert.ok(isMonthValue('2026-10') && !isMonthValue('2026-1'));
+});

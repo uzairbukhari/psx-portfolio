@@ -7,6 +7,7 @@ import { BiometricLockProvider } from '@/auth/BiometricLock';
 import { PushBridge } from '@/push/PushBridge';
 import { SignIn } from '@/screens/SignIn';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
+import { ErrorBoundary } from '@/ui/ErrorBoundary';
 import { ToastProvider } from '@/ui/Toast';
 import { PortfolioSelectionProvider } from '@/data/PortfolioSelection';
 import { VaultGate } from '@/vault/VaultProvider';
@@ -26,6 +27,7 @@ function Root() {
       <VaultGate>
         <PortfolioSelectionProvider>
         <PushBridge />
+        <ErrorBoundary>
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: colors.bg },
@@ -52,6 +54,7 @@ function Root() {
           <Stack.Screen name="quote" options={{ presentation: 'modal', title: 'Price' }} />
           <Stack.Screen name="transaction" options={{ presentation: 'modal', title: 'Add transaction' }} />
         </Stack>
+        </ErrorBoundary>
         </PortfolioSelectionProvider>
       </VaultGate>
     </ToastProvider>

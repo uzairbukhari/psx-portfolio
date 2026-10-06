@@ -46,3 +46,17 @@ export function clampDate(date: string, min?: string, max?: string): string {
   if (min && date < min) return min;
   return date;
 }
+
+const MONTH_VALUE = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+/** True for a 'YYYY-MM' SIP month. */
+export const isMonthValue = (value: string) => MONTH_VALUE.test(value);
+
+/** 'YYYY-MM' to { year, month (1-12) }, or null when it is not a valid month. */
+export function parseMonthValue(value: string): { year: number; month: number } | null {
+  const m = MONTH_VALUE.exec(value);
+  return m ? { year: Number(m[1]), month: Number(m[2]) } : null;
+}
+
+/** { year, month (1-12) } to the 'YYYY-MM' string the ledger stores. */
+export const monthValue = (ym: { year: number; month: number }) => `${String(ym.year).padStart(4, '0')}-${String(ym.month).padStart(2, '0')}`;
