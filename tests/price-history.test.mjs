@@ -117,5 +117,5 @@ test('fillChangeFromHistory spans a weekend or holiday gap', () => {
 test('eodKeep keeps a longer history for the KSE-100 only', async () => {
   const { eodKeep } = await import('../lib/price-history.ts');
   assert.equal(eodKeep('KSE100'), 2500);
-  assert.equal(eodKeep('MEBL'), 420);
+  assert.equal(eodKeep('MEBL'), 1400);
 });

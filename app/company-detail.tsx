@@ -73,6 +73,8 @@ const RANGES: [HistoryRange, string][] = [
   ['7d', '7D'],
   ['1m', '1M'],
   ['1y', '1Y'],
+  ['3y', '3Y'],
+  ['5y', '5Y'],
 ];
 
 const priceConfig = { price: { label: 'Price', color: 'var(--primary)' } } satisfies ChartConfig;
@@ -100,7 +102,7 @@ function tickLabel(seconds: number, range: HistoryRange) {
     : d.toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'short',
-        year: range === '1y' ? '2-digit' : undefined,
+        year: range === '1y' || range === '3y' || range === '5y' ? '2-digit' : undefined,
         timeZone: 'Asia/Karachi',
       });
 }
