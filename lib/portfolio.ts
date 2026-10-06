@@ -2,6 +2,7 @@ import type { PayoutAnnouncement } from './psx-payouts.ts';
 import { dividendEntitlement, lastTradingDay } from './psx-calendar.ts';
 import { UserError } from './user-error.ts';
 import { faceValueFor, type FaceValueEvidence } from './face-values.ts';
+import { validateAssets, type Asset } from './assets.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -221,6 +222,8 @@ export type Portfolio = {
   brokerFormats?: import('./broker-import.ts').BrokerFormat[];
   brokerFileHashes?: string[];
   stockSplits?: StockSplit[];
+  /** Gold and silver coins and bars (and, in later releases, savings plans and funds). Priced from public rates, valued on the device. */
+  assets?: Asset[];
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
@@ -1576,6 +1579,11 @@ export function validate(p: Portfolio) {
     (!p.taxProfile || !(p.taxProfile.filerStatus in TAX_RATES))
   )
     throw new UserError('Invalid tax profile.');
+  try {
+    validateAssets(p.assets, today());
+  } catch (error) {
+    throw new UserError(error instanceof Error ? error.message : 'Invalid assets.');
+  }
   holdings(p);
   return p;
 }

@@ -140,7 +140,8 @@ export function hasFinancialRecords(portfolio: Portfolio): boolean {
   return !!(
     portfolio.trades.length ||
     portfolio.dividends?.length ||
-    portfolio.stockSplits?.length
+    portfolio.stockSplits?.length ||
+    portfolio.assets?.length
   );
 }
 
