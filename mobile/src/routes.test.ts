@@ -40,3 +40,12 @@ test('Add transaction picks the SIP month instead of typing it, and closes witho
   assert.match(source, /Keyboard\.dismiss\(\)/);
   assert.doesNotMatch(source, /behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
 });
+
+test('both privacy covers use the self-healing foreground check, so one cannot get stuck over the app', () => {
+  for (const file of ['../src/auth/BiometricLock.tsx', '../src/vault/VaultProvider.tsx']) {
+    const source = readFileSync(new URL(file, app('x')), 'utf8');
+    assert.match(source, /useAppActive\(\)/, file);
+    assert.doesNotMatch(source, /setAppActive/, file);
+  }
+  assert.match(readFileSync(new URL('../src/auth/app-active.ts', app('x')), 'utf8'), /setInterval/);
+});

@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Icon } from '@/ui/Icon';
 import { useTheme } from '@/theme/ThemeProvider';
 import { type } from '@/theme/tokens';
+import { useAppActive } from './app-active';
 import { coversContent, shouldLock } from './lock-policy';
 
 const KEY = 'sipwise.lock';
@@ -30,7 +31,7 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [enabled, setEnabledState] = useState(false);
   const [locked, setLocked] = useState(false);
-  const [appActive, setAppActive] = useState(true);
+  const appActive = useAppActive();
   const backgroundedAt = useRef<number | null>(null);
 
   useEffect(() => {
@@ -52,7 +53,6 @@ export function BiometricLockProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!enabled) return;
     const sub = AppState.addEventListener('change', (next) => {
-      setAppActive(next === 'active');
       if (next === 'background') backgroundedAt.current = Date.now();
       else if (next === 'active') {
         if (shouldLock(backgroundedAt.current, Date.now())) setLocked(true);

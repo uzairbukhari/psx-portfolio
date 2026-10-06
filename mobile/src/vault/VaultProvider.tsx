@@ -14,6 +14,7 @@ import { forgetBiometricKey, hasBiometricKey, recallBiometricKey, saveBiometricK
 import { nativeBiometricKeyStore } from './biometric-key-native';
 import { installMobileCrypto, type CryptoSetup } from './crypto-setup';
 import { createFileVaultCache, clearVaultCache, purgeLegacyPlaintextCache } from './file-cache';
+import { useAppActive } from '@/auth/app-active';
 import { coversVault, shouldLockVault } from './lock-policy';
 import { mobilePublicData, mobileVaultTransport } from './transport';
 import { RecoveryKeyScreen, SetupScreen, StatusScreen, UnlockScreen } from './VaultScreens';
@@ -51,7 +52,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const email = state.status === 'signedIn' ? state.user.email : '';
   const [view, setView] = useState<Screen>({ kind: 'loading' });
-  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  const appActive = useAppActive();
   const sessionRef = useRef<VaultSession | null>(null);
   const backgroundedAt = useRef<number | null>(null);
   const [bioOn, setBioOn] = useState(false);
@@ -113,7 +114,6 @@ export function VaultGate({ children }: { children: ReactNode }) {
   const unlocked = view.kind === 'unlocked';
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
-      setAppActive(next === 'active');
       if (next === 'background') backgroundedAt.current = Date.now();
       else if (next === 'active') {
         if (sessionRef.current && shouldLockVault(backgroundedAt.current, Date.now())) void lockNow();
