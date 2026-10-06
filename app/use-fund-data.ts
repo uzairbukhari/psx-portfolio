@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FundCatalogResponse, FundNavRow } from '@/lib/mufap';
+import type { PlanNavRow } from '@/lib/plans';
 import { webPublicData } from './vault-transport';
 
 type Catalog = FundCatalogResponse['funds'];
@@ -86,4 +87,23 @@ export function useTrackFunds(mufapIds: string[]) {
       sent.current = '';
     });
   }, [key]);
+}
+
+/** Pak-Qatar sub-fund unit prices, fetched once per page load and only when a plan needs them. */
+export function usePlanNavs(enabled: boolean) {
+  const [state, setState] = useState<{ navs: PlanNavRow[]; loaded: boolean }>({
+    navs: [],
+    loaded: false,
+  });
+  useEffect(() => {
+    if (!enabled || state.loaded) return;
+    let live = true;
+    const done = (navs: PlanNavRow[]) =>
+      live && setState({ navs, loaded: true });
+    webPublicData.planNavs?.().then(done, () => done([]));
+    return () => {
+      live = false;
+    };
+  }, [enabled, state.loaded]);
+  return state.navs;
 }

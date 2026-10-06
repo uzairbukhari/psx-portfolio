@@ -1,4 +1,5 @@
 import { refreshFunds } from '../../../lib/mufap-refresh';
+import { refreshPlanNavs } from '../../../lib/plan-navs';
 import { dispatchWorkflow, dueWorkflows } from '../../../lib/scrape-schedule';
 
 // This Worker has no VAULT_DB binding and no way to learn what any user holds: it only starts public scrapers.
@@ -43,9 +44,15 @@ export default {
     // MUFAP blocks GitHub's runners but answers Cloudflare, so the fund prices are fetched here (public data, no user data).
     if (controller.cron === MUFAP_CRON) {
       ctx.waitUntil(
-        refreshFunds(env.DB)
-          .then((r) => console.log('Fund prices stored', r))
-          .catch((error) => console.error('Fund price refresh failed', error)),
+        (async () => {
+          // Two independent public sources: one failing must not stop the other.
+          await refreshFunds(env.DB)
+            .then((r) => console.log('Fund prices stored', r))
+            .catch((e) => console.error('Fund price refresh failed', e));
+          await refreshPlanNavs(env.DB)
+            .then((r) => console.log('Plan prices stored', r))
+            .catch((e) => console.error('Plan price refresh failed', e));
+        })(),
       );
       return;
     }

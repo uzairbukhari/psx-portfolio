@@ -14,6 +14,8 @@ import {
   PAK_QATAR_MIN_FIRST,
   PAK_QATAR_MIN_TOPUP,
   PAK_QATAR_PLAN_NAME,
+  PAK_QATAR_SUBFUNDS,
+  type PlanNavRow,
   planValue,
   type PlanAsset,
 } from '@/lib/plans';
@@ -131,9 +133,12 @@ export default function SavingsPlansSection({
   canEdit,
   busy,
   addRequest = 0,
+  planNavs = [],
   onChange,
 }: {
   owned: OwnedPlan[];
+  /** Pak-Qatar sub-fund unit prices; they move a plan's value between statements. */
+  planNavs?: PlanNavRow[];
   canEdit: boolean;
   busy: boolean;
   /** Bumped by the page's + menu to open the add dialog. */
@@ -149,10 +154,10 @@ export default function SavingsPlansSection({
     () =>
       owned.map((o) => ({
         ...o,
-        v: planValue(o.asset, asOf),
+        v: planValue(o.asset, asOf, planNavs),
         due: dueEntries(o.asset, asOf),
       })),
-    [owned, asOf],
+    [owned, asOf, planNavs],
   );
 
   // Open the add dialog when the page's + menu asks for it (set during render, not in an effect).
@@ -240,7 +245,7 @@ export default function SavingsPlansSection({
                 <b>{asset.name}</b>
                 <small>
                   {asset.provider === 'pak-qatar-mbp'
-                    ? 'Pak-Qatar Family Takaful'
+                    ? `Pak-Qatar Family Takaful${PAK_QATAR_SUBFUNDS.find((f) => f.id === asset.subFund) ? ` · ${PAK_QATAR_SUBFUNDS.find((f) => f.id === asset.subFund)!.name}` : ''}`
                     : 'Savings plan'}
                   {asset.closed ? ' · closed' : ''}
                   {portfolioName ? ` · ${portfolioName}` : ''}
@@ -278,10 +283,36 @@ export default function SavingsPlansSection({
               {v.source === 'statement' &&
                 `Value from your statement of ${dateText(v.statementDate!)}.`}
               {v.source === 'estimate' &&
-                `Estimated from your statement of ${dateText(v.statementDate!)}${asset.assumedAnnualRate ? ` grown at ${(asset.assumedAnnualRate * 100).toFixed(1)}% a year` : ''} plus what you paid in and took out since. Enter the latest statement value to correct it.`}
+                `Estimated from your statement of ${dateText(v.statementDate!)}${planNavs.some((n) => n.fundId === asset.subFund) ? ' moved by the sub-fund’s unit price' : asset.assumedAnnualRate ? ` grown at ${(asset.assumedAnnualRate * 100).toFixed(1)}% a year` : ''} plus what you paid in and took out since. Enter the latest statement value to correct it.`}
               {v.source === 'paid-in' &&
                 'No statement value yet, so the plan is shown at the amount paid in. Enter the value from your statement or app.'}
             </p>
+            {canEdit &&
+              asset.provider === 'pak-qatar-mbp' &&
+              !asset.subFund && (
+                <label className="notice">
+                  <b>Which sub-fund is this plan in?</b>
+                  <select
+                    value=""
+                    disabled={busy}
+                    onChange={(e) =>
+                      e.target.value &&
+                      void update(
+                        asset.id,
+                        (p) => ({ ...p, subFund: e.target.value }),
+                        'Sub-fund saved.',
+                      )
+                    }
+                  >
+                    <option value="">Choose…</option>
+                    {PAK_QATAR_SUBFUNDS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             {due.length > 0 && canEdit && (
               <div className="notice">
                 <b>Due:</b>
@@ -445,6 +476,7 @@ function PlanDialog({
   const [provider, setProvider] =
     useState<PlanAsset['provider']>('pak-qatar-mbp');
   const [name, setName] = useState(PAK_QATAR_PLAN_NAME);
+  const [subFund, setSubFund] = useState<string>('pure-saving');
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState('');
   const [loadPct, setLoadPct] = useState('');
@@ -495,6 +527,7 @@ function PlanDialog({
           kind: 'plan',
           name: name.trim(),
           provider,
+          ...(provider === 'pak-qatar-mbp' ? { subFund } : {}),
           note: note.trim(),
           ...(pct === undefined ? {} : { assumedAnnualRate: pct }),
           entries:
@@ -629,6 +662,21 @@ function PlanDialog({
                     <option value="other">Another savings plan</option>
                   </select>
                 </label>
+                {provider === 'pak-qatar-mbp' && (
+                  <label>
+                    Sub-fund
+                    <select
+                      value={subFund}
+                      onChange={(e) => setSubFund(e.target.value)}
+                    >
+                      {PAK_QATAR_SUBFUNDS.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label>
                   Name
                   <input

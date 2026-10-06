@@ -96,7 +96,7 @@ import GoldSilverSection, { type OwnedMetal } from './gold-silver';
 import SavingsPlansSection, { type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
 import MutualFundsSection, { type OwnedFund } from './mutual-funds';
-import { useFundCatalog, useTrackFunds } from './use-fund-data';
+import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
 import CollapsiblePanel from './collapsible-panel';
 import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
 import CompanyDetail from './company-detail';
@@ -1162,6 +1162,13 @@ function DashboardContent({
           part.portfolio.assets?.some((a) => a.kind === 'fund'),
         )
       : p?.assets?.some((a) => a.kind === 'fund')) || tab === 'holdings',
+  );
+  const planNavs = usePlanNavs(
+    (isAll
+      ? (p?.[DISPLAY_PARTS]?.flatMap((part) => part.portfolio.assets ?? []) ??
+        [])
+      : (p?.assets ?? [])
+    ).some((a) => a.kind === 'plan' && !!a.subFund),
   );
   useTrackFunds(
     (isAll
@@ -2475,6 +2482,7 @@ function DashboardContent({
                     asOf={today()}
                     metalRates={metalRates.rates}
                     fundNavs={fundData.navs}
+                    planNavs={planNavs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
                     aside={
                       widePulse ? (
@@ -2881,6 +2889,7 @@ function DashboardContent({
             <SavingsPlansSection
               addRequest={assetAdd.kind === 'plan' ? assetAdd.n : 0}
               owned={ownedPlans}
+              planNavs={planNavs}
               canEdit={!isAll && !locked}
               busy={busy}
               onChange={(plans, message) =>

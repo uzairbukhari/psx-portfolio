@@ -8,6 +8,7 @@ import type {
 } from './api-types.ts';
 import type { PublicData } from './portfolio-view.ts';
 import type { MetalRateRow } from './metal-rates.ts';
+import type { PlanNavRow } from './plans.ts';
 import type { FundCatalogResponse, FundHistoryResponse } from './mufap.ts';
 
 export type PublicCall = <T>(
@@ -54,6 +55,10 @@ export function createPublicData(call: PublicCall): PublicData {
         .rates;
     },
     funds: () => call<FundCatalogResponse>('/api/public-data/funds'),
+    async planNavs() {
+      return (await call<{ navs: PlanNavRow[] }>('/api/public-data/plan-navs'))
+        .navs;
+    },
     async trackFunds(mufapIds) {
       await call('/api/public-data/funds', 'POST', { mufapIds });
     },

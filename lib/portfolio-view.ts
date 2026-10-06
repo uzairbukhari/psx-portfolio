@@ -36,6 +36,8 @@ export type PublicData = {
   metalRates?(): Promise<import('./metal-rates.ts').MetalRateRow[]>;
   /** The MUFAP fund directory with each fund's newest price. */
   funds?(): Promise<import('./mufap.ts').FundCatalogResponse>;
+  /** Pak-Qatar sub-fund unit prices (no parameters). */
+  planNavs?(): Promise<import('./plans.ts').PlanNavRow[]>;
   /** Tells the server which funds are held (public MUFAP ids only) so their price is stored nightly. */
   trackFunds?(mufapIds: string[]): Promise<void>;
   /** One fund's price history. */

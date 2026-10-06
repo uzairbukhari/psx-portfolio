@@ -250,3 +250,43 @@ test('a front-end load is not invested: the estimate grows from amount less load
     /load/,
   );
 });
+
+test('a sub-fund price moves the plan value between statements and after later payments', async () => {
+  const { planValue } = await import('../lib/plans.ts');
+  const plan = {
+    id: 'p',
+    kind: 'plan',
+    name: 'MBP',
+    provider: 'pak-qatar-mbp',
+    subFund: 'pure-saving',
+    note: '',
+    entries: [
+      {
+        id: 'a',
+        type: 'contribution',
+        date: '2026-01-05',
+        amount: 100000,
+        note: '',
+      },
+      {
+        id: 'b',
+        type: 'contribution',
+        date: '2026-02-05',
+        amount: 10000,
+        note: '',
+      },
+    ],
+    valuations: [{ id: 'v', date: '2026-01-31', value: 101000, note: '' }],
+    rules: [],
+  };
+  const navs = [
+    { fundId: 'pure-saving', date: '2026-01-31', nav: 100 },
+    { fundId: 'pure-saving', date: '2026-02-05', nav: 102 },
+    { fundId: 'pure-saving', date: '2026-03-01', nav: 105 },
+    { fundId: 'other', date: '2026-03-01', nav: 1 },
+  ];
+  const v = planValue(plan, '2026-03-01', navs);
+  assert.equal(v.source, 'estimate');
+  assert.equal(v.value, 106050 + 10294.12); // 101000 x 105/100 + 10000 x 105/102
+  assert.equal(planValue(plan, '2026-03-01', []).value, 111000); // no price: unchanged
+});

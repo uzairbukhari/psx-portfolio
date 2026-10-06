@@ -40,6 +40,7 @@ export const SHARED_TABLES: readonly string[] = [
   'fund_catalog',
   'fund_navs',
   'tracked_funds',
+  'plan_navs',
   'refresh_requests',
   'ipo_offers',
   'ai_research_runs',

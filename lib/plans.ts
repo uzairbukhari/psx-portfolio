@@ -45,6 +45,8 @@ export type PlanAsset = {
   kind: 'plan';
   name: string;
   provider: 'pak-qatar-mbp' | 'other';
+  /** Pak-Qatar sub-fund the money is in (see PAK_QATAR_SUBFUNDS); its daily unit price moves the plan value between statements. */
+  subFund?: string;
   note: string;
   /** Optional assumed yearly return as a fraction (0.12 = 12%), used only to estimate between statement values. */
   assumedAnnualRate?: number;
@@ -54,6 +56,21 @@ export type PlanAsset = {
   valuations: PlanValuation[];
   rules: PlanRule[];
 };
+
+/** Pak-Qatar Mahana Bachat sub-funds. The id is stable; the name is what the provider publishes. */
+export const PAK_QATAR_SUBFUNDS = [
+  { id: 'aggressive', name: 'Aggressive Fund' },
+  { id: 'conservative', name: 'Conservative Fund' },
+  { id: 'balanced', name: 'Balanced Fund' },
+  { id: 'secure-wealth', name: 'Secure Wealth Fund' },
+  { id: 'pure-saving', name: 'Pure Saving Fund' },
+  { id: 'mustehkam-munafa', name: 'Mustehkam Munafa Fund' },
+  { id: 'pure-protection', name: 'Pure Protection Fund' },
+  { id: 'kafalat-pension', name: 'Kafalat Pension Fund' },
+  { id: 'prosperity', name: 'Prosperity Fund' },
+] as const;
+/** A sub-fund's published unit price on one day (public data). */
+export type PlanNavRow = { fundId: string; date: string; nav: number };
 
 export const PAK_QATAR_PLAN_NAME = 'Mahana Bachat & Takaful Flexi Plan';
 /** From the provider's brochure: minimum first contribution and smallest top-up, in rupees. */
@@ -87,7 +104,28 @@ export const invested = (e: { amount: number; load?: number }) =>
 const live = <T extends { voided?: boolean }>(list: T[]) =>
   list.filter((x) => !x.voided);
 
-export function planValue(plan: PlanAsset, asOf: string): PlanValue {
+/** Newest unit price on or before a date; null when none is stored that early. */
+const navOn = (navs: PlanNavRow[], date: string) => {
+  let best: PlanNavRow | null = null;
+  for (const n of navs)
+    if (n.date <= date && (!best || n.date > best.date)) best = n;
+  return best;
+};
+
+export function planValue(
+  plan: PlanAsset,
+  asOf: string,
+  planNavs: PlanNavRow[] = [],
+): PlanValue {
+  const navs = plan.subFund
+    ? planNavs.filter((n) => n.fundId === plan.subFund)
+    : [];
+  const latest = navOn(navs, asOf);
+  /** Moves an amount from `date` to `asOf` by the sub-fund's unit price; unchanged when no price is known at `date`. */
+  const byNav = (amount: number, date: string) => {
+    const then = navOn(navs, date);
+    return latest && then ? amount * (latest.nav / then.nav) : amount;
+  };
   const entries = live(plan.entries).filter((e) => e.date <= asOf);
   const contributed = cents(
     entries
@@ -114,8 +152,20 @@ export function planValue(plan: PlanAsset, asOf: string): PlanValue {
     value = 0;
     source = 'statement';
   } else if (!last) {
-    value = Math.max(0, cents(contributedNet - redeemed));
-    source = 'paid-in';
+    value = Math.max(
+      0,
+      cents(
+        entries.reduce(
+          (n, e) =>
+            e.type === 'contribution'
+              ? n + byNav(invested(e), e.date)
+              : n - byNav(e.amount, e.date),
+          0,
+        ),
+      ),
+    );
+    source =
+      latest && value !== contributedNet - redeemed ? 'estimate' : 'paid-in';
   } else {
     const rate = plan.assumedAnnualRate;
     const grow = (amount: number, from: string, to: string) =>
@@ -123,14 +173,20 @@ export function planValue(plan: PlanAsset, asOf: string): PlanValue {
         ? amount *
           Math.pow(1 + rate, Math.max(0, dayNumber(to) - dayNumber(from)) / 365)
         : amount;
-    let v = grow(last.value, last.date, asOf);
+    // With a sub-fund price, value moves with the price; otherwise by the assumed rate (or not at all).
+    const move = (amount: number, from: string) =>
+      latest ? byNav(amount, from) : grow(amount, from, asOf);
+    let v = move(last.value, last.date);
     for (const e of entries.filter((x) => x.date > last.date))
       v +=
         (e.type === 'contribution' ? 1 : -1) *
-        grow(e.type === 'contribution' ? invested(e) : e.amount, e.date, asOf);
+        move(e.type === 'contribution' ? invested(e) : e.amount, e.date);
     value = Math.max(0, cents(v));
     const moved = entries.some((e) => e.date > last.date);
-    source = (rate && asOf > last.date) || moved ? 'estimate' : 'statement';
+    source =
+      (latest && asOf > last.date) || (rate && asOf > last.date) || moved
+        ? 'estimate'
+        : 'statement';
   }
   const cost = cents(contributed - redeemed);
   const gain = cents(value - cost);
@@ -202,6 +258,12 @@ export function dueEntries(
 export function validatePlan(plan: PlanAsset, today: string) {
   if (plan.provider !== 'pak-qatar-mbp' && plan.provider !== 'other')
     throw new Error('Unknown plan provider.');
+  if (
+    plan.subFund !== undefined &&
+    (plan.provider !== 'pak-qatar-mbp' ||
+      !PAK_QATAR_SUBFUNDS.some((f) => f.id === plan.subFund))
+  )
+    throw new Error('Unknown sub-fund.');
   if (
     plan.assumedAnnualRate !== undefined &&
     (!Number.isFinite(plan.assumedAnnualRate) ||

@@ -1,3 +1,4 @@
+import { refreshPlanNavs } from '@/lib/plan-navs';
 import { refreshFunds } from '@/lib/mufap-refresh';
 import { db, failure, requireSuperAdmin } from '@/lib/server';
 
@@ -5,9 +6,12 @@ import { db, failure, requireSuperAdmin } from '@/lib/server';
 export async function POST(req: Request) {
   try {
     await requireSuperAdmin(req, true);
-    return Response.json(await refreshFunds(db()), {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    const funds = await refreshFunds(db());
+    const plans = await refreshPlanNavs(db());
+    return Response.json(
+      { funds, plans },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (e) {
     return failure(e);
   }

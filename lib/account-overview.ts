@@ -6,6 +6,7 @@
 import { valueAsset } from './assets.ts';
 import type { MetalRateRow } from './metal-rates.ts';
 import type { FundNavRow } from './mufap.ts';
+import type { PlanNavRow } from './plans.ts';
 import {
   moneyInFlows,
   moneyWeightedReturn,
@@ -121,7 +122,11 @@ const sumKnown = (values: (number | null)[]) =>
 export function accountOverview(
   parts: (DisplayPart & { locked?: boolean })[],
   asOf: string,
-  options: { metalRates?: MetalRateRow[]; fundNavs?: FundNavRow[] } = {},
+  options: {
+    metalRates?: MetalRateRow[];
+    fundNavs?: FundNavRow[];
+    planNavs?: PlanNavRow[];
+  } = {},
 ): AccountOverview {
   const consolidated = consolidatedAccount({
     kind: 'sipwise-portfolio-account',
@@ -136,7 +141,13 @@ export function accountOverview(
   const assetValues = parts.flatMap((part) =>
     (part.portfolio.assets ?? []).map((asset) => ({
       asset,
-      v: valueAsset(asset, rates, asOf, options.fundNavs ?? []),
+      v: valueAsset(
+        asset,
+        rates,
+        asOf,
+        options.fundNavs ?? [],
+        options.planNavs ?? [],
+      ),
     })),
   );
   const assetClass = (key: AssetClassKey): ClassTotal | null => {

@@ -20,7 +20,13 @@ import {
   type FundAsset,
 } from './funds.ts';
 import type { FundNavRow } from './mufap.ts';
-import { planFlows, planValue, validatePlan, type PlanAsset } from './plans.ts';
+import {
+  planFlows,
+  planValue,
+  validatePlan,
+  type PlanAsset,
+  type PlanNavRow,
+} from './plans.ts';
 
 export type MetalEntry = {
   id: string;
@@ -303,6 +309,7 @@ export function valueAsset(
   rates: MetalRateRow[],
   asOf: string,
   navs: FundNavRow[] = [],
+  planNavs: PlanNavRow[] = [],
 ): AssetValue {
   if (asset.kind === 'fund') {
     const v = valueFund(asset, navs, asOf);
@@ -318,7 +325,7 @@ export function valueAsset(
     };
   }
   if (asset.kind === 'plan') {
-    const v = planValue(asset, asOf);
+    const v = planValue(asset, asOf, planNavs);
     return {
       classKey: 'plans',
       value: v.value,

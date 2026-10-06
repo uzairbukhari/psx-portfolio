@@ -482,6 +482,17 @@ export const trackedFunds = sqliteTable('tracked_funds', {
   mufapId: text('mufap_id').primaryKey(),
   firstSeen: text('first_seen').notNull(),
 });
+/** Pak-Qatar sub-fund unit prices, one row per fund per day (public data). */
+export const planNavs = sqliteTable(
+  'plan_navs',
+  {
+    fundId: text('fund_id').notNull(),
+    date: text('date').notNull(),
+    nav: real('nav').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.fundId, t.date] })],
+);
 export const fundNavs = sqliteTable(
   'fund_navs',
   {
