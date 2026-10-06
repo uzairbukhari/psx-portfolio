@@ -9,7 +9,7 @@
 // --refresh-eod re-fetches daily closes for every ticker regardless of age (backfill after raising the retention).
 import { d1, trackedTickers } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
-import { fetchPsxToken, fetchPsxTimeseries } from '../lib/psx-fetch.ts';
+import { fetchPsxToken, fetchPsxTimeseries, PsxNoSeriesError } from '../lib/psx-fetch.ts';
 import { eodKeep, parseEod, parseIntraday } from '../lib/price-history.ts';
 
 const EOD_MAX_AGE_MS = 12 * 3_600_000;
@@ -53,6 +53,7 @@ async function main() {
   const ages = await storedAges();
   const now = new Date();
   const failed = [];
+  const noHistory = [];
   let ok = 0;
   // One page token serves every request in a run; refresh it once if PSX rejects it.
   // The token is not ticker-specific, so a company page that answers 500 (an odd or delisted symbol sorted
@@ -110,15 +111,21 @@ async function main() {
       }
       ok++;
     } catch (error) {
+      // A new listing has no price history yet: not a failure, it fills in once PSX publishes some.
+      if (error instanceof PsxNoSeriesError) {
+        noHistory.push(ticker);
+        return;
+      }
       failed.push(`${ticker}: ${error instanceof Error ? error.message : String(error)}`);
     }
   });
   console.log(
-    `PSX history: ${ok}/${tickers.length} tickers` +
+    `PSX history: ${ok}/${tickers.length - noHistory.length} tickers` +
       (skipped.length ? ` (skipped unlisted: ${skipped.join(', ')})` : '') +
+      (noHistory.length ? ` (no PSX history yet: ${noHistory.join(', ')})` : '') +
       (failed.length ? `. Failed: ${failed.join('; ')}` : '.'),
   );
-  process.exitCode = scrapeExitCode(tickers.length, failed.length);
+  process.exitCode = scrapeExitCode(tickers.length - noHistory.length, failed.length);
 }
 
 main().catch((error) => {
