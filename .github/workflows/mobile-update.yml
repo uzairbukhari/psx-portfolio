@@ -1,7 +1,7 @@
 name: Mobile OTA update
 
-# Publishes the Expo app's JavaScript to the `staging` channel over the air whenever a merge to main
-# changes the app or the shared lib/ modules it bundles. This is `eas update`, never `eas build`: it
+# Publishes the Expo app's JavaScript to the `staging` and then the `production` channel over the air
+# whenever a merge to main changes the app or the shared lib/ modules it bundles. This is `eas update`, never `eas build`: it
 # uses no build from the free tier's monthly allowance. A native change (new native module, app.config
 # plugins, permissions) still needs one manual `eas build`; installed apps only take updates whose
 # runtimeVersion (the app version) matches.
@@ -19,7 +19,7 @@ on:
         required: false
         default: ''
       channel:
-        description: 'Channel to publish to (merges to main always publish to staging)'
+        description: 'Channel to publish to (merges to main publish to both staging and production)'
         type: choice
         options: [staging, production]
         default: staging
@@ -75,7 +75,10 @@ jobs:
         if: steps.token.outputs.present == 'true'
         env:
           MESSAGE: ${{ inputs.message || github.event.head_commit.message }}
-          CHANNEL: ${{ inputs.channel || 'staging' }}
+          # A merge to main publishes to both channels (staging first); a manual run publishes to the chosen one.
+          CHANNELS: ${{ inputs.channel || 'staging production' }}
         run: |
           subject="$(printf '%s' "$MESSAGE" | head -n1 | cut -c1-100)"
-          npm run "update:$CHANNEL" -- --non-interactive --message "${subject:-Update from main} (${GITHUB_SHA::7})"
+          for channel in $CHANNELS; do
+            npm run "update:$channel" -- --non-interactive --message "${subject:-Update from main} (${GITHUB_SHA::7})"
+          done
