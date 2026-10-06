@@ -1,3 +1,4 @@
+import { ChoosePortfolio } from '@/ui/AllPortfolios';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -49,6 +50,7 @@ export default function Targets() {
   const edit = (next: Draft[]) => setRows(next);
   const patch = (ticker: string, change: Partial<Draft>) => edit(draft.map((r) => (r.ticker === ticker ? { ...r, ...change } : r)));
 
+  if (p.isAll) return <ChoosePortfolio purpose="Choose the portfolio whose targets you want to edit." />;
   if (p.isLoading || !portfolio)
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
@@ -64,6 +66,7 @@ export default function Targets() {
 
   async function save() {
     if (!portfolio) return;
+    if (p.locked) {setError('This portfolio is locked. Unlock it in Settings → Portfolios.');return;}
     setError(null);
     try {
       for (const r of draft)
@@ -213,7 +216,7 @@ export default function Targets() {
 
           <Muted>A screen older than 183 days pauses new buys for that company until you renew its date. Today is {today()}.</Muted>
           {error ? <Notice tone="error">{error}</Notice> : null}
-          <Button label="Save targets" icon="check" loading={busy} disabled={totals.status !== 'exact'} onPress={() => void save()} />
+          <Button label="Save targets" icon="check" loading={busy} disabled={p.locked || totals.status !== 'exact'} onPress={() => void save()} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

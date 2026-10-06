@@ -1,3 +1,4 @@
+import { ChoosePortfolio } from '@/ui/AllPortfolios';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,8 +15,10 @@ export default function Received() {
   const styles = useKitStyles();
   const { colors } = useTheme();
   const { id: raw } = useLocalSearchParams<{ id: string }>();
-  const id = String(raw ?? '');
-  const p = usePortfolio();
+  const fullId = String(raw ?? '');
+  const ownerId = fullId.includes('::') ? fullId.split('::')[0] : undefined;
+  const id = ownerId ? fullId.slice(ownerId.length+2) : fullId;
+  const p = usePortfolio(ownerId);
   const dividend = p.portfolio?.dividends?.find((d) => d.id === id);
   const row = dividend && p.portfolio ? companyDividends(p.portfolio, dividend.ticker).find((r) => r.id === id) : undefined;
   const [paymentDate, setPaymentDate] = useState(today());
@@ -44,6 +47,7 @@ export default function Received() {
   }
 
   const waiting = row?.status === 'expected';
+  if (p.isAll) return <ChoosePortfolio purpose="Choose the portfolio that received this dividend." />;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>
       <Stack.Screen options={{ title: dividend ? `${dividend.ticker} dividend` : 'Dividend' }} />

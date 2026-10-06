@@ -29,8 +29,8 @@ export function mobileVaultTransport(api: Api): VaultTransport {
     postVault: (request) => guard(api.post('/api/vault', request)),
     putWrappers: (request) => guard(api.put('/api/vault', request)),
     deleteVault: async () => void (await guard(api.delete('/api/vault', { confirm: true }))),
-    getPortfolio: () => guard(api.get('/api/v2/portfolio')),
-    putPortfolio: (request) => guard(api.put('/api/v2/portfolio', request)),
+    getPortfolio: () => guard(api.get('/api/v3/portfolio')),
+    putPortfolio: (request) => guard(api.put('/api/v3/portfolio', request)),
   };
 }
 

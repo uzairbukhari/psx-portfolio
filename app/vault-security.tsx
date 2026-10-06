@@ -8,8 +8,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { TransportError, type VaultSession } from '@/lib/vault-client';
 import { MIN_PASSWORD_CHARS, VaultError, decodeRecoverySecret } from '@/lib/vault-crypto';
 import type { BackupPackage } from '@/lib/vault-backup';
-import type { Portfolio } from '@/lib/portfolio';
-import { openBackup } from '@/lib/vault-backup';
+import type { PortfolioAccount } from '@/lib/portfolio-account';
+import { openAccountBackup } from '@/lib/vault-backup';
 
 const text = (error: unknown) => (error instanceof VaultError || error instanceof TransportError || error instanceof Error ? error.message : 'Something went wrong. Try again.');
 const sameKey = (a: string, b: string) => {
@@ -150,7 +150,7 @@ export function EncryptedRestoreDialog({
 }: {
   backup: BackupPackage | null;
   onCancel: () => void;
-  onRestore: (portfolio: Portfolio) => Promise<void>;
+  onRestore: (portfolio: PortfolioAccount) => Promise<void>;
 }) {
   const [useRecovery, setUseRecovery] = useState(false);
   const [secret, setSecret] = useState('');
@@ -162,7 +162,7 @@ export function EncryptedRestoreDialog({
     setBusy(true);
     setError('');
     try {
-      const portfolio = await openBackup(backup, useRecovery ? { recovery: secret } : { password: secret });
+      const portfolio = await openAccountBackup(backup, useRecovery ? { recovery: secret } : { password: secret });
       await onRestore(portfolio);
       setSecret('');
     } catch (e) {
@@ -176,7 +176,7 @@ export function EncryptedRestoreDialog({
       <DialogContent className="form-dialog">
         <DialogTitle>Restore encrypted backup</DialogTitle>
         <DialogDescription>
-          Enter the vault password or recovery key this backup was made with. It is decrypted on this device and re-encrypted into your current vault; your portfolio is replaced.
+          Enter the vault password or recovery key this backup was made with. It is decrypted on this device and re-encrypted into your current vault; all portfolios in this account will be replaced after you review the portfolio names.
         </DialogDescription>
         <form onSubmit={submit}>
           <label>

@@ -150,6 +150,7 @@ export default function SettingsView({
   importSummary,
   dividendSync,
   security,
+  portfolios,
   initialSection,
 }: {
   name: string | null;
@@ -174,6 +175,7 @@ export default function SettingsView({
   dividendSync?: ReactNode;
   /** The vault security card (lock, change password, recovery key). */
   security?: ReactNode;
+  portfolios?: ReactNode;
   initialSection?: string;
 }) {
   const isAdmin = role === 'super_admin';
@@ -238,6 +240,7 @@ export default function SettingsView({
   const [active, setActive] = useState(initialSection ?? 'account');
   const sections = [
     { id: 'account', label: 'Account', icon: UserRound },
+    ...(portfolios ? [{id:'portfolios',label:'Portfolios',icon:Database}] : []),
     ...(security ? [{ id: 'security', label: 'Security', icon: KeyRound }] : []),
     { id: 'data', label: 'Data & imports', icon: Database },
     ...(dividendSync ? [{ id: 'sync-dividends', label: 'Sync dividends', icon: RefreshCw }] : []),
@@ -272,6 +275,7 @@ export default function SettingsView({
               onClick={(e) => {
                 e.preventDefault();
                 setActive(id);
+                window.history.replaceState(null, '', `#${id}`);
                 window.scrollTo({ top: 0 });
               }}
             >
@@ -280,6 +284,7 @@ export default function SettingsView({
           ))}
         </nav>
         <div className="set-content">
+          {current === 'portfolios' && portfolios ? <Section id="portfolios" icon={<Database size={18} />} title="Portfolios" description="Create, rename and protect your portfolios.">{portfolios}</Section> : null}
           {current === 'account' && (
             <>
               <Section

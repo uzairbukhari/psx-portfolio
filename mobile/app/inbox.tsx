@@ -59,7 +59,7 @@ export default function Inbox() {
     setBusy(true);
     setError(null);
     try {
-      await p.save(changeNotifications(p.portfolio, change));
+      await p.saveNotifications(changeNotifications(p.portfolio, change).notifications ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not update your alerts.');
     } finally {

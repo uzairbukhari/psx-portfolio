@@ -7,8 +7,10 @@
 // SavePortfolioResponse shapes the screens already use.
 import type { CompanyLookup, PortfolioResponse, PublicDataResponse, SavePortfolioResponse } from './api-types.ts';
 import { applyLookups, hasPlaceholderDetails, newTickers } from './company-enrichment.ts';
+import { planAutoDividendUpdate } from './dividend-sync.ts';
 import { mergeQuotes } from './quote-merge.ts';
 import { validate, type Portfolio } from './portfolio.ts';
+import { type PortfolioAccount, type PortfolioTarget } from './portfolio-account.ts';
 import { ConflictError, type VaultSession } from './vault-client.ts';
 
 export type PublicData = {
@@ -47,8 +49,8 @@ async function lookupPlaceholders(portfolio: Portfolio, publicData: PublicData):
 }
 
 /** Reload + decrypt + overlay. Public data is best effort: offline or a hiccup shows the portfolio without it. */
-export async function loadPortfolioView(session: VaultSession, publicData: PublicData): Promise<PortfolioResponse> {
-  const { portfolio: stored, revision } = await session.reload();
+export async function loadPortfolioView(session: VaultSession, publicData: PublicData, target?: PortfolioTarget): Promise<PortfolioResponse> {
+  const { portfolio: stored, revision } = await session.reload(target);
   const tickers = tickersOf(stored);
   const market = tickers.length ? await publicData.market(tickers).catch(() => null) : null;
   const lookups = await lookupPlaceholders(stored, publicData);
@@ -76,8 +78,9 @@ export async function savePortfolioView(
   incoming: Portfolio,
   revision: number,
   createCompanies: readonly string[] = [],
+  target?: PortfolioTarget,
 ): Promise<SavePortfolioResponse> {
-  const previous = session.portfolio;
+  const previous = session.portfolioFor(target);
   const added = new Set(newTickers(previous, incoming));
   const present = new Set(tickersOf(incoming));
   const strict = [...new Set(createCompanies)];
@@ -108,8 +111,36 @@ export async function savePortfolioView(
   }
   // Validate what is actually stored: after the details were filled in.
   validate(incoming);
-  const saved = await session.save(incoming, revision);
+  const saved = await session.save(incoming, revision, target);
   return { revision: saved, details, pendingCompanies: pending };
 }
 
 export { ConflictError };
+
+/** One public fetch for the union of tickers, then an independent overlay on every ledger. */
+export async function loadAccountView(session: VaultSession, publicData: PublicData, syncDividends = false): Promise<{ account: PortfolioAccount; revision: number }> {
+  return session.guarded(async () => {
+    let { account, revision } = await session.reload();
+    const tickers = [...new Set(account.portfolios.flatMap((p) => tickersOf(p.portfolio)))];
+    const placeholders = [...new Set(account.portfolios.flatMap((p) => p.portfolio.companies.filter(hasPlaceholderDetails).map((c) => c.ticker)))];
+    const [market, lookups] = await Promise.all([
+      tickers.length ? publicData.market(tickers).catch(() => null) : null,
+      placeholders.length ? publicData.companies(placeholders).catch(() => []) : [],
+    ]);
+    if (syncDividends && market && !session.offline) {
+      let changed = false;
+      const updated = { ...account, portfolios: account.portfolios.map((entry) => {
+        if (entry.locked) return entry;
+        const update = planAutoDividendUpdate(entry.portfolio, market.announcements ?? [], undefined, undefined, market.faceValues ?? {});
+        if (!update) return entry;
+        changed = true;
+        return { ...entry, portfolio: update.next };
+      }) };
+      if (changed) {
+        try { revision = await session.saveAccount(updated, revision); account = updated; }
+        catch (error) { if (!(error instanceof ConflictError)) throw error; return loadAccountView(session, publicData, false); }
+      }
+    }
+    return { account: { ...account, portfolios: account.portfolios.map((entry) => ({ ...entry, portfolio: applyPublicData(entry.portfolio, market, lookups).portfolio })) }, revision };
+  });
+}

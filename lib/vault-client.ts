@@ -19,6 +19,7 @@ import type {
   VaultWrappersResponse,
 } from './api-types.ts';
 import { blankPortfolio, type Portfolio } from './portfolio.ts';
+import { accountFromPortfolio, assertAccountWritable, normalizeAccount, portfolioAt, replacePortfolio, type PortfolioAccount, type PortfolioTarget } from './portfolio-account.ts';
 import { createBackupPackage, type BackupPackage } from './vault-backup.ts';
 import {
   VaultError,
@@ -128,7 +129,7 @@ export async function prepareVault(transport: VaultTransport, password: string, 
   const keys = await createVaultKeys(password);
   const material: VaultKeyMaterial = { ...keys.material, wrapperVersion: 1 };
   const portfolio = blankPortfolio();
-  const envelope = await encryptPortfolio(keys.dataKey, material.vaultId, material.keyVersion, 1, JSON.stringify(portfolio));
+  const envelope = await encryptPortfolio(keys.dataKey, material.vaultId, material.keyVersion, 1, JSON.stringify(accountFromPortfolio(portfolio)));
   let done = false;
   return {
     recoverySecret: keys.recoverySecret,
@@ -178,27 +179,20 @@ export async function openWithKey(
     const stored = status.portfolio;
     if (!stored) throw new VaultError('invalid', 'No encrypted portfolio was found for this vault.');
     const plain = await decryptPortfolio(dataKey, stored.envelope, { vaultId: status.vault.vaultId, keyVersion: status.vault.keyVersion, revision: stored.revision });
-    const portfolio = parsePortfolio(plain);
-    return new VaultSession(transport, cache, status.vault, dataKey, { revision: stored.revision, portfolio }, status.offline);
+    const account = parseAccount(plain);
+    return new VaultSession(transport, cache, status.vault, dataKey, { revision: stored.revision, account }, status.offline);
   } catch (error) {
     dataKey.fill(0);
     throw error;
   }
 }
 
-function parsePortfolio(text: string): Portfolio {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw new VaultError('tampered', 'The decrypted portfolio is not readable.');
-  }
-  if (!value || typeof value !== 'object' || !Array.isArray((value as Portfolio).companies))
-    throw new VaultError('tampered', 'The decrypted portfolio is not readable.');
-  return value as Portfolio;
+function parseAccount(text: string): PortfolioAccount {
+  try { return normalizeAccount(JSON.parse(text), false); }
+  catch (error) { throw new VaultError('invalid', error instanceof Error ? error.message : 'The decrypted portfolio is not readable.'); }
 }
 
-type State = { revision: number; portfolio: Portfolio };
+type State = { revision: number; portfolio?: Portfolio; account?: PortfolioAccount };
 
 export class VaultSession {
   private key: Uint8Array | null;
@@ -208,7 +202,12 @@ export class VaultSession {
   /** True while the session was opened from the device cache because the server was unreachable. */
   offline: boolean;
   revision: number;
-  portfolio: Portfolio;
+  account: PortfolioAccount;
+  private changeListeners = new Set<() => void>();
+  get portfolio(): Portfolio { return this.account.portfolios[0]?.portfolio ?? blankPortfolio(); }
+  portfolioFor(target?: PortfolioTarget): Portfolio { return portfolioAt(this.account, target); }
+  onChange(fn: () => void) { this.changeListeners.add(fn); return () => { this.changeListeners.delete(fn); }; }
+  private changed() { for (const fn of this.changeListeners) fn(); }
 
   private transport: VaultTransport;
   private cache: VaultCache;
@@ -226,7 +225,7 @@ export class VaultSession {
     this.key = dataKey;
     this.material = material;
     this.revision = state.revision;
-    this.portfolio = state.portfolio;
+    this.account = state.account ?? accountFromPortfolio(state.portfolio);
     this.offline = offline;
   }
 
@@ -251,7 +250,9 @@ export class VaultSession {
     this.key.fill(0);
     this.key = null;
     this.epoch++;
-    this.portfolio = blankPortfolio();
+    this.account = accountFromPortfolio();
+    this.changed();
+    this.changeListeners.clear();
     this.revision = 0;
     for (const fn of [...this.listeners]) fn();
     this.listeners.clear();
@@ -289,7 +290,7 @@ export class VaultSession {
   }
 
   /** Re-reads and decrypts the stored portfolio (a reload). Never merges with local state. */
-  async reload(): Promise<{ portfolio: Portfolio; revision: number }> {
+  async reload(target?: PortfolioTarget): Promise<{ portfolio: Portfolio; account: PortfolioAccount; revision: number }> {
     return this.guarded(async () => {
       const key = this.requireKey();
       const epoch = this.epoch;
@@ -300,16 +301,18 @@ export class VaultSession {
         if (!isOffline(error)) throw error;
         // Offline: keep what is already open rather than failing the whole screen.
         this.offline = true;
-        return { portfolio: this.portfolio, revision: this.revision };
+        return { portfolio: this.portfolioFor(target), account: this.account, revision: this.revision };
       }
       const plain = await decryptPortfolio(key, stored.envelope, { vaultId: this.material.vaultId, keyVersion: this.material.keyVersion, revision: stored.revision });
-      const portfolio = parsePortfolio(plain);
+      const account = parseAccount(plain);
       this.assertCurrent(epoch);
       this.offline = false;
-      this.portfolio = portfolio;
+      if (stored.revision < this.revision) return { portfolio: this.portfolioFor(target), account: this.account, revision: this.revision };
+      this.account = account;
       this.revision = stored.revision;
+      this.changed();
       await this.cache.write({ vault: this.material, portfolio: stored });
-      return { portfolio, revision: stored.revision };
+      return { portfolio: this.portfolioFor(target), account, revision: stored.revision };
     });
   }
 
@@ -317,16 +320,26 @@ export class VaultSession {
    * Encrypts `next` for `expectedRevision + 1` and stores it only if the server still has `expectedRevision`.
    * Throws ConflictError on a lost race (nothing is written), VaultLockedError if locked meanwhile.
    */
-  async save(next: Portfolio, expectedRevision: number): Promise<number> {
+  async save(next: Portfolio, expectedRevision: number, target?: PortfolioTarget): Promise<number> {
+    return this.saveAccount(replacePortfolio(this.account, next, target), expectedRevision);
+  }
+
+  /** Saves the complete collection atomically; every portfolio shares the same revision. */
+  async saveAccount(next: PortfolioAccount, expectedRevision: number, options: { replaceAll?: boolean } = {}): Promise<number> {
     return this.guarded(async () => {
+      if (expectedRevision !== this.revision) throw new ConflictError();
+      normalizeAccount(next, false);
+      // An explicit, confirmed "replace everything" (restore, delete all data) is allowed past portfolio locks.
+      if (!options.replaceAll) assertAccountWritable(this.account, next);
       const key = this.requireKey();
       const epoch = this.epoch;
       const envelope = await encryptPortfolio(key, this.material.vaultId, this.material.keyVersion, expectedRevision + 1, JSON.stringify(next));
       try {
         const saved = await this.transport.putPortfolio({ envelope, expectedRevision });
         this.assertCurrent(epoch);
-        this.portfolio = next;
+        this.account = next;
         this.revision = saved.revision;
+        this.changed();
         await this.cache.write({ vault: this.material, portfolio: { vaultId: this.material.vaultId, revision: saved.revision, envelope, updatedAt: new Date().toISOString() } });
         return saved.revision;
       } catch (error) {

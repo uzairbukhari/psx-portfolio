@@ -211,7 +211,11 @@ export const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
   budgetUsd: 0.5,
   maxAttempts: 3,
 };
+/** Display-only provenance; Symbols are never serialized into encrypted ledgers. */
+export const DISPLAY_PARTS = Symbol('portfolio-display-parts');
+export type DisplayPart = { id: string; name: string; portfolio: Portfolio };
 export type Portfolio = {
+  [DISPLAY_PARTS]?: DisplayPart[];
   companies: Company[];
   trades: Trade[];
   brokerFormats?: import('./broker-import.ts').BrokerFormat[];
@@ -441,7 +445,8 @@ function applySplit(shares: number, split: StockSplit) {
     );
   return adjusted;
 }
-export function sharesHeldOn(p: Portfolio, ticker: string, date: string) {
+export function sharesHeldOn(p: Portfolio, ticker: string, date: string): number {
+  if (p[DISPLAY_PARTS]) return p[DISPLAY_PARTS]!.reduce((n, part) => n + sharesHeldOn(part.portfolio, ticker, date), 0);
   let shares = 0;
   for (const event of ledgerEventsFor(p, ticker, date)) {
     if (event.type === 'split') shares = applySplit(shares, event.value);
@@ -452,7 +457,8 @@ export function sharesHeldOn(p: Portfolio, ticker: string, date: string) {
   if (shares < 0) throw new UserError(ticker + ': a holding adjustment exceeds shares held.');
   return shares;
 }
-export function sharesHeldBefore(p: Portfolio, ticker: string, date: string) {
+export function sharesHeldBefore(p: Portfolio, ticker: string, date: string): number {
+  if (p[DISPLAY_PARTS]) return p[DISPLAY_PARTS]!.reduce((n, part) => n + sharesHeldBefore(part.portfolio, ticker, date), 0);
   let shares = 0;
   for (const event of ledgerEventsFor(p, ticker)) {
     if (event.value.date >= date) break;
@@ -500,6 +506,7 @@ export type RealizedSale = {
   realizedGain: number | null;
 };
 export function realizedSales(p: Portfolio): RealizedSale[] {
+  if (p[DISPLAY_PARTS]) return p[DISPLAY_PARTS]!.flatMap((part) => realizedSales(part.portfolio).map((sale) => ({ ...sale, tradeId: `${part.id}::${sale.tradeId}` })));
   const out: RealizedSale[] = [];
   for (const c of p.companies) {
     let shares = 0,
@@ -587,7 +594,12 @@ export const amountsAgree = (a: number, b: number) =>
   a > 0 && b > 0 && Math.abs(a - b) / Math.max(a, b) <= AMOUNT_TOLERANCE;
 
 /** Gross amount of a dividend: recorded for imports and received ones, derived from the ledger while expected. */
-export function dividendGross(p: Portfolio, d: Dividend) {
+export function dividendGross(p: Portfolio, d: Dividend): number {
+  if (p[DISPLAY_PARTS]) {
+    const owner = p[DISPLAY_PARTS]!.find((part) => d.id.startsWith(part.id + '::'));
+    const original = owner?.portfolio.dividends?.find((entry) => `${owner.id}::${entry.id}` === d.id);
+    if (owner && original) return dividendGross(owner.portfolio, original);
+  }
   if (d.source === 'import') return d.grossAmount ?? 0;
   if (d.source === 'auto' && dividendStatus(d) === 'expected')
     return round(
@@ -781,7 +793,22 @@ export type TaxYearSummary = {
  * (capital gains netted per tax year, dividends taxed at the rate). Expected dividends are
  * reported separately and stay out of income and realised-return totals.
  */
-export function taxSummary(p: Portfolio) {
+export function taxSummary(p: Portfolio): ReturnType<typeof ledgerTaxSummary> {
+  if (!p[DISPLAY_PARTS]) return ledgerTaxSummary(p);
+  const parts = p[DISPLAY_PARTS]!.map((part) => ({ ...part, tax: ledgerTaxSummary(part.portfolio) }));
+  const sum = (values: (number | null)[]) => values.some((v) => v === null) ? null : round(values.reduce<number>((a, v) => a + v!, 0));
+  const years = new Map<string, TaxYearSummary[]>();
+  for (const {tax} of parts) for (const y of tax.taxYears) years.set(y.taxYear, [...(years.get(y.taxYear) ?? []), y]);
+  return {
+    sales: parts.flatMap(({id,tax}) => tax.sales.map((s) => ({...s, tradeId: `${id}::${s.tradeId}`}))),
+    dividends: parts.flatMap(({id,tax}) => tax.dividends.map((d) => ({...d, id: `${id}::${d.id}`}))),
+    taxYears: [...years.entries()].map(([taxYear, rows]) => ({taxYear, gains: sum(rows.map((r)=>r.gains))!, losses: sum(rows.map((r)=>r.losses))!, netTaxableGain: sum(rows.map((r)=>r.netTaxableGain))!, estimatedTax: sum(rows.map((r)=>r.estimatedTax)), actualTax: sum(rows.map((r)=>r.actualTax))!, basis: rows.every((r)=>r.basis===rows[0].basis) ? rows[0].basis : 'mixed' as const})),
+    totalRealizedGain: sum(parts.map((p)=>p.tax.totalRealizedGain))!, totalCapitalGainsTax: sum(parts.map((p)=>p.tax.totalCapitalGainsTax)), totalDividendIncomeGross: sum(parts.map((p)=>p.tax.totalDividendIncomeGross))!, totalDividendTax: sum(parts.map((p)=>p.tax.totalDividendTax)), netRealizedReturn: sum(parts.map((p)=>p.tax.netRealizedReturn)),
+    receivedUnknownPaymentDate: {count: parts.reduce((n,p)=>n+p.tax.receivedUnknownPaymentDate.count,0), grossAmount: sum(parts.map((p)=>p.tax.receivedUnknownPaymentDate.grossAmount))!},
+    expectedDividends: {count: parts.reduce((n,p)=>n+p.tax.expectedDividends.count,0), grossAmount: sum(parts.map((p)=>p.tax.expectedDividends.grossAmount))!, estimatedTax: sum(parts.map((p)=>p.tax.expectedDividends.estimatedTax)), uncertainEntitlement: parts.reduce((n,p)=>n+p.tax.expectedDividends.uncertainEntitlement,0)}
+  };
+}
+function ledgerTaxSummary(p: Portfolio) {
   const rate = p.taxProfile ? TAX_RATES[p.taxProfile.filerStatus] : null;
   const realized = realizedSales(p);
   const withheld = new Map(
@@ -937,7 +964,17 @@ export function taxSummary(p: Portfolio) {
  * Where `holdings` throws on a sale larger than the position, this clamps at zero and sets
  * `oversold` from that point on, so a chart can still render and flag the ledger.
  */
-export function positionTimeline(p: Portfolio, ticker: string) {
+export function positionTimeline(p: Portfolio, ticker: string): ReturnType<typeof ledgerPositionTimeline> {
+  const parts = p[DISPLAY_PARTS];
+  if (!parts) return ledgerPositionTimeline(p, ticker);
+  const series = parts.map((part) => ledgerPositionTimeline(part.portfolio, ticker));
+  const dates = [...new Set(series.flatMap((rows) => rows.map((r) => r.date)))].sort();
+  return dates.map((date) => {
+    const rows = series.map((points) => points.filter((r) => r.date <= date).at(-1));
+    return { date, shares: rows.reduce((a, r) => a + (r?.shares ?? 0), 0), cost: rows.some((r) => r?.cost === null) ? null : round(rows.reduce((a, r) => a + (r?.cost ?? 0), 0)), oversold: rows.some((r) => r?.oversold) };
+  });
+}
+function ledgerPositionTimeline(p: Portfolio, ticker: string) {
   const out: { date: string; shares: number; cost: number | null; oversold: boolean }[] = [];
   let shares = 0,
     cost: number | null = 0,
@@ -967,7 +1004,20 @@ export function positionTimeline(p: Portfolio, ticker: string) {
   }
   return out;
 }
-export function holdings(p: Portfolio) {
+export function holdings(p: Portfolio): (ReturnType<typeof ledgerHoldings>[number] & {components?: ReturnType<typeof ledgerHoldings>})[] {
+  const parts = p[DISPLAY_PARTS];
+  if (!parts) return ledgerHoldings(p);
+  const rows = new Map<string, ReturnType<typeof ledgerHoldings>>();
+  for (const part of parts) for (const h of ledgerHoldings(part.portfolio)) rows.set(h.ticker, [...(rows.get(h.ticker) ?? []), h]);
+  const sum = (values: (number | null)[]) => values.some((v) => v === null) ? null : round(values.reduce<number>((a, v) => a + v!, 0));
+  return [...rows.values()].map((items) => {
+    const shares = items.reduce((a, h) => a + h.shares, 0), cost = sum(items.map((h) => h.cost));
+    return { ...items[0], components: items, target: 0, shares, cost, average: shares && cost !== null ? cost / shares : null,
+      value: sum(items.map((h) => h.value)), gain: sum(items.map((h) => h.gain)), realized: sum(items.map((h) => h.realized)),
+      quote: items.filter((h) => h.shares > 0).some((h) => !h.quote) ? undefined : items.find((h) => h.quote)?.quote };
+  });
+}
+function ledgerHoldings(p: Portfolio) {
   return p.companies.map((c) => {
     let shares = 0,
       cost: number | null = 0,
@@ -1049,7 +1099,8 @@ export type PortfolioSummary = {
  * cost and gain are only reported when they are complete, and `incomplete` says why not.
  */
 export function portfolioSummary(held: PortfolioSummaryHolding[]): PortfolioSummary {
-  const open = held.filter((h) => h.shares > 0);
+  const grouped = held.filter((h) => h.shares > 0);
+  const open = held.flatMap((h) => ('components' in h && Array.isArray(h.components)) ? h.components as PortfolioSummaryHolding[] : [h]).filter((h) => h.shares > 0);
   const missing = open.filter((h) => !h.quote || h.value === null);
   const unknown = open.filter((h) => h.cost === null);
   const value = round(open.reduce((a, h) => a + (h.value ?? 0), 0));
@@ -1057,18 +1108,19 @@ export function portfolioSummary(held: PortfolioSummaryHolding[]): PortfolioSumm
   const gain = cost === null || missing.length ? null : round(value - cost);
   const dates = open.flatMap((h) => (h.quote && h.value !== null ? [h.quote.date] : [])).sort();
   return {
-    heldCount: open.length,
+    heldCount: grouped.length,
     value,
     cost,
     gain,
     gainPercent: gain !== null && cost !== null && cost > 0 ? (gain / cost) * 100 : null,
-    missingPrice: missing.map((h) => h.ticker),
-    unknownCost: unknown.map((h) => h.ticker),
+    missingPrice: [...new Set(missing.map((h) => h.ticker))],
+    unknownCost: [...new Set(unknown.map((h) => h.ticker))],
     incomplete: [...(missing.length ? ['missing-price' as const] : []), ...(unknown.length ? ['unknown-cost' as const] : [])],
     oldestQuoteDate: dates[0] ?? null,
   };
 }
 export function validate(p: Portfolio) {
+  if (p?.[DISPLAY_PARTS]) throw new Error('Choose a portfolio before saving.');
   if (
     !p ||
     !Array.isArray(p.companies) ||
@@ -1547,6 +1599,7 @@ export function plan(
   feePct = 0,
   allowOld = false,
 ) {
+  if (p[DISPLAY_PARTS]) throw new Error('Choose a portfolio to generate a SIP plan.');
   const hs = holdings(p),
     budget = p.budgets[month] ?? 100000;
   // A buy tagged to this SIP month counts, and so does an untagged buy dated in it.

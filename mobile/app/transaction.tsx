@@ -61,10 +61,13 @@ export default function Transaction() {
   const kit = useKitStyles();
   const { colors } = useTheme();
   const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string; shares?: string; price?: string; month?: string }>();
-  const p = usePortfolio();
+  const selection = usePortfolio();
+  const [destination, setDestination] = useState('');
+  const ownerId = params.id?.includes('::') ? params.id.split('::')[0] : undefined;
+  const p = usePortfolio(destination || ownerId);
   const { api } = useAuth();
   const toast = useToast();
-  const editingId = params.id || undefined;
+  const editingId = params.id?.includes('::') ? params.id.slice(params.id.indexOf('::')+2) : params.id || undefined;
 
   // Editing: find the existing entry and lock its kind and company.
   const existing = useMemo(() => {
@@ -143,12 +146,13 @@ export default function Transaction() {
   );
   const editing = Boolean(editingId);
   // Deep links can reach any entry id; imported, automatic and voided entries are not editable here.
-  const locked = kind === 'adjustment'
+  const locked = p.locked ? 'This portfolio is locked. Unlock it in Settings → Portfolios.' : kind === 'adjustment'
     ? 'Holding adjustments come from statement imports. Review or void them on the web.'
     : editingId && p.portfolio ? readOnlyReason(p.portfolio, editingId) : null;
 
   async function submit() {
     setError(null);
+    if (p.isAll) { setError('Choose a destination portfolio.'); return; }
     if (!p.portfolio) return;
     try {
       if (kind === 'adjustment') throw new Error('Holding adjustments cannot be entered here.');
@@ -196,14 +200,14 @@ export default function Transaction() {
       }
       setBusy(true);
       const previous = p.portfolio;
-      await p.save(next);
+      const savedRevision = await p.save(next);
       // Undo is a second revisioned save of the portfolio as it was; a change from another device in between
       // makes it fail with the usual "portfolio changed" message instead of overwriting that change.
       toast.show({
         message: `${editing ? 'Correction saved' : `${kind === 'buy' ? 'Buy' : kind === 'sell' ? 'Sale' : kind === 'dividend' ? 'Dividend' : kind === 'split' ? 'Split' : 'Opening balance'} recorded`} for ${ticker}`,
         actionLabel: 'Undo',
         onAction: async () => {
-          await p.save(previous);
+          await p.save(previous, { expectedRevision: savedRevision });
           toast.show({ message: 'Undone. Your portfolio is back as it was.' });
         },
       });
@@ -226,12 +230,12 @@ export default function Transaction() {
           try {
             setBusy(true);
             const previous = p.portfolio!;
-            await p.save(voidEntry(previous, existing.entryKind, editingId));
+            const savedRevision = await p.save(voidEntry(previous, existing.entryKind, editingId));
             toast.show({
               message: 'Entry voided',
               actionLabel: 'Undo',
               onAction: async () => {
-                await p.save(previous);
+                await p.save(previous, { expectedRevision: savedRevision });
                 toast.show({ message: 'Undone. The entry counts again.' });
               },
             });
@@ -262,6 +266,8 @@ export default function Transaction() {
       <Stack.Screen options={{ title: editing ? 'Edit entry' : 'Add transaction' }} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+          {selection.account && selection.account.portfolios.length>1 && !editing ? <Card><SectionLabel>Portfolio</SectionLabel><Chips items={selection.account.portfolios.filter((entry)=>!entry.locked).map((entry)=>({key:entry.id,label:entry.name}))} value={p.targetId ?? ''} disabled={busy} onChange={(id)=>{setDestination(id);setTicker('');}} />{p.isAll ? <Muted>Choose a portfolio to enter this transaction.</Muted> : null}</Card> : null}
+          <View pointerEvents={p.isAll ? 'none' : 'auto'} style={{opacity:p.isAll ? 0.4 : 1}}>
           {editingId && !existing && !p.isLoading ? <Notice tone="error">That entry no longer exists.</Notice> : null}
           <SectionLabel>Type</SectionLabel>
           <Chips items={KINDS} value={kind} onChange={setKind} disabled={editing} />
@@ -340,6 +346,7 @@ export default function Transaction() {
             onPress={() => void submit()}
           />
           {editing && existing ? <Button label="Void this entry" variant="destructive" disabled={busy} onPress={confirmVoid} /> : null}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

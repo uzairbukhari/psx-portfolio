@@ -1,120 +1,150 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PortfolioResponse, QuotesResponse } from '@shared/api-types.ts';
+import { refreshImportQuotes } from '@shared/import-refresh.ts';
+import type { QuotesResponse } from '@shared/api-types.ts';
 import { notificationCounts } from '@shared/notification-actions.ts';
-import { loadPortfolioView, savePortfolioView } from '@shared/portfolio-view.ts';
+import { loadAccountView, savePortfolioView } from '@shared/portfolio-view.ts';
 import { validate, type Portfolio } from '@shared/portfolio.ts';
+import {
+  ALL_PORTFOLIOS,
+  dashboardPortfolio,
+  type PortfolioAccount,
+  type PortfolioTarget,
+} from '@shared/portfolio-account.ts';
 import { ConflictError } from '@shared/vault-client.ts';
 import { useAuth } from '@/auth/AuthProvider';
 import { useVault } from '@/vault/VaultProvider';
-import { syncAnnouncementsOnLoad } from './auto-dividends';
+import { usePortfolioSelection } from './PortfolioSelection';
 import { openPositions, priceTickers, safeHoldings, totals } from './derive';
 
-export function usePortfolio() {
+type AccountView = { account: PortfolioAccount; revision: number };
+export function usePortfolio(scopeId?: string) {
   const { api, state } = useAuth();
   const { session, publicData } = useVault();
+  const selection = usePortfolioSelection();
+  const selectedId = scopeId ?? selection.selectedId;
+  const select = selection.select;
   const queryClient = useQueryClient();
   const email = state.status === 'signedIn' ? state.user.email : '';
-
+  const key = ['portfolio-account', email];
   const query = useQuery({
-    queryKey: ['portfolio', email],
+    queryKey: key,
     enabled: Boolean(email),
-    queryFn: async () => {
-      // Decrypts on this phone and overlays public quotes, announcements and company names for the tickers held.
-      const loaded = await loadPortfolioView(session, publicData);
-      // Same as the web on load: book PSX announcements as expected dividends and alerts (saves only when
-      // something is new), so the phone alone keeps them current.
-      return syncAnnouncementsOnLoad(
-        {
-          save: async (portfolio, revision) => {
-            try {
-              return { revision: (await savePortfolioView(session, publicData, portfolio, revision)).revision };
-            } catch (e) {
-              if (e instanceof ConflictError) return { conflict: true as const };
-              throw e;
-            }
-          },
-          reload: async () => {
-            const fresh = await loadPortfolioView(session, publicData);
-            return { portfolio: fresh.portfolio, revision: fresh.revision };
-          },
-        },
-        loaded,
-      );
-    },
+    queryFn: () => loadAccountView(session, publicData, true),
   });
-
   const data = query.data ?? null;
+  const single = data?.account.portfolios.length === 1;
+  const entry = data?.account.portfolios.find((p) => p.id === selectedId) ?? (single ? data!.account.portfolios[0] : undefined);
+  const isAll = !entry && selectedId === ALL_PORTFOLIOS;
+  const portfolio = useMemo(()=> data ? dashboardPortfolio(data.account, entry?.id ?? ALL_PORTFOLIOS) : null, [data, entry?.id]);
   const view = useMemo(() => {
-    if (!data) return null;
-    const { held, error } = safeHoldings(data.portfolio);
+    if (!portfolio) return null;
+    const { held, error } = safeHoldings(portfolio);
     return { held, error, open: openPositions(held), totals: totals(held) };
-  }, [data]);
+  }, [portfolio]);
 
-  /**
-   * Asks the server for fresh PSX prices (cached server-side), then reloads. Covers held and targeted
-   * companies and the Monthly Picks shortlist, since the SIP plan needs a price for each; `extra` adds tickers.
-   */
-  async function refreshPrices(extra: string[] = []) {
-    const tickers = data ? priceTickers(data.portfolio, extra) : [];
-    if (tickers.length) await api.post<QuotesResponse>('/api/quotes', { tickers });
-    await queryClient.invalidateQueries({ queryKey: ['portfolio', email] });
+  async function refreshPrices(extra: string[] = [], destination?: string) {
+    const tickers = [
+      ...new Set(
+        (data?.account.portfolios ?? []).filter((p)=>!destination || p.id===destination).flatMap((p) => [...priceTickers(p.portfolio, extra), ...extra]),
+      ),
+    ];
+    if (tickers.length) {
+      try { await refreshImportQuotes({start:()=>api.post<QuotesResponse>('/api/quotes',{tickers}),poll:(since)=>api.get<QuotesResponse>(`/api/quotes?tickers=${tickers.join(',')}&since=${encodeURIComponent(since??'')}`),cancelled:()=>!session.active}); }
+      finally { if (session.active) await queryClient.fetchQuery({queryKey:key,queryFn:()=>loadAccountView(session,publicData,false),staleTime:0}); }
+    }
   }
 
-  /**
-   * Validates and saves a new version of the portfolio. The server rejects a stale revision
-   * with 409 (edited elsewhere); then we reload and ask the user to retry. The revision is read from the
-   * query cache at call time, so a save started later (an undo from a toast, after the screen that made the
-   * change has closed) still uses the revision of the previous save.
-   */
-  async function save(next: Portfolio) {
-    const current = queryClient.getQueryData<PortfolioResponse>(['portfolio', email]) ?? data;
-    if (!current) throw new Error('Portfolio is not loaded yet.');
+  /** Target is captured by this render; delayed callbacks never consult the newly selected portfolio. */
+  async function save(
+    next: Portfolio,
+    options: { target?: PortfolioTarget; expectedRevision?: number } = {},
+  ) {
+    const target =
+      options.target ??
+      (entry ? { id: entry.id } : null);
+    if (!target) throw new Error('Choose a portfolio before saving.');
+    const current = queryClient.getQueryData<AccountView>(key) ?? data;
+    if (!current) throw new Error('Portfolios are not loaded yet.');
     validate(next);
-    // A refetch that started before this save must not land afterwards and overwrite the new data.
-    await queryClient.cancelQueries({ queryKey: ['portfolio', email] });
+    const revision = options.expectedRevision ?? current.revision;
+    await queryClient.cancelQueries({ queryKey: key });
     try {
-      // Validates, fills company details from the public directory, encrypts here and stores ciphertext only.
-      const saved = await savePortfolioView(session, publicData, next, current.revision);
-      const updated: PortfolioResponse = { ...current, portfolio: next, revision: saved.revision };
-      queryClient.setQueryData(['portfolio', email], updated);
+      const saved = await savePortfolioView(
+        session,
+        publicData,
+        next,
+        revision,
+        [],
+        target,
+      );
+      queryClient.setQueryData<AccountView>(key, {
+        account: {
+          ...current.account,
+          portfolios: session.account.portfolios.map((p) =>
+            p.id === target.id
+              ? { ...p, portfolio: next }
+              : (current.account.portfolios.find((old) => old.id === p.id) ??
+                p),
+          ),
+        },
+        revision: saved.revision,
+      });
+      return saved.revision;
     } catch (e) {
       if (e instanceof ConflictError) {
-        await queryClient.invalidateQueries({ queryKey: ['portfolio', email] });
-        throw new Error('Your portfolio changed (on another device, or this save did not reach us). It has been reloaded. Check Activity before entering the change again.');
+        await queryClient.invalidateQueries({ queryKey: key });
+        throw new Error(
+          'Your account changed on another device. It has been reloaded. Rebuild the import preview or check Activity before trying again.',
+        );
       }
       throw e;
     }
   }
-
+  async function saveNotifications(notifications: NonNullable<Portfolio['notifications']>) {
+    if (!isAll) return save({...portfolio!,notifications});
+    const current = queryClient.getQueryData<AccountView>(key);
+    if (!current) throw Error('Portfolios are not loaded yet.');
+    const account = session.account;
+    const next = {...account,portfolios:account.portfolios.map((part)=>part.locked ? part : {...part,portfolio:{...part.portfolio,notifications:notifications.filter((n)=>n.id.startsWith(part.id+'::')).map((n)=>({...n,id:n.id.slice(part.id.length+2),title:n.title.replace(part.name+' · ','')}))}})};
+    await session.saveAccount(next,current.revision);
+    await queryClient.invalidateQueries({queryKey:key});
+  }
   return {
+    saveNotifications,
     save,
-    portfolio: data?.portfolio ?? null,
+    portfolio,
+    account: data?.account ?? null,
+    selectedId,
+    select,
+    portfolioName: single || isAll ? 'All' : entry?.name ?? 'All',
+    isAll,
+    locked: !!entry?.locked,
+    targetId: entry?.id,
     revision: data?.revision ?? 0,
     view,
     isLoading: query.isPending && !data,
     isRefetching: query.isRefetching,
     error: query.error,
     offline: session.offline || (Boolean(query.error) && Boolean(data)),
-    /** When the data on screen was last fetched or saved (ms since epoch); null if unknown. */
     savedAt: query.dataUpdatedAt || null,
     refetch: query.refetch,
     refreshPrices,
   };
 }
 
-/**
- * Unread alert count for the bell badge. It watches the shared portfolio query's cache without being an
- * observer of it, so it can never fetch the query or change how the real observers fetch it.
- */
 export function useUnreadAlerts(): number {
-  const { state } = useAuth();
-  const email = state.status === 'signedIn' ? state.user.email : '';
-  const queryClient = useQueryClient();
-  const live = useSyncExternalStore(
-    (notify) => queryClient.getQueryCache().subscribe(notify),
-    () => queryClient.getQueryData<PortfolioResponse>(['portfolio', email]),
+  const p = usePortfolio();
+  return useMemo(
+    () =>
+      p.account
+        ? p.account.portfolios.reduce(
+            (n, entry) =>
+              n +
+              notificationCounts(entry.portfolio.notifications ?? []).unread,
+            0,
+          )
+        : 0,
+    [p.account],
   );
-  const data = live ?? null;
-  return useMemo(() => (data ? notificationCounts(data.portfolio.notifications ?? []).unread : 0), [data]);
 }

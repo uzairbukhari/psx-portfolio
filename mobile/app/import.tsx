@@ -3,13 +3,16 @@ import { Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
+import * as Crypto from 'expo-crypto';
+import { blankPortfolio } from '@shared/portfolio.ts';
+import { importMatches, portfolioName, type PortfolioTarget } from '@shared/portfolio-account.ts';
 import { validate, type Portfolio } from '@shared/portfolio.ts';
 import { parseJsonFile, previewImport, type ImportKind, type ImportPreview } from '@/data/imports';
 import { usePortfolio } from '@/data/usePortfolio';
 import { plural } from '@/data/format';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Icon } from '@/ui/Icon';
-import { Button, Card, Loading, Muted, Notice, Screen, SectionLabel, Stat, useKitStyles } from '@/ui/kit';
+import { Button, Card, Chip, Input, Loading, Muted, Notice, Screen, SectionLabel, Stat, useKitStyles } from '@/ui/kit';
 import { useToast } from '@/ui/Toast';
 
 const SOURCES: { kind: ImportKind; title: string; help: string }[] = [
@@ -18,8 +21,8 @@ const SOURCES: { kind: ImportKind; title: string; help: string }[] = [
 ];
 const SHOWN_ROWS = 5;
 
-type Pending = { preview: ImportPreview; fileName: string; baseRevision: number };
-type Done = { summary: string; added: string; previous: Portfolio };
+type Pending = { preview: ImportPreview; fileName: string; baseRevision: number; target: PortfolioTarget; previous: Portfolio; raw: unknown; kind: ImportKind; hash: string; matches: string[] };
+type Done = { summary: string; added: string; previous: Portfolio; target: PortfolioTarget; revision: number };
 
 export default function Import() {
   const params = useLocalSearchParams<{ kind?: string }>();
@@ -28,30 +31,58 @@ export default function Import() {
   const { colors } = useTheme();
   const p = usePortfolio();
   const toast = useToast();
+  const [refreshError, setRefreshError] = useState('');
   const [busy, setBusy] = useState<ImportKind | 'saving' | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const [undoing, setUndoing] = useState(false);
   const [allRows, setAllRows] = useState(false);
+  const [destination, setDestination] = useState(p.isAll ? '' : p.targetId ?? '');
+  const [newName, setNewName] = useState('');
+  const [draftId] = useState(() => Crypto.randomUUID());
+  const [override, setOverride] = useState(false);
+
+  function targetFor(id = destination): PortfolioTarget {
+    if (!id) throw new Error('Choose a destination portfolio.');
+    if (id === 'new') return { id: draftId, name: portfolioName(newName) };
+    if (p.account?.portfolios.find((entry)=>entry.id===id)?.locked) throw Error('This portfolio is locked. Unlock it in Settings → Portfolios.');
+    return { id };
+  }
+  function buildPreview(kind: ImportKind, raw: unknown, hash: string, fileName: string, target: PortfolioTarget) {
+    if (!p.account) throw new Error('Portfolios are not loaded.');
+    if (target.name && p.account.portfolios.some((e) => e.name.toLowerCase() === target.name!.toLowerCase() && e.id !== target.id)) throw new Error('That portfolio name already exists.');
+    const previous = p.account.portfolios.find((e) => e.id === target.id)?.portfolio ?? blankPortfolio();
+    if (previous.brokerFileHashes?.includes(hash)) { void p.refreshPrices(previous.companies.map((c)=>c.ticker),target.id).catch((e)=>setRefreshError(e.message)); setPending(null); setMessage({ text: 'This file was already imported into this portfolio.', error: false }); return; }
+    const preview = previewImport(kind, previous, raw);
+    setOverride(false);
+    if (!preview.next) { if (/duplicate|already/i.test(preview.message)) void p.refreshPrices(previous.companies.map((c)=>c.ticker),target.id).catch((e)=>setRefreshError(e.message)); setPending(null); setMessage({ text: preview.message, error: false }); }
+    else setPending({ preview, fileName, baseRevision: p.revision, target, previous, raw, kind, hash, matches: importMatches(p.account, target.id, preview.next, hash).map((e) => e.name) });
+  }
+  function changeDestination(id: string) {
+    setDestination(id); setMessage(null);
+    if (pending) try { buildPreview(pending.kind, pending.raw, pending.hash, pending.fileName, targetFor(id)); }
+    catch (e) { setPending(null); setMessage({ text: e instanceof Error ? e.message : 'Choose destination again.', error: true }); }
+  }
 
   async function choose(kind: ImportKind) {
-    if (!p.portfolio) return;
+    if (!p.account) return;
     setMessage(null);
     setPending(null);
     setAllRows(false);
     setBusy(kind);
     try {
+      const target = targetFor();
       const picked = await DocumentPicker.getDocumentAsync({
         type: ['application/json', 'text/plain', '*/*'],
         copyToCacheDirectory: true,
       });
       if (picked.canceled || !picked.assets?.[0]) return;
       const asset = picked.assets[0];
-      const raw = parseJsonFile(await new File(asset.uri).text());
-      const preview = previewImport(kind, p.portfolio, raw);
-      if (!preview.next) setMessage({ text: preview.message, error: false });
-      else setPending({ preview, fileName: asset.name ?? 'the file', baseRevision: p.revision });
+      const text = await new File(asset.uri).text();
+      const raw = parseJsonFile(text);
+      const hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, text);
+      buildPreview(kind, raw, hash, asset.name ?? 'the file', target);
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : 'Import failed.', error: true });
     } finally {
@@ -60,7 +91,7 @@ export default function Import() {
   }
 
   async function confirm() {
-    if (!pending?.preview.next || !p.portfolio) return;
+    if (!pending?.preview.next || !p.account || (pending.matches.length && !override)) return;
     if (p.revision !== pending.baseRevision) {
       setPending(null);
       setMessage({ text: 'Your portfolio changed after this preview. Nothing was saved. Choose the file again.', error: true });
@@ -68,23 +99,26 @@ export default function Import() {
     }
     setBusy('saving');
     try {
-      const previous = p.portfolio;
+      const previous = pending.previous;
       validate(pending.preview.next);
-      await p.save(pending.preview.next);
+      pending.preview.next.brokerFileHashes = [...new Set([...(pending.preview.next.brokerFileHashes ?? []), pending.hash])];
+      const savedRevision = await p.save(pending.preview.next, { target: pending.target, expectedRevision: pending.baseRevision });
       const { counts, message: summary } = pending.preview;
       const added = [
         counts.trades ? plural(counts.trades, 'trade') : '',
         counts.dividends ? plural(counts.dividends, 'dividend') : '',
       ].filter(Boolean).join(' and ');
       setPending(null);
-      setDone({ summary, added, previous });
+      setDone({ summary, added, previous, target: pending.target, revision: savedRevision });
+      setRefreshError('');
+      void p.refreshPrices(pending.preview.next.companies.map((c)=>c.ticker),pending.target.id).catch((e)=>setRefreshError(e instanceof Error ? e.message : 'PSX refresh failed.'));
       // Batch undo: one revisioned save puts the whole portfolio back as it was before the import.
       toast.show({
         message: `Imported ${added}`,
         actionLabel: 'Undo import',
         durationMs: 12000,
         onAction: async () => {
-          await p.save(previous);
+          await p.save(previous, { target: pending.target, expectedRevision: savedRevision });
           setDone(null);
           setMessage({ text: 'Import undone. Your portfolio is back as it was.', error: false });
           toast.show({ message: 'Import undone' });
@@ -107,7 +141,7 @@ export default function Import() {
     if (!done || undoing) return;
     setUndoing(true);
     try {
-      await p.save(done.previous);
+      await p.save(done.previous, { target: done.target, expectedRevision: done.revision });
       setDone(null);
       setMessage({ text: 'Import undone. Your portfolio is back as it was.', error: false });
     } catch (e) {
@@ -120,6 +154,7 @@ export default function Import() {
   if (done)
     return (
       <Screen edges={['bottom']}>
+        {refreshError ? <Notice tone="error">Import saved. {refreshError}<Button label="Retry refresh" onPress={()=>{setRefreshError('');void p.refreshPrices(done.previous.companies.map((c)=>c.ticker),done.target.id).catch((e)=>setRefreshError(e.message));}} /></Notice> : null}
         <View style={{ alignItems: 'center', gap: 12, paddingTop: 32, paddingBottom: 8 }}>
           <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: colors.gainSoft, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="check" size={32} color={colors.gain} strokeWidth={2.6} />
@@ -129,21 +164,26 @@ export default function Import() {
           </Text>
           <Text style={[styles.muted, { textAlign: 'center' }]}>{done.summary} Saved as one change you can undo.</Text>
         </View>
-        <Button label="Set this month’s budget and targets" onPress={() => router.replace('/plan')} />
-        <Button label="View in Activity" variant="outline" onPress={() => router.replace('/activity')} />
+        <Button label="Set this month’s budget and targets" onPress={() => { p.select(done.target.id); router.replace('/plan'); }} />
+        <Button label="View in Activity" variant="outline" onPress={() => { p.select(done.target.id); router.replace('/activity'); }} />
         <Button label="Undo import" variant="text" loading={undoing} onPress={() => void undo()} />
       </Screen>
     );
 
   return (
     <Screen edges={['bottom']}>
+      <SectionLabel>Which portfolio should receive this import?</SectionLabel>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{p.account?.portfolios.map((e) => <Chip key={e.id} label={e.name+(e.locked?' · locked':'')} selected={destination === e.id} onPress={busy || e.locked ? undefined : () => changeDestination(e.id)} />)}<Chip label="Create new portfolio" selected={destination === 'new'} onPress={busy ? undefined : () => changeDestination('new')} /></View>
+      {destination === 'new' ? <Input label="New portfolio name" value={newName} maxLength={80} editable={!busy} onChangeText={(value) => { setNewName(value); setPending(null); }} /> : null}
       <Text style={styles.muted}>Pick a file from your phone's Files app. You see what it would add before anything is saved.</Text>
+      {refreshError ? <Notice tone="error">Your saved data is safe. {refreshError}<Button label="Retry refresh" onPress={()=>{setRefreshError('');void p.refreshPrices([],destination).catch((e)=>setRefreshError(e.message))}} /></Notice> : null}
       {message ? <Notice tone={message.error ? 'error' : 'success'}>{message.text}</Notice> : null}
       {pending && pv ? (
         <>
           <Card accessibilityLabel={`Preview of ${pending.fileName}: ${plural(pv.counts.trades, 'trade')}, ${plural(pv.counts.dividends, 'dividend')} to add. Nothing is saved yet.`}>
             <Text style={styles.sectionLabel}>Check before importing</Text>
-            <Text style={styles.strong}>{pending.fileName}</Text>
+<Text style={styles.strong}>{pending.fileName}</Text>
+            <Muted>Destination: {pending.target.name ?? p.account?.portfolios.find((e) => e.id === pending.target.id)?.name}</Muted>
             <View style={styles.row}>
               <Stat label="Trades to add"><Text style={styles.number}>{pv.counts.trades}</Text></Stat>
               <Stat label="Dividends to add"><Text style={styles.number}>{pv.counts.dividends}</Text></Stat>
@@ -173,7 +213,9 @@ export default function Import() {
             ))}
           </View>
           {pv.rows.length > SHOWN_ROWS ? <Button label={allRows ? `Show the first ${SHOWN_ROWS} only` : `Show all ${pv.rows.length} rows`} variant="text" onPress={() => setAllRows((v) => !v)} /> : null}
-          <Button label={busy === 'saving' ? 'Saving…' : `Import ${plural(pv.rows.length, 'entry', 'entries')}`} icon="check" loading={busy === 'saving'} disabled={p.offline} onPress={() => void confirm()} />
+          {pending.matches.length ? <Notice>This import appears in {pending.matches.join(', ')}. Adding it here also will count it twice in All portfolios.</Notice> : null}
+          {pending.matches.length && !override ? <Button label="Import here anyway" variant="outline" onPress={() => setOverride(true)} /> : null}
+          <Button label={busy === 'saving' ? 'Saving…' : `Import ${plural(pv.rows.length, 'entry', 'entries')}`} icon="check" loading={busy === 'saving'} disabled={p.offline || (!!pending.matches.length && !override)} onPress={() => void confirm()} />
           <Button label="Choose another file" variant="outline" disabled={busy === 'saving'} onPress={() => setPending(null)} />
         </>
       ) : (
@@ -181,7 +223,7 @@ export default function Import() {
           <Card key={s.kind}>
             <Text style={styles.strong}>{s.title}</Text>
             <Muted>{s.help}</Muted>
-            <Button label={busy === s.kind ? 'Reading file…' : 'Choose file'} icon="upload" loading={busy === s.kind} disabled={busy !== null} onPress={() => void choose(s.kind)} />
+            <Button label={busy === s.kind ? 'Reading file…' : 'Choose file'} icon="upload" loading={busy === s.kind} disabled={busy !== null || !destination || (destination === 'new' && !newName.trim()) || p.offline} onPress={() => void choose(s.kind)} />
           </Card>
         ))
       )}

@@ -32,7 +32,7 @@ async function session(server, portfolio) {
 
 test('load overlays shared quotes without replacing a newer saved quote, and fills placeholder names', async () => {
   const server = createVaultServer();
-  const saved = { price: 120, asOf: 'a', date: '2026-09-29', source: 's', fetchedAt: '2026-09-29T05:38:00Z' };
+  const saved = { price: 120, asOf: 'a', date: '2026-09-29', source: 'https://dps.psx.com.pk/company/MEBL', fetchedAt: '2026-09-29T05:38:00Z' };
   const s = await session(server, { ...blankPortfolio(), companies: [company('MEBL', 'MEBL'), company('LUCK', 'Lucky Cement', 'Cement')], quotes: { MEBL: saved } });
   const pub = fakePublic({ rows: [row('MEBL', 100, '2026-09-28', '2026-09-28T11:00:00Z'), row('LUCK', 90, '2026-09-28', '2026-09-28T11:00:00Z'), row('OTHER', 5, '2026-09-28', '2026-09-28T11:00:00Z')], lookups: [lookup('MEBL', 'Meezan Bank', 'Bank')] });
   const out = await view.loadPortfolioView(s, pub);

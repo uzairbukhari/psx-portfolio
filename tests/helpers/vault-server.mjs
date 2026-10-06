@@ -28,8 +28,8 @@ export function createVaultServer() {
     postVault: (b) => call(email, 'POST', '/api/vault', (req) => api.postVault(db, email, req), b),
     putWrappers: (b) => call(email, 'PUT', '/api/vault', (req) => api.putVaultWrappers(db, email, req), b),
     deleteVault: () => call(email, 'DELETE', '/api/vault', (req) => api.deleteOwnVault(db, email, req), { confirm: true }),
-    getPortfolio: () => call(email, 'GET', '/api/v2/portfolio', () => api.getCiphertext(db, email)),
-    putPortfolio: (b) => call(email, 'PUT', '/api/v2/portfolio', (req) => api.putCiphertext(db, email, req), b),
+    getPortfolio: () => call(email, 'GET', '/api/v3/portfolio', () => api.getCiphertext(db, email)),
+    putPortfolio: (b) => call(email, 'PUT', '/api/v3/portfolio', (req) => api.putCiphertext(db, email, req), b),
   });
   return { db, as, log, state };
 }

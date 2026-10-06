@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { WEIGHT_CAP, money, moneyShort } from '@shared/portfolio.ts';
@@ -17,9 +17,10 @@ import { Avatar, Button, Card, Collapsible, Input, Loading, Muted, Notice, Progr
 
 type Mode = 'targets' | 'picks';
 
-export default function Plan() {
+function EmbeddedPlan({children}: {children:ReactNode;onRefresh?:()=>void;refreshing?:boolean}) {return <View style={{gap:14}}>{children}</View>}
+export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;embedded?:boolean} = {}) {
   const params = useLocalSearchParams<{ mode?: string }>();
-  const p = usePortfolio();
+  const p = usePortfolio(portfolioId);
   const styles = useKitStyles();
   const { colors } = useTheme();
   const now = currentMonth();
@@ -37,9 +38,11 @@ export default function Plan() {
   const [reviewing, setReviewing] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
-  const result = useMemo(() => (p.portfolio ? buildPlan(p.portfolio, month, parseNumber(fee) ?? 0, allowOld) : null), [p.portfolio, month, fee, allowOld]);
+  const result = useMemo(() => (!p.isAll && p.portfolio ? buildPlan(p.portfolio, month, parseNumber(fee) ?? 0, allowOld) : null), [p.portfolio, month, fee, allowOld]);
+  useEffect(()=>{setEditingBudget(false);setReviewing(false)},[p.selectedId]);
   const bar = <AppBar title="Plan" subtitle="Decide this month’s buys" />;
 
+  if (p.isAll) return <Screen>{bar}{p.account?.portfolios.map((part)=><Card key={part.id}><Text style={styles.strong}>{part.name}</Text><Button label="Open portfolio to plan" variant="text" onPress={()=>p.select(part.id)} /><Plan portfolioId={part.id} embedded /></Card>)}</Screen>;
   if (p.isLoading)
     return (
       <Screen>
@@ -59,7 +62,7 @@ export default function Plan() {
 
   const portfolio = p.portfolio;
   const plan = result.plan;
-  const readOnly = month < now;
+  const readOnly = embedded || p.locked || month < now;
   const targeted = portfolio.companies.filter((c) => c.target > 0);
   // The targets total gets its own notice with a way to fix it, so it is not repeated among the plan's errors.
   const planErrors = (plan?.errors ?? []).filter((e) => e !== 'Target weights must total 100%.');
@@ -97,9 +100,10 @@ export default function Plan() {
     </Pressable>
   );
 
+  const Container = embedded ? EmbeddedPlan : Screen;
   return (
-    <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
-      {bar}
+    <Container onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
+      {embedded ? null : bar}
       <Card tone="hero">
         <View style={styles.row}>
           {arrow(-1)}
@@ -134,7 +138,7 @@ export default function Plan() {
       {p.offline ? <Notice tone="offline">Offline · this plan is read only until you reconnect.</Notice> : null}
 
       {mode === 'picks' ? (
-        <PicksView month={month} fee={fee} onFee={setFee} readOnly={readOnly} />
+        <PicksView key={p.targetId ?? 'all'} portfolioId={portfolioId} month={month} fee={fee} onFee={setFee} readOnly={readOnly} />
       ) : targeted.length === 0 ? (
         <Card tone="hero">
           <Text style={styles.strong}>Choose your companies and targets</Text>
@@ -143,7 +147,7 @@ export default function Plan() {
             company is capped at {WEIGHT_CAP}% of the portfolio.
           </Muted>
           {portfolio.companies.length === 0 ? <Muted>Add your first company by recording a purchase or importing your trades, then set its target here.</Muted> : null}
-          <Button label="Set targets" icon="check" disabled={portfolio.companies.length === 0} onPress={() => router.push('/targets')} />
+          <Button label="Set targets" icon="check" disabled={readOnly || portfolio.companies.length === 0} onPress={() => router.push('/targets')} />
           <Button label="Or start with Monthly Picks" variant="text" onPress={() => setMode('picks')} />
         </Card>
       ) : (
@@ -232,7 +236,7 @@ export default function Plan() {
       )}
 
       <BudgetSheet key={month} visible={editingBudget} month={month} current={budgetSet ? portfolio.budgets[month] : null} onClose={() => setEditingBudget(false)} onSaved={(text) => setMessage({ text, error: false })} />
-    </Screen>
+    </Container>
   );
 }
 

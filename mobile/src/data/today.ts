@@ -1,3 +1,4 @@
+import { DISPLAY_PARTS } from '../../../lib/portfolio.ts';
 // View-models for the Today screen (pure): the return breakdown behind "See total return", this month's
 // progress, and the next actions list. Calculations stay in lib/; this only arranges them.
 import { lastTradingDay } from '../../../lib/psx-calendar.ts';
@@ -55,6 +56,11 @@ export type MonthProgress = {
 
 /** Progress for one month from the shared plan(); `plan()` falls back to a default budget the user never chose, so `budgetSet` says whether it is real. */
 export function monthProgress(p: Portfolio, month: string, feePct = 0, allowOld = false): MonthProgress {
+  if (p[DISPLAY_PARTS]) {
+    const parts = p[DISPLAY_PARTS]!.map((part)=>monthProgress(part.portfolio,month,feePct,allowOld));
+    const budget=parts.reduce((n,p)=>n+p.budget,0),bought=parts.reduce((n,p)=>n+p.bought,0);
+    return {month,budgetSet:parts.some((p)=>p.budgetSet),budget,bought,remaining:Math.max(0,budget-bought),fraction:budget>0 ? Math.min(1,bought/budget) : 0,suggested:0,blockers:[],planError:null};
+  }
   const built = buildPlan(p, month, feePct, allowOld);
   const plan: SipPlan | null = built.plan;
   const budgetSet = p.budgets[month] !== undefined;

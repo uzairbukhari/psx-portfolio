@@ -69,7 +69,7 @@ test('isolation: two users and a super-admin each only reach their own rows', as
   await expectFail(api.getCiphertext(db, 'admin@example.com'), 404, 'no-vault');
   // B cannot overwrite A's ciphertext by presenting A's vault id: the owner comes from the session, not the body.
   const forged = await v.encryptPortfolio(b.vault.dataKey, a.material.vaultId, 1, 2, '{}');
-  await expectFail(api.putCiphertext(db, 'b@example.com', post('/api/v2/portfolio', 'PUT', { envelope: forged, expectedRevision: 1 })), 409, 'conflict');
+  await expectFail(api.putCiphertext(db, 'b@example.com', post('/api/v3/portfolio', 'PUT', { envelope: forged, expectedRevision: 1 })), 409, 'conflict');
   const stillA = await body(await api.getCiphertext(db, 'a@example.com'));
   assert.deepEqual(stillA.envelope, a.envelope);
   // Same for wrappers and deletion.
@@ -87,17 +87,17 @@ test('saves: revision check, next-revision binding, conflict, and key version', 
   const a = await newVault();
   await api.postVault(db, 'a@example.com', post('/api/vault', 'POST', { material: a.material, envelope: a.envelope }));
   const e2 = await v.encryptPortfolio(a.vault.dataKey, a.material.vaultId, 1, 2, '{"n":2}');
-  const ok = await api.putCiphertext(db, 'a@example.com', post('/api/v2/portfolio', 'PUT', { envelope: e2, expectedRevision: 1 }));
+  const ok = await api.putCiphertext(db, 'a@example.com', post('/api/v3/portfolio', 'PUT', { envelope: e2, expectedRevision: 1 }));
   assert.equal((await body(ok)).revision, 2);
   // Stale writer: still thinks revision is 1.
   const stale = await v.encryptPortfolio(a.vault.dataKey, a.material.vaultId, 1, 2, '{"n":"stale"}');
-  await expectFail(api.putCiphertext(db, 'a@example.com', post('/api/v2/portfolio', 'PUT', { envelope: stale, expectedRevision: 1 })), 409, 'conflict');
+  await expectFail(api.putCiphertext(db, 'a@example.com', post('/api/v3/portfolio', 'PUT', { envelope: stale, expectedRevision: 1 })), 409, 'conflict');
   // Envelope encrypted for the wrong revision, or the wrong key version.
   const wrongRev = await v.encryptPortfolio(a.vault.dataKey, a.material.vaultId, 1, 9, '{}');
-  await assert.rejects(api.putCiphertext(db, 'a@example.com', post('/api/v2/portfolio', 'PUT', { envelope: wrongRev, expectedRevision: 2 })), (e) => e.status === 400);
+  await assert.rejects(api.putCiphertext(db, 'a@example.com', post('/api/v3/portfolio', 'PUT', { envelope: wrongRev, expectedRevision: 2 })), (e) => e.status === 400);
   const wrongKey = await v.encryptPortfolio(a.vault.dataKey, a.material.vaultId, 2, 3, '{}');
-  await expectFail(api.putCiphertext(db, 'a@example.com', post('/api/v2/portfolio', 'PUT', { envelope: wrongKey, expectedRevision: 2 })), 409, 'conflict');
-  await assert.rejects(api.putCiphertext(db, 'a@example.com', post('/api/v2/portfolio', 'PUT', { envelope: wrongRev, expectedRevision: 0 })), (e) => e.status === 400);
+  await expectFail(api.putCiphertext(db, 'a@example.com', post('/api/v3/portfolio', 'PUT', { envelope: wrongKey, expectedRevision: 2 })), 409, 'conflict');
+  await assert.rejects(api.putCiphertext(db, 'a@example.com', post('/api/v3/portfolio', 'PUT', { envelope: wrongRev, expectedRevision: 0 })), (e) => e.status === 400);
   const read = await body(await api.getCiphertext(db, 'a@example.com'));
   assert.equal(read.revision, 2);
   assert.equal(await v.decryptPortfolio(a.vault.dataKey, read.envelope, { vaultId: a.material.vaultId, keyVersion: 1, revision: 2 }), '{"n":2}');
@@ -107,7 +107,7 @@ test('concurrent saves: exactly one wins', async () => {
   const db = createD1(vaultMigrationsDir);
   const a = await newVault();
   await api.postVault(db, 'a@example.com', post('/api/vault', 'POST', { material: a.material, envelope: a.envelope }));
-  const make = async (n) => post('/api/v2/portfolio', 'PUT', { envelope: await v.encryptPortfolio(a.vault.dataKey, a.material.vaultId, 1, 2, `{"n":${n}}`), expectedRevision: 1 });
+  const make = async (n) => post('/api/v3/portfolio', 'PUT', { envelope: await v.encryptPortfolio(a.vault.dataKey, a.material.vaultId, 1, 2, `{"n":${n}}`), expectedRevision: 1 });
   const results = await Promise.allSettled([api.putCiphertext(db, 'a@example.com', await make(1)), api.putCiphertext(db, 'a@example.com', await make(2))]);
   assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(results.filter((r) => r.status === 'rejected' && r.reason.status === 409).length, 1);
@@ -152,7 +152,7 @@ test('size limits: oversize bodies are refused by bytes before parsing; an exact
   assert.equal(res.status, 201);
   // An envelope whose ciphertext exceeds the cap is rejected by validation without decrypting.
   const oversized = { ...full, ct: 'A'.repeat(v.b64uLength(4_000_100)) };
-  await assert.rejects(api.putCiphertext(db, 'a@example.com', post('/api/v2/portfolio', 'PUT', { envelope: { ...oversized, revision: 2 }, expectedRevision: 1 })), (e) => e.status === 400);
+  await assert.rejects(api.putCiphertext(db, 'a@example.com', post('/api/v3/portfolio', 'PUT', { envelope: { ...oversized, revision: 2 }, expectedRevision: 1 })), (e) => e.status === 400);
 });
 
 test('nothing but ciphertext reaches storage: no synthetic marker anywhere in the raw database', async () => {
@@ -160,7 +160,7 @@ test('nothing but ciphertext reaches storage: no synthetic marker anywhere in th
   const a = await newVault();
   await api.postVault(db, 'a@example.com', post('/api/vault', 'POST', { material: a.material, envelope: a.envelope }));
   const e2 = await v.encryptPortfolio(a.vault.dataKey, a.material.vaultId, 1, 2, JSON.stringify({ companies: [{ ticker: 'MARKERCO' }], marker: MARKER }));
-  await api.putCiphertext(db, 'a@example.com', post('/api/v2/portfolio', 'PUT', { envelope: e2, expectedRevision: 1 }));
+  await api.putCiphertext(db, 'a@example.com', post('/api/v3/portfolio', 'PUT', { envelope: e2, expectedRevision: 1 }));
   const dump = JSON.stringify([db.sqlite.prepare('SELECT * FROM vaults').all(), db.sqlite.prepare('SELECT * FROM vault_portfolios').all()]);
   assert.ok(!dump.includes('MARKER') && !dump.includes('MARKERCO') && !dump.includes('ZEBRA'));
   assert.ok(!dump.includes(PASSWORD) && !dump.includes(a.vault.recoverySecret));
@@ -186,7 +186,7 @@ test('the retired plaintext endpoint rejects every method with upgrade-required 
 });
 
 test('the new route files take the owner only from the verified session and never import the public database', () => {
-  for (const file of ['app/api/vault/route.ts', 'app/api/v2/portfolio/route.ts']) {
+  for (const file of ['app/api/vault/route.ts', 'app/api/v3/portfolio/route.ts']) {
     const text = readFileSync(new URL(file, base), 'utf8');
     assert.ok(!/\bdb\(\)/.test(text.replace(/vaultDb\(\)/g, '')), `${file} must use vaultDb() only`);
     assert.match(text, /identity\(req(, true)?\)/);
