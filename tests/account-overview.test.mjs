@@ -174,7 +174,7 @@ test('gold coins are valued, added to net worth and shown as their own class', (
   assert.equal(noRate.total.gain, null);
 });
 
-test('sectors beyond the top six roll into one Other slice that keeps the total', () => {
+test('sectors beyond the top five roll into one Other slice that keeps the total', () => {
   const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
   const many = ledger({
     companies: names.map((n) => company(n, `Sector ${n}`)),
@@ -182,7 +182,7 @@ test('sectors beyond the top six roll into one Other slice that keeps the total'
     quotes: Object.fromEntries(names.map((n, i) => [n, quote(100 + i)])),
   });
   const o = accountOverview([{ id: 'x', name: 'X', portfolio: many }], '2026-10-06');
-  assert.equal(o.sectors.length, 7);
+  assert.equal(o.sectors.length, 6);
   assert.equal(o.sectors.at(-1).sector, 'Other');
   assert.equal(o.sectors.reduce((n, s) => n + s.value, 0), o.total.value);
 });

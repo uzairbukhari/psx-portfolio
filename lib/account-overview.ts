@@ -66,7 +66,7 @@ export type IncomeMonth = { month: string; amount: number };
 export type InvestedMonth = { month: string; amount: number } & Record<AssetClassKey, number>;
 
 /** Sectors shown on the All dashboard; the rest roll into one Other slice. */
-export const TOP_SECTOR_COUNT = 6;
+export const TOP_SECTOR_COUNT = 5;
 
 export type AccountOverview = {
   asOf: string;
@@ -267,7 +267,7 @@ export function accountOverview(
       share: share(value, stockValue),
     }))
     .sort((a, b) => b.value - a.value);
-  if (sectors.length > TOP_SECTOR_COUNT + 1) {
+  if (sectors.length > TOP_SECTOR_COUNT) {
     const rest = sectors.slice(TOP_SECTOR_COUNT);
     sectors.length = TOP_SECTOR_COUNT;
     const value = round(rest.reduce((n, r) => n + r.value, 0));
