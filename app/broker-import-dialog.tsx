@@ -6,7 +6,7 @@ import { ReviewShell, StaleBanner } from './import-review-parts';
 
 export function BrokerImportDialog({ statement, fileName, portfolio, revision, busy, method, mappingReady, onCancel, onCommit }: {
   statement: BrokerStatement; fileName: string; portfolio: Portfolio; revision: number; busy: boolean;
-  method: 'ai' | 'saved'; mappingReady: boolean;
+  method: 'ai' | 'saved' | 'local'; mappingReady: boolean;
   onCancel: () => void; onCommit: (next: Portfolio, message: string, broker: string) => Promise<void>;
 }) {
   const [account, setAccount] = useState(statement.account);
@@ -28,7 +28,7 @@ export function BrokerImportDialog({ statement, fileName, portfolio, revision, b
     summary={<><span>{statement.trades.length} reported trades</span><span>{statement.holdings.length} reported holdings</span><span>{counts.trades} trades to import</span></>}
     busy={busy} onCancel={onCancel} primaryLabel="Import reviewed entries" primaryDisabled={!canImport} onPrimary={() => void commit()}>
     {reviewedRevision !== revision && <StaleBanner onRefresh={() => setReviewedRevision(revision)} />}
-    <p className="muted">{method === 'saved' ? 'Read locally using a saved statement format. No AI call was made.' : mappingReady ? 'After you confirm this import, this table layout can be read locally next time if the format matches.' : 'This layout could not be made into a safe local parser. A different file will need AI extraction again; an identical imported file will be recognised without AI.'}</p>
+    <p className="muted">{method === 'local' ? 'Read on your device using the built-in statement reader. No AI call was made; name, address and bank details were not read.' : method === 'saved' ? 'Read locally using a saved statement format. No AI call was made.' : mappingReady ? 'After you confirm this import, this table layout can be read locally next time if the format matches.' : 'This layout could not be made into a safe local parser. A different file will need AI extraction again; an identical imported file will be recognised without AI.'}</p>
     <label className="ir-toggle">Broker <input value={broker} maxLength={80} onChange={(e) => setBroker(e.target.value)} /></label>
     <label className="ir-toggle">Broker account label <input value={account} maxLength={60} onChange={(e) => setAccount(e.target.value)} placeholder="e.g. JS main" /></label>
     <p className="muted">Use a different label for each account with the same broker. The label is saved only in your encrypted portfolio.</p>
