@@ -26,6 +26,7 @@ const identity = async (req, write) => {
 };
 const failure = (e, status) => Response.json({ error: e.message }, { status: status ?? e.status ?? 500 });`)
   .replace("import { getViewer } from '@/lib/auth';", 'const getViewer = async () => null;')
+  .replace("import { env } from 'cloudflare:workers';", "const env = { SESSION_SECRET: 'test-secret' };")
   .replace("import { UserError } from '@/lib/user-error';", `class UserError extends Error { constructor(m, status = 400) { super(m); this.status = status; } }`)
   .replace(/from '@\/lib\/([\w-]+)'/g, (_, name) => `from '${new URL(`lib/${name}.ts`, base).href}'`);
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;

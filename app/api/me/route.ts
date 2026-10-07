@@ -1,5 +1,7 @@
 import type { DeleteAccountRequest, DeleteAccountResponse, MeResponse } from '@/lib/api-types';
+import { env } from 'cloudflare:workers';
 import { getViewer } from '@/lib/auth';
+import { deleteUserEvents } from '@/lib/analytics-store';
 import { accountDeletionStatements, confirmationMatches } from '@/lib/account-deletion';
 import { db, failure, identity, vaultDb } from '@/lib/server';
 import { deleteVault } from '@/lib/vault-store';
@@ -39,6 +41,7 @@ export async function DELETE(req: Request) {
     await deleteVault(vaultDb(), email);
     const database = db();
     await database.batch(accountDeletionStatements().map((sql) => database.prepare(sql).bind(email)));
+    await deleteUserEvents(database, email, env.SESSION_SECRET ?? '').catch((e) => console.error('Could not delete usage events', e));
     const headers = new Headers({ 'Cache-Control': 'no-store' });
     headers.append('Set-Cookie', serializeExpiredCookie('session'));
     return Response.json({ deleted: true } satisfies DeleteAccountResponse, { headers });

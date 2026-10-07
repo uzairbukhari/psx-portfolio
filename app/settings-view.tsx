@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Activity,
   ArrowLeft,
+  BarChart3,
   Cpu,
   Database,
   Download,
@@ -34,6 +35,9 @@ import {
 } from '@/lib/portfolio';
 import { useConfirm } from '@/components/confirm-dialog';
 import SystemHealth from './system-health';
+import UsageDashboard from './usage-dashboard';
+import { analyticsEnabled, setAnalyticsEnabled, track, flushAnalytics } from './analytics';
+import { Switch } from '@/components/ui/switch';
 import { UserAvatar } from './user-avatar';
 import { ImportPanel, UploadButton } from './settings-imports';
 import type { ImportKind, ImportSummary } from '@/lib/import-detect';
@@ -238,13 +242,15 @@ export default function SettingsView({
     }
   }
   const [active, setActive] = useState(initialSection ?? 'account');
+  const [shareStats, setShareStats] = useState(true);
+  useEffect(() => setShareStats(analyticsEnabled()), []);
   const sections = [
     { id: 'account', label: 'Account', icon: UserRound },
     ...(portfolios ? [{id:'portfolios',label:'Portfolios',icon:Database}] : []),
     ...(security ? [{ id: 'security', label: 'Security', icon: KeyRound }] : []),
     { id: 'data', label: 'Data & imports', icon: Database },
     ...(dividendSync ? [{ id: 'sync-dividends', label: 'Sync dividends', icon: RefreshCw }] : []),
-    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }, { id: 'health', label: 'System health', icon: Activity }] : []),
+    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }, { id: 'health', label: 'System health', icon: Activity }, { id: 'analytics', label: 'Usage analytics', icon: BarChart3 }] : []),
   ];
   const current = sections.some((x) => x.id === active) ? active : 'account';
 
@@ -312,12 +318,36 @@ export default function SettingsView({
                     type="button"
                     className="secondary compact signout-link"
                     onClick={() => {
-                      window.location.href = '/api/auth/logout';
+                      track('signed_out');
+                      void flushAnalytics().finally(() => {
+                        window.location.href = '/api/auth/logout';
+                      });
                     }}
                   >
                     <LogOut size={14} /> Sign out
                   </button>
                 </div>
+              </Section>
+
+              <Section
+                id="usage-stats"
+                icon={<BarChart3 size={18} />}
+                title="Usage stats"
+                description="Help improve Sipwise by sharing which screens and features you use."
+              >
+                <Row
+                  label="Share anonymous usage stats"
+                  hint="Feature and screen names only, on this device. Never holdings, tickers, amounts or notes."
+                >
+                  <Switch
+                    checked={shareStats}
+                    aria-label="Share anonymous usage stats"
+                    onCheckedChange={(on) => {
+                      setShareStats(on);
+                      setAnalyticsEnabled(on);
+                    }}
+                  />
+                </Row>
               </Section>
 
               <Section
@@ -513,6 +543,18 @@ export default function SettingsView({
               description="Monthly Picks run processor, data freshness and recent scrape failures."
             >
               <SystemHealth />
+            </Section>
+          )}
+
+          {isAdmin && current === 'analytics' && (
+            <Section
+              id="analytics"
+              icon={<BarChart3 size={18} />}
+              title="Usage analytics"
+              badge="Super admin"
+              description="Sign-ups, active users and feature use on web and phone. Counts only: no holdings, tickers or amounts are ever recorded."
+            >
+              <UsageDashboard />
             </Section>
           )}
 

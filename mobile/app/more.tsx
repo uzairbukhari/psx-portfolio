@@ -17,6 +17,7 @@ import { APPEARANCES } from '@/theme/appearance';
 import { useTheme } from '@/theme/ThemeProvider';
 import { DeleteAccountSheet } from '@/ui/DeleteAccountSheet';
 import { Icon } from '@/ui/Icon';
+import { flushAnalytics, readAnalyticsEnabled, setAnalyticsEnabled, track } from '@/analytics/analytics';
 import { Button, Card, Chip, ListRow, Muted, Notice, Screen, Segmented, SectionLabel, Stat, StatusChip, useKitStyles } from '@/ui/kit';
 
 /** More: account, appearance, security, notifications, tax status, AI usage, data and about. */
@@ -31,6 +32,8 @@ export default function More() {
   const queryClient = useQueryClient();
   const email = useEmail();
   const lock = useBiometricLock();
+  const [shareStats, setShareStats] = useState(true);
+  useEffect(() => { void readAnalyticsEnabled().then(setShareStats); }, []);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushNote, setPushNote] = useState<string | null>(null);
@@ -224,6 +227,26 @@ export default function More() {
           </View>
         </Card>
       ) : null}
+      <SectionLabel>Usage stats</SectionLabel>
+      <Card>
+        <View style={styles.row}>
+          {iconBox('lock')}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.strong}>Share anonymous usage stats</Text>
+            <Muted>Which screens and features you use. Never holdings, tickers, amounts or notes.</Muted>
+          </View>
+          <Switch
+            accessibilityLabel="Share anonymous usage stats"
+            value={shareStats}
+            trackColor={{ true: colors.primary, false: colors.line }}
+            thumbColor={colors.surface}
+            onValueChange={(on) => {
+              setShareStats(on);
+              void setAnalyticsEnabled(on);
+            }}
+          />
+        </View>
+      </Card>
       <SectionLabel>Signed-in devices</SectionLabel>
       {devices.error ? <Notice tone="error">{devices.error.message}</Notice> : null}
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
@@ -331,7 +354,10 @@ export default function More() {
         icon="logout"
         // Ends the server session (which also stops this phone's notifications) and clears all local data;
         // when offline the server part is retried on the next launch.
-        onPress={() => void signOut()}
+        onPress={() => {
+          track('signed_out');
+          void flushAnalytics().finally(() => void signOut());
+        }}
       />
 
       <SectionLabel>About</SectionLabel>

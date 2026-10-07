@@ -7,6 +7,8 @@ import { failure } from '@/lib/server';
 import { UserError } from '@/lib/user-error';
 import { readLimited } from '@/lib/read-limited';
 import { getUserRole } from '@/lib/roles';
+import { noteSignIn } from '@/lib/analytics-store';
+import { cleanPlatform } from '@/lib/mobile-sessions';
 
 // Native sign-in: the app gets a Google ID token from the Google Sign-In SDK and
 // exchanges it here for an app token tied to a revocable device session.
@@ -24,10 +26,12 @@ export async function POST(req: Request) {
       throw new UserError('Google sign-in was not accepted.', 401);
     const sid = await createMobileSession(identity.email, body.deviceName, body.platform);
     const token = await signMobileToken({ ...identity, sid }, env.SESSION_SECRET);
+    const role = await getUserRole(identity.email);
+    await noteSignIn(env.DB, identity.email, cleanPlatform(body.platform), env.SESSION_SECRET, role === 'super_admin');
     return Response.json(
       {
         token,
-        user: { ...identity, role: await getUserRole(identity.email) },
+        user: { ...identity, role },
       } satisfies MobileSignInResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );

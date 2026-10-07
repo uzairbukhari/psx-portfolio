@@ -8,6 +8,7 @@ import type { RunProgress } from '@/lib/monthly-picks-progress';
 import { heldValues, recordRun, type StoredPicksRun } from '@/lib/picks-local';
 import { executePicksRun } from '@/lib/picks-run';
 import { watchQuery } from '@/lib/market-watch';
+import { track } from './analytics';
 
 /** Runs are computed on this device and live in the encrypted portfolio, so every saved run is finished. */
 export type RunStatus = 'completed' | 'failed';
@@ -114,6 +115,7 @@ export function useRecommendations({ portfolio, tickers, onSave }: Options) {
   /** Gathers public data (asking for a fresh scrape when needed), then ranks and sizes entirely on this device. */
   const start = useCallback(async (input: RunInput) => {
     setError(null);
+    track('picks_run_started');
     try {
       const latest = portfolioRef.current;
       const { run, analysis } = await executePicksRun(
@@ -130,8 +132,12 @@ export function useRecommendations({ portfolio, tickers, onSave }: Options) {
       const current = portfolioRef.current;
       await onSaveRef.current({ ...current, monthlyPicksRuns: recordRun(current.monthlyPicksRuns, run) }, 'Monthly Picks run saved.');
       setSelectedId(run.id);
+      track('picks_run_completed');
       setFacts(Object.fromEntries(analysis.facts.map((info) => [info.ticker, info as FactsInfo])));
       return run;
+    } catch (e) {
+      track('picks_run_failed');
+      throw e;
     } finally {
       setProgress(null);
     }

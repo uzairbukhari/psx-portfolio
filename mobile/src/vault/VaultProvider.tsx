@@ -15,6 +15,7 @@ import { nativeBiometricKeyStore } from './biometric-key-native';
 import { installMobileCrypto, type CryptoSetup } from './crypto-setup';
 import { createFileVaultCache, clearVaultCache, purgeLegacyPlaintextCache } from './file-cache';
 import { useAppActive } from '@/auth/app-active';
+import { reportAccountState } from '@/analytics/analytics';
 import { coversVault, shouldLockVault } from './lock-policy';
 import { mobilePublicData, mobileVaultTransport } from './transport';
 import { RecoveryKeyScreen, SetupScreen, StatusScreen, UnlockScreen } from './VaultScreens';
@@ -94,7 +95,11 @@ export function VaultGate({ children }: { children: ReactNode }) {
       return;
     }
     loadVaultStatus(transport, cache)
-      .then((status) => alive && setView(status.state === 'none' ? { kind: 'setup' } : { kind: 'locked', status, mode: 'password' }))
+      .then((status) => {
+        if (!alive) return;
+        void reportAccountState(status.state !== 'none');
+        setView(status.state === 'none' ? { kind: 'setup' } : { kind: 'locked', status, mode: 'password' });
+      })
       .catch((e) => alive && setView({ kind: 'error', message: messageOf(e), upgrade: isUpgrade(e) }));
     return () => {
       alive = false;

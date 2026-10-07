@@ -25,6 +25,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { EncryptedRestoreDialog } from './vault-security';
+import { track } from './analytics';
 
 export type ImportRequest = {
   file: File;
@@ -97,6 +98,7 @@ export default function PortfolioWorkspace({
     setDraft(null);
     setChildBusy(false);
     setSelected(id);
+    track('portfolio_switched');
   }
   const canCreate = account.portfolios.length < MAX_PORTFOLIOS;
   function openCreate() {
@@ -197,6 +199,7 @@ export default function PortfolioWorkspace({
         )
           throw new Error('That portfolio name already exists.');
         setDraft({ id, name: clean });
+        track('portfolio_created');
       } else {
         assertPortfolioWritable(account, id);
         setDraft(null);

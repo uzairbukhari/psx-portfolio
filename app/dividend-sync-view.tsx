@@ -16,6 +16,7 @@ import { historicalTickers } from '@/lib/dividend-history';
 import { useConfirm } from '@/components/confirm-dialog';
 import './import-review.css';
 import { readJson } from '@/lib/safe-json';
+import { track } from './analytics';
 
 const OVERALL: Record<DividendRefreshResponse['overall'], { label: string; tone: 'ok' | 'bad' | 'wait' | '' }> = {
   idle: { label: 'Not fetched yet', tone: '' },
@@ -185,6 +186,7 @@ export function DividendSyncView({
     }
     setError('');
     await onSave(result.portfolio, `${result.approved.length + result.converted.length} dividend${result.approved.length + result.converted.length === 1 ? '' : 's'} approved as received (${money(result.total)} gross).`);
+    track('dividend_approved');
     setSelected(new Set());
   }
 

@@ -15,6 +15,8 @@ import { ConflictError } from '@shared/vault-client.ts';
 import { useAuth } from '@/auth/AuthProvider';
 import { useVault } from '@/vault/VaultProvider';
 import { usePortfolioSelection } from './PortfolioSelection';
+import { detectImport, eventsForSave } from '../../../lib/analytics-diff.ts';
+import { track } from '@/analytics/analytics';
 import { openPositions, priceTickers, safeHoldings, totals } from './derive';
 
 type AccountView = { account: PortfolioAccount; revision: number };
@@ -90,6 +92,9 @@ export function usePortfolio(scopeId?: string) {
         },
         revision: saved.revision,
       });
+      const before = current.account.portfolios.find((p) => p.id === target.id)?.portfolio ?? null;
+      const imported = detectImport(before, next);
+      for (const e of eventsForSave(before, next, imported ?? undefined)) track(e.event, e.props);
       return saved.revision;
     } catch (e) {
       if (e instanceof ConflictError) {

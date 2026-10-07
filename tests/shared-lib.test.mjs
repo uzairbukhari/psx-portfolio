@@ -6,6 +6,8 @@ import { readFileSync } from 'node:fs';
 // must stay free of the Workers runtime, Next.js and DOM-only imports.
 const SHARED = [
   'api-types',
+  'analytics-events',
+  'analytics-diff',
   'portfolio',
   'portfolio-account',
   'account-overview',

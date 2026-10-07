@@ -7,6 +7,7 @@ import { parsePublicAnalysis, pollIntervalMs } from '@shared/api-validate.ts';
 import { watchQuery } from '@shared/market-watch.ts';
 import { heldValues, recordRun, type StoredPicksRun } from '@shared/picks-local.ts';
 import { executePicksRun } from '@shared/picks-run.ts';
+import { track } from '@/analytics/analytics';
 import type { RunProgress } from '@shared/monthly-picks-progress.ts';
 import { portfolioCounts } from '@shared/portfolio-counts.ts';
 import { explainSizing } from '@shared/monthly-picks-allocation.ts';
@@ -100,6 +101,7 @@ export function PicksView({ month, fee, onFee, readOnly, portfolioId }: { portfo
       // Remember the shortlist and this month's amount (encrypted, like everything else) so they are here next time.
       const withInputs = withPicksInputs(portfolio, month, selected, amt) ?? portfolio;
       if (withInputs !== portfolio) await p.save(withInputs);
+      track('picks_run_started');
       const { run } = await executePicksRun(
         {
           // Only the tickers go to the server, to read public company data.
@@ -121,7 +123,9 @@ export function PicksView({ month, fee, onFee, readOnly, portfolioId }: { portfo
         { month, amount: amt, feePct: parseNumber(fee) ?? 0, shortlist: selected, holdings: heldValues(withInputs) },
       );
       await p.save({ ...withInputs, monthlyPicksRuns: recordRun(withInputs.monthlyPicksRuns, run) });
+      track('picks_run_completed');
     } catch (e) {
+      track('picks_run_failed');
       setError(e instanceof Error ? e.message : 'Could not get the picks.');
     } finally {
       setProgress(null);

@@ -1,5 +1,6 @@
 import { getViewer } from '@/lib/auth';
 import Dashboard from './portfolio';
+import { CfBeacon } from './cf-beacon';
 export const metadata = {
   title: 'Sipwise | SIP desk',
   description:
@@ -8,11 +9,14 @@ export const metadata = {
 export default async function Home() {
   const user = await getViewer();
   return (
-    <Dashboard
-      email={user?.email ?? null}
-      name={user?.name ?? null}
-      picture={user?.picture ?? null}
-      role={user?.role ?? 'user'}
-    />
+    <>
+      {!user && <CfBeacon />}
+      <Dashboard
+        email={user?.email ?? null}
+        name={user?.name ?? null}
+        picture={user?.picture ?? null}
+        role={user?.role ?? 'user'}
+      />
+    </>
   );
 }

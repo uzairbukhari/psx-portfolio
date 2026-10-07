@@ -1,4 +1,5 @@
 import { LandingFooter, LandingNav } from '../landing/landing-chrome';
+import { CfBeacon } from '../cf-beacon';
 
 export const metadata = {
   title: 'Terms of use | Sipwise',
@@ -8,6 +9,7 @@ export const metadata = {
 export default function Page() {
   return (
     <main className="landing">
+      <CfBeacon />
       <LandingNav />
       <article className="lp-legal">
         <h1>Terms of use</h1>

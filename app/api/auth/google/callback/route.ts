@@ -1,6 +1,8 @@
 import { env } from 'cloudflare:workers';
 import { safeRelativeReturnPath } from '@/lib/auth';
 import { emailAllowed, safeGooglePicture } from '@/lib/google-id-token';
+import { noteSignIn } from '@/lib/analytics-store';
+import { getUserRole } from '@/lib/roles';
 import {
   readCookieValue,
   serializeCookie,
@@ -64,6 +66,8 @@ export async function GET(req: Request) {
     undefined,
     picture,
   );
+
+  await noteSignIn(env.DB, email, 'web', env.SESSION_SECRET, (await getUserRole(email)) === 'super_admin');
 
   const headers = new Headers({
     Location: new URL(returnTo, url.origin).toString(),

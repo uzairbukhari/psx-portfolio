@@ -188,6 +188,8 @@ import {
 import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
+import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
+import { flushAnalytics, track } from './analytics';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -792,6 +794,7 @@ function DashboardContent({
   }
   async function refresh() {
     if (!p || quoteRunning.current) return;
+    track('price_refresh_requested');
     quoteRunning.current = true;
     setBusy(true);
     try {
@@ -1044,12 +1047,14 @@ function DashboardContent({
         workspace?.onSaved();
       }
       if (wasImport) void refreshImported(next.companies.map((c) => c.ticker));
+      for (const e of eventsForSave(p, next, wasImport ? importSourceOf(p, next) : undefined)) track(e.event, e.props);
       notify(
         d.pendingCompanies?.length
           ? `${success} Company details for ${d.pendingCompanies.join(', ')} are still being looked up; your transactions are saved and the details will fill in on a later load.`
           : success,
       );
     } catch (e) {
+      if (wasImport && !(e instanceof VaultLockedError)) track('import_failed', { source: 'broker' });
       if (e instanceof ConflictError) {
         importActive.current = false;
         importHash.current = undefined;
@@ -1189,6 +1194,29 @@ function DashboardContent({
   );
   // Monthly Picks is a general stock-picking tool: it always works on the companies and holdings of every
   // portfolio, whichever one is selected. Its saved inputs and runs live in the account's first portfolio.
+  useEffect(() => {
+    if (!email) return;
+    track('app_opened');
+  }, [email]);
+  useEffect(() => {
+    if (!email) return;
+    const screen = companyTicker
+      ? 'company'
+      : tab === 'holdings'
+        ? isAll
+          ? 'overview'
+          : 'holdings'
+        : tab === 'history'
+          ? 'activity'
+          : tab === 'reports' || tab === 'sip' || tab === 'settings' || tab === 'notifications'
+            ? tab
+            : null;
+    if (screen) track('screen_viewed', { screen });
+  }, [email, tab, companyTicker, isAll]);
+  const importOpen = ahlStatement ? 'ahl' : finqalabReview ? 'finqalab' : brokerReview ? 'broker' : ipoReview ? 'ipo' : null;
+  useEffect(() => {
+    if (importOpen) track('import_started', { source: importOpen });
+  }, [importOpen]);
   const picksHome = workspace?.account.portfolios[0];
   const picksPortfolio = useMemo(() => {
     if (!workspace || !picksHome) return p;
@@ -1493,6 +1521,7 @@ function DashboardContent({
   const exportEncryptedBackup = () =>
     attempt(async () => {
       const pkg = await vault!.session.backupPackage();
+      track('backup_exported');
       download(
         `sipwise-backup-${today()}.encrypted.json`,
         JSON.stringify(pkg, null, 2),
@@ -2401,7 +2430,10 @@ function DashboardContent({
                     <DropdownMenuItem
                       variant="destructive"
                       onClick={() => {
-                        window.location.href = '/api/auth/logout';
+                        track('signed_out');
+                        void flushAnalytics().finally(() => {
+                          window.location.href = '/api/auth/logout';
+                        });
                       }}
                     >
                       <LogOut size={15} /> Sign out

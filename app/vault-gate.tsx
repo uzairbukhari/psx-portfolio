@@ -21,6 +21,7 @@ import { MIN_PASSWORD_CHARS, VaultError, decodeRecoverySecret } from '@/lib/vaul
 import { forgetTabKey, keepTabKey, recallTabKey } from '@/lib/vault-tab-keep';
 import { browserTabKeepStore } from './vault-tab-store';
 import { webVaultTransport } from './vault-transport';
+import { reportAccountState, track } from './analytics';
 import './vault.css';
 
 export const INACTIVITY_LOCK_MS = 15 * 60_000;
@@ -87,6 +88,7 @@ export default function VaultGate({ email, children }: { email: string; children
     loadVaultStatus(webVaultTransport)
       .then(async (status) => {
         if (!alive) return;
+        void reportAccountState(status.state !== 'none');
         if (status.state === 'none') return setView({ kind: 'setup' });
         // Opt-in "stay unlocked in this tab": a reload reopens the vault without the password.
         const store = browserTabKeepStore();
@@ -245,7 +247,9 @@ function RecoveryKey({ prepared, onDone, onBack }: { prepared: PreparedVault; on
     setBusy(true);
     setError('');
     try {
-      onDone(await prepared.finish());
+      const session = await prepared.finish();
+      track('vault_created');
+      onDone(session);
     } catch (e) {
       setError(message(e));
       setBusy(false);
@@ -327,7 +331,11 @@ function Unlock({
           onSubmit={(e) => {
             e.preventDefault();
             if (password !== again) return setError('The two passwords do not match.');
-            void run(() => recoverWithKey(webVaultTransport, status, recovery, password));
+            void run(async () => {
+              const session = await recoverWithKey(webVaultTransport, status, recovery, password);
+              track('vault_recovered');
+              return session;
+            });
           }}
         >
           <label>
@@ -391,6 +399,7 @@ function Unlock({
               const key = session.exportKey();
               try { await keepTabKey(browserTabKeepStore(), email, status.vault.vaultId, key); } finally { key.fill(0); }
             }
+            track('vault_unlocked', { method: 'password' });
             return session;
           });
         }}
