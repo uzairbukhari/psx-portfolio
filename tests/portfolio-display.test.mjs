@@ -20,7 +20,7 @@ test('one portfolio is the real editable ledger; two use a read-only display; re
   assert.notEqual(dashboardPortfolio(two),original);
   assert.throws(()=>validate(dashboardPortfolio(two)),/Choose a portfolio/);
   assert.equal(dashboardPortfolio(removePortfolio(two,'b')),original);
-  assert.throws(()=>removePortfolio(two,'default'),/default/);
+  assert.equal(removePortfolio(two,'default').portfolios[0].id,'b');
 });
 test('shared dashboard holdings and taxes isolate each portfolio before summing',()=>{
   const a=ledger();a.trades.push({id:'sale',ticker:'MEBL',kind:'sell',shares:5,price:250,date:'2026-09-20',fees:0,month:'',note:''});

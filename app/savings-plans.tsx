@@ -26,7 +26,12 @@ import CollapsiblePanel from './collapsible-panel';
 export type OwnedPlan = { asset: PlanAsset; portfolioName?: string };
 type Mode =
   | { kind: 'plan' }
-  | { kind: 'contribution' | 'redeem' | 'value' | 'monthly'; planId: string };
+  | {
+      kind: 'contribution' | 'redeem' | 'value' | 'monthly';
+      planId: string;
+      /** The history record being corrected, when editing rather than adding. */
+      editId?: string;
+    };
 
 const tone = (n: number | null) =>
   n === null ? '' : n >= 0 ? 'pos-text' : 'neg-text';
@@ -53,6 +58,7 @@ function planHistoryRows(
     change: (plan: PlanAsset) => PlanAsset,
     message: string,
   ) => Promise<void>,
+  edit: (kind: 'contribution' | 'redeem' | 'value', id: string) => void,
 ): HistoryRow[] {
   const toggle = (kind: 'entry' | 'value', key: string) =>
     void update(
@@ -97,6 +103,9 @@ function planHistoryRows(
             onClick: () => toggle('entry', e.id),
           }
         : undefined,
+      edit: canEdit
+        ? { disabled: busy, onClick: () => edit(e.type, e.id) }
+        : undefined,
     })),
     ...asset.valuations.map((x) => ({
       id: x.id,
@@ -114,6 +123,9 @@ function planHistoryRows(
             disabled: busy,
             onClick: () => toggle('value', x.id),
           }
+        : undefined,
+      edit: canEdit
+        ? { disabled: busy, onClick: () => edit('value', x.id) }
         : undefined,
     })),
   ];
@@ -463,7 +475,14 @@ export default function SavingsPlansSection({
               ))}
             <AssetHistory
               summary={`${asset.entries.length + asset.valuations.length} records`}
-              rows={planHistoryRows(asset, canEdit, busy, update)}
+              rows={planHistoryRows(
+                asset,
+                canEdit,
+                busy,
+                update,
+                (kind, editId) =>
+                  setMode({ kind, planId: asset.id, editId }),
+              )}
             />
           </article>
         ))}
@@ -488,18 +507,37 @@ function PlanDialog({
 }) {
   const plan =
     mode.kind === 'plan' ? undefined : plans.find((p) => p.id === mode.planId);
+  const editEntry =
+    mode.kind !== 'plan' && mode.editId && mode.kind !== 'value'
+      ? plan?.entries.find((e) => e.id === mode.editId)
+      : undefined;
+  const editValuation =
+    mode.kind === 'value' && mode.editId
+      ? plan?.valuations.find((x) => x.id === mode.editId)
+      : undefined;
+  const editing = !!(editEntry || editValuation);
   const [provider, setProvider] =
     useState<PlanAsset['provider']>('pak-qatar-mbp');
   const [name, setName] = useState(PAK_QATAR_PLAN_NAME);
   const [subFund, setSubFund] = useState<string>('pure-saving');
-  const [date, setDate] = useState(today());
-  const [amount, setAmount] = useState('');
-  const [loadPct, setLoadPct] = useState('');
-  const [value, setValue] = useState('');
+  const [date, setDate] = useState(
+    editEntry?.date ?? editValuation?.date ?? today(),
+  );
+  const [amount, setAmount] = useState(
+    editEntry ? String(editEntry.amount) : '',
+  );
+  const [loadPct, setLoadPct] = useState(
+    editEntry?.load
+      ? String(Math.round((editEntry.load / editEntry.amount) * 1e4) / 100)
+      : '',
+  );
+  const [value, setValue] = useState(
+    editValuation ? String(editValuation.value) : '',
+  );
   const [rate, setRate] = useState('');
   const [day, setDay] = useState('5');
   const [from, setFrom] = useState(today().slice(0, 7));
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(editEntry?.note ?? editValuation?.note ?? '');
   const [error, setError] = useState('');
 
   const titles = {
@@ -573,16 +611,22 @@ function PlanDialog({
           throw new Error('Enter the value from your statement or app.');
         next = {
           ...plan,
-          valuations: [
-            ...plan.valuations,
-            { id: id(), date, value: v, note: note.trim() },
-          ],
+          valuations: editValuation
+            ? plan.valuations.map((x) =>
+                x.id === editValuation.id
+                  ? { ...x, date, value: v, note: note.trim() }
+                  : x,
+              )
+            : [
+                ...plan.valuations,
+                { id: id(), date, value: v, note: note.trim() },
+              ],
           closed:
             v === 0 && plan.entries.some((e) => e.type === 'redeem')
               ? true
               : plan.closed,
         };
-        message = 'Plan value updated.';
+        message = editing ? 'Entry updated.' : 'Plan value updated.';
       } else if (mode.kind === 'monthly') {
         const a = number(amount);
         const d = Math.floor(number(day));
@@ -612,24 +656,27 @@ function PlanDialog({
           throw new Error(
             `Pak-Qatar's smallest top-up is ${money(PAK_QATAR_MIN_TOPUP)}.`,
           );
+        const record = {
+          ...(editEntry ?? {}),
+          id: editEntry?.id ?? id(),
+          type: mode.kind,
+          date,
+          amount: a,
+          load:
+            mode.kind === 'contribution' && loadFor(a) !== undefined
+              ? loadFor(a)
+              : undefined,
+          note: note.trim(),
+        };
         next = {
           ...plan,
-          entries: [
-            ...plan.entries,
-            {
-              id: id(),
-              type: mode.kind,
-              date,
-              amount: a,
-              ...(mode.kind === 'contribution' && loadFor(a) !== undefined
-                ? { load: loadFor(a) }
-                : {}),
-              note: note.trim(),
-            },
-          ],
+          entries: editEntry
+            ? plan.entries.map((e) => (e.id === editEntry.id ? record : e))
+            : [...plan.entries, record],
         };
-        message =
-          mode.kind === 'redeem'
+        message = editEntry
+          ? 'Entry updated.'
+          : mode.kind === 'redeem'
             ? 'Redemption recorded.'
             : 'Contribution recorded.';
       }
@@ -645,7 +692,7 @@ function PlanDialog({
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="form-dialog tx-dialog asset-dialog">
-        <DialogTitle>{titles[mode.kind]}</DialogTitle>
+        <DialogTitle>{editing ? 'Edit entry' : titles[mode.kind]}</DialogTitle>
         <DialogDescription>
           {mode.kind === 'plan'
             ? `Pak-Qatar's plan needs at least ${money(PAK_QATAR_MIN_FIRST)} to start and top-ups from ${money(PAK_QATAR_MIN_TOPUP)}. Gains stay in the plan.`

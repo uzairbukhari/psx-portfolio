@@ -12,6 +12,8 @@ import {
 export const ACCOUNT_VERSION = 1;
 export const ALL_PORTFOLIOS = 'all';
 export const LEGACY_PORTFOLIO_ID = 'default';
+/** One login can keep at most this many portfolios. The server only holds ciphertext, so the limit is applied here. */
+export const MAX_PORTFOLIOS = 4;
 export type NamedPortfolio = {
   id: string;
   name: string;
@@ -145,6 +147,13 @@ export function hasFinancialRecords(portfolio: Portfolio): boolean {
   );
 }
 
+export function assertCanAddPortfolio(account: PortfolioAccount) {
+  if (account.portfolios.length >= MAX_PORTFOLIOS)
+    throw new Error(
+      `You can keep up to ${MAX_PORTFOLIOS} portfolios. Delete one to create another.`,
+    );
+}
+
 export function renamePortfolio(
   account: PortfolioAccount,
   id: string,
@@ -170,9 +179,6 @@ export function removePortfolio(
   const entry = account.portfolios.find((p) => p.id === id);
   if (!entry) throw new Error('That portfolio no longer exists.');
   assertPortfolioWritable(account, id);
-  if (id === LEGACY_PORTFOLIO_ID) throw Error('Keep the default portfolio.');
-  if (hasFinancialRecords(entry.portfolio))
-    throw new Error('A portfolio with financial records cannot be deleted.');
   if (account.portfolios.length === 1)
     throw new Error('Keep at least one portfolio.');
   return {
@@ -446,5 +452,8 @@ export function dashboardPortfolio(
       result.budgets[month] = (result.budgets[month] ?? 0) + budget;
   }
   result.companies = [...companies.values()];
+  // Monthly Picks keeps its shortlist in the account's first portfolio; the All view follows it.
+  const shortlist = account.portfolios[0]?.portfolio.monthlyPicksShortlist;
+  if (shortlist?.length) result.monthlyPicksShortlist = [...shortlist];
   return result;
 }

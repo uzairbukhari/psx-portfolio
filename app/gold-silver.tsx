@@ -51,6 +51,7 @@ function historyRows(
   canEdit: boolean,
   busy: boolean,
   toggleVoid: (assetId: string, entryId: string) => Promise<void>,
+  edit: (assetId: string, entryId: string) => void,
 ): HistoryRow[] {
   return [...asset.entries]
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
@@ -86,6 +87,9 @@ function historyRows(
               onClick: () => void toggleVoid(asset.id, e.id),
             }
           : undefined,
+        edit: canEdit
+          ? { disabled: busy, onClick: () => edit(asset.id, e.id) }
+          : undefined,
       } satisfies HistoryRow;
     });
 }
@@ -117,6 +121,7 @@ export default function GoldSilverSection({
   const [open, setOpen] = useState<{
     type: MetalEntry['type'];
     assetId?: string;
+    entryId?: string;
   } | null>(null);
   const [error, setError] = useState('');
   const rows = useMemo(
@@ -162,6 +167,16 @@ export default function GoldSilverSection({
   const dialog = open ? (
     <MetalEntryDialog
       initialType={open.type}
+      editing={
+        open.assetId && open.entryId
+          ? {
+              assetId: open.assetId,
+              entry: assets
+                .find((a) => a.id === open.assetId)
+                ?.entries.find((e) => e.id === open.entryId),
+            }
+          : undefined
+      }
       assets={assets}
       busy={busy}
       onClose={() => setOpen(null)}
@@ -178,7 +193,7 @@ export default function GoldSilverSection({
     <>
       <CollapsiblePanel
         id="gold-silver"
-        title="Gold and silver"
+        title="Gold and Silver"
         badge={`${totals.held} held`}
         figures={[
           {
@@ -291,7 +306,15 @@ export default function GoldSilverSection({
             </p>
             <AssetHistory
               summary={`${v.history.length} ${v.history.length === 1 ? 'entry' : 'entries'}${asset.entries.some((e) => e.voided) ? `, ${asset.entries.filter((e) => e.voided).length} voided` : ''}`}
-              rows={historyRows(asset, v, canEdit, busy, toggleVoid)}
+              rows={historyRows(
+                asset,
+                v,
+                canEdit,
+                busy,
+                toggleVoid,
+                (assetId, entryId) =>
+                  setOpen({ type: 'buy', assetId, entryId }),
+              )}
             />
           </article>
         ))}
@@ -303,30 +326,45 @@ export default function GoldSilverSection({
 
 function MetalEntryDialog({
   initialType,
+  editing,
   assets,
   busy,
   onClose,
   onSave,
 }: {
   initialType: MetalEntry['type'];
+  /** Correct an existing entry in place instead of adding a new one. */
+  editing?: { assetId: string; entry?: MetalEntry };
   assets: MetalAsset[];
   busy: boolean;
   onClose: () => void;
   onSave: (assets: MetalAsset[], message: string) => Promise<void>;
 }) {
-  const [type, setType] = useState<MetalEntry['type']>(initialType);
+  const existing = editing?.entry;
+  const existingPiece = existing?.pieceGrams
+    ? STANDARD_PIECES.find((s) => s.grams === existing.pieceGrams)
+    : undefined;
+  const [type, setType] = useState<MetalEntry['type']>(
+    existing?.type ?? initialType,
+  );
   const [assetId, setAssetId] = useState(
-    initialType === 'sell' ? (assets[0]?.id ?? '') : '',
+    editing?.assetId ?? (initialType === 'sell' ? (assets[0]?.id ?? '') : ''),
   );
   const [metal, setMetal] = useState<Metal>('gold');
   const [karat, setKarat] = useState<Karat>(24);
-  const [form, setForm] = useState<'coin' | 'bar'>('coin');
-  const [size, setSize] = useState('1 tola');
-  const [pieces, setPieces] = useState('1');
-  const [customGrams, setCustomGrams] = useState('');
-  const [date, setDate] = useState(today());
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
+  const [form, setForm] = useState<'coin' | 'bar'>(existing?.form ?? 'coin');
+  const [size, setSize] = useState(
+    existing ? (existingPiece?.label ?? OTHER) : '1 tola',
+  );
+  const [pieces, setPieces] = useState(String(existing?.pieces ?? 1));
+  const [customGrams, setCustomGrams] = useState(
+    existing && !existingPiece ? String(existing.grams) : '',
+  );
+  const [date, setDate] = useState(existing?.date ?? today());
+  const [amount, setAmount] = useState(
+    existing?.amount != null ? String(existing.amount) : '',
+  );
+  const [note, setNote] = useState(existing?.note ?? '');
   const [error, setError] = useState('');
 
   const chosen = assets.find((a) => a.id === assetId);
@@ -353,10 +391,15 @@ function MetalEntryDialog({
             : 'Enter the amount you paid.',
         );
       const entry: MetalEntry = {
-        id: `e-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`,
+        ...(existing ?? {}),
+        id:
+          existing?.id ??
+          `e-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`,
         type,
         date,
         grams: Math.round(totalGrams * 1e6) / 1e6,
+        pieces: undefined,
+        pieceGrams: undefined,
         ...(size !== OTHER && piece
           ? { pieces: count, pieceGrams: piece.grams }
           : {}),
@@ -373,7 +416,16 @@ function MetalEntryDialog({
               (a) =>
                 a.metal === metal && (metal === 'silver' || a.karat === karat),
             ));
-      if (target)
+      if (existing && target)
+        next = assets.map((a) =>
+          a.id === target.id
+            ? {
+                ...a,
+                entries: a.entries.map((e) => (e.id === existing.id ? entry : e)),
+              }
+            : a,
+        );
+      else if (target)
         next = assets.map((a) =>
           a.id === target.id ? { ...a, entries: [...a.entries, entry] } : a,
         );
@@ -392,7 +444,11 @@ function MetalEntryDialog({
         ];
       await onSave(
         next,
-        type === 'sell' ? 'Sale recorded.' : 'Purchase recorded.',
+        existing
+          ? 'Entry updated.'
+          : type === 'sell'
+            ? 'Sale recorded.'
+            : 'Purchase recorded.',
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -403,7 +459,9 @@ function MetalEntryDialog({
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="form-dialog tx-dialog asset-dialog">
         <DialogTitle>
-          {type === 'sell'
+          {existing
+            ? 'Edit entry'
+            : type === 'sell'
             ? 'Record a sale'
             : type === 'opening'
               ? 'Opening balance'
@@ -438,6 +496,7 @@ function MetalEntryDialog({
                 <select
                   value={assetId}
                   onChange={(e) => setAssetId(e.target.value)}
+                  disabled={!!existing}
                 >
                   {type !== 'sell' && (
                     <option value="">

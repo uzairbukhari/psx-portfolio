@@ -31,6 +31,7 @@ import type { Metal, MetalRateRow } from '@/lib/metal-rates';
 import type { FundNavRow } from '@/lib/mufap';
 import type { PlanNavRow } from '@/lib/plans';
 import type { Asset } from '@/lib/assets';
+import { ChartInfo } from './chart-info';
 import PortfolioReports from './portfolio-reports';
 
 // Same fixed hue order as the stock reports (validated on the dark surface).
@@ -71,7 +72,7 @@ function MonthlyBars({ rows, eyebrow, source }: { rows: (MonthPoint & { label: s
       <div className="report-heading">
         <div>
           <p className="eyebrow">{eyebrow}</p>
-          <h3>Monthly purchase activity</h3>
+          <h3>Monthly purchase activity<ChartInfo text="How much you bought in each calendar month, including fees. Opening balances and sales are left out." /></h3>
         </div>
         <span>PKR invested, including fees</span>
       </div>
@@ -99,7 +100,7 @@ function Trajectory({ rows, total, eyebrow, source }: { rows: (MonthPoint & { la
       <div className="report-heading">
         <div>
           <p className="eyebrow">{eyebrow}</p>
-          <h3>Cumulative invested</h3>
+          <h3>Cumulative invested<ChartInfo text="Running total of everything you have paid in, month by month. Opening balances and sales are left out." /></h3>
         </div>
         <span>{rows.length ? money(total) : '—'} to date</span>
       </div>
@@ -164,7 +165,7 @@ function FundReports({ portfolio, navs }: { portfolio: Portfolio; navs: FundNavR
           <div className="report-heading">
             <div>
               <p className="eyebrow">SIP ACTIVITY</p>
-              <h3>Monthly investment by fund</h3>
+              <h3>Monthly investment by fund<ChartInfo text="Your monthly purchases split by fund, so you can see where each month goes." /></h3>
             </div>
             <span>{money(report.invested)} invested</span>
           </div>
@@ -236,7 +237,7 @@ function PlanReports({ portfolio, navs }: { portfolio: Portfolio; navs: PlanNavR
           <div className="report-heading">
             <div>
               <p className="eyebrow">PLAN GROWTH</p>
-              <h3>Paid in against value</h3>
+              <h3>Paid in against value<ChartInfo text="What you have paid into the plan over time against its current value; the gap is the profit the plan has added." /></h3>
             </div>
             <span>Month-end</span>
           </div>
@@ -305,7 +306,7 @@ function MetalReports({ portfolio, metal, rates }: { portfolio: Portfolio; metal
           <div className="report-heading">
             <div>
               <p className="eyebrow">{name.toUpperCase()} RATE</p>
-              <h3>Rate history against your average cost</h3>
+              <h3>Rate history against your average cost<ChartInfo text="The saved market rate over time, with a dashed line at your average cost per tola of pure metal. Above the line, your holding is in profit." /></h3>
             </div>
             <div className="reports-tabs seg" aria-label="Range">
               {RANGES.map(([k]) => (
@@ -354,20 +355,47 @@ export default function AssetReports({
   const metals = (['gold', 'silver'] as const).filter((m) =>
     portfolio.assets?.some((a) => a.kind === 'metal' && a.metal === m),
   );
+  const classes: { key: string; label: string; node: React.ReactNode }[] = [];
+  if (mode === 'savings') {
+    if (portfolio.assets?.some((a) => a.kind === 'fund'))
+      classes.push({
+        key: 'fund',
+        label: 'Mutual fund',
+        node: <FundReports portfolio={portfolio} navs={fundNavs} />,
+      });
+    if (portfolio.assets?.some((a) => a.kind === 'plan'))
+      classes.push({
+        key: 'plan',
+        label: 'Savings plan',
+        node: <PlanReports portfolio={portfolio} navs={planNavs} />,
+      });
+  } else {
+    for (const m of metals)
+      classes.push({
+        key: m,
+        label: m === 'gold' ? 'Gold' : 'Silver',
+        node: <MetalReports portfolio={portfolio} metal={m} rates={metalRates} />,
+      });
+  }
+  const [picked, setPicked] = useState('');
+  const current = classes.find((c) => c.key === picked) ?? classes[0];
   return (
     <div className="reports">
-      {mode === 'savings' ? (
-        <>
-          {portfolio.assets?.some((a) => a.kind === 'fund') && (
-            <FundReports portfolio={portfolio} navs={fundNavs} />
-          )}
-          {portfolio.assets?.some((a) => a.kind === 'plan') && (
-            <PlanReports portfolio={portfolio} navs={planNavs} />
-          )}
-        </>
-      ) : (
-        metals.map((m) => <MetalReports key={m} portfolio={portfolio} metal={m} rates={metalRates} />)
+      {classes.length > 1 && (
+        <div className="reports-tabs seg" aria-label="Asset type">
+          {classes.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              data-active={c.key === current.key || undefined}
+              onClick={() => setPicked(c.key)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
       )}
+      {current?.node}
     </div>
   );
 }

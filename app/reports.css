@@ -35,3 +35,6 @@
   .reports-summary span{font-size:10px;letter-spacing:.5px}
 }
 @media(max-width:760px){.reports-tabs{top:52px}}
+.chart-info{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:8px;padding:0;vertical-align:middle;border:0;border-radius:50%;background:transparent;color:var(--muted-foreground);cursor:help;transition:color .15s ease,background-color .15s ease}
+.chart-info:hover,.chart-info:focus-visible{color:var(--primary);background:rgba(59,130,246,.14)}
+.chart-info:focus-visible{outline:2px solid var(--primary);outline-offset:1px}

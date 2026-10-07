@@ -23,6 +23,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { money, moneyShort, round, type Portfolio } from '@/lib/portfolio';
+import { ChartInfo } from './chart-info';
 import { TickerLink } from './ticker-link';
 import {
   portfolioReport,
@@ -402,215 +403,38 @@ export default function PortfolioReports({
         ))}
       </div>
 
-      <div className="reports-grid" style={{ marginBottom: 20 }}>
-        <section className="panel report-panel" data-group="performance">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">REALISED P&amp;L &amp; TAX</p>
-              <h3>Realised gains by month</h3>
-            </div>
-            <span>Estimated tax (15% filer / 30% non-filer), unless a deduction is recorded</span>
-          </div>
-          {realizedActivity.length ? (
-            <ChartContainer
-              config={realizedActivityConfig}
-              className="report-chart report-chart--trend"
-            >
-              <BarChart
-                accessibilityLayer
-                data={realizedActivity}
-                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
-              >
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  label={{
-                    value: 'Sale month',
-                    position: 'insideBottom',
-                    offset: -16,
-                  }}
-                />
-                <YAxis
-                  width={72}
-                  tickFormatter={(value) =>
-                    new Intl.NumberFormat('en-PK', {
-                      notation: 'compact',
-                    }).format(value)
-                  }
-                />
-                <ReferenceLine y={0} stroke="var(--border)" />
-                <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
-                  content={
-                    <ChartTooltipContent
-                      formatter={(_value, _name, item) => {
-                        const point = item.payload as (typeof realizedActivity)[number];
-                        const amount = point.net ?? point.gain;
-                        return (
-                          <div className="report-tooltip-row">
-                            <span>
-                              {point.net === null ? 'Gross gain' : 'Net gain'}
-                            </span>
-                            <b>{money(amount)}</b>
-                          </div>
-                        );
-                      }}
-                    />
-                  }
-                />
-                <Bar
-                  dataKey={(item: (typeof realizedActivity)[number]) =>
-                    item.net ?? item.gain
-                  }
-                  shape={realizedMonthBarShape}
-                />
-              </BarChart>
-            </ChartContainer>
-          ) : (
-            <ReportEmpty>Record a sale to see realised gains here.</ReportEmpty>
-          )}
-          <p className="report-source">
-            Source: recorded sales · realised gains only
-          </p>
-        </section>
-
-        <section className="panel report-panel" data-group="performance">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">REALISED P&amp;L &amp; TAX</p>
-              <h3>Realised gain / loss by company</h3>
-            </div>
-            <span>Net of estimated capital gains tax</span>
-          </div>
-          {realizedCompanies.length ? (
-            <ChartContainer
-              config={realizedCompanyConfig}
-              className="report-chart"
-              style={{
-                height: Math.max(220, realizedCompanies.length * 34 + 70),
-              }}
-            >
-              <BarChart
-                accessibilityLayer
-                data={realizedCompanies}
-                layout="vertical"
-                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
-              >
-                <CartesianGrid horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickFormatter={(value) =>
-                    new Intl.NumberFormat('en-PK', {
-                      notation: 'compact',
-                    }).format(value)
-                  }
-                  label={{
-                    value: 'Realised gain / loss (PKR)',
-                    position: 'insideBottom',
-                    offset: -12,
-                  }}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="ticker"
-                  width={58}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <ReferenceLine x={0} stroke="var(--border)" />
-                <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
-                  content={
-                    <ChartTooltipContent
-                      hideLabel
-                      formatter={(_value, _name, item) => {
-                        const point = item.payload as RealizedCompanyPoint;
-                        return (
-                          <div className="report-tooltip-row">
-                            <span>{point.name}</span>
-                            <b>
-                              {point.net === null
-                                ? `${money(point.gain)} gross`
-                                : `${money(point.net)} net`}
-                              {point.weight === null
-                                ? ''
-                                : ` · ${point.weight.toFixed(1)}%`}
-                            </b>
-                          </div>
-                        );
-                      }}
-                    />
-                  }
-                />
-                <Bar
-                  dataKey={(item: RealizedCompanyPoint) =>
-                    item.net ?? item.gain
-                  }
-                  shape={realizedCompanyBarShape}
-                >
-                  <LabelList
-                    dataKey={(item: RealizedCompanyPoint) =>
-                      item.net ?? item.gain
-                    }
-                    position="right"
-                    formatter={(value) =>
-                      new Intl.NumberFormat('en-PK', {
-                        notation: 'compact',
-                      }).format(Number(value))
-                    }
-                  />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          ) : (
-            <ReportEmpty>Record a sale to see realised gains here.</ReportEmpty>
-          )}
-          <p className="report-source">
-            Source: recorded sales, ranked by absolute gain / loss
-          </p>
-        </section>
-      </div>
-
       <div className="reports-grid">
-        <section className="panel report-panel" data-group="income">
+        <section className="panel report-panel" data-group="activity">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">DIVIDEND TRAJECTORY</p>
-              <h3>Net received, last 12 months</h3>
+              <p className="eyebrow">SIP TRAJECTORY</p>
+              <h3>Cumulative invested<ChartInfo text="Running total of everything you have put into purchases, month by month, including fees. Opening balances and sales are left out." /></h3>
             </div>
-            <span>
-              {dividendActivity.length
-                ? money(
-                    round(
-                      dividendActivity.reduce(
-                        (sum, item) => sum + (item.net ?? 0),
-                        0,
-                      ),
-                    ),
-                  )
-                : '—'}{' '}
-              total
-            </span>
+            <span>{activity.length ? money(cumulativeTotal) : '—'} to date</span>
           </div>
-          {dividendActivity.length ? (
+          {activity.length ? (
             <ChartContainer
-              config={dividendActivityConfig}
+              config={cumulativeConfig}
               className="report-chart report-chart--trend"
             >
-              <BarChart
+              <AreaChart
                 accessibilityLayer
-                data={dividendActivity}
+                data={activity}
                 margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
               >
+                <defs>
+                  <linearGradient id="cumulativeFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="label"
                   tickLine={false}
                   axisLine={false}
                   label={{
-                    value: 'Dividend month',
+                    value: 'Purchase month',
                     position: 'insideBottom',
                     offset: -16,
                   }}
@@ -624,403 +448,109 @@ export default function PortfolioReports({
                   }
                 />
                 <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
                   content={
                     <ChartTooltipContent
-                      formatter={(_value, _name, item) => {
-                        const point = item.payload as (typeof dividendActivity)[number];
-                        const amount = point.net ?? point.gross;
-                        return (
-                          <div className="report-tooltip-row">
-                            <span>
-                              {point.net === null ? 'Gross declared' : 'Net received'}
-                            </span>
-                            <b>{money(amount)}</b>
-                          </div>
-                        );
-                      }}
+                      formatter={(value) => (
+                        <div className="report-tooltip-row">
+                          <span>Cumulative invested</span>
+                          <b>{money(Number(value))}</b>
+                        </div>
+                      )}
                     />
                   }
                 />
-                <Bar
-                  dataKey={(item: (typeof dividendActivity)[number]) =>
-                    item.net ?? item.gross
-                  }
-                  fill="var(--color-net)"
-                  radius={[4, 4, 0, 0]}
+                <Area
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  fill="url(#cumulativeFill)"
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)' }}
                 />
-              </BarChart>
+              </AreaChart>
             </ChartContainer>
           ) : (
             <ReportEmpty>
-              Record dividends to see your income trajectory.
+              Record purchases to see your contribution trajectory.
             </ReportEmpty>
           )}
           <p className="report-source">
-            Source: net dividend income by month · post-withholding
+            Source: running total of non-voided purchases · opening balances
+            and sales excluded
           </p>
         </section>
 
-        <section className="panel report-panel" data-group="income">
+        <section className="panel report-panel" data-group="activity">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">TOP PAYERS</p>
-              <h3>Dividend income by company</h3>
+              <p className="eyebrow">CONTRIBUTION RHYTHM</p>
+              <h3>Monthly purchase activity<ChartInfo text="How much you invested in each calendar month, including fees. Months with no purchases show as zero so gaps in your habit are visible." /></h3>
             </div>
-            <span>Net received, ranked</span>
+            <span>PKR invested, including fees</span>
           </div>
-          {dividendCompanies.length ? (
+          {activity.length ? (
             <ChartContainer
-              config={dividendCompanyConfig}
-              className="report-chart"
-              style={{
-                height: Math.max(220, dividendCompanies.length * 34 + 70),
-              }}
+              config={activityConfig}
+              className="report-chart report-chart--activity"
             >
               <BarChart
                 accessibilityLayer
-                data={dividendCompanies}
-                layout="vertical"
-                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
+                data={activity}
+                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
               >
-                <defs>
-                  <linearGradient
-                    id="dividendCompanyFill"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop offset="0%" stopColor="var(--primary)" />
-                    <stop offset="100%" stopColor="#7dd3fc" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid horizontal={false} />
+                <CartesianGrid vertical={false} />
                 <XAxis
-                  type="number"
-                  domain={[0, 'dataMax']}
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  label={{
+                    value: 'Purchase month',
+                    position: 'insideBottom',
+                    offset: -16,
+                  }}
+                />
+                <YAxis
+                  width={72}
                   tickFormatter={(value) =>
                     new Intl.NumberFormat('en-PK', {
                       notation: 'compact',
                     }).format(value)
                   }
                   label={{
-                    value: 'Net dividend income (PKR)',
-                    position: 'insideBottom',
-                    offset: -12,
+                    value: 'Invested (PKR)',
+                    angle: -90,
+                    position: 'insideLeft',
                   }}
                 />
-                <YAxis
-                  type="category"
-                  dataKey="ticker"
-                  width={58}
-                  tickLine={false}
-                  axisLine={false}
-                />
                 <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
                   content={
                     <ChartTooltipContent
-                      hideLabel
-                      formatter={(_value, _name, item) => {
-                        const point = item.payload as DividendCompanyPoint;
-                        return (
-                          <div className="report-tooltip-row">
-                            <span>{point.name}</span>
-                            <b>
-                              {point.net === null
-                                ? `${money(point.gross)} gross`
-                                : `${money(point.net)} net`}
-                              {point.weight === null
-                                ? ''
-                                : ` · ${point.weight.toFixed(1)}%`}
-                            </b>
-                          </div>
-                        );
-                      }}
+                      formatter={(value) => (
+                        <div className="report-tooltip-row">
+                          <span>Cash invested</span>
+                          <b>{money(Number(value))}</b>
+                        </div>
+                      )}
                     />
                   }
                 />
                 <Bar
-                  dataKey={(item: DividendCompanyPoint) =>
-                    item.net ?? item.gross
-                  }
-                  fill="url(#dividendCompanyFill)"
-                  radius={[0, 5, 5, 0]}
-                >
-                  <LabelList
-                    dataKey={(item: DividendCompanyPoint) =>
-                      item.net ?? item.gross
-                    }
-                    position="right"
-                    formatter={(value) =>
-                      new Intl.NumberFormat('en-PK', {
-                        notation: 'compact',
-                      }).format(Number(value))
-                    }
-                  />
-                </Bar>
+                  dataKey="invested"
+                  fill="var(--color-invested)"
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={56}
+                />
               </BarChart>
             </ChartContainer>
           ) : (
             <ReportEmpty>
-              Record dividends to see which companies pay the most.
+              Record purchases to see monthly investment activity.
             </ReportEmpty>
           )}
           <p className="report-source">
-            Source: recorded dividends, net where filer status is set ·
-            grouped by company
-          </p>
-        </section>
-
-        <section className="panel report-panel" data-group="allocation">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">ALLOCATION LADDER</p>
-              <h3>Company weight</h3>
-            </div>
-            <span>Percent of priced market value</span>
-          </div>
-          {report.companyAllocation.length ? (
-            <ChartContainer
-              config={companyConfig}
-              className="report-chart"
-              style={{
-                height: Math.max(
-                  310,
-                  report.companyAllocation.length * 34 + 70,
-                ),
-              }}
-            >
-              <BarChart
-                accessibilityLayer
-                data={report.companyAllocation}
-                layout="vertical"
-                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
-              >
-                <defs>
-                  <linearGradient id="allocationFill" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="var(--primary)" />
-                    <stop offset="100%" stopColor="#7dd3fc" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid horizontal={false} />
-                <XAxis
-                  type="number"
-                  domain={[0, 'dataMax']}
-                  tickFormatter={(value) => `${value}%`}
-                  label={{
-                    value: 'Portfolio weight (%)',
-                    position: 'insideBottom',
-                    offset: -12,
-                  }}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="ticker"
-                  width={58}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
-                  content={
-                    <ChartTooltipContent
-                      hideLabel
-                      formatter={(value, _name, item) => (
-                        <div className="report-tooltip-row">
-                          <span>{item.payload.name}</span>
-                          <b>
-                            {Number(value).toFixed(1)}% ·{' '}
-                            {money(item.payload.value)}
-                          </b>
-                        </div>
-                      )}
-                    />
-                  }
-                />
-                <Bar dataKey="weight" fill="url(#allocationFill)" radius={[0, 5, 5, 0]}>
-                  <LabelList
-                    dataKey="weight"
-                    position="right"
-                    formatter={(value) => `${Number(value).toFixed(1)}%`}
-                  />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          ) : (
-            <ReportEmpty>
-              Add current prices to see company allocation.
-            </ReportEmpty>
-          )}
-          <p className="report-source">
-            Source: saved holdings and latest portfolio quotes · current
-            snapshot
-          </p>
-        </section>
-
-        <section className="panel report-panel" data-group="performance">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">PERFORMANCE</p>
-              <h3>Gain / loss vs cost</h3>
-            </div>
-            <span>Unrealised, by company</span>
-          </div>
-          {report.performance.length ? (
-            <>
-              <ChartContainer
-                config={performanceConfig}
-                className="report-chart"
-                style={{
-                  height: Math.max(220, report.performance.length * 32 + 60),
-                }}
-              >
-                <BarChart
-                  accessibilityLayer
-                  data={report.performance}
-                  layout="vertical"
-                  margin={{ top: 8, right: 20, bottom: 20, left: 4 }}
-                >
-                  <CartesianGrid horizontal={false} />
-                  <XAxis
-                    type="number"
-                    domain={[-maxAbsGain, maxAbsGain]}
-                    tickFormatter={(value) =>
-                      `${Number(value) >= 0 ? '+' : ''}${value}%`
-                    }
-                    label={{
-                      value: 'Gain / loss (%)',
-                      position: 'insideBottom',
-                      offset: -12,
-                    }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="ticker"
-                    width={58}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <ReferenceLine x={0} stroke="var(--border)" />
-                  <ChartTooltip
-                    cursor={{ fill: 'rgba(148,178,225,.12)' }}
-                    content={
-                      <ChartTooltipContent
-                        hideLabel
-                        formatter={(value, _name, item) => (
-                          <div className="report-tooltip-row">
-                            <span>{item.payload.name}</span>
-                            <b
-                              className={
-                                item.payload.gain >= 0 ? 'pos-text' : 'neg-text'
-                              }
-                            >
-                              {item.payload.gain >= 0 ? '+' : ''}
-                              {money(item.payload.gain)} (
-                              {Number(value) >= 0 ? '+' : ''}
-                              {Number(value).toFixed(1)}%)
-                            </b>
-                          </div>
-                        )}
-                      />
-                    }
-                  />
-                  <Bar dataKey="gainPercent" shape={performanceBarShape} />
-                </BarChart>
-              </ChartContainer>
-              <div className="perf-key" aria-label="Gain and loss by company">
-                {report.performance.map((item) => (
-                  <div key={item.ticker}>
-                    <TickerLink ticker={item.ticker} />
-                    <b className={item.gain >= 0 ? 'pos-text' : 'neg-text'}>
-                      {item.gain >= 0 ? '+' : ''}
-                      {item.gainPercent.toFixed(1)}%
-                    </b>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <ReportEmpty>
-              Add purchase prices to every holding to see gain and loss.
-            </ReportEmpty>
-          )}
-          <p className="report-source">
-            Source: recorded cost basis vs latest portfolio quotes · unrealised
-          </p>
-        </section>
-
-        <section className="panel report-panel" data-group="allocation">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">DIVERSIFICATION</p>
-              <h3>Sector allocation</h3>
-            </div>
-            <span>Current snapshot</span>
-          </div>
-          {sectors.length ? (
-            <ChartContainer
-              config={{ value: { label: 'Market value' } }}
-              className="report-chart report-chart--square"
-            >
-              <PieChart accessibilityLayer>
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      nameKey="sector"
-                      formatter={(value, _name, item) => (
-                        <div className="report-tooltip-row">
-                          <span>{item.payload.sector}</span>
-                          <b>
-                            {item.payload.weight.toFixed(1)}% ·{' '}
-                            {money(Number(value))}
-                          </b>
-                        </div>
-                      )}
-                    />
-                  }
-                />
-                <Pie
-                  data={sectors.map((item, index) => ({
-                    ...item,
-                    fill:
-                      item.sector === 'Other'
-                        ? OTHER_SECTOR_COLOR
-                        : sectorColors[index % sectorColors.length],
-                  }))}
-                  dataKey="value"
-                  nameKey="sector"
-                  innerRadius="55%"
-                  outerRadius="78%"
-                  paddingAngle={2}
-                />
-              </PieChart>
-            </ChartContainer>
-          ) : (
-            <ReportEmpty>
-              Assign company sectors and add prices to see diversification.
-            </ReportEmpty>
-          )}
-          <div className="sector-key" aria-label="Sector allocation legend">
-            {sectors.map((item, index) => (
-              <div key={item.sector}>
-                <i
-                  aria-hidden="true"
-                  style={{
-                    background:
-                      item.sector === 'Other'
-                        ? OTHER_SECTOR_COLOR
-                        : sectorColors[index % sectorColors.length],
-                  }}
-                />
-                <span>{item.sector}</span>
-                <b>{item.weight.toFixed(1)}%</b>
-              </div>
-            ))}
-          </div>
-          <p className="report-source">
-            Source: company sectors and priced market values · PKR
+            Source: non-voided purchase transactions · opening balances and
+            sales excluded
           </p>
         </section>
 
@@ -1028,7 +558,7 @@ export default function PortfolioReports({
           <div className="report-heading">
             <div>
               <p className="eyebrow">SIP ACTIVITY</p>
-              <h3>Monthly investment by company</h3>
+              <h3>Monthly investment by company<ChartInfo text="Your recent monthly purchases split by company, so you can see which stocks your SIP money has gone to." /></h3>
             </div>
             <span>
               {recentInvestment.length ? money(recentInvestmentTotal) : '—'}{' '}
@@ -1150,22 +680,107 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel" data-group="activity">
+        <section className="panel report-panel" data-group="allocation">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">CONTRIBUTION RHYTHM</p>
-              <h3>Monthly purchase activity</h3>
+              <p className="eyebrow">DIVERSIFICATION</p>
+              <h3>Sector allocation<ChartInfo text="Share of your priced portfolio value in each sector. The five largest sectors are shown; the rest are grouped as Other. Only held companies with a saved price and a sector are counted." /></h3>
             </div>
-            <span>PKR invested, including fees</span>
+            <span>Current snapshot</span>
           </div>
-          {activity.length ? (
+          {sectors.length ? (
             <ChartContainer
-              config={activityConfig}
-              className="report-chart report-chart--activity"
+              config={{ value: { label: 'Market value' } }}
+              className="report-chart report-chart--square"
+            >
+              <PieChart accessibilityLayer>
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      nameKey="sector"
+                      formatter={(value, _name, item) => (
+                        <div className="report-tooltip-row">
+                          <span>{item.payload.sector}</span>
+                          <b>
+                            {item.payload.weight.toFixed(1)}% ·{' '}
+                            {money(Number(value))}
+                          </b>
+                        </div>
+                      )}
+                    />
+                  }
+                />
+                <Pie
+                  data={sectors.map((item, index) => ({
+                    ...item,
+                    fill:
+                      item.sector === 'Other'
+                        ? OTHER_SECTOR_COLOR
+                        : sectorColors[index % sectorColors.length],
+                  }))}
+                  dataKey="value"
+                  nameKey="sector"
+                  innerRadius="55%"
+                  outerRadius="78%"
+                  paddingAngle={2}
+                />
+              </PieChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>
+              Assign company sectors and add prices to see diversification.
+            </ReportEmpty>
+          )}
+          <div className="sector-key" aria-label="Sector allocation legend">
+            {sectors.map((item, index) => (
+              <div key={item.sector}>
+                <i
+                  aria-hidden="true"
+                  style={{
+                    background:
+                      item.sector === 'Other'
+                        ? OTHER_SECTOR_COLOR
+                        : sectorColors[index % sectorColors.length],
+                  }}
+                />
+                <span>{item.sector}</span>
+                <b>{item.weight.toFixed(1)}%</b>
+              </div>
+            ))}
+          </div>
+          <p className="report-source">
+            Source: company sectors and priced market values · PKR
+          </p>
+        </section>
+
+        <section className="panel report-panel" data-group="income">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">DIVIDEND TRAJECTORY</p>
+              <h3>Net received, last 12 months<ChartInfo text="Cash dividends received each month over the last 12 months, after withholding tax." /></h3>
+            </div>
+            <span>
+              {dividendActivity.length
+                ? money(
+                    round(
+                      dividendActivity.reduce(
+                        (sum, item) => sum + (item.net ?? 0),
+                        0,
+                      ),
+                    ),
+                  )
+                : '—'}{' '}
+              total
+            </span>
+          </div>
+          {dividendActivity.length ? (
+            <ChartContainer
+              config={dividendActivityConfig}
+              className="report-chart report-chart--trend"
             >
               <BarChart
                 accessibilityLayer
-                data={activity}
+                data={dividendActivity}
                 margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
               >
                 <CartesianGrid vertical={false} />
@@ -1174,7 +789,7 @@ export default function PortfolioReports({
                   tickLine={false}
                   axisLine={false}
                   label={{
-                    value: 'Purchase month',
+                    value: 'Dividend month',
                     position: 'insideBottom',
                     offset: -16,
                   }}
@@ -1186,74 +801,360 @@ export default function PortfolioReports({
                       notation: 'compact',
                     }).format(value)
                   }
-                  label={{
-                    value: 'Invested (PKR)',
-                    angle: -90,
-                    position: 'insideLeft',
-                  }}
                 />
                 <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
                   content={
                     <ChartTooltipContent
-                      formatter={(value) => (
-                        <div className="report-tooltip-row">
-                          <span>Cash invested</span>
-                          <b>{money(Number(value))}</b>
-                        </div>
-                      )}
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as (typeof dividendActivity)[number];
+                        const amount = point.net ?? point.gross;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>
+                              {point.net === null ? 'Gross declared' : 'Net received'}
+                            </span>
+                            <b>{money(amount)}</b>
+                          </div>
+                        );
+                      }}
                     />
                   }
                 />
                 <Bar
-                  dataKey="invested"
-                  fill="var(--color-invested)"
-                  radius={[5, 5, 0, 0]}
-                  maxBarSize={56}
+                  dataKey={(item: (typeof dividendActivity)[number]) =>
+                    item.net ?? item.gross
+                  }
+                  fill="var(--color-net)"
+                  radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             </ChartContainer>
           ) : (
             <ReportEmpty>
-              Record purchases to see monthly investment activity.
+              Record dividends to see your income trajectory.
             </ReportEmpty>
           )}
           <p className="report-source">
-            Source: non-voided purchase transactions · opening balances and
-            sales excluded
+            Source: net dividend income by month · post-withholding
           </p>
         </section>
 
-        <section className="panel report-panel" data-group="activity">
+        <section className="panel report-panel" data-group="income">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">SIP TRAJECTORY</p>
-              <h3>Cumulative invested</h3>
+              <p className="eyebrow">TOP PAYERS</p>
+              <h3>Dividend income by company<ChartInfo text="Which companies paid you the most dividend income, ranked by net amount received." /></h3>
             </div>
-            <span>{activity.length ? money(cumulativeTotal) : '—'} to date</span>
+            <span>Net received, ranked</span>
           </div>
-          {activity.length ? (
+          {dividendCompanies.length ? (
             <ChartContainer
-              config={cumulativeConfig}
-              className="report-chart report-chart--trend"
+              config={dividendCompanyConfig}
+              className="report-chart"
+              style={{
+                height: Math.max(220, dividendCompanies.length * 34 + 70),
+              }}
             >
-              <AreaChart
+              <BarChart
                 accessibilityLayer
-                data={activity}
-                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
+                data={dividendCompanies}
+                layout="vertical"
+                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
               >
                 <defs>
-                  <linearGradient id="cumulativeFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
+                  <linearGradient
+                    id="dividendCompanyFill"
+                    x1="0"
+                    y1="0"
+                    x2="1"
+                    y2="0"
+                  >
+                    <stop offset="0%" stopColor="var(--primary)" />
+                    <stop offset="100%" stopColor="#7dd3fc" />
                   </linearGradient>
                 </defs>
+                <CartesianGrid horizontal={false} />
+                <XAxis
+                  type="number"
+                  domain={[0, 'dataMax']}
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                  label={{
+                    value: 'Net dividend income (PKR)',
+                    position: 'insideBottom',
+                    offset: -12,
+                  }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="ticker"
+                  width={58}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  content={
+                    <ChartTooltipContent
+                      hideLabel
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as DividendCompanyPoint;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>{point.name}</span>
+                            <b>
+                              {point.net === null
+                                ? `${money(point.gross)} gross`
+                                : `${money(point.net)} net`}
+                              {point.weight === null
+                                ? ''
+                                : ` · ${point.weight.toFixed(1)}%`}
+                            </b>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey={(item: DividendCompanyPoint) =>
+                    item.net ?? item.gross
+                  }
+                  fill="url(#dividendCompanyFill)"
+                  radius={[0, 5, 5, 0]}
+                >
+                  <LabelList
+                    dataKey={(item: DividendCompanyPoint) =>
+                      item.net ?? item.gross
+                    }
+                    position="right"
+                    formatter={(value) =>
+                      new Intl.NumberFormat('en-PK', {
+                        notation: 'compact',
+                      }).format(Number(value))
+                    }
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>
+              Record dividends to see which companies pay the most.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded dividends, net where filer status is set ·
+            grouped by company
+          </p>
+        </section>
+
+        <section className="panel report-panel" data-group="allocation">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">ALLOCATION LADDER</p>
+              <h3>Company weight<ChartInfo text="Each holding as a share of your priced portfolio value, compared with its target weight once every holding has a price." /></h3>
+            </div>
+            <span>Percent of priced market value</span>
+          </div>
+          {report.companyAllocation.length ? (
+            <ChartContainer
+              config={companyConfig}
+              className="report-chart"
+              style={{
+                height: Math.max(
+                  310,
+                  report.companyAllocation.length * 34 + 70,
+                ),
+              }}
+            >
+              <BarChart
+                accessibilityLayer
+                data={report.companyAllocation}
+                layout="vertical"
+                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
+              >
+                <defs>
+                  <linearGradient id="allocationFill" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="var(--primary)" />
+                    <stop offset="100%" stopColor="#7dd3fc" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid horizontal={false} />
+                <XAxis
+                  type="number"
+                  domain={[0, 'dataMax']}
+                  tickFormatter={(value) => `${value}%`}
+                  label={{
+                    value: 'Portfolio weight (%)',
+                    position: 'insideBottom',
+                    offset: -12,
+                  }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="ticker"
+                  width={58}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  content={
+                    <ChartTooltipContent
+                      hideLabel
+                      formatter={(value, _name, item) => (
+                        <div className="report-tooltip-row">
+                          <span>{item.payload.name}</span>
+                          <b>
+                            {Number(value).toFixed(1)}% ·{' '}
+                            {money(item.payload.value)}
+                          </b>
+                        </div>
+                      )}
+                    />
+                  }
+                />
+                <Bar dataKey="weight" fill="url(#allocationFill)" radius={[0, 5, 5, 0]}>
+                  <LabelList
+                    dataKey="weight"
+                    position="right"
+                    formatter={(value) => `${Number(value).toFixed(1)}%`}
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>
+              Add current prices to see company allocation.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: saved holdings and latest portfolio quotes · current
+            snapshot
+          </p>
+        </section>
+
+        <section className="panel report-panel" data-group="performance">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">PERFORMANCE</p>
+              <h3>Gain / loss vs cost<ChartInfo text="For each holding, how far its current market value is above or below what you paid, in rupees and percent. Realised sales are not included." /></h3>
+            </div>
+            <span>Unrealised, by company</span>
+          </div>
+          {report.performance.length ? (
+            <>
+              <ChartContainer
+                config={performanceConfig}
+                className="report-chart"
+                style={{
+                  height: Math.max(220, report.performance.length * 32 + 60),
+                }}
+              >
+                <BarChart
+                  accessibilityLayer
+                  data={report.performance}
+                  layout="vertical"
+                  margin={{ top: 8, right: 20, bottom: 20, left: 4 }}
+                >
+                  <CartesianGrid horizontal={false} />
+                  <XAxis
+                    type="number"
+                    domain={[-maxAbsGain, maxAbsGain]}
+                    tickFormatter={(value) =>
+                      `${Number(value) >= 0 ? '+' : ''}${value}%`
+                    }
+                    label={{
+                      value: 'Gain / loss (%)',
+                      position: 'insideBottom',
+                      offset: -12,
+                    }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="ticker"
+                    width={58}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ReferenceLine x={0} stroke="var(--border)" />
+                  <ChartTooltip
+                    cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                    content={
+                      <ChartTooltipContent
+                        hideLabel
+                        formatter={(value, _name, item) => (
+                          <div className="report-tooltip-row">
+                            <span>{item.payload.name}</span>
+                            <b
+                              className={
+                                item.payload.gain >= 0 ? 'pos-text' : 'neg-text'
+                              }
+                            >
+                              {item.payload.gain >= 0 ? '+' : ''}
+                              {money(item.payload.gain)} (
+                              {Number(value) >= 0 ? '+' : ''}
+                              {Number(value).toFixed(1)}%)
+                            </b>
+                          </div>
+                        )}
+                      />
+                    }
+                  />
+                  <Bar dataKey="gainPercent" shape={performanceBarShape} />
+                </BarChart>
+              </ChartContainer>
+              <div className="perf-key" aria-label="Gain and loss by company">
+                {report.performance.map((item) => (
+                  <div key={item.ticker}>
+                    <TickerLink ticker={item.ticker} />
+                    <b className={item.gain >= 0 ? 'pos-text' : 'neg-text'}>
+                      {item.gain >= 0 ? '+' : ''}
+                      {item.gainPercent.toFixed(1)}%
+                    </b>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <ReportEmpty>
+              Add purchase prices to every holding to see gain and loss.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded cost basis vs latest portfolio quotes · unrealised
+          </p>
+        </section>
+
+        <section className="panel report-panel" data-group="performance">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">REALISED P&amp;L &amp; TAX</p>
+              <h3>Realised gains by month<ChartInfo text="Profit or loss you locked in by selling, grouped by the month of the sale, with tax shown separately." /></h3>
+            </div>
+            <span>Estimated tax (15% filer / 30% non-filer), unless a deduction is recorded</span>
+          </div>
+          {realizedActivity.length ? (
+            <ChartContainer
+              config={realizedActivityConfig}
+              className="report-chart report-chart--trend"
+            >
+              <BarChart
+                accessibilityLayer
+                data={realizedActivity}
+                margin={{ top: 12, right: 10, bottom: 24, left: 16 }}
+              >
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="label"
                   tickLine={false}
                   axisLine={false}
                   label={{
-                    value: 'Purchase month',
+                    value: 'Sale month',
                     position: 'insideBottom',
                     offset: -16,
                   }}
@@ -1266,37 +1167,135 @@ export default function PortfolioReports({
                     }).format(value)
                   }
                 />
+                <ReferenceLine y={0} stroke="var(--border)" />
                 <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
                   content={
                     <ChartTooltipContent
-                      formatter={(value) => (
-                        <div className="report-tooltip-row">
-                          <span>Cumulative invested</span>
-                          <b>{money(Number(value))}</b>
-                        </div>
-                      )}
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as (typeof realizedActivity)[number];
+                        const amount = point.net ?? point.gain;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>
+                              {point.net === null ? 'Gross gain' : 'Net gain'}
+                            </span>
+                            <b>{money(amount)}</b>
+                          </div>
+                        );
+                      }}
                     />
                   }
                 />
-                <Area
-                  type="monotone"
-                  dataKey="cumulative"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  fill="url(#cumulativeFill)"
-                  dot={false}
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)' }}
+                <Bar
+                  dataKey={(item: (typeof realizedActivity)[number]) =>
+                    item.net ?? item.gain
+                  }
+                  shape={realizedMonthBarShape}
                 />
-              </AreaChart>
+              </BarChart>
             </ChartContainer>
           ) : (
-            <ReportEmpty>
-              Record purchases to see your contribution trajectory.
-            </ReportEmpty>
+            <ReportEmpty>Record a sale to see realised gains here.</ReportEmpty>
           )}
           <p className="report-source">
-            Source: running total of non-voided purchases · opening balances
-            and sales excluded
+            Source: recorded sales · realised gains only
+          </p>
+        </section>
+
+        <section className="panel report-panel" data-group="performance">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">REALISED P&amp;L &amp; TAX</p>
+              <h3>Realised gain / loss by company<ChartInfo text="Profit or loss from your recorded sales, grouped by company and ranked by size." /></h3>
+            </div>
+            <span>Net of estimated capital gains tax</span>
+          </div>
+          {realizedCompanies.length ? (
+            <ChartContainer
+              config={realizedCompanyConfig}
+              className="report-chart"
+              style={{
+                height: Math.max(220, realizedCompanies.length * 34 + 70),
+              }}
+            >
+              <BarChart
+                accessibilityLayer
+                data={realizedCompanies}
+                layout="vertical"
+                margin={{ top: 8, right: 44, bottom: 20, left: 4 }}
+              >
+                <CartesianGrid horizontal={false} />
+                <XAxis
+                  type="number"
+                  tickFormatter={(value) =>
+                    new Intl.NumberFormat('en-PK', {
+                      notation: 'compact',
+                    }).format(value)
+                  }
+                  label={{
+                    value: 'Realised gain / loss (PKR)',
+                    position: 'insideBottom',
+                    offset: -12,
+                  }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="ticker"
+                  width={58}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <ReferenceLine x={0} stroke="var(--border)" />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  content={
+                    <ChartTooltipContent
+                      hideLabel
+                      formatter={(_value, _name, item) => {
+                        const point = item.payload as RealizedCompanyPoint;
+                        return (
+                          <div className="report-tooltip-row">
+                            <span>{point.name}</span>
+                            <b>
+                              {point.net === null
+                                ? `${money(point.gain)} gross`
+                                : `${money(point.net)} net`}
+                              {point.weight === null
+                                ? ''
+                                : ` · ${point.weight.toFixed(1)}%`}
+                            </b>
+                          </div>
+                        );
+                      }}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey={(item: RealizedCompanyPoint) =>
+                    item.net ?? item.gain
+                  }
+                  shape={realizedCompanyBarShape}
+                >
+                  <LabelList
+                    dataKey={(item: RealizedCompanyPoint) =>
+                      item.net ?? item.gain
+                    }
+                    position="right"
+                    formatter={(value) =>
+                      new Intl.NumberFormat('en-PK', {
+                        notation: 'compact',
+                      }).format(Number(value))
+                    }
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          ) : (
+            <ReportEmpty>Record a sale to see realised gains here.</ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: recorded sales, ranked by absolute gain / loss
           </p>
         </section>
       </div>

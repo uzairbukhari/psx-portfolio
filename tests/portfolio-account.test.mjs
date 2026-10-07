@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { blankPortfolio, holdings } from '../lib/portfolio.ts';
-import { accountFromPortfolio, accountActivity, consolidatedAccount, importMatches, normalizeAccount, portfolioAt, removePortfolio, renamePortfolio, replacePortfolio } from '../lib/portfolio-account.ts';
+import { assertCanAddPortfolio, MAX_PORTFOLIOS, dashboardPortfolio, accountFromPortfolio, accountActivity, consolidatedAccount, importMatches, normalizeAccount, portfolioAt, removePortfolio, renamePortfolio, replacePortfolio } from '../lib/portfolio-account.ts';
 import { loadAccountView, savePortfolioView } from '../lib/portfolio-view.ts';
 import { openAccountBackup, parseBackup } from '../lib/vault-backup.ts';
 import * as c from '../lib/vault-client.ts';
@@ -65,10 +65,10 @@ test('dividend income excludes expected payouts; activity and notifications reta
 
 test('management rejects duplicate names, invalid IDs and deleting financial history', () => {
   const all = account(); assert.throws(() => renamePortfolio(all, 'ahl', 'finqalab'), /unique/);
-  assert.throws(() => removePortfolio(all, 'ahl'), /financial records/);
+  assert.equal(removePortfolio(all, 'ahl').portfolios.length, all.portfolios.length - 1);
   const withEmpty = replacePortfolio(all, blankPortfolio(), { id: 'new', name: 'Other' });
   assert.equal(removePortfolio(withEmpty, 'new').portfolios.length, 2);
-  assert.throws(() => removePortfolio(accountFromPortfolio(), 'default'), /at least one|default/);
+  assert.throws(() => removePortfolio(accountFromPortfolio(), 'default'), /at least one/);
   assert.throws(() => normalizeAccount({ ...all, portfolios: [{ ...all.portfolios[0], id: 'all' }] }), /identifier/);
 });
 
@@ -146,4 +146,20 @@ test('portfolio locks block ordinary saves but not an explicit replace-everythin
   await assert.rejects(session.saveAccount(accountFromPortfolio(), 2), /locked/);
   await session.saveAccount(accountFromPortfolio(), 2, { replaceAll: true });
   assert.equal(session.account.portfolios.length, 1);
+});
+
+test('an account keeps at most four portfolios', () => {
+  let a = accountFromPortfolio();
+  for (let i = 1; i < MAX_PORTFOLIOS; i++) {
+    assertCanAddPortfolio(a);
+    a = replacePortfolio(a, blankPortfolio(), { id: `p${i}`, name: `P${i}` });
+  }
+  assert.equal(a.portfolios.length, MAX_PORTFOLIOS);
+  assert.throws(() => assertCanAddPortfolio(a), /up to 4 portfolios/);
+});
+
+test('the All view follows the Monthly Picks shortlist kept in the first portfolio', () => {
+  const a = ledger(); a.monthlyPicksShortlist = ['MEBL'];
+  const all = account(a, ledger(200));
+  assert.deepEqual(dashboardPortfolio(all).monthlyPicksShortlist, ['MEBL']);
 });

@@ -31,7 +31,7 @@ export const ASSET_CHOICES: {
   },
   {
     kind: 'metal',
-    label: 'Gold or silver',
+    label: 'Gold or Silver',
     hint: 'Coins and bars, valued at today’s rate.',
     Icon: Coins,
   },
