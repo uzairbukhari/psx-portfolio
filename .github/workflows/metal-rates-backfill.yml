@@ -1,0 +1,29 @@
+name: Gold and silver rate backfill
+
+# One-time, on demand: fills five years of past world gold and silver prices (in rupees per tola) into the shared
+# `metal_rates` table. Never overwrites an existing row. Run with dry_run first to read the numbers.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only print, do not write'
+        type: boolean
+        default: true
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment: prod
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Backfill metal_rates
+        run: node scripts/metal-rates-backfill.mjs ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

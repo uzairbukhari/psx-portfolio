@@ -17,12 +17,12 @@ type StoredRate = {
   fetched_at: string;
 };
 
-/** The last 400 days of rates (a year of history for the charts), oldest first. */
+/** The last five years of rates (history for the charts), oldest first. */
 export async function readMetalRates(
   db: RateDb,
   today: string,
 ): Promise<MetalRateRow[]> {
-  const from = new Date(Date.parse(`${today}T00:00:00Z`) - 400 * 86_400_000)
+  const from = new Date(Date.parse(`${today}T00:00:00Z`) - 1830 * 86_400_000)
     .toISOString()
     .slice(0, 10);
   const rows = await db
