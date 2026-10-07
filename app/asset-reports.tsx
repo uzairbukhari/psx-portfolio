@@ -22,12 +22,14 @@ import {
 import { money, moneyShort, today, type Portfolio } from '@/lib/portfolio';
 import {
   fundReport,
+  planReport,
   metalReport,
   type MonthPoint,
   type ReportMode,
 } from '@/lib/asset-reports';
 import type { Metal, MetalRateRow } from '@/lib/metal-rates';
 import type { FundNavRow } from '@/lib/mufap';
+import type { PlanNavRow } from '@/lib/plans';
 
 // Same fixed hue order as the stock reports (validated on the dark surface).
 const colors = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'];
@@ -205,6 +207,60 @@ function FundReports({ portfolio, navs }: { portfolio: Portfolio; navs: FundNavR
   );
 }
 
+function PlanReports({ portfolio, navs }: { portfolio: Portfolio; navs: PlanNavRow[] }) {
+  const report = planReport(portfolio.assets ?? [], navs, today());
+  const rows = report.monthly.map((m) => ({ ...m, label: monthLabel(m.month) }));
+  const series = report.series.map((s) => ({ ...s, label: monthLabel(s.month) }));
+  const config = {
+    paidIn: { label: 'Paid in', color: '#7f93b8' },
+    value: { label: 'Value', color: 'var(--primary)' },
+  } satisfies ChartConfig;
+  return (
+    <>
+      <div className="reports-intro">
+        <div className="reports-intro-header">
+          <p className="eyebrow">SAVINGS PLAN REPORTS</p>
+          <p>What you paid into your savings plans against what they are worth. Values come from your dated statements, moved by the plan’s unit price or your assumed rate in between.</p>
+        </div>
+        <div className="reports-hero-stats">
+          <Stat label="Paid in" value={moneyShort(report.paidIn)} note="All contributions" />
+          <Stat label="Current value" value={moneyShort(report.value)} note="Latest statement, adjusted since" />
+          <Stat label="Gain / loss" value={signed(report.gain)} note="Value plus redeemed, less paid in" tone={report.gain >= 0 ? 'pos' : 'neg'} />
+          <Stat label="Redeemed" value={moneyShort(report.redeemed)} note="Cash taken out" />
+        </div>
+      </div>
+      <div className="reports-grid" style={{ marginBottom: 20 }}>
+        <section className="panel report-panel report-panel--wide">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">PLAN GROWTH</p>
+              <h3>Paid in against value</h3>
+            </div>
+            <span>Month-end</span>
+          </div>
+          {series.length ? (
+            <ChartContainer config={config} className="report-chart report-chart--medium">
+              <LineChart accessibilityLayer data={series} margin={{ top: 12, right: 16, bottom: 24, left: 16 }}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} label={{ value: 'Month', position: 'insideBottom', offset: -16 }} />
+                <YAxis width={72} tickFormatter={compact} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(v, name) => <div className="report-tooltip-row"><span>{name === 'value' ? 'Value' : 'Paid in'}</span><b>{money(Number(v))}</b></div>} />} />
+                <Line type="monotone" dataKey="paidIn" stroke="#7f93b8" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                <Line type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)' }} />
+              </LineChart>
+            </ChartContainer>
+          ) : (
+            <Empty>Record contributions to see how your plan grows.</Empty>
+          )}
+          <p className="report-source">Source: contributions and statement values · dashed line is what you paid in</p>
+        </section>
+        <Trajectory rows={rows} total={rows.at(-1)?.cumulative ?? 0} eyebrow="SIP TRAJECTORY" source="Source: running total of non-voided plan contributions" />
+        <MonthlyBars rows={rows} eyebrow="CONTRIBUTION RHYTHM" source="Source: non-voided plan contributions · redemptions excluded" />
+      </div>
+    </>
+  );
+}
+
 const RANGES = [
   ['1Y', 365],
   ['3Y', 1095],
@@ -285,19 +341,28 @@ export default function AssetReports({
   mode,
   metalRates,
   fundNavs,
+  planNavs,
 }: {
   portfolio: Portfolio;
   mode: Exclude<ReportMode, 'stocks'>;
   metalRates: MetalRateRow[];
   fundNavs: FundNavRow[];
+  planNavs: PlanNavRow[];
 }) {
   const metals = (['gold', 'silver'] as const).filter((m) =>
     portfolio.assets?.some((a) => a.kind === 'metal' && a.metal === m),
   );
   return (
     <div className="reports">
-      {mode === 'funds' ? (
-        <FundReports portfolio={portfolio} navs={fundNavs} />
+      {mode === 'savings' ? (
+        <>
+          {portfolio.assets?.some((a) => a.kind === 'fund') && (
+            <FundReports portfolio={portfolio} navs={fundNavs} />
+          )}
+          {portfolio.assets?.some((a) => a.kind === 'plan') && (
+            <PlanReports portfolio={portfolio} navs={planNavs} />
+          )}
+        </>
       ) : (
         metals.map((m) => <MetalReports key={m} portfolio={portfolio} metal={m} rates={metalRates} />)
       )}

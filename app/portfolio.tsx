@@ -2949,9 +2949,10 @@ function DashboardContent({
             {!isAll && reportMode(p) !== 'stocks' ? (
               <AssetReports
                 portfolio={p}
-                mode={reportMode(p) as 'funds' | 'metal'}
+                mode={reportMode(p) as 'savings' | 'metal'}
                 metalRates={metalRates.rates}
                 fundNavs={fundData.navs}
+                planNavs={planNavs}
               />
             ) : (
               <PortfolioReports portfolio={p} />

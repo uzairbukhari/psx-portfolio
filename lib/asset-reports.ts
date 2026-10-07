@@ -5,13 +5,14 @@ import { metalPosition, valueMetal } from './assets.ts';
 import type { FundAsset } from './funds.ts';
 import { valueFund } from './funds.ts';
 import type { FundNavRow } from './mufap.ts';
+import { planValue, type PlanAsset, type PlanNavRow } from './plans.ts';
 import { purity, TOLA_GRAMS, type Metal, type MetalRateRow } from './metal-rates.ts';
 
 const cents = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-export type ReportMode = 'stocks' | 'funds' | 'metal';
+export type ReportMode = 'stocks' | 'savings' | 'metal';
 
-/** Which report set a portfolio gets: only when it has no stock activity and its assets are all funds, or all gold/silver. */
+/** Which report set a portfolio gets: only when it has no stock activity and its assets are all funds and savings plans ('savings'), or all gold/silver. */
 export function reportMode(p: {
   trades: { voided?: boolean }[];
   dividends?: { voided?: boolean }[];
@@ -21,7 +22,7 @@ export function reportMode(p: {
     return 'stocks';
   const live = p.assets ?? [];
   if (!live.length) return 'stocks';
-  if (live.every((a) => a.kind === 'fund')) return 'funds';
+  if (live.every((a) => a.kind === 'fund' || a.kind === 'plan')) return 'savings';
   if (live.every((a) => a.kind === 'metal')) return 'metal';
   return 'stocks';
 }
@@ -186,5 +187,60 @@ export function metalReport(
     value,
     gain: value === null || cost === null ? null : cents(value - cost),
     latest: history.at(-1) ?? null,
+  };
+}
+
+export type PlanReport = {
+  monthly: MonthPoint[];
+  /** Month-end paid in against value, from the first contribution to today. */
+  series: { month: string; paidIn: number; value: number }[];
+  plans: { id: string; name: string; invested: number; value: number }[];
+  paidIn: number;
+  redeemed: number;
+  value: number;
+  gain: number;
+};
+
+const monthEnd = (month: string, asOf: string) => {
+  const [y, m] = month.split('-').map(Number);
+  const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  return end < asOf ? end : asOf;
+};
+
+export function planReport(
+  assets: Asset[],
+  planNavs: PlanNavRow[],
+  asOf: string,
+): PlanReport {
+  const plans = assets.filter((a): a is PlanAsset => a.kind === 'plan');
+  const buys = plans.flatMap((p) =>
+    p.entries
+      .filter((e) => !e.voided && e.type === 'contribution')
+      .map((e) => ({ date: e.date, amount: e.amount, key: p.id })),
+  );
+  const months = monthly(buys, asOf);
+  const series = months.map((m) => {
+    const at = monthEnd(m.month, asOf);
+    const v = plans.map((p) => planValue(p, at, planNavs));
+    return {
+      month: m.month,
+      paidIn: cents(v.reduce((t, x) => t + x.contributed, 0)),
+      value: cents(v.reduce((t, x) => t + x.value, 0)),
+    };
+  });
+  const now = plans.map((p) => ({ p, v: planValue(p, asOf, planNavs) }));
+  const value = cents(now.reduce((t, x) => t + x.v.value, 0));
+  const paid = cents(now.reduce((t, x) => t + x.v.contributed, 0));
+  const redeemed = cents(now.reduce((t, x) => t + x.v.redeemed, 0));
+  return {
+    monthly: months,
+    series,
+    plans: now
+      .map(({ p, v }) => ({ id: p.id, name: p.name, invested: v.contributed, value: v.value }))
+      .sort((a, b) => b.invested - a.invested),
+    paidIn: paid,
+    redeemed,
+    value,
+    gain: cents(value + redeemed - paid),
   };
 }

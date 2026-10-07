@@ -8,11 +8,11 @@ const gold = (entries) => ({ id: 'g', kind: 'metal', name: 'Gold', metal: 'gold'
 
 test('mode only switches for pure fund or metal portfolios', () => {
   const f = fund('a', []);
-  assert.equal(reportMode({ trades: [], assets: [f] }), 'funds');
+  assert.equal(reportMode({ trades: [], assets: [f] }), 'savings');
   assert.equal(reportMode({ trades: [], assets: [gold([])] }), 'metal');
   assert.equal(reportMode({ trades: [], assets: [f, gold([])] }), 'stocks');
   assert.equal(reportMode({ trades: [{}], assets: [f] }), 'stocks');
-  assert.equal(reportMode({ trades: [{ voided: true }], assets: [f] }), 'funds');
+  assert.equal(reportMode({ trades: [{ voided: true }], assets: [f] }), 'savings');
   assert.equal(reportMode({ trades: [], assets: [] }), 'stocks');
 });
 
@@ -47,4 +47,15 @@ test('backfill converts world prices with the latest dollar rate and skips empty
   assert.equal(rows[0].pkrPerTola, Math.round((2000 * 280 * 11.6638) / 31.1035));
   assert.equal(rows[1].pkrPerTola, Math.round((2100 * 282 * 11.6638) / 31.1035));
   assert.throws(() => parseYahooChart({}));
+});
+
+import { planReport } from '../lib/asset-reports.ts';
+test('plan report: savings-only mode and paid in against value', () => {
+  const plan = { id: 'p', kind: 'plan', name: 'MBP', provider: 'other', note: '', entries: [{ id: '1', date: '2026-08-10', type: 'contribution', amount: 50000, note: '' }, { id: '2', date: '2026-09-10', type: 'contribution', amount: 10000, note: '' }], valuations: [{ id: 'v', date: '2026-09-30', value: 62000, note: '' }], rules: [] };
+  assert.equal(reportMode({ trades: [], assets: [plan] }), 'savings');
+  assert.equal(reportMode({ trades: [], assets: [plan, fund('a', [])] }), 'savings');
+  const r = planReport([plan], [], '2026-10-07');
+  assert.deepEqual(r.series.map((s) => [s.month, s.paidIn]), [['2026-08', 50000], ['2026-09', 60000], ['2026-10', 60000]]);
+  assert.equal(r.value, 62000);
+  assert.equal(r.gain, 2000);
 });
