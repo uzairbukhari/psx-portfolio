@@ -6,11 +6,17 @@ import { useMemo, type ReactNode } from 'react';
 import { Bar, BarChart, Pie, PieChart, XAxis } from 'recharts';
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { money, moneyShort, type DisplayPart } from '@/lib/portfolio';
-import { accountOverview, type AssetClassKey } from '@/lib/account-overview';
+import {
+  accountOverview,
+  ASSET_CLASS_LABELS,
+  type AssetClassKey,
+} from '@/lib/account-overview';
 import { daysBetween } from '@/lib/performance';
 import type { MetalRateRow } from '@/lib/metal-rates';
 
@@ -30,6 +36,7 @@ const SECTOR_COLORS = [
   '#008300',
   '#9085e9',
 ];
+const investedKeys: AssetClassKey[] = ['stocks', 'funds', 'plans', 'gold', 'silver'];
 const OTHER_COLOR = '#5b6b85';
 
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
@@ -78,14 +85,14 @@ export default function AccountOverview({
     () => accountOverview(parts, asOf, { metalRates, fundNavs, planNavs }),
     [parts, asOf, metalRates, fundNavs, planNavs],
   );
-  const { total, returns, income } = o;
+  const { total, returns, income, invested } = o;
   const staleDays = total.oldestQuoteDate
     ? daysBetween(total.oldestQuoteDate, asOf)
     : null;
   const sectorData = o.sectors.map((s, i) => ({
     ...s,
     fill:
-      s.sector === 'Others' || i >= SECTOR_COLORS.length
+      s.sector === 'Others' || s.sector === 'Other' || i >= SECTOR_COLORS.length
         ? OTHER_COLOR
         : SECTOR_COLORS[i],
   }));
@@ -325,23 +332,26 @@ export default function AccountOverview({
           </ul>
         </section>
 
-        <section className="panel overview-panel" aria-label="Income">
+        <section className="panel overview-panel" aria-label="Invested">
           <div className="report-heading">
             <div>
-              <p className="eyebrow">INCOME</p>
-              <h3>Dividends received</h3>
+              <p className="eyebrow">INVESTING</p>
+              <h3>Invested per month</h3>
             </div>
             <span>Last 12 months</span>
           </div>
-          {income.months.some((m) => m.amount > 0) ? (
+          {invested.months.some((m) => m.amount > 0) ? (
             <ChartContainer
-              config={{
-                amount: { label: 'Received', color: 'var(--primary)' },
-              }}
+              config={Object.fromEntries(
+                investedKeys.map((k) => [
+                  k,
+                  { label: ASSET_CLASS_LABELS[k], color: CLASS_COLORS[k] },
+                ]),
+              )}
               className="overview-income"
             >
               <BarChart
-                data={income.months}
+                data={invested.months}
                 margin={{ top: 8, right: 4, bottom: 0, left: 4 }}
               >
                 <XAxis
@@ -358,21 +368,40 @@ export default function AccountOverview({
                       labelFormatter={(_l, items) =>
                         String(items?.[0]?.payload?.month ?? '')
                       }
-                      formatter={(value) => <b>{money(Number(value))}</b>}
+                      formatter={(value, name) =>
+                        Number(value) ? (
+                          <span>
+                            {ASSET_CLASS_LABELS[name as AssetClassKey]}{' '}
+                            <b>{money(Number(value))}</b>
+                          </span>
+                        ) : null
+                      }
                     />
                   }
                 />
-                <Bar dataKey="amount" fill="var(--primary)" radius={3} />
+                {investedKeys.map((k, i) => (
+                  <Bar
+                    key={k}
+                    dataKey={k}
+                    stackId="invested"
+                    fill={CLASS_COLORS[k]}
+                    radius={i === investedKeys.length - 1 ? [3, 3, 0, 0] : 0}
+                  />
+                ))}
+                <ChartLegend content={<ChartLegendContent />} />
               </BarChart>
             </ChartContainer>
           ) : (
             <p className="report-empty">
-              No dividends received in the last 12 months.
+              Nothing invested in the last 12 months.
             </p>
           )}
           <p className="report-source">
-            {money(income.receivedTotal)} received in total. Expected dividends
-            are a plan and stay out of income until you confirm them.
+            {money(invested.total)} invested in the last 12 months. Counts
+            money put in across every portfolio: stock buys (with fees), fund
+            and plan payments, and gold and silver purchases. Sales and
+            redemptions are not subtracted. Dividends are in the Income panel
+            ({money(income.receivedTotal)} received in total).
           </p>
         </section>
       </div>

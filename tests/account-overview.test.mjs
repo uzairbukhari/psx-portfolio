@@ -173,3 +173,34 @@ test('gold coins are valued, added to net worth and shown as their own class', (
   assert.ok(noRate.total.incomplete.some((m) => /gold rate/.test(m)));
   assert.equal(noRate.total.gain, null);
 });
+
+test('sectors beyond the top six roll into one Other slice that keeps the total', () => {
+  const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const many = ledger({
+    companies: names.map((n) => company(n, `Sector ${n}`)),
+    trades: names.map((n, i) => trade(String(i), n, 'buy', 10, 100, '2025-01-10')),
+    quotes: Object.fromEntries(names.map((n, i) => [n, quote(100 + i)])),
+  });
+  const o = accountOverview([{ id: 'x', name: 'X', portfolio: many }], '2026-10-06');
+  assert.equal(o.sectors.length, 7);
+  assert.equal(o.sectors.at(-1).sector, 'Other');
+  assert.equal(o.sectors.reduce((n, s) => n + s.value, 0), o.total.value);
+});
+
+test('invested per month counts money put in over the last 12 months, not sales', () => {
+  const led = ledger({
+    companies: [company('MEBL')],
+    trades: [
+      trade('1', 'MEBL', 'buy', 10, 100, '2026-08-05'),
+      trade('2', 'MEBL', 'buy', 10, 100, '2026-08-20'),
+      trade('3', 'MEBL', 'sell', 5, 100, '2026-09-10'),
+      trade('4', 'MEBL', 'buy', 10, 100, '2024-01-10'),
+    ],
+    quotes: { MEBL: quote(150) },
+  });
+  const o = accountOverview([{ id: 'x', name: 'X', portfolio: led }], '2026-10-06');
+  assert.equal(o.invested.months.length, 12);
+  assert.equal(o.invested.months.find((m) => m.month === '2026-08').amount, 2000);
+  assert.equal(o.invested.months.find((m) => m.month === '2026-09').amount, 0);
+  assert.equal(o.invested.total, 2000);
+});
