@@ -1,4 +1,5 @@
 import { LandingFooter, LandingNav } from '../landing/landing-chrome';
+import { CfBeacon } from '../cf-beacon';
 
 export const metadata = {
   title: 'Privacy policy | Sipwise',
@@ -8,10 +9,11 @@ export const metadata = {
 export default function Page() {
   return (
     <main className="landing">
+      <CfBeacon />
       <LandingNav />
       <article className="lp-legal">
         <h1>Privacy policy</h1>
-        <p className="updated">Last updated 6 October 2026</p>
+        <p className="updated">Last updated 7 October 2026</p>
         <p>
           Sipwise is a portfolio ledger and planner. This page says what we
           collect and what we cannot see.
@@ -46,6 +48,21 @@ export default function Page() {
           announcements) that is the same for every user. If you turn on phone
           notifications, we store a device token and send generic alerts that
           contain no holdings or amounts.
+        </p>
+        <h2>Usage statistics</h2>
+        <p>
+          To learn which screens and features are used, the app records
+          anonymous usage events: the name of a screen or feature (for example
+          &ldquo;Reports opened&rdquo; or &ldquo;Import completed&rdquo;), the
+          platform and the app version. These events never include tickers,
+          amounts, holdings, notes or anything you type, and they are stored in
+          our own database, not sent to an analytics provider. They are linked
+          to your account only through a one-way code, and are deleted with
+          your account. You can switch this off in Settings under &ldquo;Usage
+          stats&rdquo;. The public pages (home, privacy, terms) also use
+          Cloudflare Web Analytics, which counts page views without cookies.
+          Your sign-up and last sign-in dates are kept as part of your account
+          whatever you choose.
         </p>
         <h2>What we share</h2>
         <p>

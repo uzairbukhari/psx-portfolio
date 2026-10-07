@@ -505,3 +505,38 @@ export const fundNavs = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.mufapId, t.date] })],
 );
+
+// One row per account, written at sign-in. `origin` starts 'unknown' and is settled on the first vault status read:
+// 'signup' when the account had no vault yet, 'existing' for accounts that predate analytics. Sign-up counts use
+// 'signup' and 'unknown'.
+export const appUsers = sqliteTable('app_users', {
+  email: text('email').primaryKey(),
+  firstSeenAt: text('first_seen_at').notNull(),
+  firstPlatform: text('first_platform').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  lastPlatform: text('last_platform').notNull(),
+  origin: text('origin').notNull(),
+});
+
+// Usage events: feature/screen names and closed-enum props only (lib/analytics-events.ts). `user_key` is an HMAC of the
+// email, so this table alone names nobody. Raw rows are kept 180 days.
+export const analyticsEvents = sqliteTable(
+  'analytics_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    ts: text('ts').notNull(),
+    day: text('day').notNull(),
+    userKey: text('user_key'),
+    anonId: text('anon_id'),
+    sessionId: text('session_id').notNull(),
+    platform: text('platform').notNull(),
+    appVersion: text('app_version'),
+    event: text('event').notNull(),
+    props: text('props'),
+    isAdmin: integer('is_admin').notNull().default(0),
+  },
+  (table) => [
+    index('analytics_events_day_idx').on(table.day, table.event),
+    index('analytics_events_user_idx').on(table.userKey, table.day),
+  ],
+);

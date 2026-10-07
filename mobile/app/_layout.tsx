@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
 import { BiometricLockProvider } from '@/auth/BiometricLock';
 import { PushBridge } from '@/push/PushBridge';
+import { AnalyticsBridge } from '@/analytics/AnalyticsBridge';
 import { SignIn } from '@/screens/SignIn';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { ErrorBoundary } from '@/ui/ErrorBoundary';
@@ -27,6 +28,7 @@ function Root() {
       <VaultGate>
         <PortfolioSelectionProvider>
         <PushBridge />
+        <AnalyticsBridge />
         <ErrorBoundary>
         <Stack
           screenOptions={{

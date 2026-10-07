@@ -1,5 +1,6 @@
 /* oxlint-disable next/no-html-link-for-pages -- full page loads are intended, see LandingNav */
 import { LogoMark, Wordmark } from '@/components/logo';
+import { UsageBeacon } from '../usage-beacon';
 import '../landing.css';
 
 // Plain anchors on purpose: the landing page is mounted inside the app shell,
@@ -15,6 +16,7 @@ export function LandingNav({
   const signIn = `/api/auth/google/login?return_to=${encodeURIComponent(returnTo ?? '/')}`;
   return (
     <nav className="lp-nav" aria-label="Sipwise">
+      <UsageBeacon />
       <div className="lp-wrap">
         <a className="lp-brand" href="/">
           <LogoMark size={28} />

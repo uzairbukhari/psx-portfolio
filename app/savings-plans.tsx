@@ -22,6 +22,7 @@ import {
 import { money, moneyShort, today } from '@/lib/portfolio';
 import AssetHistory, { type HistoryRow } from './asset-history';
 import CollapsiblePanel from './collapsible-panel';
+import { track } from './analytics';
 
 export type OwnedPlan = { asset: PlanAsset; portfolioName?: string };
 type Mode =
@@ -368,7 +369,7 @@ export default function SavingsPlansSection({
                             ],
                           }),
                           'Contribution recorded.',
-                        )
+                        ).then(() => track('plan_contribution_confirmed'))
                       }
                     >
                       Confirm paid
@@ -389,7 +390,7 @@ export default function SavingsPlansSection({
                             ),
                           }),
                           'Month skipped.',
-                        )
+                        ).then(() => track('plan_contribution_skipped'))
                       }
                     >
                       Skip

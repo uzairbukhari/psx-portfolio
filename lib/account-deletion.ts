@@ -16,6 +16,7 @@ export const USER_TABLES: readonly { table: string; column: string }[] = [
   { table: 'rate_limits', column: 'user_id' },
   { table: 'mobile_sessions', column: 'email' },
   { table: 'user_roles', column: 'email' },
+  { table: 'app_users', column: 'email' },
 ];
 
 /** Child tables keyed through a per-user parent row; deleted before the parent so the link still exists. */
@@ -51,6 +52,8 @@ export const SHARED_TABLES: readonly string[] = [
   'ai_company_research',
   'ai_rankings',
   'ai_research_requests',
+  // Keyed by an HMAC of the email, not the email: DELETE /api/me removes the user's rows through deleteUserEvents.
+  'analytics_events',
 ];
 
 /** SQL statements (child rows first) with the single bound email each one takes. */
