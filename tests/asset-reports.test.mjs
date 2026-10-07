@@ -35,3 +35,16 @@ test('metal report: average cost per tola and one rate per day', () => {
   assert.equal(Math.round(r.averageCostPerTola), 350000);
   assert.equal(r.latest.rate, 405000);
 });
+
+import { backfillRows, parseYahooChart } from '../lib/metal-history.ts';
+
+test('backfill converts world prices with the latest dollar rate and skips empty days', () => {
+  const day = (d) => Date.parse(`${d}T12:00:00Z`) / 1000;
+  const gold = parseYahooChart({ chart: { result: [{ timestamp: [day('2026-01-02'), day('2026-01-05'), day('2026-01-06')], indicators: { quote: [{ close: [2000, null, 2100] }] } }] } });
+  assert.deepEqual(gold.map((g) => g.date), ['2026-01-02', '2026-01-06']);
+  const rows = backfillRows('gold', gold, [{ date: '2026-01-01', close: 280 }, { date: '2026-01-05', close: 282 }]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].pkrPerTola, Math.round((2000 * 280 * 11.6638) / 31.1035));
+  assert.equal(rows[1].pkrPerTola, Math.round((2100 * 282 * 11.6638) / 31.1035));
+  assert.throws(() => parseYahooChart({}));
+});
