@@ -60,7 +60,10 @@ export default function Page() {
           below.
         </p>
         <h2>Contact</h2>
-        <p>Questions about privacy: suzairbukhari@gmail.com.</p>
+        <p>
+          Questions about privacy:{' '}
+          <a href="mailto:support@sipwise.trade">support@sipwise.trade</a>.
+        </p>
       </article>
       <LandingFooter />
     </main>

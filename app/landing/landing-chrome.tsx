@@ -42,6 +42,7 @@ export function LandingFooter() {
         <span className="lp-footer-links">
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
+          <a href="mailto:support@sipwise.trade">Contact</a>
         </span>
         <span>
           Sipwise is a tracking and planning tool. It is not investment advice
