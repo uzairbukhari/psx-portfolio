@@ -2981,34 +2981,27 @@ function DashboardContent({
                 </p>
               </div>
             ) : isAll ? (
-              p[DISPLAY_PARTS]?.map((part) => (
-                <section key={part.id} className="account-plan-section">
-                  <div className="row">
-                    <h2>{part.name}</h2>
-                    <button
-                      className="secondary compact"
-                      onClick={() => workspace?.choose(part.id)}
-                    >
-                      Open portfolio to plan
-                    </button>
-                  </div>
-                  <MonthlyPicks
-                    portfolio={part.portfolio}
-                    month={month}
-                    setMonth={setMonth}
-                    feePct={fees}
-                    setFeePct={setFees}
-                    busy={true}
-                    onSave={async () => {
-                      throw Error('Choose a portfolio to edit its plan.');
-                    }}
-                    onRecordBuys={() => workspace?.choose(part.id)}
-                    onRefreshPrices={refresh}
-                    onOpenCompany={openCompany}
-                    onManualPrice={() => workspace?.choose(part.id)}
-                  />
-                </section>
-              ))
+              <>
+                <p className="muted">
+                  Combined view of all your portfolios. Choose a single
+                  portfolio to run Monthly Picks and record the buys.
+                </p>
+                <MonthlyPicks
+                  portfolio={p}
+                  month={month}
+                  setMonth={setMonth}
+                  feePct={fees}
+                  setFeePct={setFees}
+                  busy={true}
+                  onSave={async () => {
+                    throw Error('Choose a portfolio to run Monthly Picks.');
+                  }}
+                  onRecordBuys={() => {}}
+                  onRefreshPrices={refresh}
+                  onOpenCompany={openCompany}
+                  onManualPrice={() => {}}
+                />
+              </>
             ) : (
               <MonthlyPicks
                 portfolio={p}
