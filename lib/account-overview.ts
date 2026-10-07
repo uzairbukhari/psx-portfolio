@@ -63,6 +63,10 @@ export type HoldingTotal = {
 };
 export type SectorTotal = { sector: string; value: number; share: number };
 export type IncomeMonth = { month: string; amount: number };
+export type InvestedMonth = { month: string; amount: number };
+
+/** Sectors shown on the All dashboard; the rest roll into one Other slice. */
+export const TOP_SECTOR_COUNT = 6;
 
 export type AccountOverview = {
   asOf: string;
@@ -82,6 +86,8 @@ export type AccountOverview = {
   topHoldings: HoldingTotal[];
   holdingCount: number;
   sectors: SectorTotal[];
+  /** Money paid in per month over the last twelve months, oldest first: stock buys, fund and plan paid-in, gold and silver purchases. Sales, redemptions and cash back are not subtracted. */
+  invested: { months: InvestedMonth[]; total: number };
   income: {
     taxYear: string;
     /** Dividends received in the current tax year (gross). */
@@ -261,6 +267,12 @@ export function accountOverview(
       share: share(value, stockValue),
     }))
     .sort((a, b) => b.value - a.value);
+  if (sectors.length > TOP_SECTOR_COUNT + 1) {
+    const rest = sectors.slice(TOP_SECTOR_COUNT);
+    sectors.length = TOP_SECTOR_COUNT;
+    const value = round(rest.reduce((n, r) => n + r.value, 0));
+    sectors.push({ sector: 'Other', value, share: share(value, stockValue) });
+  }
 
   // Income: received dividends only. Expected ones are a plan, not money.
   const taxYear = taxYearOf(asOf);
@@ -347,6 +359,18 @@ export function accountOverview(
       : unknownCostFlows || summary.unknownCost.length || metalUnknown.length
         ? 'Needs the cost of every holding.'
         : null;
+  const investedByMonth = new Map(months.map((m) => [m, 0]));
+  for (const f of flows) {
+    // Only money going in: buys and paid-in. Sales, redemptions and cash back are negative flows.
+    if (f.amount <= 0 || f.date > asOf) continue;
+    const month = f.date.slice(0, 7);
+    if (investedByMonth.has(month))
+      investedByMonth.set(month, (investedByMonth.get(month) ?? 0) + f.amount);
+  }
+  const investedMonths = months.map((month) => ({
+    month,
+    amount: round(investedByMonth.get(month) ?? 0),
+  }));
   const mwr = moneyWeightedReturn(flows, total, asOf);
 
   return {
@@ -364,6 +388,10 @@ export function accountOverview(
     topHoldings,
     holdingCount: held.length,
     sectors,
+    invested: {
+      months: investedMonths,
+      total: round(investedMonths.reduce((n, m) => n + m.amount, 0)),
+    },
     income: {
       taxYear,
       received: round(received),
