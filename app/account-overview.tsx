@@ -17,6 +17,7 @@ import {
   ASSET_CLASS_LABELS,
   type AssetClassKey,
 } from '@/lib/account-overview';
+import { ChartInfo } from './chart-info';
 import { daysBetween } from '@/lib/performance';
 import type { MetalRateRow } from '@/lib/metal-rates';
 
@@ -179,7 +180,10 @@ export default function AccountOverview({
           <div className="report-heading">
             <div>
               <p className="eyebrow">ASSET MIX</p>
-              <h3>Where your money is</h3>
+              <h3>
+                Where your money is
+                <ChartInfo text="Your net worth split by kind of asset: stocks, mutual funds, gold, silver and savings plans, at current value." />
+              </h3>
             </div>
             <span>By market value</span>
           </div>
@@ -255,7 +259,10 @@ export default function AccountOverview({
           <div className="report-heading">
             <div>
               <p className="eyebrow">DIVERSIFICATION</p>
-              <h3>Stocks by sector</h3>
+              <h3>
+                Stocks by sector
+                <ChartInfo text="How the value of your PSX stocks is spread across sectors. The five largest sectors are shown; the rest are grouped as Other." />
+              </h3>
             </div>
             <span>Across all portfolios</span>
           </div>
@@ -292,7 +299,10 @@ export default function AccountOverview({
           <div className="report-heading">
             <div>
               <p className="eyebrow">PORTFOLIOS</p>
-              <h3>Each portfolio</h3>
+              <h3>
+                Each portfolio
+                <ChartInfo text="What each of your portfolios is worth and its share of the total." />
+              </h3>
             </div>
             <span>Share of net worth</span>
           </div>
@@ -336,7 +346,10 @@ export default function AccountOverview({
           <div className="report-heading">
             <div>
               <p className="eyebrow">INVESTING</p>
-              <h3>Invested per month</h3>
+              <h3>
+                Invested per month
+                <ChartInfo text="Money you put in each month over the last 12 months: stock buys, fund and plan payments and gold or silver purchases. Sales and redemptions are not subtracted." />
+              </h3>
             </div>
             <span>Last 12 months</span>
           </div>

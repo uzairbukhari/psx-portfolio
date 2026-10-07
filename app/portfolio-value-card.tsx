@@ -1,5 +1,6 @@
 'use client';
 
+import { ChartInfo } from './chart-info';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from 'recharts';
 import {
@@ -194,7 +195,10 @@ export default function PortfolioValueCard({
       <div className="value-card-chart">
       <div className="company-chart-head">
         <div>
-          <strong className="value-card-chart-title">Stocks: remaining unrealised gain / loss</strong>
+          <strong className="value-card-chart-title">
+            Stocks: remaining unrealised gain / loss
+            <ChartInfo text="Value of the shares you still hold minus what they cost you, day by day. PSX stocks only." />
+          </strong>
           <small className={change === null ? undefined : change >= 0 ? 'pos-text' : 'neg-text'}>
             {change === null
               ? 'PSX stocks only: value of shares still held minus their remaining cost, day by day. Excludes mutual funds, gold, silver and savings plans, realised gains and dividends.'
