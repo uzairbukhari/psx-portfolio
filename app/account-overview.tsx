@@ -6,11 +6,17 @@ import { useMemo, type ReactNode } from 'react';
 import { Bar, BarChart, Pie, PieChart, XAxis } from 'recharts';
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { money, moneyShort, type DisplayPart } from '@/lib/portfolio';
-import { accountOverview, type AssetClassKey } from '@/lib/account-overview';
+import {
+  accountOverview,
+  ASSET_CLASS_LABELS,
+  type AssetClassKey,
+} from '@/lib/account-overview';
 import { daysBetween } from '@/lib/performance';
 import type { MetalRateRow } from '@/lib/metal-rates';
 
@@ -30,6 +36,7 @@ const SECTOR_COLORS = [
   '#008300',
   '#9085e9',
 ];
+const investedKeys: AssetClassKey[] = ['stocks', 'funds', 'plans', 'gold', 'silver'];
 const OTHER_COLOR = '#5b6b85';
 
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
@@ -335,9 +342,12 @@ export default function AccountOverview({
           </div>
           {invested.months.some((m) => m.amount > 0) ? (
             <ChartContainer
-              config={{
-                amount: { label: 'Invested', color: 'var(--primary)' },
-              }}
+              config={Object.fromEntries(
+                investedKeys.map((k) => [
+                  k,
+                  { label: ASSET_CLASS_LABELS[k], color: CLASS_COLORS[k] },
+                ]),
+              )}
               className="overview-income"
             >
               <BarChart
@@ -358,11 +368,27 @@ export default function AccountOverview({
                       labelFormatter={(_l, items) =>
                         String(items?.[0]?.payload?.month ?? '')
                       }
-                      formatter={(value) => <b>{money(Number(value))}</b>}
+                      formatter={(value, name) =>
+                        Number(value) ? (
+                          <span>
+                            {ASSET_CLASS_LABELS[name as AssetClassKey]}{' '}
+                            <b>{money(Number(value))}</b>
+                          </span>
+                        ) : null
+                      }
                     />
                   }
                 />
-                <Bar dataKey="amount" fill="var(--primary)" radius={3} />
+                {investedKeys.map((k, i) => (
+                  <Bar
+                    key={k}
+                    dataKey={k}
+                    stackId="invested"
+                    fill={CLASS_COLORS[k]}
+                    radius={i === investedKeys.length - 1 ? [3, 3, 0, 0] : 0}
+                  />
+                ))}
+                <ChartLegend content={<ChartLegendContent />} />
               </BarChart>
             </ChartContainer>
           ) : (

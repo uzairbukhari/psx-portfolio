@@ -63,7 +63,7 @@ export type HoldingTotal = {
 };
 export type SectorTotal = { sector: string; value: number; share: number };
 export type IncomeMonth = { month: string; amount: number };
-export type InvestedMonth = { month: string; amount: number };
+export type InvestedMonth = { month: string; amount: number } & Record<AssetClassKey, number>;
 
 /** Sectors shown on the All dashboard; the rest roll into one Other slice. */
 export const TOP_SECTOR_COUNT = 6;
@@ -359,18 +359,32 @@ export function accountOverview(
       : unknownCostFlows || summary.unknownCost.length || metalUnknown.length
         ? 'Needs the cost of every holding.'
         : null;
-  const investedByMonth = new Map(months.map((m) => [m, 0]));
-  for (const f of flows) {
-    // Only money going in: buys and paid-in. Sales, redemptions and cash back are negative flows.
-    if (f.amount <= 0 || f.date > asOf) continue;
-    const month = f.date.slice(0, 7);
-    if (investedByMonth.has(month))
-      investedByMonth.set(month, (investedByMonth.get(month) ?? 0) + f.amount);
-  }
-  const investedMonths = months.map((month) => ({
-    month,
-    amount: round(investedByMonth.get(month) ?? 0),
-  }));
+  const classKeys = ['stocks', 'gold', 'silver', 'plans', 'funds'] as const;
+  const investedByMonth = new Map(
+    months.map((m) => [m, { stocks: 0, gold: 0, silver: 0, plans: 0, funds: 0 }]),
+  );
+  const addInvested = (key: AssetClassKey, list: CashFlow[]) => {
+    for (const f of list) {
+      // Only money going in: buys and paid-in. Sales, redemptions and cash back are negative flows.
+      if (f.amount <= 0 || f.date > asOf) continue;
+      const row = investedByMonth.get(f.date.slice(0, 7));
+      if (row) row[key] += f.amount;
+    }
+  };
+  for (const entry of consolidated.breakdown)
+    addInvested('stocks', moneyInFlows(entry.portfolio).flows);
+  for (const m of assetValues) addInvested(m.v.classKey, m.v.flows);
+  const investedMonths = months.map((month) => {
+    const row = investedByMonth.get(month)!;
+    const rounded = Object.fromEntries(
+      classKeys.map((k) => [k, round(row[k])]),
+    ) as Record<AssetClassKey, number>;
+    return {
+      month,
+      ...rounded,
+      amount: round(classKeys.reduce((n, k) => n + row[k], 0)),
+    };
+  });
   const mwr = moneyWeightedReturn(flows, total, asOf);
 
   return {
