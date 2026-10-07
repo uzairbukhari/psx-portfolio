@@ -51,7 +51,7 @@ export default function Page() {
         <h2>Changes and contact</h2>
         <p>
           We may update these terms and will change the date above when we do.
-          Questions: suzairbukhari@gmail.com.
+          Questions: <a href="mailto:support@sipwise.trade">support@sipwise.trade</a>.
         </p>
       </article>
       <LandingFooter />
