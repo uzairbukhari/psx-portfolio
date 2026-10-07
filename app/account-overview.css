@@ -114,7 +114,8 @@
 }
 .overview-income {
   width: 100%;
-  min-height: 200px;
+  /* A real height: the chart sizes itself to its parent and measures 0 when only min-height is set. */
+  height: 240px;
   aspect-ratio: auto;
 }
 @media (max-width: 1000px) {
