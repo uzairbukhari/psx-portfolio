@@ -30,6 +30,8 @@ import {
 import type { Metal, MetalRateRow } from '@/lib/metal-rates';
 import type { FundNavRow } from '@/lib/mufap';
 import type { PlanNavRow } from '@/lib/plans';
+import type { Asset } from '@/lib/assets';
+import PortfolioReports from './portfolio-reports';
 
 // Same fixed hue order as the stock reports (validated on the dark surface).
 const colors = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'];
@@ -366,6 +368,65 @@ export default function AssetReports({
       ) : (
         metals.map((m) => <MetalReports key={m} portfolio={portfolio} metal={m} rates={metalRates} />)
       )}
+    </div>
+  );
+}
+
+/** The All workspace: one switcher over stocks, metals and mutual funds / plans, built from every portfolio's holdings. */
+export function AllReports({
+  portfolio,
+  assets,
+  metalRates,
+  fundNavs,
+  planNavs,
+}: {
+  portfolio: Portfolio;
+  assets: Asset[];
+  metalRates: MetalRateRow[];
+  fundNavs: FundNavRow[];
+  planNavs: PlanNavRow[];
+}) {
+  const [view, setView] = useState<'all' | 'stocks' | 'metals' | 'funds'>('all');
+  const merged: Portfolio = { ...portfolio, assets };
+  const has = {
+    stocks:
+      portfolio.trades.some((t) => !t.voided) ||
+      !!portfolio.dividends?.some((d) => !d.voided),
+    metals: assets.some((a) => a.kind === 'metal'),
+    funds: assets.some((a) => a.kind === 'fund' || a.kind === 'plan'),
+  };
+  const kinds = (['stocks', 'metals', 'funds'] as const).filter((k) => has[k]);
+  const labels = { all: 'All', stocks: 'Stocks', metals: 'Metals', funds: 'Mutual Funds' };
+  const show = (k: 'stocks' | 'metals' | 'funds') =>
+    kinds.length === 1 || view === 'all' || view === k;
+  const section = (k: 'stocks' | 'metals' | 'funds') =>
+    !has[k] || !show(k) ? null : k === 'stocks' ? (
+      <PortfolioReports key={k} portfolio={merged} />
+    ) : (
+      <AssetReports
+        key={k}
+        portfolio={merged}
+        mode={k === 'metals' ? 'metal' : 'savings'}
+        metalRates={metalRates}
+        fundNavs={fundNavs}
+        planNavs={planNavs}
+      />
+    );
+  if (!kinds.length) return <PortfolioReports portfolio={portfolio} />;
+  return (
+    <div>
+      {kinds.length > 1 && (
+        <div className="reports-tabs seg" aria-label="Asset type" style={{ marginBottom: 20 }}>
+          {(['all', ...kinds] as const).map((k) => (
+            <button key={k} type="button" data-active={view === k || undefined} onClick={() => setView(k)}>
+              {labels[k]}
+            </button>
+          ))}
+        </div>
+      )}
+      {section('stocks')}
+      {section('metals')}
+      {section('funds')}
     </div>
   );
 }
