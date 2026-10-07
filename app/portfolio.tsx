@@ -51,7 +51,6 @@ import {
   Bell,
   BarChart3,
   ScrollText,
-  Sparkles,
   FlaskConical,
   Microscope,
   LockKeyhole,
@@ -1550,6 +1549,10 @@ function DashboardContent({
     o.asset.kind === 'fund' ? [{ ...o, asset: o.asset }] : [],
   );
   const hasAssets = allAssets.length > 0;
+  // Monthly Picks is stock-only, so the tab shows once any portfolio holds a stock.
+  const hasStocks = workspace
+    ? workspace.account.portfolios.some((part) => part.portfolio.companies.length > 0)
+    : p.companies.length > 0;
   const newBuys = round(
     p.trades
       .filter((t) => t.kind === 'buy' && !t.voided)
@@ -2394,11 +2397,13 @@ function DashboardContent({
                   <span className="tab-long">Activity</span>
                   <span className="tab-short">Activity</span>
                 </TabsTrigger>
-                <TabsTrigger value="sip">
-                  <Sparkles className="tab-icon" aria-hidden="true" />
-                  <span className="tab-long">Monthly Picks</span>
-                  <span className="tab-short">Picks</span>
-                </TabsTrigger>
+                {hasStocks && (
+                  <TabsTrigger value="sip" title="Experimental feature">
+                    <FlaskConical className="tab-icon" aria-hidden="true" />
+                    <span className="tab-long">Monthly Picks</span>
+                    <span className="tab-short">Picks</span>
+                  </TabsTrigger>
+                )}
                 {isAdmin && (
                   <TabsTrigger value="research-desk">
                     <FlaskConical className="tab-icon" aria-hidden="true" />
@@ -2967,7 +2972,15 @@ function DashboardContent({
             )}
           </TabsContent>
           <TabsContent value="sip">
-            {isAll ? (
+            {!hasStocks ? (
+              <div className="panel empty-holdings">
+                <h2>Monthly Picks needs a stock</h2>
+                <p>
+                  Monthly Picks works on PSX stocks. Add or import a stock and
+                  the tab will appear.
+                </p>
+              </div>
+            ) : isAll ? (
               p[DISPLAY_PARTS]?.map((part) => (
                 <section key={part.id} className="account-plan-section">
                   <div className="row">

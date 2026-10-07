@@ -137,7 +137,8 @@ export function PicksView({ month, fee, onFee, readOnly, portfolioId }: { portfo
 
   return (
     <>
-      <Muted>Ranks the companies you choose and suggests how to split this month's money. Not financial advice.</Muted>
+      <Muted>🧪 Experimental. Ranks the companies you choose and suggests how to split this month's money. Not financial advice.</Muted>
+      <Muted>How it works: each company's public PSX data is scored 0–100 (earnings yield, profit growth, margins, 52-week position). The best scorers share your money, capped at 35% per pick and 20% of your portfolio per holding. Nothing is sold, leftovers stay cash, and nothing is recorded until you confirm.</Muted>
       {readOnly ? <Notice tone="info">{month} is in the past, so picks are read only here.</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
 
