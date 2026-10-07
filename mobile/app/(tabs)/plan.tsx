@@ -133,11 +133,11 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
         />
       </Card>
 
-      <Segmented label="Plan mode" value={mode} onChange={setMode} options={[{ key: 'targets', label: 'Targets' }, { key: 'picks', label: 'Monthly Picks' }]} />
+      <Segmented label="Plan mode" value={mode} onChange={setMode} options={portfolio.companies.length ? [{ key: 'targets', label: 'Targets' }, { key: 'picks', label: '🧪 Monthly Picks' }] : [{ key: 'targets', label: 'Targets' }]} />
       {message ? <Notice tone={message.error ? 'error' : 'success'}>{message.text}</Notice> : null}
       {p.offline ? <Notice tone="offline">Offline · this plan is read only until you reconnect.</Notice> : null}
 
-      {mode === 'picks' ? (
+      {mode === 'picks' && portfolio.companies.length ? (
         <PicksView key={p.targetId ?? 'all'} portfolioId={portfolioId} month={month} fee={fee} onFee={setFee} readOnly={readOnly} />
       ) : targeted.length === 0 ? (
         <Card tone="hero">
