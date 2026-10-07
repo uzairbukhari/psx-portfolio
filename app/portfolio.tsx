@@ -3,6 +3,7 @@ import { useConfirm } from '@/components/confirm-dialog';
 import {
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -976,6 +977,8 @@ function DashboardContent({
     options: {
       createCompanies?: string[];
       target?: import('@/lib/portfolio-account').PortfolioTarget;
+      /** Reload the selected view after saving a different portfolio than the one on screen. */
+      reload?: boolean;
     } = {},
   ) {
     if (!mounted.current)
@@ -1028,7 +1031,7 @@ function DashboardContent({
           company.sector = detail.sector;
         }
       }
-      if (isAll) await load();
+      if (isAll || options.reload) await load();
       else setP(next);
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
@@ -1181,6 +1184,25 @@ function DashboardContent({
     ).flatMap((a) => (a.kind === 'fund' ? [a.mufapId] : [])),
     fundData.reload,
   );
+  // Monthly Picks is a general stock-picking tool: it always works on the companies and holdings of every
+  // portfolio, whichever one is selected. Its saved inputs and runs live in the account's first portfolio.
+  const picksHome = workspace?.account.portfolios[0];
+  const picksPortfolio = useMemo(() => {
+    if (!workspace || !picksHome) return p;
+    const combined = dashboardPortfolio(workspace.account, ALL_PORTFOLIOS);
+    if (workspace.account.portfolios.length < 2) return p ?? combined;
+    const quotes = { ...combined.quotes };
+    for (const [ticker, quote] of Object.entries(p?.quotes ?? {}))
+      if (!quotes[ticker] || quote.date >= quotes[ticker].date)
+        quotes[ticker] = quote;
+    return {
+      ...combined,
+      quotes,
+      budgets: picksHome.portfolio.budgets,
+      monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
+      monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
+    };
+  }, [workspace, picksHome, p]);
   if (!p && email && !(failed && message))
     return (
       <main className="app-loading">
@@ -2980,37 +3002,28 @@ function DashboardContent({
                   the tab will appear.
                 </p>
               </div>
-            ) : isAll ? (
-              <>
-                <p className="muted">
-                  Combined view of all your portfolios. Choose a single
-                  portfolio to run Monthly Picks and record the buys.
-                </p>
-                <MonthlyPicks
-                  portfolio={p}
-                  month={month}
-                  setMonth={setMonth}
-                  feePct={fees}
-                  setFeePct={setFees}
-                  busy={true}
-                  onSave={async () => {
-                    throw Error('Choose a portfolio to run Monthly Picks.');
-                  }}
-                  onRecordBuys={() => {}}
-                  onRefreshPrices={refresh}
-                  onOpenCompany={openCompany}
-                  onManualPrice={() => {}}
-                />
-              </>
             ) : (
               <MonthlyPicks
-                portfolio={p}
+                portfolio={picksPortfolio ?? p}
                 month={month}
                 setMonth={setMonth}
                 feePct={fees}
                 setFeePct={setFees}
-                busy={busy || locked}
-                onSave={save}
+                busy={busy}
+                onSave={async (next, message) => {
+                  if (!picksHome || workspace!.account.portfolios.length < 2)
+                    return save(next, message);
+                  await save(
+                    {
+                      ...picksHome.portfolio,
+                      monthlyPicksShortlist: next.monthlyPicksShortlist,
+                      budgets: next.budgets,
+                      monthlyPicksRuns: next.monthlyPicksRuns,
+                    },
+                    message,
+                    { target: { id: picksHome.id }, reload: true },
+                  );
+                }}
                 onRecordBuys={recordPicks}
                 onRefreshPrices={refresh}
                 onOpenCompany={openCompany}
