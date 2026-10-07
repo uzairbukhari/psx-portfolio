@@ -164,3 +164,5 @@
 .landing .lp-brand{font-size:20px;color:var(--ink);text-shadow:none}
 .landing .lp-brand .logo-word{font-weight:700}
 .landing .lp-brand .logo-word em{font-style:normal;color:var(--primary-2)}
+.landing section[id]{scroll-margin-top:72px}
+.landing{scroll-behavior:smooth}

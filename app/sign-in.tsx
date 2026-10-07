@@ -33,7 +33,7 @@ export function SignIn({ returnTo }: { returnTo: string }) {
     : '';
   return (
     <main className="landing">
-      <LandingNav returnTo={returnTo} />
+      <LandingNav returnTo={returnTo} onLanding />
       <Hero returnTo={returnTo} error={error} />
       <AssetsSection />
       <PlanSection />
