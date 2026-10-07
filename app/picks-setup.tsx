@@ -76,8 +76,22 @@ export default function PicksSetup(props: Props) {
     </button>
   );
 
+  const howTo = (
+    <details className="mp-howto">
+      <summary>How Monthly Picks works <span className="mp-beta">Experimental</span></summary>
+      <ol>
+        <li>Pick up to {MAX_SHORTLIST} PSX companies you would be happy to own, and the fresh money you have this month.</li>
+        <li>We read each company&apos;s public PSX page (price, P/E, 52-week range, four years of results and recent announcements) and give it a 0–100 score from earnings yield, profit growth, margin trend and where the price sits in its 52-week range.</li>
+        <li>The best-scoring companies get a share of your money. No pick takes more than 35% of it, and no holding goes above 20% of your portfolio after buying. Anything that cannot be placed stays as cash, and nothing is ever sold.</li>
+        <li>You get whole-share estimates at the latest price. Nothing is recorded until you review it and record the buys yourself.</li>
+      </ol>
+      <p className="muted">It does not depend on what you already hold, only on the companies you choose, and it all runs on your device, so your holdings and amounts never leave it. It is a screening aid, not investment advice.</p>
+    </details>
+  );
+
   if (props.collapsed) {
     return (
+      <>
       <section className="mp-setup mp-setup--collapsed">
         <div className="mp-setup__summary">
           <b>{props.month}</b>
@@ -91,6 +105,8 @@ export default function PicksSetup(props: Props) {
           {generateButton}
         </div>
       </section>
+      <section className="mp-setup mp-setup--collapsed">{howTo}</section>
+      </>
     );
   }
 
@@ -101,16 +117,7 @@ export default function PicksSetup(props: Props) {
           <p className="eyebrow">MONTHLY PICKS</p>
           <h2>Where should this month&apos;s money go?</h2>
           <p>Choose companies and an amount. PSX company data is scored, then ranked for the next 60–90 days.</p>
-          <details className="mp-howto">
-            <summary>How Monthly Picks works <span className="mp-beta">Experimental</span></summary>
-            <ol>
-              <li>Pick up to {MAX_SHORTLIST} PSX companies you would be happy to own, and the fresh money you have this month.</li>
-              <li>We read each company&apos;s public PSX page (price, P/E, 52-week range, four years of results and recent announcements) and give it a 0–100 score from earnings yield, profit growth, margin trend and where the price sits in its 52-week range.</li>
-              <li>The best-scoring companies get a share of your money. No pick takes more than 35% of it, and no holding goes above 20% of your portfolio after buying. Anything that cannot be placed stays as cash, and nothing is ever sold.</li>
-              <li>You get whole-share estimates at the latest price. Nothing is recorded until you review it and record the buys yourself.</li>
-            </ol>
-            <p className="muted">It does not depend on what you already hold, only on the companies you choose, and it all runs on your device, so your holdings and amounts never leave it. It is a screening aid, not investment advice.</p>
-          </details>
+          {howTo}
         </div>
         <div className="mp-fields">
           <label>

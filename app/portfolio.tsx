@@ -2399,7 +2399,7 @@ function DashboardContent({
                 </TabsTrigger>
                 {hasStocks && (
                   <TabsTrigger value="sip" title="Experimental feature">
-                    <FlaskConical className="tab-icon" aria-hidden="true" />
+                    <FlaskConical className="tab-icon tab-flask" aria-hidden="true" />
                     <span className="tab-long">Monthly Picks</span>
                     <span className="tab-short">Picks</span>
                   </TabsTrigger>
