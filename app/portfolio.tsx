@@ -90,6 +90,8 @@ import { addNotifications, dividendNotifications } from '@/lib/notifications';
 import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import PortfolioReports from './portfolio-reports';
+import AssetReports from './asset-reports';
+import { reportMode } from '@/lib/asset-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
 import GoldSilverSection, { type OwnedMetal } from './gold-silver';
@@ -2944,7 +2946,16 @@ function DashboardContent({
             />
           </TabsContent>
           <TabsContent value="reports">
-            <PortfolioReports portfolio={p} />
+            {!isAll && reportMode(p) !== 'stocks' ? (
+              <AssetReports
+                portfolio={p}
+                mode={reportMode(p) as 'funds' | 'metal'}
+                metalRates={metalRates.rates}
+                fundNavs={fundData.navs}
+              />
+            ) : (
+              <PortfolioReports portfolio={p} />
+            )}
           </TabsContent>
           <TabsContent value="sip">
             {isAll ? (
