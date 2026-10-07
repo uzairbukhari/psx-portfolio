@@ -207,8 +207,13 @@
 .mp-bar::-webkit-progress-value{background:var(--primary);border-radius:999px;transition:width .4s ease}
 .mp-bar::-moz-progress-bar{background:var(--primary);border-radius:999px}
 
-.mp-howto{margin:12px 0 0;font-size:14px}
+.mp-howto-wrap{padding:14px 26px 4px}
+.mp-setup.mp-howto-wrap{padding:14px 26px}
+.mp-howto{font-size:14px}
 .mp-howto summary{cursor:pointer;font-weight:600}
-.mp-howto ol{margin:8px 0;padding-left:20px;display:grid;gap:6px}
-.mp-howto p{margin:6px 0 0}
+.mp-howto__steps{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.mp-howto__steps li{display:grid;grid-template-columns:26px 1fr;column-gap:10px;row-gap:2px;align-items:start;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.025)}
+.mp-howto__num{grid-row:1 / span 2;display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:rgba(59,130,246,.18);color:var(--primary);font-size:13px;font-weight:700}
+.mp-howto__steps li span:last-child{color:var(--muted-foreground);font-size:13px;line-height:1.45}
+.mp-howto__note{margin:10px 0 0;font-size:12.5px}
 .mp-beta{margin-left:6px;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid currentColor;opacity:.75}
