@@ -139,7 +139,7 @@ test('sign-up flow: new account becomes a signup, existing vault becomes existin
   const events = db.sqlite.prepare('SELECT event FROM analytics_events ORDER BY id').all().map((r) => r.event);
   assert.deepEqual(events.sort(), ['signed_in', 'signed_in', 'signed_up']);
   // The events table never holds the email.
-  assert.equal(JSON.stringify(db.sqlite.prepare('SELECT * FROM analytics_events').all()).includes('x.com'), false);
+  assert.doesNotMatch(JSON.stringify(db.sqlite.prepare('SELECT * FROM analytics_events').all()), /@/);
 });
 
 test('usage report counts users, excludes admin activity and deletes with the account', async () => {
