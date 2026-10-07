@@ -40,7 +40,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-  RefreshCw,
   Plus,
   Briefcase,
   Upload,
@@ -121,7 +120,7 @@ import {
   type AhlLedgerStatement,
 } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
-import { watchTickers } from '@/lib/market-watch';
+import { MAX_WATCH_TICKERS, watchTickers } from '@/lib/market-watch';
 import MonthlyPicks from './monthly-picks';
 import { parseFinqalabReport } from './finqalab-import';
 import { FinqalabImportDialog } from './finqalab-import-dialog';
@@ -455,7 +454,11 @@ export default function Dashboard(props: DashboardProps) {
   return (
     <VaultGate email={props.email}>
       {(session, lock) => (
-        <PortfolioWorkspace session={session} lock={lock}>
+        <PortfolioWorkspace
+          session={session}
+          lock={lock}
+          canLock={props.role === 'super_admin'}
+        >
           {(workspace) => (
             <DashboardContent
               {...props}
@@ -1217,8 +1220,16 @@ function DashboardContent({
   if (!p && !email) return <SignIn returnTo={initialPathname || '/'} />;
   if (!p) return <LoadError message={message} busy={busy} onRetry={load} />;
   // The market pulse sends only these tickers to the server; names and saved quotes are merged back in locally.
+  // The All view follows the Monthly Picks shortlist; a single portfolio follows what it holds.
   const pulseWatch = {
-    tickers: watchTickers(p),
+    mode: (isAll ? 'shortlist' : 'holdings') as 'shortlist' | 'holdings',
+    tickers: isAll
+      ? watchTickers(p)
+      : holdings(p)
+          .filter((h) => h.shares > 0)
+          .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
+          .map((h) => h.ticker)
+          .slice(0, MAX_WATCH_TICKERS),
     names: Object.fromEntries(p.companies.map((c) => [c.ticker, c.name])),
     saved: p.quotes,
   };
@@ -2222,7 +2233,11 @@ function DashboardContent({
                 type="button"
                 data-slot="brand"
                 className="brand"
-                onClick={() => setTab('holdings')}
+                onClick={() => {
+                  // The logo is home: the All portfolios view.
+                  setTab('holdings');
+                  workspace?.choose(ALL_PORTFOLIOS);
+                }}
               >
                 <LogoMark size={28} />
                 <Wordmark />
@@ -2230,17 +2245,6 @@ function DashboardContent({
               {workspace?.selector}
             </div>
             <div className="header-right">
-              <button
-                type="button"
-                data-slot="hdr"
-                className="hdr-btn"
-                disabled={busy}
-                aria-label="Refresh PSX prices"
-                onClick={refresh}
-              >
-                <RefreshCw size={18} />
-                <span className="hdr-label">Refresh PSX prices</span>
-              </button>
               <button
                 type="button"
                 data-slot="hdr"
@@ -2533,6 +2537,8 @@ function DashboardContent({
                         <PsxMarketPulse
                           ref={pulseRef}
                           onOpenShortlist={() => setTab('sip')}
+                          onRefresh={refresh}
+                          refreshing={busy}
                           {...pulseWatch}
                         />
                       ) : undefined
@@ -2566,6 +2572,8 @@ function DashboardContent({
                         <PsxMarketPulse
                           ref={pulseRef}
                           onOpenShortlist={() => setTab('sip')}
+                          onRefresh={refresh}
+                          refreshing={busy}
                           {...pulseWatch}
                         />
                       ) : undefined
@@ -2905,6 +2913,8 @@ function DashboardContent({
                   <PsxMarketPulse
                     ref={pulseRef}
                     onOpenShortlist={() => setTab('sip')}
+                    onRefresh={refresh}
+                    refreshing={busy}
                     {...pulseWatch}
                   />
                 )}

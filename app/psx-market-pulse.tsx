@@ -38,7 +38,13 @@ interface MarketSummary {
 }
 
 interface Props {
+  /** `shortlist`: the Monthly Picks shortlist (All view). `holdings`: the biggest movers among what one portfolio holds. */
+  mode?: 'shortlist' | 'holdings';
   onOpenShortlist: () => void;
+  /** Refresh everything the page refreshes (PSX prices included), not only the market summary. */
+  onRefresh?: () => void | Promise<void>;
+  /** The page is busy refreshing prices. */
+  refreshing?: boolean;
   /** The companies to follow. Only these tickers are sent to the server; names and saved quotes stay local. */
   tickers: string[];
   names: Record<string, string>;
@@ -104,8 +110,60 @@ function saveSummary(tickers: string[], summary: MarketSummary, fetchedAt: strin
   } catch {}
 }
 
+/** Best and worst movers today among the companies a portfolio holds. */
+function HoldingsMovers({ companies }: { companies: ShortlistPerformance[] | null }) {
+  if (!companies) return <TabLoader label="Loading today's moves in your holdings…" />;
+  const moved = companies.filter((c) => c.changePercent !== null && c.price !== null);
+  const up = moved.filter((c) => c.changePercent! > 0).sort((a, b) => b.changePercent! - a.changePercent!).slice(0, 4);
+  const down = moved.filter((c) => c.changePercent! < 0).sort((a, b) => a.changePercent! - b.changePercent!).slice(0, 4);
+  const flat = moved.length - moved.filter((c) => c.changePercent !== 0).length;
+  const list = (title: string, rows: ShortlistPerformance[], tone: 'pos' | 'neg') => (
+    <div className="pulse-movers">
+      <h4>{title}</h4>
+      {rows.length ? (
+        <div className="pulse-mover-list">
+          {rows.map((c) => (
+            <div className="pulse-mover-row" key={c.ticker}>
+              <span><TickerLink ticker={c.ticker} /></span>
+              <b className={tone}>
+                {c.changePercent! > 0 ? '+' : ''}
+                {number(c.changePercent!)}%
+              </b>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="pulse-empty">None today.</p>
+      )}
+    </div>
+  );
+  if (!moved.length)
+    return (
+      <div className="pulse-shortlist">
+        <p className="pulse-empty">Prices for your holdings have not loaded yet.</p>
+      </div>
+    );
+  return (
+    <div className="pulse-shortlist pulse-holdings">
+      <div className="pulse-shortlist__head">
+        <div>
+          <h4>Your holdings today</h4>
+          <span>
+            {moved.filter((c) => c.changePercent! > 0).length} up ·{' '}
+            {moved.filter((c) => c.changePercent! < 0).length} down · {flat} unchanged
+          </span>
+        </div>
+      </div>
+      <div className="pulse-holdings__cols">
+        {list('Top gainers', up, 'pos')}
+        {list('Top decliners', down, 'neg')}
+      </div>
+    </div>
+  );
+}
+
 export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
-  { onOpenShortlist, tickers, names, saved },
+  { mode = 'shortlist', onOpenShortlist, onRefresh, refreshing = false, tickers, names, saved },
   ref,
 ) {
   const watch = useRef({ tickers, names, saved });
@@ -356,9 +414,13 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
               {stale ? 'Cached' : 'Retrieved'} {sourceTime(displayedAt)}
             </span>
           )}
-          <button className="secondary compact" disabled={loading} onClick={refresh}>
-            <RefreshCw className={loading ? 'spin' : ''} size={14} />
-            {loading ? 'Refreshing…' : 'Refresh'}
+          <button
+            className="secondary compact"
+            disabled={loading || refreshing}
+            onClick={() => (onRefresh ? void onRefresh() : void refresh())}
+          >
+            <RefreshCw className={loading || refreshing ? 'spin' : ''} size={14} />
+            {loading || refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
       </div>
@@ -394,6 +456,9 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
             </small>
           </div>
         )}
+        {mode === 'holdings' ? (
+          <HoldingsMovers companies={summary?.companies ?? null} />
+        ) : (
         <div className="pulse-shortlist">
           <div className="pulse-shortlist__head">
             <div>
@@ -432,6 +497,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
             <TabLoader label="Loading your shortlist and latest saved market data…" />
           )}
         </div>
+        )}
       </div>
     </section>
   );

@@ -557,6 +557,10 @@ button.asset-history__toggle:not([data-slot]):hover {
   opacity: 0.5;
   text-decoration: line-through;
 }
+.asset-history__actions {
+  display: inline-flex;
+  gap: 6px;
+}
 .asset-history__more {
   margin: 8px 0 0;
 }
@@ -634,7 +638,7 @@ button.start-tile:not([data-slot]):hover {
 .add-asset {
   display: flex;
   justify-content: flex-end;
-  margin: 18px 0 0;
+  margin: 18px 0 18px;
 }
 
 /* The All dashboard's value chart has no market-pulse column beside it, so it takes the whole width. */
@@ -657,7 +661,28 @@ button.start-tile:not([data-slot]):hover {
 .add-asset__trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(59, 130, 246, 0.08);
+  color: #bcd4f7;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.add-asset__trigger:hover:not(:disabled),
+.add-asset__trigger[aria-expanded='true'] {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.16);
+}
+.add-asset__trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* Asset dialogs: a little wider, and never a sideways scroll from a long option or field */
@@ -678,4 +703,48 @@ button.start-tile:not([data-slot]):hover {
 .asset-dialog input {
   min-width: 0;
   max-width: 100%;
+}
+
+/* The empty-portfolio card: a 2 x 2 grid of choices at a readable width, icon beside the text */
+.empty-holdings .start-grid {
+  width: 100%;
+  max-width: 720px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 8px 0 0;
+}
+.empty-holdings button.start-tile:not([data-slot]) {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'icon title' 'icon hint';
+  column-gap: 14px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 16px 18px;
+}
+.empty-holdings .start-tile__icon {
+  grid-area: icon;
+  margin: 0;
+}
+.empty-holdings .start-tile b {
+  grid-area: title;
+  align-self: end;
+}
+.empty-holdings .start-tile small {
+  grid-area: hint;
+  align-self: start;
+}
+.empty-holdings .empty-holdings-actions {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+.empty-holdings .empty-holdings-hint {
+  margin-top: 10px;
+}
+@media (max-width: 640px) {
+  .empty-holdings .start-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

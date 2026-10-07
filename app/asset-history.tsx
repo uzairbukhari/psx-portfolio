@@ -20,6 +20,8 @@ export type HistoryRow = {
   meta?: string[];
   voided?: boolean;
   action?: { label: string; disabled?: boolean; onClick: () => void };
+  /** Opens the entry for correction; shown beside the void / restore button. */
+  edit?: { disabled?: boolean; onClick: () => void };
 };
 
 const FIRST = 6;
@@ -91,15 +93,29 @@ export default function AssetHistory({
                     <small key={m}>{m}</small>
                   ))}
                 </span>
-                {r.action && (
-                  <button
-                    type="button"
-                    className="secondary compact asset-history__action"
-                    disabled={r.action.disabled}
-                    onClick={r.action.onClick}
-                  >
-                    {r.action.label}
-                  </button>
+                {(r.action || r.edit) && (
+                  <span className="asset-history__action asset-history__actions">
+                    {r.edit && (
+                      <button
+                        type="button"
+                        className="secondary compact"
+                        disabled={r.edit.disabled}
+                        onClick={r.edit.onClick}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {r.action && (
+                      <button
+                        type="button"
+                        className="secondary compact"
+                        disabled={r.action.disabled}
+                        onClick={r.action.onClick}
+                      >
+                        {r.action.label}
+                      </button>
+                    )}
+                  </span>
                 )}
               </li>
             ))}

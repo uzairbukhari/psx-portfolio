@@ -32,8 +32,17 @@ type Catalog = FundCatalogResponse['funds'];
 type Mode =
   | { kind: 'add' }
   | {
-      kind: 'buy' | 'redeem' | 'dividend' | 'reinvest' | 'price' | 'monthly';
+      kind:
+        | 'buy'
+        | 'opening'
+        | 'redeem'
+        | 'dividend'
+        | 'reinvest'
+        | 'price'
+        | 'monthly';
       fundId: string;
+      /** The history entry being corrected, when editing rather than adding. */
+      editId?: string;
       prefill?: {
         date: string;
         amount: number;
@@ -407,6 +416,9 @@ export default function MutualFundsSection({
               v={v}
               canEdit={canEdit}
               busy={busy}
+              onEdit={(kind, editId) =>
+                setMode({ kind, fundId: asset.id, editId })
+              }
               onToggle={(entryId) =>
                 void update(
                   asset.id,
@@ -434,12 +446,14 @@ function FundHistory({
   canEdit,
   busy,
   onToggle,
+  onEdit,
 }: {
   asset: FundAsset;
   v: ReturnType<typeof valueFund>;
   canEdit: boolean;
   busy: boolean;
   onToggle: (entryId: string) => void;
+  onEdit: (kind: FundEntry['type'], entryId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const history = useFundHistory(asset.mufapId, open);
@@ -489,6 +503,9 @@ function FundHistory({
               disabled: busy,
               onClick: () => onToggle(e.id),
             }
+          : undefined,
+        edit: canEdit
+          ? { disabled: busy, onClick: () => onEdit(e.type, e.id) }
           : undefined,
       } satisfies HistoryRow;
     });
@@ -569,22 +586,39 @@ function FundDialog({
 }) {
   const fund =
     mode.kind === 'add' ? undefined : funds.find((f) => f.id === mode.fundId);
+  const editEntry =
+    mode.kind !== 'add' && mode.editId
+      ? fund?.entries.find((e) => e.id === mode.editId)
+      : undefined;
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Catalog[number] | null>(null);
   const [type, setType] = useState<'buy' | 'opening'>('buy');
   const [date, setDate] = useState(
-    mode.kind !== 'add' && mode.prefill ? mode.prefill.date : today(),
+    editEntry?.date ??
+      (mode.kind !== 'add' && mode.prefill ? mode.prefill.date : today()),
   );
-  const [unitCount, setUnitCount] = useState('');
+  const [unitCount, setUnitCount] = useState(
+    editEntry?.units !== undefined ? String(editEntry.units) : '',
+  );
   const [amount, setAmount] = useState(
-    mode.kind !== 'add' && mode.prefill ? String(mode.prefill.amount) : '',
+    editEntry?.amount != null
+      ? String(editEntry.amount)
+      : mode.kind !== 'add' && mode.prefill
+        ? String(mode.prefill.amount)
+        : '',
   );
-  const [tax, setTax] = useState('');
-  const [loadPct, setLoadPct] = useState('');
+  const [tax, setTax] = useState(
+    editEntry?.taxWithheld !== undefined ? String(editEntry.taxWithheld) : '',
+  );
+  const [loadPct, setLoadPct] = useState(
+    editEntry?.load && editEntry.amount
+      ? String(Math.round((editEntry.load / editEntry.amount) * 1e4) / 100)
+      : '',
+  );
   const [price, setPrice] = useState('');
   const [day, setDay] = useState('1');
   const [from, setFrom] = useState(today().slice(0, 7));
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(editEntry?.note ?? '');
   const [error, setError] = useState('');
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -604,6 +638,7 @@ function FundDialog({
     redeem: 'Redeem units',
     dividend: 'Cash dividend received',
     reinvest: 'Dividend reinvested',
+    opening: 'Opening balance',
     price: 'Enter a price',
     monthly: 'Monthly purchase',
   } as const;
@@ -679,21 +714,28 @@ function FundDialog({
         const load =
           pct > 0 && a ? Math.round(((a * pct) / 100) * 100) / 100 : undefined;
         const entry: FundEntry = {
-          id: rid(),
+          ...(editEntry ?? {}),
+          id: editEntry?.id ?? rid(),
           type: kind,
           date,
-          ...(u === undefined ? {} : { units: u }),
+          units: u,
           amount: a,
-          ...(t === undefined ? {} : { taxWithheld: t }),
-          ...(load === undefined ? {} : { load }),
+          taxWithheld: t,
+          load,
           ...(mode.kind === 'buy' && mode.prefill
             ? { recurringId: mode.prefill.recurringId }
             : {}),
           note: note.trim(),
         };
-        next = { ...target, entries: [...target.entries, entry] };
-        message =
-          kind === 'redeem'
+        next = {
+          ...target,
+          entries: editEntry
+            ? target.entries.map((e) => (e.id === editEntry.id ? entry : e))
+            : [...target.entries, entry],
+        };
+        message = editEntry
+          ? 'Entry updated.'
+          : kind === 'redeem'
             ? 'Redemption recorded.'
             : kind === 'dividend'
               ? 'Dividend recorded.'
@@ -717,7 +759,7 @@ function FundDialog({
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="form-dialog tx-dialog asset-dialog">
-        <DialogTitle>{titles[mode.kind]}</DialogTitle>
+        <DialogTitle>{editEntry ? 'Edit entry' : titles[mode.kind]}</DialogTitle>
         <DialogDescription>
           {fund
             ? fund.fundName
