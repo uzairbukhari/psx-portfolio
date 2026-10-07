@@ -124,6 +124,7 @@ import MonthlyPicks from './monthly-picks';
 import { parseFinqalabReport } from './finqalab-import';
 import { FinqalabImportDialog } from './finqalab-import-dialog';
 import { BrokerImportDialog } from './broker-import-dialog';
+import { detectPsxConfirmation, parsePsxConfirmation } from '@/lib/psx-confirmation';
 import {
   validateBrokerStatement,
   type BrokerStatement,
@@ -586,7 +587,7 @@ function DashboardContent({
       fileName: string;
       format: BrokerFormat | null;
       hash: string;
-      method: 'ai' | 'saved';
+      method: 'ai' | 'saved' | 'local';
     } | null>(null),
     [ipoReview, setIpoReview] = useState<{
       items: IpoAllotment[];
@@ -1374,6 +1375,18 @@ function DashboardContent({
           } catch {
             throw Error(UNSUPPORTED_FILE);
           }
+        }
+        if (!kind && pdf && !expected && detectPsxConfirmation(pdf.text)) {
+          // Youngs Capital, Syed Faraz Equities and other brokers on the same PSX confirmation template.
+          reviewing = true;
+          setBrokerReview({
+            statement: validateBrokerStatement(parsePsxConfirmation(pdf.text)),
+            fileName: f.name,
+            format: null,
+            hash,
+            method: 'local',
+          });
+          return;
         }
         if (!kind) {
           if (expected) throw Error(UNSUPPORTED_FILE);

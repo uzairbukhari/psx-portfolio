@@ -91,7 +91,7 @@ export function ImportPanel({
         />
       </div>
       <p className="imp-note">
-        Choose a PDF, CSV, Excel (.xlsx), or JSON statement. Known AHL and Finqalab formats are read on your device without AI. Other formats may use the app’s AI service after you approve sharing the statement text.
+        Choose a PDF, CSV, Excel (.xlsx), or JSON statement. Known AHL, Finqalab, Youngs Capital and Syed Faraz Equities formats (and other brokers that use the same PSX Client Confirmation layout) are read on your device without AI. Other formats may use the app’s AI service after you approve sharing the statement text.
       </p>
       <p className="imp-note">Importing the same statement again will not duplicate your trades.</p>
       {isAdmin && <>
