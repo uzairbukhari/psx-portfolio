@@ -1706,6 +1706,8 @@ function DashboardContent({
   const unreadCount = notifications.filter((n) => !n.read).length;
   const chromeless =
     tab === 'settings' || tab === 'company' || tab === 'notifications';
+  // A portfolio with nothing in it shows only its start screen: no tabs to open.
+  const hideTabs = chromeless || (p.companies.length === 0 && !hasAssets);
   const taxedDividends = taxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
@@ -2227,7 +2229,7 @@ function DashboardContent({
           }}
         />
         <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-          <header className={'app-header' + (chromeless ? ' no-tabs' : '')}>
+          <header className={'app-header' + (hideTabs ? ' no-tabs' : '')}>
             <div className="header-brand-group">
               <button
                 type="button"
@@ -2242,9 +2244,10 @@ function DashboardContent({
                 <LogoMark size={28} />
                 <Wordmark />
               </button>
-              {workspace?.selector}
+              {tab !== 'settings' && workspace?.selector}
             </div>
             <div className="header-right">
+              {tab !== 'settings' && (
               <button
                 type="button"
                 data-slot="hdr"
@@ -2258,6 +2261,7 @@ function DashboardContent({
                 <Plus size={18} />
                 <span className="hdr-label">Add transaction</span>
               </button>
+              )}
               <Popover
                 open={bellOpen}
                 onOpenChange={(next) => {
@@ -2406,7 +2410,7 @@ function DashboardContent({
                 </DropdownMenu>
               )}
             </div>
-            {!chromeless && (
+            {!hideTabs && (
               <TabsList variant="line">
                 <TabsTrigger value="holdings">
                   <Wallet className="tab-icon" aria-hidden="true" />
