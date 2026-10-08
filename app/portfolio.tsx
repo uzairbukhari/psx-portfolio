@@ -189,7 +189,7 @@ import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
 import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
-import { flushAnalytics, track } from './analytics';
+import { flushAnalytics, hookGlobalErrors, reportError, track } from './analytics';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -693,6 +693,7 @@ function DashboardContent({
     });
   }
   function notify(s: string, error = false) {
+    if (error) reportError(s);
     setMessageState(s);
     setFailed(error);
     showToast(s, error);
@@ -1087,6 +1088,7 @@ function DashboardContent({
     if (!tickers.length) return '';
     return ` Warning: ${tickers.length === 1 ? 'a sale has' : tickers.length + ' sales have'} unknown cost basis (${tickers.join(', ')}). Review the acquisition history before relying on tax figures.`;
   }
+  useEffect(() => hookGlobalErrors(), []);
   useEffect(() => {
     const context = (
       document as unknown as {

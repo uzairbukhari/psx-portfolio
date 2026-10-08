@@ -2,6 +2,7 @@
 // only: every prop is a closed enum, there is no free text, and the server rejects anything outside this list. Never
 // add a prop that could hold a ticker, an amount, a quantity, a price, a name or a note.
 // Pure module (no Workers imports) so the phone app can import it.
+import { ERROR_AREAS, ERROR_CODES } from './error-codes.ts';
 
 export const PLATFORMS = ['web', 'android', 'ios', 'other'] as const;
 export type Platform = (typeof PLATFORMS)[number];
@@ -60,8 +61,8 @@ export const EVENT_CATALOG = {
   notifications_enabled: {},
   theme_changed: { theme: ['light', 'dark', 'system'] },
   chart_range_changed: { range: ['1w', '1m', '3m', '6m', '1y', 'all'] },
-  // Errors (no message text, no stack)
-  client_error: { area: ['vault', 'import', 'picks', 'sync', 'render', 'other'] },
+  // Errors for the super-admin audit log (category, code and screen only: no message text, no stack)
+  client_error: { area: ERROR_AREAS, code: ERROR_CODES, screen: SCREENS },
 } as const satisfies Record<string, Record<string, readonly string[]>>;
 
 export type EventName = keyof typeof EVENT_CATALOG;

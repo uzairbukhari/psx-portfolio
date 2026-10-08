@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 const SHARED = [
   'api-types',
   'analytics-events',
+  'error-codes',
   'analytics-diff',
   'portfolio',
   'portfolio-account',
