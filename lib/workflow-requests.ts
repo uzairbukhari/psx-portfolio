@@ -9,16 +9,18 @@
 //  - the production-writing workflows are never dispatched from staging (see dispatchBlockedReason).
 import { dispatchBlockedReason, type DispatchConfig } from './github-dispatch.ts';
 
-export type RequestKind = 'payouts' | 'ipo' | 'company' | 'quotes' | 'facevalue';
+export type RequestKind = 'payouts' | 'ipo' | 'company' | 'quotes' | 'facevalue' | 'history';
 export const WORKFLOWS: Record<RequestKind, string> = {
   payouts: 'psx-payouts.yml', ipo: 'psx-ipo.yml', company: 'psx-directory.yml', quotes: 'psx-quotes.yml', facevalue: 'psx-face-values.yml',
+  history: 'psx-history.yml',
 };
 /**
  * The `inputs` each workflow declares (GitHub rejects an undeclared input). The quote scraper declares none:
- * it serves every open `quotes` request it finds in D1, so a delayed or lost dispatch loses nothing.
+ * it serves every open `quotes` request it finds in D1, so a delayed or lost dispatch loses nothing. The history
+ * scraper works the same way for `history` requests.
  */
 export const workflowInputs = (kind: RequestKind, tickers: string[]): Record<string, string> | undefined =>
-  kind === 'quotes' ? undefined : kind === 'company' ? { tickers: tickers.join(','), mode: 'incremental' } : { tickers: tickers.join(',') };
+  kind === 'quotes' || kind === 'history' ? undefined : kind === 'company' ? { tickers: tickers.join(','), mode: 'incremental' } : { tickers: tickers.join(',') };
 /** A queued or running request older than this is reported as timed out. */
 export const REQUEST_TIMEOUT_MS = 20 * 60_000;
 /** Most tickers one request may cover. */

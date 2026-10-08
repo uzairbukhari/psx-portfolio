@@ -96,6 +96,15 @@ export type PriceHistoryResponse = {
   /** Additive: freshness of the daily and intraday series, judged by their last point, not by fetch time. */
   eodMeta?: import('./market-meta.ts').DataMeta;
   intradayMeta?: import('./market-meta.ts').DataMeta;
+  /** Additive: state of an on-demand history fetch for this symbol (`none` when nobody asked). */
+  request?: import('./workflow-requests.ts').TickerState;
+};
+/** POST /api/price-history: ask for a symbol's history to be fetched now. */
+export type PriceHistoryRequestResponse = {
+  request: import('./workflow-requests.ts').TickerState;
+  /** False when nothing could be started (no dispatch configured, staging); `reason` says why. */
+  started: boolean;
+  reason?: string;
 };
 export type PriceHistoryBatchResponse = {
   histories: Record<string, { eod: PricePoint[] }>;
