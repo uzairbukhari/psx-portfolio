@@ -3494,7 +3494,9 @@ function DashboardContent({
         {ahlStatement && (
           <AhlImportDialog
             statement={ahlStatement.statement}
-            fileName={`${ahlStatement.fileName} · ${destinationName}`}
+            fileName={ahlStatement.fileName}
+            destination={destinationName}
+            onViewActivity={() => setTab('history')}
             portfolio={p}
             revision={revision}
             busy={busy}
@@ -3505,14 +3507,15 @@ function DashboardContent({
             }}
             onCommit={async (next, message) => {
               await save(next, message + unknownCostWarning(next));
-              setAhlStatement(null);
             }}
           />
         )}
         {finqalabReview && (
           <FinqalabImportDialog
             rows={finqalabReview.rows}
-            fileName={`${finqalabReview.fileName} · ${destinationName}`}
+            fileName={finqalabReview.fileName}
+            destination={destinationName}
+            onViewActivity={() => setTab('history')}
             portfolio={p}
             revision={revision}
             busy={busy}
@@ -3523,14 +3526,15 @@ function DashboardContent({
             }}
             onCommit={async (next, message) => {
               await save(next, message + unknownCostWarning(next));
-              setFinqalabReview(null);
             }}
           />
         )}
         {brokerReview && (
           <BrokerImportDialog
             statement={brokerReview.statement}
-            fileName={`${brokerReview.fileName} · ${destinationName}`}
+            fileName={brokerReview.fileName}
+            destination={destinationName}
+            onViewActivity={() => setTab('history')}
             portfolio={p}
             revision={revision}
             busy={busy}
@@ -3559,14 +3563,15 @@ function DashboardContent({
                 brokerReview.hash,
               ];
               await save(next, message + unknownCostWarning(next));
-              setBrokerReview(null);
             }}
           />
         )}
         {ipoReview && (
           <IpoImportDialog
             items={ipoReview.items}
-            fileName={`${ipoReview.fileName} · ${destinationName}`}
+            fileName={ipoReview.fileName}
+            destination={destinationName}
+            onViewActivity={() => setTab('history')}
             portfolio={p}
             revision={revision}
             busy={busy}
@@ -3577,7 +3582,6 @@ function DashboardContent({
             }}
             onCommit={async (next, message) => {
               await save(next, message + unknownCostWarning(next));
-              setIpoReview(null);
             }}
           />
         )}
