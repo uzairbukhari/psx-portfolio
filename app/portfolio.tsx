@@ -190,6 +190,10 @@ import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
 import { pktDate, type PricePoint } from '@/lib/price-history';
+import type {
+  PriceHistoryRequestResponse,
+  PriceHistoryResponse,
+} from '@/lib/api-types';
 import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
 import { flushAnalytics, hookGlobalErrors, reportError, track } from './analytics';
 
@@ -385,9 +389,10 @@ function TickerPicker({
     { ticker: string; name: string }[]
   >([]);
   const q = query.trim().toLowerCase();
+  const choose = useEffectEvent(onChange);
   // New companies can be any PSX symbol, so search the shared directory too (public data; only the typed text is sent).
   useEffect(() => {
-    if (!allowNew || !q) return;
+    if (!allowNew || q.length < 2) return;
     let live = true;
     const timer = window.setTimeout(() => {
       fetch(`/api/companies/search?q=${encodeURIComponent(q)}`)
@@ -396,7 +401,12 @@ function TickerPicker({
             r.ok ? r.json() : Promise.resolve({ companies: [] }),
         )
         .then((body) => {
-          if (live) setDirectory(body.companies ?? []);
+          if (!live) return;
+          const found = body.companies ?? [];
+          setDirectory(found);
+          // A symbol typed out in full is selected once the directory confirms it exists.
+          const exact = found.find((c) => c.ticker.toLowerCase() === q);
+          if (exact) choose(exact.ticker);
         })
         .catch(() => {
           if (live) setDirectory([]);
@@ -425,7 +435,11 @@ function TickerPicker({
     const exact = companies.find(
       (c) => c.ticker.toLowerCase() === text.trim().toLowerCase(),
     );
-    onChange(exact ? exact.ticker : allowNew ? text.trim().toUpperCase() : '');
+    // Only a symbol that exists is passed on: typing alone never triggers lookups for half-typed text.
+    const listed = directory.find(
+      (c) => c.ticker.toLowerCase() === text.trim().toLowerCase(),
+    );
+    onChange(exact ? exact.ticker : listed ? listed.ticker : '');
   }
   return (
     <div className="ticker-picker">
@@ -471,10 +485,13 @@ function TickerPicker({
     </div>
   );
 }
+type HistoryData = Pick<PriceHistoryResponse, 'eod' | 'intraday' | 'request'>;
 /**
  * Fills the price field with the closing price on the chosen trade date (the last close on or before it), from the
  * shared price history, and says what it found. Runs when the symbol or date changes, so a price you type afterwards
- * is left alone. A symbol with no stored history is queued for the scheduled scrapers, so it has one next time.
+ * is left alone. The symbol is already a confirmed listing (the picker only emits those). When nothing is stored yet,
+ * it asks the server to fetch that symbol's history now (GitHub Actions; PSX blocks Cloudflare), shows a loader while
+ * that runs, and fills the price when it lands.
  */
 function TradePriceAutofill({
   ticker,
@@ -485,61 +502,131 @@ function TradePriceAutofill({
   date: string;
   onPrice: (price: number) => void;
 }) {
-  const cache = useRef<Record<string, { eod: PricePoint[]; intraday: PricePoint[] }>>({});
-  const requested = useRef(new Set<string>());
+  const cache = useRef<Record<string, HistoryData>>({});
+  const asked = useRef(new Set<string>());
   const apply = useEffectEvent(onPrice);
-  const [note, setNote] = useState<{ key: string; text: string } | null>(null);
+  const [note, setNote] = useState<{
+    key: string;
+    text: string;
+    busy?: boolean;
+  } | null>(null);
   const key = `${ticker}:${date}`;
   useEffect(() => {
     if (!/^[A-Z0-9]{2,12}$/.test(ticker) || !date) return;
     let live = true;
-    const timer = window.setTimeout(async () => {
+    let timer: number | undefined;
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        timer = window.setTimeout(resolve, ms);
+      });
+    const say = (text: string, busy = false) =>
+      live && setNote({ key, text, busy });
+    const load = async (): Promise<HistoryData> => {
+      const r = await fetch(
+        `/api/price-history?ticker=${encodeURIComponent(ticker)}`,
+      );
+      if (!r.ok) throw new Error('history');
+      const body = (await r.json()) as Partial<HistoryData>;
+      const data = {
+        eod: body.eod ?? [],
+        intraday: body.intraday ?? [],
+        request: body.request,
+      };
+      cache.current[ticker] = data;
+      return data;
+    };
+    const latest = (points: PricePoint[]) =>
+      points
+        .filter(([sec]) => pktDate(sec) <= date)
+        .sort((a, b) => b[0] - a[0])[0];
+    // Daily closes first; today's ticks only stand in for a close that has not been recorded yet.
+    const pick = (data: HistoryData) =>
+      latest(data.eod) ?? (date === today() ? latest(data.intraday) : undefined);
+    const has = (data: HistoryData) =>
+      data.eod.length > 0 || data.intraday.length > 0;
+    const fill = (point: PricePoint) => {
+      apply(point[1]);
+      say(
+        `Filled with the ${pktDate(point[0]) === date ? 'close' : `last close, ${pktDate(point[0])},`} Rs ${point[1].toLocaleString('en-PK', { maximumFractionDigits: 2 })}. Change it if your fill was different.`,
+      );
+    };
+    void (async () => {
       try {
-        if (!cache.current[ticker]) {
-          const r = await fetch(
-            `/api/price-history?ticker=${encodeURIComponent(ticker)}`,
-          );
-          const body = r.ok
-            ? ((await r.json()) as { eod?: PricePoint[]; intraday?: PricePoint[] })
-            : {};
-          cache.current[ticker] = { eod: body.eod ?? [], intraday: body.intraday ?? [] };
-        }
-        const { eod, intraday } = cache.current[ticker];
-        const latest = (points: PricePoint[]) =>
-          points
-            .filter(([sec]) => pktDate(sec) <= date)
-            .sort((a, b) => b[0] - a[0])[0];
-        // Daily closes first; today's ticks only stand in for a close that has not been recorded yet.
-        const point = latest(eod) ?? (date === today() ? latest(intraday) : undefined);
+        await sleep(300);
         if (!live) return;
-        if (point && point[1] > 0) {
-          apply(point[1]);
-          setNote({
-            key,
-            text: `Filled with the ${pktDate(point[0]) === date ? 'close' : 'last close, ' + pktDate(point[0]) + ','} Rs ${point[1].toLocaleString('en-PK', { maximumFractionDigits: 2 })}. Change it if your fill was different.`,
+        let data = cache.current[ticker];
+        if (!data) {
+          say(`Looking up the closing price for ${ticker}…`, true);
+          data = await load();
+          if (!live) return;
+        }
+        if (has(data)) {
+          const point = pick(data);
+          if (point && point[1] > 0) fill(point);
+          else
+            say(
+              'No stored close on or before this date. Enter the price from your broker confirmation.',
+            );
+          return;
+        }
+        // Nothing stored for this symbol: have it fetched now, then wait for it.
+        say(`Fetching ${ticker}'s price history from PSX. This can take a minute or two…`, true);
+        if (!asked.current.has(ticker)) {
+          asked.current.add(ticker);
+          const r = await fetch('/api/price-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker }),
           });
-        } else {
-          setNote({
-            key,
-            text: eod.length || intraday.length
-              ? 'No stored close on or before this date. Enter the price from your broker confirmation.'
-              : `No price history for ${ticker} yet. Enter the price yourself; it is being collected for next time.`,
-          });
-          if (!eod.length && !intraday.length && !requested.current.has(ticker)) {
-            requested.current.add(ticker);
-            void queueQuoteRefresh([ticker]);
+          const answer = (await r.json().catch(() => ({}))) as Partial<PriceHistoryRequestResponse> & { error?: string };
+          if (!live) return;
+          if (!r.ok || !answer.started) {
+            say(
+              `${answer.error ?? answer.reason ?? 'Fetching is not available here.'} Enter the price yourself.`,
+            );
+            return;
           }
         }
+        for (let attempt = 0; attempt < 50 && live; attempt++) {
+          await sleep(6000);
+          if (!live) return;
+          data = await load();
+          if (!live) return;
+          if (has(data)) {
+            const point = pick(data);
+            if (point && point[1] > 0) fill(point);
+            else
+              say(
+                'No stored close on or before this date. Enter the price from your broker confirmation.',
+              );
+            return;
+          }
+          const state = data.request?.state;
+          if (state === 'failed') {
+            say(`${data.request?.error ?? 'The fetch failed.'} Enter the price yourself.`);
+            return;
+          }
+          if (state === 'completed') {
+            say(`PSX has no price history for ${ticker} yet. Enter the price yourself.`);
+            return;
+          }
+        }
+        say('The fetch is taking longer than expected. Enter the price yourself; it will be there next time.');
       } catch {
-        if (live) setNote({ key, text: 'Could not load the closing price. Enter it yourself.' });
+        say('Could not load the closing price. Enter it yourself.');
       }
-    }, 300);
+    })();
     return () => {
       live = false;
       window.clearTimeout(timer);
     };
   }, [ticker, date, key]);
-  return note?.key === key ? <output className="wide muted">{note.text}</output> : null;
+  if (note?.key !== key) return null;
+  return (
+    <output className="wide muted">
+      {note.busy && <Spinner />} {note.text}
+    </output>
+  );
 }
 type VaultContext = { session: VaultSession; lock: () => void };
 type DashboardProps = {

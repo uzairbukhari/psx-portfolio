@@ -160,3 +160,21 @@ test('requestRefresh never exceeds the ticker cap and ignores malformed symbols'
   assert.equal(res.queued.length, 40);
   assert.ok(fetcher.calls[0].body.inputs.tickers.split(',').every((t) => /^[A-Z0-9]{2,12}$/.test(t)));
 });
+
+test('a history request dispatches psx-history.yml with no inputs and is deduplicated while in flight', async () => {
+  const db = createD1();
+  const fetcher = ok();
+  const first = await requestRefresh(db, config, 'history', ['MTL'], Date.now(), fetcher);
+  assert.deepEqual(first.queued, ['MTL']);
+  assert.match(fetcher.calls[0].url, /workflows\/psx-history\.yml\/dispatches$/);
+  assert.equal(fetcher.calls[0].body.inputs, undefined);
+  const again = await requestRefresh(db, config, 'history', ['MTL'], Date.now(), fetcher);
+  assert.equal(fetcher.calls.length, 1);
+  assert.deepEqual(again.alreadyRunning, ['MTL']);
+});
+
+test('a history request is not dispatched from staging', async () => {
+  const res = await requestRefresh(createD1(), { ...config, appEnv: 'staging' }, 'history', ['MTL']);
+  assert.equal(res.dispatched, false);
+  assert.match(res.reason, /staging/);
+});

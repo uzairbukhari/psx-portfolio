@@ -1,4 +1,10 @@
-import type { PriceHistoryBatchResponse, PriceHistoryResponse } from '@/lib/api-types';
+import type {
+  PriceHistoryBatchResponse,
+  PriceHistoryRequestResponse,
+  PriceHistoryResponse,
+} from '@/lib/api-types';
+import { dispatchConfig } from '@/lib/dispatch-config';
+import { readRequests, requestRefresh, tickerState } from '@/lib/workflow-requests';
 import { dataMeta } from '@/lib/market-freshness';
 import { pktDate, type PricePoint } from '@/lib/price-history';
 import { db, failure, identity } from '@/lib/server';
@@ -68,7 +74,35 @@ export async function GET(req: Request) {
         intradayFetchedAt: row?.intraday_fetched_at ?? null,
         eodMeta: metaFor(eod, row?.eod_fetched_at ?? null, false),
         intradayMeta: metaFor(intraday, row?.intraday_fetched_at ?? null, true),
+        request: tickerState((await readRequests(db(), 'history', [ticker])).get(ticker), ticker, Date.now()),
       } satisfies PriceHistoryResponse,
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+/**
+ * Asks for one symbol's price history to be fetched now (GitHub Actions; PSX blocks Cloudflare). Only a symbol the
+ * company directory lists is accepted, so half-typed searches never start a fetch. The body is just the symbol.
+ */
+export async function POST(req: Request) {
+  try {
+    await identity(req, true);
+    const body = (await req.json().catch(() => ({}))) as { ticker?: unknown };
+    const ticker = (typeof body.ticker === 'string' ? body.ticker : '').trim().toUpperCase();
+    if (!tickerOK(ticker)) throw new UserError('Invalid symbol.');
+    const listed = await db()
+      .prepare("SELECT 1 AS ok FROM security_catalog WHERE ticker=? AND COALESCE(listing_status,'')<>'delisted'")
+      .bind(ticker)
+      .first();
+    if (!listed) throw new UserError(`${ticker} is not a listed PSX symbol.`);
+    const result = await requestRefresh(db(), dispatchConfig(), 'history', [ticker]);
+    const request = tickerState((await readRequests(db(), 'history', [ticker])).get(ticker), ticker, Date.now());
+    const started = result.dispatched || result.alreadyRunning.includes(ticker);
+    return Response.json(
+      { request, started, ...(started ? {} : { reason: result.reason }) } satisfies PriceHistoryRequestResponse,
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

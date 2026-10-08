@@ -8,6 +8,7 @@
 // Usage: node scripts/psx-history-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK] [--refresh-eod]
 // --refresh-eod re-fetches daily closes for every ticker regardless of age (backfill after raising the retention).
 import { d1, trackedTickers } from './d1-rest.mjs';
+import { markFinished, markRunning } from './refresh-state.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsxToken, fetchPsxTimeseries, PsxNoSeriesError } from '../lib/psx-fetch.ts';
 import { eodKeep, parseEod, parseIntraday } from '../lib/price-history.ts';
@@ -47,9 +48,19 @@ async function listedOnly(tickers) {
   return { kept: tickers.filter((t) => listed.has(t)), skipped: tickers.filter((t) => !listed.has(t)) };
 }
 
+/** Symbols a user asked for from the app (`refresh_requests` kind 'history'): their daily closes are fetched in full. */
+async function openRequests() {
+  if (dryRun || tickerArg) return [];
+  const rows = await d1("SELECT ticker FROM refresh_requests WHERE kind='history' AND status IN ('queued','running')").catch(() => []);
+  return rows.map((row) => String(row.ticker)).filter((ticker) => /^[A-Z0-9]{2,12}$/.test(ticker));
+}
+
 async function main() {
-  const { kept, skipped } = await listedOnly(await trackedTickers(tickerArg));
+  const requested = await openRequests();
+  const { kept, skipped } = await listedOnly([...new Set([...(await trackedTickers(tickerArg)), ...requested])]);
   const tickers = kept;
+  const results = new Map(requested.map((ticker) => [ticker, { ticker, rows: 0, error: skipped.includes(ticker) ? 'Not a listed PSX symbol.' : null }]));
+  if (requested.length) await markRunning('history', requested.filter((ticker) => !skipped.includes(ticker))).catch((e) => console.log(`Request state not updated: ${e.message}`));
   const ages = await storedAges();
   const now = new Date();
   const failed = [];
@@ -93,7 +104,7 @@ async function main() {
     try {
       const intraday = parseIntraday(await series(ticker, 'int'));
       const eodAt = ages.get(ticker);
-      const stale = refreshEod || !eodAt || now - new Date(eodAt) > EOD_MAX_AGE_MS;
+      const stale = refreshEod || results.has(ticker) || !eodAt || now - new Date(eodAt) > EOD_MAX_AGE_MS;
       const eod = stale ? parseEod(await series(ticker, 'eod')).slice(-eodKeep(ticker)) : null;
       if (dryRun) {
         console.log(`  ${ticker}: ${intraday.length} intraday, ${eod ? eod.length + ' eod' : 'eod fresh'}`);
@@ -110,6 +121,7 @@ async function main() {
         );
       }
       ok++;
+      if (results.has(ticker)) results.get(ticker).rows = eod?.length ?? 0;
     } catch (error) {
       // A new listing has no price history yet: not a failure, it fills in once PSX publishes some.
       if (error instanceof PsxNoSeriesError) {
@@ -117,8 +129,11 @@ async function main() {
         return;
       }
       failed.push(`${ticker}: ${error instanceof Error ? error.message : String(error)}`);
+      if (results.has(ticker)) results.get(ticker).error = 'PSX did not answer. Try again in a few minutes.';
     }
   });
+  if (requested.length)
+    await markFinished('history', [...results.values()]).catch((e) => console.log(`Request state not updated: ${e.message}`));
   console.log(
     `PSX history: ${ok}/${tickers.length - noHistory.length} tickers` +
       (skipped.length ? ` (skipped unlisted: ${skipped.join(', ')})` : '') +
