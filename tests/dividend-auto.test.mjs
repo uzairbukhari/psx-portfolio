@@ -95,3 +95,14 @@ test('undoing a batch voids exactly what that run added', () => {
   assert.equal(undoAutoBatch(p, 'auto-x'), 1);
   assert.equal(p.dividends[0].voided, true);
 });
+
+test('first-fetch detection: only never-fetched companies without cached announcements, and only when dispatch works', async () => {
+  const { tickersNeedingFirstFetch } = await import('../lib/payout-bootstrap.ts');
+  const data = {
+    tickers: ['AAAA', 'BBBB', 'CCCC'], dispatchEnabled: true,
+    states: [{ ticker: 'AAAA', state: 'none' }, { ticker: 'BBBB', state: 'completed' }, { ticker: 'CCCC', state: 'none' }],
+    announcements: [{ ticker: 'CCCC' }],
+  };
+  assert.deepEqual(tickersNeedingFirstFetch(data), ['AAAA']);
+  assert.deepEqual(tickersNeedingFirstFetch({ ...data, dispatchEnabled: false }), []);
+});
