@@ -1,8 +1,9 @@
 name: Deploy staging
 
-# Every PR from this repo (and manual runs) checks, migrates, builds and deploys the
-# STAGING Worker + D1 database. Production is untouched: it only deploys from main
-# via deploy.yml. The quote-refresh cron Worker is never deployed to staging.
+# Every PR from this repo (and manual runs) is merged into the long-lived `staging` branch, then that branch
+# is checked, migrated, built and deployed to the STAGING Worker + D1 database. Staging therefore carries
+# main plus every open PR, so deploying one PR no longer wipes out the others. Production is untouched: it
+# only deploys from main via deploy.yml. The quote-refresh cron Worker is never deployed to staging.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -10,36 +11,112 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch, tag or SHA to deploy to staging (default: the selected branch)'
+        description: 'Extra branch, tag or SHA to merge into staging (default: only main + open PRs)'
         required: false
         default: ''
+      reset:
+        description: 'Recreate the staging branch from main first (drops code from closed or abandoned PRs)'
+        type: boolean
+        required: false
+        default: false
 
-# One shared staging: the most recently pushed PR wins.
+# Least privilege by default; only the merge job needs to push the staging branch.
+permissions:
+  contents: read
+
+# One shared staging. Runs queue instead of cancelling so a half-finished branch update is never abandoned;
+# the merge job re-merges every open PR, so a run GitHub drops from the queue loses nothing.
 concurrency:
   group: deploy-staging
-  cancel-in-progress: true
+  cancel-in-progress: false
 
+# No npm cache below: these jobs run merged PR code, which must not be able to poison a cache that the
+# default branch's workflows restore.
 jobs:
-  check:
+  merge:
     # Fork PRs get no secrets and must not reach the staging environment.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      sha: ${{ steps.merge.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # staging = main + every open same-repo PR into main (+ an optional manual ref). Merging is incremental, so
+      # code from PRs merged earlier stays; `reset` starts over from main. The PR that triggered this run must
+      # merge cleanly or the run fails; other open PRs that conflict are skipped with a warning.
+      - name: Merge main and open PRs into staging
+        id: merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_PR: ${{ github.event.pull_request.number }}
+          EXTRA_REF: ${{ inputs.ref }}
+          RESET: ${{ inputs.reset }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ "$RESET" = "true" ] || ! git ls-remote --exit-code --heads origin staging >/dev/null 2>&1; then
+            git checkout -B staging origin/main
+          else
+            git checkout -B staging origin/staging
+          fi
+
+          merge_ref() { # $1 = label, $2 = ref
+            if git merge --no-ff --no-edit -m "Merge $1 into staging" "$2"; then return 0; fi
+            git merge --abort || true
+            return 1
+          }
+
+          merge_ref "main" origin/main || { echo "::error::main does not merge into staging. Run this workflow manually with reset=true."; exit 1; }
+
+          gh pr list --state open --base main --json number,headRefOid,isCrossRepository,isDraft \
+            --jq '.[] | select(.isCrossRepository | not) | select(.isDraft | not) | "\(.number) \(.headRefOid)"' |
+          while read -r number sha; do
+            git fetch --no-tags origin "refs/pull/$number/head" >/dev/null 2>&1 || true
+            if merge_ref "PR #$number" "$sha"; then
+              echo "Merged PR #$number"
+            elif [ "$number" = "$TRIGGER_PR" ]; then
+              echo "::error::PR #$number conflicts with staging. Resolve the conflict with main or the other open PRs."
+              exit 1
+            else
+              echo "::warning::PR #$number conflicts with staging and was skipped."
+            fi
+          done
+
+          if [ -n "$EXTRA_REF" ]; then
+            git fetch --no-tags origin "$EXTRA_REF" || true
+            merge_ref "$EXTRA_REF" FETCH_HEAD || { echo "::error::$EXTRA_REF conflicts with staging."; exit 1; }
+          fi
+
+          git push origin staging
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: merge
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: staging
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
       - name: Unit tests
         run: node --test 'tests/*.test.mjs'
 
   deploy:
-    needs: check
+    needs: [merge, check]
     runs-on: ubuntu-latest
     # CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN are `staging` environment secrets.
     environment:
@@ -49,7 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: staging
       # Until the owner creates the staging D1 database and pastes its id into
       # wrangler.jsonc (env.staging), there is nothing to deploy to: skip cleanly.
       - name: Check staging database is configured
@@ -65,7 +142,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
       - if: steps.configured.outputs.ready == 'true'
         run: npm ci
       - name: Apply staging D1 migrations
