@@ -24,9 +24,9 @@
   display: block;
   margin: 12px 0 0;
   padding: 10px 12px;
-  border-left: 3px solid #d39a29;
-  background: rgba(211, 154, 41, 0.14);
-  color: #e8c27a;
+  border-left: 3px solid var(--warn-strong);
+  background: rgb(var(--ch-warn) / 0.14);
+  color: var(--warn-ink);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -163,7 +163,7 @@
   padding: 18px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgb(var(--ch-tint) / 0.02);
 }
 .metal-section .metal-asset + .metal-asset,
 .collapsible__body .metal-asset + .metal-asset {
@@ -302,15 +302,15 @@ button.overview-portfolio:not([data-slot]) {
   padding: 16px 18px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgb(var(--ch-tint) / 0.03);
   color: var(--foreground);
   box-shadow: none;
   transform: none;
   font-weight: 400;
 }
 button.overview-portfolio:not([data-slot]):hover {
-  background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.4);
+  background: rgb(var(--ch-primary) / 0.08);
+  border-color: rgb(var(--ch-primary) / 0.4);
   box-shadow: none;
   transform: none;
 }
@@ -521,24 +521,24 @@ button.asset-history__toggle:not([data-slot]):hover {
   border-radius: 999px;
   padding: 3px 10px;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgb(var(--ch-tint) / 0.07);
   color: var(--muted-foreground);
 }
 .asset-history__tag.tag-buy {
-  background: rgba(59, 130, 246, 0.18);
-  color: #9cc2ff;
+  background: rgb(var(--ch-primary) / 0.18);
+  color: var(--soft-ink);
 }
 .asset-history__tag.tag-sell {
-  background: rgba(211, 154, 41, 0.18);
-  color: #e8c27a;
+  background: rgb(var(--ch-warn) / 0.18);
+  color: var(--warn-ink);
 }
 .asset-history__tag.tag-income {
-  background: rgba(34, 224, 160, 0.14);
+  background: rgb(var(--ch-success) / 0.14);
   color: var(--success);
 }
 .asset-history__tag.tag-value {
-  background: rgba(167, 139, 250, 0.16);
-  color: #c4b5fd;
+  background: rgb(var(--ch-violet) / 0.16);
+  color: var(--violet-ink);
 }
 .asset-history__what small,
 .asset-history__amount small {
@@ -605,7 +605,7 @@ button.start-tile:not([data-slot]) {
   padding: 18px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgb(var(--ch-tint) / 0.03);
   color: var(--foreground);
   box-shadow: none;
   transform: none;
@@ -613,8 +613,8 @@ button.start-tile:not([data-slot]) {
   font-weight: 400;
 }
 button.start-tile:not([data-slot]):hover {
-  background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.4);
+  background: rgb(var(--ch-primary) / 0.08);
+  border-color: rgb(var(--ch-primary) / 0.4);
   box-shadow: none;
   transform: none;
 }
@@ -624,8 +624,8 @@ button.start-tile:not([data-slot]):hover {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: rgba(59, 130, 246, 0.16);
-  color: #9cc2ff;
+  background: rgb(var(--ch-primary) / 0.16);
+  color: var(--soft-ink);
   margin-bottom: 4px;
 }
 .start-tile b {
@@ -665,8 +665,8 @@ button.start-tile:not([data-slot]):hover {
   padding: 9px 16px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: rgba(59, 130, 246, 0.08);
-  color: #bcd4f7;
+  background: rgb(var(--ch-primary) / 0.08);
+  color: var(--soft-ink);
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
@@ -677,8 +677,8 @@ button.start-tile:not([data-slot]):hover {
 }
 .add-asset__trigger:hover:not(:disabled),
 .add-asset__trigger[aria-expanded='true'] {
-  border-color: rgba(59, 130, 246, 0.5);
-  background: rgba(59, 130, 246, 0.16);
+  border-color: rgb(var(--ch-primary) / 0.5);
+  background: rgb(var(--ch-primary) / 0.16);
 }
 .add-asset__trigger:focus-visible {
   outline: 2px solid var(--primary);

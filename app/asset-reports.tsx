@@ -35,8 +35,8 @@ import { ChartInfo } from './chart-info';
 import PortfolioReports from './portfolio-reports';
 
 // Same fixed hue order as the stock reports (validated on the dark surface).
-const colors = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'];
-const OTHER = '#5b6b85';
+const colors = ['var(--cat-1)', 'var(--cat-2)', 'var(--cat-3)', 'var(--cat-4)', 'var(--cat-5)', 'var(--cat-6)', 'var(--cat-7)'];
+const OTHER = 'var(--chart-other)';
 const compact = (v: number) =>
   new Intl.NumberFormat('en-PK', { notation: 'compact' }).format(v);
 const monthLabel = (month: string) => {
@@ -176,7 +176,7 @@ function FundReports({ portfolio, navs }: { portfolio: Portfolio; navs: FundNavR
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} label={{ value: 'Month', position: 'insideBottom', offset: -16 }} />
                   <YAxis width={72} tickFormatter={compact} label={{ value: 'Invested (PKR)', angle: -90, position: 'insideLeft' }} />
-                  <ChartTooltip cursor={{ fill: 'rgba(148,178,225,.12)' }} content={<ChartTooltipContent formatter={(v, name) => {
+                  <ChartTooltip cursor={{ fill: 'var(--chart-cursor)' }} content={<ChartTooltipContent formatter={(v, name) => {
                     if (!Number(v)) return null;
                     const k = keys.find((x) => x.id === name);
                     return <div className="report-tooltip-row"><span>{k?.name ?? name}</span><b>{money(Number(v))}</b></div>;
@@ -215,7 +215,7 @@ function PlanReports({ portfolio, navs }: { portfolio: Portfolio; navs: PlanNavR
   const rows = report.monthly.map((m) => ({ ...m, label: monthLabel(m.month) }));
   const series = report.series.map((s) => ({ ...s, label: monthLabel(s.month) }));
   const config = {
-    paidIn: { label: 'Paid in', color: '#7f93b8' },
+    paidIn: { label: 'Paid in', color: 'var(--chart-neutral)' },
     value: { label: 'Value', color: 'var(--primary)' },
   } satisfies ChartConfig;
   return (
@@ -248,7 +248,7 @@ function PlanReports({ portfolio, navs }: { portfolio: Portfolio; navs: PlanNavR
                 <XAxis dataKey="label" tickLine={false} axisLine={false} label={{ value: 'Month', position: 'insideBottom', offset: -16 }} />
                 <YAxis width={72} tickFormatter={compact} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(v, name) => <div className="report-tooltip-row"><span>{name === 'value' ? 'Value' : 'Paid in'}</span><b>{money(Number(v))}</b></div>} />} />
-                <Line type="monotone" dataKey="paidIn" stroke="#7f93b8" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                <Line type="monotone" dataKey="paidIn" stroke="var(--chart-neutral)" strokeWidth={2} strokeDasharray="6 4" dot={false} />
                 <Line type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)' }} />
               </LineChart>
             </ChartContainer>
@@ -321,7 +321,7 @@ function MetalReports({ portfolio, metal, rates }: { portfolio: Portfolio; metal
                 <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={48} tickFormatter={monthLabel} />
                 <YAxis width={72} domain={domain} tickFormatter={compact} label={{ value: 'PKR per tola', angle: -90, position: 'insideLeft' }} />
                 <ChartTooltip content={<ChartTooltipContent labelFormatter={(l) => dayLabel(String(l))} formatter={(v, _n, item) => <div className="report-tooltip-row"><span>{item.payload.kind === 'local' ? 'Dealer rate' : 'World price in rupees'}</span><b>{money(Number(v))}</b></div>} />} />
-                {avg !== null && <ReferenceLine y={avg} stroke="var(--warning, #c98500)" strokeDasharray="6 4" label={{ value: `Your average cost ${moneyShort(avg)}`, position: 'insideTopLeft', fill: 'var(--muted-foreground)', fontSize: 12 }} />}
+                {avg !== null && <ReferenceLine y={avg} stroke="var(--warn-strong)" strokeDasharray="6 4" label={{ value: `Your average cost ${moneyShort(avg)}`, position: 'insideTopLeft', fill: 'var(--muted-foreground)', fontSize: 12 }} />}
                 <Line type="monotone" dataKey="rate" stroke="var(--primary)" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--background)' }} />
               </LineChart>
             </ChartContainer>

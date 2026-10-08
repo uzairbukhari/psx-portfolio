@@ -10,6 +10,7 @@ import {
   Download,
   KeyRound,
   LogOut,
+  Palette,
   Receipt,
   RefreshCw,
   ShieldCheck,
@@ -36,6 +37,7 @@ import {
 import { useConfirm } from '@/components/confirm-dialog';
 import SystemHealth from './system-health';
 import UsageDashboard from './usage-dashboard';
+import { ThemeSetting } from './theme-menu';
 import { analyticsEnabled, setAnalyticsEnabled, track, flushAnalytics } from './analytics';
 import { Switch } from '@/components/ui/switch';
 import { UserAvatar } from './user-avatar';
@@ -327,6 +329,15 @@ export default function SettingsView({
                     <LogOut size={14} /> Sign out
                   </button>
                 </div>
+              </Section>
+
+              <Section
+                id="appearance"
+                icon={<Palette size={18} />}
+                title="Appearance"
+                description="Choose how Sipwise looks. Light is the default."
+              >
+                <ThemeSetting />
               </Section>
 
               <Section

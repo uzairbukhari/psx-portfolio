@@ -4,7 +4,7 @@
 .vault-card label{margin:10px 0}
 .vault-hint{font-size:13px;line-height:1.55;margin:4px 0 0}
 .vault-card .secondary{width:100%}
-.vault-recovery{font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:15px;line-height:1.9;letter-spacing:.5px;word-break:break-word;padding:16px;border:1px dashed var(--border);border-radius:10px;background:#0b1526;color:var(--foreground);user-select:all;margin:12px 0}
+.vault-recovery{font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:15px;line-height:1.9;letter-spacing:.5px;word-break:break-word;padding:16px;border:1px dashed var(--border);border-radius:10px;background:var(--field);color:var(--foreground);user-select:all;margin:12px 0}
 .vault-actions{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
 .vault-actions button{flex:1 1 140px}
 .vault-links{display:grid;gap:2px;margin-top:6px}

@@ -58,7 +58,7 @@ export const EVENT_CATALOG = {
   report_viewed: { report: ['summary', 'performance', 'income', 'allocation', 'tax', 'other'] },
   // Engagement
   notifications_enabled: {},
-  theme_changed: { theme: ['light', 'dark', 'system'] },
+  theme_changed: { theme: ['light', 'dark', 'midnight', 'paper', 'system'] },
   chart_range_changed: { range: ['1w', '1m', '3m', '6m', '1y', 'all'] },
   // Errors (no message text, no stack)
   client_error: { area: ['vault', 'import', 'picks', 'sync', 'render', 'other'] },
