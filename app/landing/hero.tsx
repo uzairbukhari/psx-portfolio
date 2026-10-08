@@ -35,10 +35,10 @@ export function Hero({
           </p>
           {error && (
             <p role="alert" className="notice error">
-              {error}
+              <strong>Sign-in didn&rsquo;t finish.</strong> {error}
             </p>
           )}
-          <GoogleButton returnTo={returnTo} />
+          <GoogleButton returnTo={returnTo} label={error ? 'Try again with Google' : undefined} />
           <div className="cta-note">
             <Lock size={15} aria-hidden="true" />
             End-to-end encrypted. Nothing is shared, and no orders are placed.
