@@ -60,6 +60,8 @@ export default function PicksSetup(props: Props) {
       props.onAddToList([{ ticker: company.ticker, name: company.name }]);
       if (shortlist.length < MAX_SHORTLIST && !shortlist.includes(company.ticker)) setShortlist([...shortlist, company.ticker]);
     }
+    setFind('');
+    setCursor(0);
     findRef.current?.focus();
   }
 
