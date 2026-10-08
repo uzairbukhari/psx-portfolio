@@ -7,6 +7,8 @@ on:
     # Daily 13:30 UTC Monday-Friday = 18:30 PKT, after the close, when PSX
     # companies publish most payout announcements. GitHub may delay runs.
     - cron: '30 13 * * 1-5'
+    # And 13:30 PKT (08:30 UTC) Monday-Friday: boards often announce payouts around midday.
+    - cron: '30 8 * * 1-5'
   workflow_dispatch:
     inputs:
       tickers:

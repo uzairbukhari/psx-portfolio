@@ -61,7 +61,7 @@ export type DividendCandidate = {
    * Where `faceValue` came from: `review` (typed or assumed in this review), `account` (the company's own
    * value), `verified` (dated evidence). Null when none could be stated.
    */
-  faceValueSource: 'review' | 'account' | 'verified' | null;
+  faceValueSource: 'review' | 'account' | 'verified' | 'ai' | null;
   /** Why no face value could be stated (only when `faceValue` is null and the rate is a percentage). */
   faceValueGap: 'none' | 'before-coverage' | 'conflict' | null;
   gross: number | null;
@@ -178,7 +178,7 @@ export function planHistoricalDividends(
     const verified = rateSource === 'percent-of-face-value' ? resolveFaceValue(options.faceValueEvidence?.[a.ticker], entitlement.date) : null;
     const faceValue = reviewed ?? company.faceValue ?? (verified?.status === 'verified' ? verified.faceValue : null);
     const faceValueSource: DividendCandidate['faceValueSource'] =
-      reviewed !== undefined ? 'review' : company.faceValue !== undefined ? 'account' : verified?.status === 'verified' ? 'verified' : null;
+      reviewed !== undefined ? 'review' : company.faceValue !== undefined ? 'account' : verified?.status === 'verified' ? (verified.evidence.status === 'ai' ? 'ai' : 'verified') : null;
     const faceValueGap: DividendCandidate['faceValueGap'] = faceValue === null && verified?.status === 'unresolved' ? verified.reason : null;
     const perShare = perShareOf(a, faceValue);
     let shares = 0;

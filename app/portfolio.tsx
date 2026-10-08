@@ -189,6 +189,9 @@ import {
 import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
+import { historicalTickers } from '@/lib/dividend-history';
+import { tickersNeedingFirstFetch } from '@/lib/payout-bootstrap';
+import type { DividendRefreshResponse } from '@/lib/api-types';
 import { pktDate, type PricePoint } from '@/lib/price-history';
 import type {
   PriceHistoryRequestResponse,
@@ -1041,6 +1044,30 @@ function DashboardContent({
       quoteRunning.current = false;
     }
   }
+  /** Asks for the payout history of companies never fetched, once per tab, then reloads so the sync can use it. */
+  const payoutsAsked = useRef(new Set<string>());
+  async function fetchFirstPayouts(tickers: string[]) {
+    try {
+      const fresh = tickers.filter((t) => !payoutsAsked.current.has(t));
+      if (!fresh.length) return;
+      const query = encodeURIComponent(fresh.join(','));
+      const status = (await readJson(await fetch(`/api/dividends/refresh?tickers=${query}`))) as DividendRefreshResponse;
+      const need = tickersNeedingFirstFetch(status);
+      fresh.forEach((t) => payoutsAsked.current.add(t));
+      if (!need.length) return;
+      await fetch('/api/dividends/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: need }) });
+      for (let i = 0; i < 30; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 20_000));
+        const next = (await readJson(await fetch(`/api/dividends/refresh?tickers=${encodeURIComponent(need.join(','))}`))) as DividendRefreshResponse;
+        if (next.overall !== 'queued' && next.overall !== 'running') {
+          if (next.overall === 'completed' || next.overall === 'partial') await load();
+          return;
+        }
+      }
+    } catch {
+      /* a background aid: the next open tries again */
+    }
+  }
   async function load() {
     setBusy(true);
     try {
@@ -1060,13 +1087,15 @@ function DashboardContent({
       setRevision(d.revision);
       setPendingCompanies(d.pendingCompanies ?? []);
       void resumeRefresh(d.portfolio.companies.map((c) => c.ticker));
-      if (!isAll && !locked && !target?.name)
+      if (!isAll && !locked && !target?.name) {
         await recordAutoDividends(
           d.portfolio,
           d.revision,
           d.announcements ?? [],
           d.faceValues ?? {},
         );
+        void fetchFirstPayouts(historicalTickers(d.portfolio));
+      }
     } catch (e) {
       // A lock mid-load is not an error to show: the unlock screen takes over.
       if (!(e instanceof VaultLockedError)) notify(String(e), true);
@@ -1127,9 +1156,13 @@ function DashboardContent({
         notify(
           `${voided.length} past expected dividend${voided.length === 1 ? '' : 's'} voided: expected dividends now start from ${next.dividendTrackingFrom}.`,
         );
+      else if (result.update.history.length || result.update.settled.length)
+        notify(
+          `${result.update.history.length + result.update.settled.length} dividend${result.update.history.length + result.update.settled.length === 1 ? '' : 's'} added automatically with estimated payment dates. Review them in Notifications; undo in Settings > Sync dividends.`,
+        );
       else if (pending.length)
         notify(
-          `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
+          `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. They are marked received automatically after the estimated payment date; void one if the money never arrives.`,
         );
     }
   }
@@ -2205,6 +2238,8 @@ function DashboardContent({
             entitlementCertain: undefined,
             paymentDate: undefined,
             paymentDateUnknown: undefined,
+            paymentDateEstimated: undefined,
+            autoBatch: undefined,
             receiptConfirmedAt: undefined,
             entitlement: undefined,
           }

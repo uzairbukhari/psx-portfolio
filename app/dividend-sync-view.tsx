@@ -12,6 +12,7 @@ import {
   type DividendCandidate,
 } from '@/lib/dividend-history';
 import { money, today, type Portfolio } from '@/lib/portfolio';
+import { undoAutoBatch } from '@/lib/dividend-auto';
 import { historicalTickers } from '@/lib/dividend-history';
 import { useConfirm } from '@/components/confirm-dialog';
 import './import-review.css';
@@ -190,6 +191,24 @@ export function DividendSyncView({
     setSelected(new Set());
   }
 
+  // Dividends the automatic sync added (past payouts and expected ones it marked received), grouped by run.
+  const batches = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const d of portfolio.dividends ?? []) if (d.autoBatch && !d.voided) out.set(d.autoBatch, (out.get(d.autoBatch) ?? 0) + 1);
+    return [...out];
+  }, [portfolio]);
+  async function undo(batch: string) {
+    const ok = await confirm({
+      title: 'Undo this automatic run?',
+      description: 'Voids every dividend that run added or marked received. Voided records stay in Activity and are not added again.',
+      confirmLabel: 'Undo',
+    });
+    if (!ok) return;
+    const next = JSON.parse(JSON.stringify(portfolio)) as Portfolio;
+    const n = undoAutoBatch(next, batch);
+    await onSave(next, `${n} automatic dividend${n === 1 ? '' : 's'} voided.`);
+  }
+
   const status = data ? OVERALL[data.overall] : null;
   return (
     <div className="ds">
@@ -199,6 +218,21 @@ export function DividendSyncView({
         payout’s cutoff date (the last trade that settles before book closure: T+2 before 9 Feb 2026, T+1 after, skipping weekends and market holidays).
         Announcement dates alone do not decide it. Nothing is added until you approve it.
       </p>
+      <p className="muted">
+        New and past payouts are now added automatically when you open the app: clean ones are recorded as received with an estimated payment date, and only
+        the ones that need a decision (for example an unknown face value) wait below. Edit a record in Activity if its date or amount differs, or void it if you did not receive it.
+      </p>
+      {batches.length > 0 && (
+        <div className="ir-banner" aria-live="polite">
+          Added automatically:{' '}
+          {batches.map(([batch, count]) => (
+            <span key={batch} className="ir-inline">
+              {count} dividend{count === 1 ? '' : 's'}{' '}
+              <button type="button" className="secondary compact" disabled={busy} onClick={() => void undo(batch).catch((e) => setError(e instanceof Error ? e.message : String(e)))}>Undo</button>{' '}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="ir-controls">
         <label>Book closure from <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label>
         <label>to <input type="date" value={to} min={from} max={today()} onChange={(e) => setTo(e.target.value)} /></label>
@@ -298,7 +332,7 @@ export function DividendSyncView({
                     {c.rateSource === 'percent-of-face-value' && c.faceValue !== null && (
                       <small>
                         face value Rs {c.faceValue} ·{' '}
-                        {c.faceValueSource === 'verified' ? 'verified' : c.faceValueSource === 'account' ? 'your value' : assumed.includes(c.announcement.ticker) ? 'assumed' : 'entered'}
+                        {c.faceValueSource === 'verified' ? 'verified' : c.faceValueSource === 'ai' ? 'found by AI' : c.faceValueSource === 'account' ? 'your value' : assumed.includes(c.announcement.ticker) ? 'assumed' : 'entered'}
                       </small>
                     )}
                   </td>

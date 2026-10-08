@@ -160,7 +160,7 @@ export function buildEntries({
         (expected
           ? ` · not yet received${tax?.entitlementCertain === false ? ' · entitlement date unconfirmed' : ''}`
           : d.paymentDate
-            ? ` · paid ${d.paymentDate}`
+            ? ` · paid ${d.paymentDate}${d.paymentDateEstimated ? ' (estimated)' : ''}`
             : ''),
       fees: null,
       amount: net,
