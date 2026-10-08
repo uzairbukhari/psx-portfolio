@@ -13,6 +13,8 @@ import {
 import { addNotifications, announcementNotifications, dividendNotifications } from './notifications.ts';
 import type { PayoutAnnouncement } from './psx-payouts.ts';
 import type { FaceValueEvidence } from './face-values.ts';
+import { addResolvedHistory, settleEstimatedPayments } from './dividend-auto.ts';
+import { money } from './portfolio.ts';
 
 export type FaceValueEvidenceMap = Record<string, FaceValueEvidence[]>;
 
@@ -28,6 +30,12 @@ export type AutoDividendUpdate = {
   pending: Dividend[];
   /** Past unconfirmed auto dividends voided because tracking now starts later. */
   voided: Dividend[];
+  /** Past payouts added as received (clean rows only), expected ones marked received, and received ones given a date. */
+  history: Dividend[];
+  settled: Dividend[];
+  dated: Dividend[];
+  /** Id shared by everything this run added or changed, for one-step undo. */
+  batch: string;
   notifications: AppNotification[];
 };
 
@@ -55,10 +63,35 @@ export function planAutoDividendUpdate(
   } catch {
     return null;
   }
-  if (!notifications.length && !tracking.set && !tracking.voided.length) return null;
   if (pending.length) next.dividends = [...(next.dividends ?? []), ...pending];
+  // Automatic bookkeeping beyond the announcements themselves: past payouts that need no review, and payment dates.
+  const batch = `auto-${Date.parse(now).toString(36)}`;
+  let history: Dividend[] = [], settled: Dividend[] = [], dated: Dividend[] = [];
+  try {
+    history = addResolvedHistory(next, announcements, faceValueEvidence, asOf, batch, now);
+    const result = settleEstimatedPayments(next, announcements, asOf, batch, now);
+    settled = result.received;
+    dated = result.dated;
+  } catch {
+    /* the forward sync still stands */
+  }
+  if (history.length || settled.length)
+    notifications.push({
+      id: `auto:${batch}`,
+      at: now,
+      kind: 'info',
+      title: `${history.length + settled.length} dividend${history.length + settled.length === 1 ? '' : 's'} added automatically`,
+      body:
+        [
+          history.length ? `${history.length} past payout${history.length === 1 ? '' : 's'} (${money(history.reduce((a, d) => a + (d.grossAmount ?? 0), 0))} gross) calculated from your holdings and PSX's announced rate` : '',
+          settled.length ? `${settled.length} expected dividend${settled.length === 1 ? '' : 's'} marked received after the estimated payment date` : '',
+        ].filter(Boolean).join('; ') +
+        '. Payment dates are estimates. Edit a record if it differs, or void it in Activity if you did not receive it. Undo this batch in Settings > Sync dividends.',
+      read: false,
+    });
+  if (!notifications.length && !tracking.set && !tracking.voided.length && !dated.length) return null;
   addNotifications(next, notifications);
-  return { next, pending, voided: tracking.voided, notifications };
+  return { next, pending, voided: tracking.voided, history, settled, dated, batch, notifications };
 }
 
 export type SyncSave = (portfolio: Portfolio, revision: number) => Promise<{ conflict: true } | { revision: number }>;

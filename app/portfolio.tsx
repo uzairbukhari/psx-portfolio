@@ -1127,9 +1127,13 @@ function DashboardContent({
         notify(
           `${voided.length} past expected dividend${voided.length === 1 ? '' : 's'} voided: expected dividends now start from ${next.dividendTrackingFrom}.`,
         );
+      else if (result.update.history.length || result.update.settled.length)
+        notify(
+          `${result.update.history.length + result.update.settled.length} dividend${result.update.history.length + result.update.settled.length === 1 ? '' : 's'} added automatically with estimated payment dates. Review them in Notifications; undo in Settings > Sync dividends.`,
+        );
       else if (pending.length)
         notify(
-          `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. Mark them received once paid.`,
+          `${pending.length} expected dividend${pending.length === 1 ? '' : 's'} added from PSX announcements: ${pending.map((d) => d.ticker).join(', ')}. They are marked received automatically after the estimated payment date; void one if the money never arrives.`,
         );
     }
   }
@@ -2205,6 +2209,8 @@ function DashboardContent({
             entitlementCertain: undefined,
             paymentDate: undefined,
             paymentDateUnknown: undefined,
+            paymentDateEstimated: undefined,
+            autoBatch: undefined,
             receiptConfirmedAt: undefined,
             entitlement: undefined,
           }

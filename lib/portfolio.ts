@@ -119,6 +119,13 @@ export type Dividend = {
    * stays absent; the gross amount is the frozen entitlement, not CDC evidence, and no tax is invented.
    */
   paymentDateUnknown?: boolean;
+  /**
+   * `paymentDate` is an estimate (book closure end plus ten weekdays), set when the app received an automatic
+   * dividend on the user's behalf. A real date from the user or a CDC import replaces it.
+   */
+  paymentDateEstimated?: boolean;
+  /** Id of the automatic sync that added this dividend, so the whole batch can be undone. */
+  autoBatch?: string;
   /** ISO time the user confirmed receipt in the historical review. */
   receiptConfirmedAt?: string;
   /** Frozen entitlement basis recorded at approval. */
@@ -583,6 +590,7 @@ export function confirmDividendReceipt(
   const out: Dividend = { ...d, status: 'received', paymentDate: receipt.paymentDate };
   // A real date replaces an earlier "received, date unknown" confirmation.
   delete out.paymentDateUnknown;
+  delete out.paymentDateEstimated;
   if (receipt.grossAmount !== undefined) out.grossAmount = round(receipt.grossAmount);
   if (receipt.taxWithheld !== undefined) out.taxWithheld = round(receipt.taxWithheld);
   return out;
@@ -1480,6 +1488,10 @@ export function validate(p: Portfolio) {
         (d.paymentDateUnknown !== undefined &&
           (d.paymentDateUnknown !== true || d.paymentDate !== undefined || d.source !== 'auto' ||
             d.status !== 'received')) ||
+        (d.paymentDateEstimated !== undefined &&
+          (d.paymentDateEstimated !== true || d.paymentDate === undefined || d.source !== 'auto' ||
+            d.status !== 'received')) ||
+        (d.autoBatch !== undefined && (typeof d.autoBatch !== 'string' || d.autoBatch.length > 64)) ||
         (d.receiptConfirmedAt !== undefined &&
           (typeof d.receiptConfirmedAt !== 'string' || !Number.isFinite(Date.parse(d.receiptConfirmedAt)))) ||
         (d.entitlement !== undefined &&

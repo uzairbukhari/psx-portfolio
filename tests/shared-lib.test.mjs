@@ -20,6 +20,8 @@ const SHARED = [
   'notifications',
   'notification-actions',
   'dividend-sync',
+  'dividend-auto',
+  'dividend-history',
   'targets',
   'monthly-picks-flow',
   'price-history',
