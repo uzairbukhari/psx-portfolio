@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { ChevronDown, ExternalLink, Plus, RefreshCw } from 'lucide-react';
 import { money, type Portfolio } from '@/lib/portfolio';
 import { explainSizing } from '@/lib/monthly-picks-allocation';
+import { explainPick } from '@/lib/pick-explain';
 import { estimateMonthlyPicks, summarizeEstimates, type CompanyOutlook, type MonthlyPickEstimate } from '@/lib/monthly-picks';
 import type { Recommendation } from './use-recommendations';
 
@@ -35,10 +36,11 @@ type Props = {
   onRefreshPrices: () => void;
   onManualPrice: (ticker: string) => void;
   onOpenCompany: (ticker: string) => void;
+  extraNames?: Record<string, string>;
   onRecordBuys?: (picks: { ticker: string; shares: number; price: number | null }[], month: string) => void;
 };
 
-export default function PicksResults({ run, portfolio, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys }: Props) {
+export default function PicksResults({ run, portfolio, extraNames, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys }: Props) {
   // Keep the SPA (no reload) for plain clicks; modified clicks fall through to the real link.
   const open_ = (ticker: string) => (event: React.MouseEvent) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -57,7 +59,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
   );
   const summary = useMemo(() => summarizeEstimates(estimates, run.amount), [estimates, run.amount]);
   const recordable = estimates.filter((pick) => pick.shares !== null && pick.shares > 0 && pick.price !== null && pick.price > 0);
-  const names = useMemo(() => new Map(portfolio.companies.map((company) => [company.ticker, company.name])), [portfolio.companies]);
+  const names = useMemo(() => new Map([...Object.entries(extraNames ?? {}), ...portfolio.companies.map((company): [string, string] => [company.ticker, company.name])]), [portfolio.companies, extraNames]);
 
   const [filter, setFilter] = useState<(typeof OUTLOOKS)[number] | 'All'>('All');
   const [sort, setSort] = useState<'score' | 'ticker'>('score');
@@ -141,7 +143,9 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
             <small>Opens the Add transaction form for each pick, one at a time.</small>
           </div>
         )}
-        {estimates.map((pick, index) => (
+        {estimates.map((pick, index) => {
+          const plain = explainPick(pick, index + 1, estimates.length);
+          return (
           <article className="mp-card" key={pick.ticker}>
             <header className="mp-card__head">
               <span className="mp-rank">{index + 1}</span>
@@ -160,7 +164,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
                 <div><span>Score</span><b>{pick.metrics.score === null ? '—' : `${pick.metrics.score}/100`}</b></div>
               </div>
             )}
-            <p className="mp-thesis">{pick.thesis}</p>
+            <p className="mp-thesis">{plain.summary}</p>
             {!!pick.evidenceRefs?.length && (
               <p className="muted" aria-label="Evidence cited">
                 Evidence: {pick.evidenceRefs.map((ref) => `${ref.label} ${ref.value}`).join(' · ')}
@@ -181,17 +185,40 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
               )}
             </div>
             <details className="mp-more">
-              <summary>Reasoning, risks and sources</summary>
-              {pick.whySelected && <p><b>Why selected:</b> {pick.whySelected}</p>}
-              {pick.invalidation && <p><b>What would change this view:</b> {pick.invalidation}</p>}
-              <div className="mp-reasons">
-                <div><b>Catalysts</b><ul>{pick.catalysts.length ? pick.catalysts.map((item) => <li key={item}>{item}</li>) : <li>None on file</li>}</ul></div>
-                <div><b>Risks</b><ul>{pick.risks.length ? pick.risks.map((item) => <li key={item}>{item}</li>) : <li>None listed</li>}</ul></div>
-              </div>
+              <summary>Why this pick, risks and news</summary>
+              <section className="mp-sec">
+                <h4>Why it was chosen</h4>
+                <p className="mp-sec__lead">{plain.headline}</p>
+                <ul className="mp-points">{plain.whyPoints.map((item) => <li key={item}>{item}</li>)}</ul>
+              </section>
+              <section className="mp-sec">
+                <h4>What would change this view</h4>
+                <ul className="mp-points">{plain.changePoints.map((item) => <li key={item}>{item}</li>)}</ul>
+              </section>
+              <section className="mp-sec mp-sec--risk">
+                <h4>Risks to know about</h4>
+                <ul className="mp-points mp-points--risk">{plain.risks.map((item) => <li key={item}>{item}</li>)}</ul>
+              </section>
+              <section className="mp-sec">
+                <h4>News and company plans</h4>
+                {!!plain.news.length && (
+                  <ul className="mp-news">
+                    {plain.news.map((item) => (
+                      <li key={`${item.date}${item.title}`}>
+                        {item.date && <time>{item.date}</time>}
+                        <span>{item.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mp-sec__note">{plain.newsNote}</p>
+              </section>
+              <h4 className="mp-sources-title">Sources</h4>
               <Sources items={sourceItems(pick)} />
             </details>
           </article>
-        ))}
+          );
+        })}
         {!estimates.length && <p className="muted">No company scored high enough to recommend an allocation this month. See All companies for the scores.</p>}
       </div>
       )}

@@ -1305,6 +1305,7 @@ function DashboardContent({
       quotes,
       budgets: picksHome.portfolio.budgets,
       monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
+      monthlyPicksList: picksHome.portfolio.monthlyPicksList,
       monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
     };
   }, [workspace, picksHome, p]);
@@ -1526,6 +1527,11 @@ function DashboardContent({
         }
         if (!kind) {
           if (expected) throw Error(UNSUPPORTED_FILE);
+          if (pdf && unknownText.trim())
+            // AI reading of PDFs is paused: only recognized brokers are parsed.
+            throw Error(
+              'We don’t recognize this broker’s statement yet. We’re working on adding your broker to Sipwise.',
+            );
           if (!unknownText.trim())
             throw Error(
               'No readable text was found. Scanned statements are not supported yet.',
@@ -3137,6 +3143,7 @@ function DashboardContent({
                     {
                       ...picksHome.portfolio,
                       monthlyPicksShortlist: next.monthlyPicksShortlist,
+                      monthlyPicksList: next.monthlyPicksList,
                       budgets: next.budgets,
                       monthlyPicksRuns: next.monthlyPicksRuns,
                     },
