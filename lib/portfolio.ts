@@ -227,6 +227,8 @@ export type Portfolio = {
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
+  /** The person's own Monthly Picks candidate list. Separate from the ledger: nothing here is a holding or a saved company. */
+  monthlyPicksList?: { ticker: string; name: string }[];
   /** Finished Monthly Picks runs, computed on the device and kept only inside the encrypted portfolio. */
   monthlyPicksRuns?: import('./picks-local.ts').StoredPicksRun[];
   /** Experimental AI Lab runs (super admin), kept apart from Monthly Picks and stored only in the encrypted portfolio. */
@@ -1342,10 +1344,25 @@ export function validate(p: Portfolio) {
       !Array.isArray(p.monthlyPicksShortlist) ||
       p.monthlyPicksShortlist.length > 15 ||
       new Set(p.monthlyPicksShortlist).size !== p.monthlyPicksShortlist.length ||
-      p.monthlyPicksShortlist.some((ticker) => !tickers.has(ticker))
+      p.monthlyPicksShortlist.some((ticker) => !tickers.has(ticker) && !p.monthlyPicksList?.some((entry) => entry.ticker === ticker))
     )
       throw new UserError('Invalid Monthly Picks shortlist.');
   }
+  if (
+    p.monthlyPicksList !== undefined &&
+    (!Array.isArray(p.monthlyPicksList) ||
+      p.monthlyPicksList.length > 600 ||
+      new Set(p.monthlyPicksList.map((entry) => entry?.ticker)).size !== p.monthlyPicksList.length ||
+      p.monthlyPicksList.some(
+        (entry) =>
+          !entry ||
+          typeof entry.ticker !== 'string' ||
+          !/^[A-Z0-9]{2,12}$/.test(entry.ticker) ||
+          typeof entry.name !== 'string' ||
+          entry.name.length > 200,
+      ))
+  )
+    throw new UserError('Invalid Monthly Picks list.');
   if (p.monthlyPicksRuns !== undefined) {
     const runs = p.monthlyPicksRuns;
     if (

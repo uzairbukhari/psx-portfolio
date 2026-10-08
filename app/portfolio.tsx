@@ -126,7 +126,7 @@ import MonthlyPicks from './monthly-picks';
 import { parseFinqalabReport } from './finqalab-import';
 import { FinqalabImportDialog } from './finqalab-import-dialog';
 import { BrokerImportDialog } from './broker-import-dialog';
-import { detectPsxConfirmation, parsePsxConfirmation } from '@/lib/psx-confirmation';
+import { detectPsxConfirmation, detectPsxLedger, parsePsxConfirmation, parsePsxLedger } from '@/lib/psx-confirmation';
 import {
   validateBrokerStatement,
   type BrokerStatement,
@@ -189,8 +189,9 @@ import {
 import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
+import { pktDate, type PricePoint } from '@/lib/price-history';
 import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
-import { flushAnalytics, track } from './analytics';
+import { flushAnalytics, hookGlobalErrors, reportError, track } from './analytics';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -380,15 +381,44 @@ function TickerPicker({
 }) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
+  const [directory, setDirectory] = useState<
+    { ticker: string; name: string }[]
+  >([]);
   const q = query.trim().toLowerCase();
-  const matches = companies
-    .filter(
-      (c) =>
-        !q ||
-        c.ticker.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q),
-    )
-    .slice(0, 8);
+  // New companies can be any PSX symbol, so search the shared directory too (public data; only the typed text is sent).
+  useEffect(() => {
+    if (!allowNew || !q) return;
+    let live = true;
+    const timer = window.setTimeout(() => {
+      fetch(`/api/companies/search?q=${encodeURIComponent(q)}`)
+        .then(
+          (r): Promise<{ companies?: { ticker: string; name: string }[] }> =>
+            r.ok ? r.json() : Promise.resolve({ companies: [] }),
+        )
+        .then((body) => {
+          if (live) setDirectory(body.companies ?? []);
+        })
+        .catch(() => {
+          if (live) setDirectory([]);
+        });
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [q, allowNew]);
+  const own = companies.filter(
+    (c) =>
+      !q ||
+      c.ticker.toLowerCase().includes(q) ||
+      c.name.toLowerCase().includes(q),
+  );
+  const matches = [
+    ...own,
+    ...(allowNew && q ? directory : []).filter(
+      (d) => !own.some((c) => c.ticker === d.ticker),
+    ),
+  ].slice(0, 8);
   function type(text: string) {
     setQuery(text);
     setOpen(true);
@@ -440,6 +470,50 @@ function TickerPicker({
       )}
     </div>
   );
+}
+/**
+ * Fills the price field with the closing price on the chosen trade date (the last close on or before it), from the
+ * shared price history. Runs when the symbol or date changes, so a price you type afterwards is left alone.
+ */
+function TradePriceAutofill({
+  ticker,
+  date,
+  onPrice,
+}: {
+  ticker: string;
+  date: string;
+  onPrice: (price: number) => void;
+}) {
+  const cache = useRef<Record<string, PricePoint[]>>({});
+  const apply = useEffectEvent(onPrice);
+  useEffect(() => {
+    if (!/^[A-Z0-9]{2,12}$/.test(ticker) || !date) return;
+    let live = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (!cache.current[ticker]) {
+          const r = await fetch(
+            `/api/price-history?ticker=${encodeURIComponent(ticker)}`,
+          );
+          const body = r.ok
+            ? ((await r.json()) as { eod?: PricePoint[]; intraday?: PricePoint[] })
+            : {};
+          cache.current[ticker] = [...(body.eod ?? []), ...(body.intraday ?? [])];
+        }
+        const point = cache.current[ticker]
+          .filter(([sec]) => pktDate(sec) <= date)
+          .sort((a, b) => b[0] - a[0])[0];
+        if (live && point && point[1] > 0) apply(point[1]);
+      } catch {
+        /* no suggestion; the price stays whatever you typed */
+      }
+    }, 300);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [ticker, date]);
+  return null;
 }
 type VaultContext = { session: VaultSession; lock: () => void };
 type DashboardProps = {
@@ -694,6 +768,7 @@ function DashboardContent({
     });
   }
   function notify(s: string, error = false) {
+    if (error) reportError(s);
     setMessageState(s);
     setFailed(error);
     showToast(s, error);
@@ -1088,6 +1163,7 @@ function DashboardContent({
     if (!tickers.length) return '';
     return ` Warning: ${tickers.length === 1 ? 'a sale has' : tickers.length + ' sales have'} unknown cost basis (${tickers.join(', ')}). Review the acquisition history before relying on tax figures.`;
   }
+  useEffect(() => hookGlobalErrors(), []);
   useEffect(() => {
     const context = (
       document as unknown as {
@@ -1232,6 +1308,7 @@ function DashboardContent({
       quotes,
       budgets: picksHome.portfolio.budgets,
       monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
+      monthlyPicksList: picksHome.portfolio.monthlyPicksList,
       monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
     };
   }, [workspace, picksHome, p]);
@@ -1451,8 +1528,24 @@ function DashboardContent({
           });
           return;
         }
+        if (!kind && pdf && !expected && detectPsxLedger(pdf.text)) {
+          reviewing = true;
+          setBrokerReview({
+            statement: validateBrokerStatement(parsePsxLedger(pdf.text)),
+            fileName: f.name,
+            format: null,
+            hash,
+            method: 'local',
+          });
+          return;
+        }
         if (!kind) {
           if (expected) throw Error(UNSUPPORTED_FILE);
+          if (pdf && unknownText.trim())
+            // AI reading of PDFs is paused: only recognized brokers are parsed.
+            throw Error(
+              'We don’t recognize this broker’s statement yet. We’re working on adding your broker to Sipwise.',
+            );
           if (!unknownText.trim())
             throw Error(
               'No readable text was found. Scanned statements are not supported yet.',
@@ -3065,6 +3158,7 @@ function DashboardContent({
                     {
                       ...picksHome.portfolio,
                       monthlyPicksShortlist: next.monthlyPicksShortlist,
+                      monthlyPicksList: next.monthlyPicksList,
                       budgets: next.budgets,
                       monthlyPicksRuns: next.monthlyPicksRuns,
                     },
@@ -3606,6 +3700,22 @@ function DashboardContent({
                             onChange={(e) => patchTx({ date: e.target.value })}
                           />
                         </label>
+                        {isTrade && t && !correcting && txType !== 'opening' && (
+                          <TradePriceAutofill
+                            ticker={ticker ?? ''}
+                            date={date}
+                            onPrice={(price) =>
+                              setTrade(
+                                (x) =>
+                                  x &&
+                                  x.ticker === ticker &&
+                                  x.date === date
+                                    ? { ...x, price }
+                                    : x,
+                              )
+                            }
+                          />
+                        )}
                         {isTrade && t && (
                           <>
                             <label>

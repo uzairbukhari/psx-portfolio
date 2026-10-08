@@ -16,8 +16,28 @@
 // statically detects as a worker entry, so it excludes its client script
 // and preserves the worker file's own ESM format.
 let pdfjsLibPromise: ReturnType<typeof loadPdfjs> | null = null;
+const STALE_CHUNK =
+  /dynamically imported module|importing a module script failed|loading chunk|ChunkLoadError/i;
+// A deploy replaces the hashed chunk files, so a page opened before it can ask for
+// one that no longer exists. Retry once (covers a network blip), then tell the user
+// to reload instead of surfacing the browser's raw module error.
+async function importPdfjs() {
+  try {
+    return await import('pdfjs-dist');
+  } catch (first) {
+    if (!STALE_CHUNK.test(String((first as Error)?.message ?? first))) throw first;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      return await import('pdfjs-dist');
+    } catch {
+      throw Error(
+        'Sipwise was updated since this page was opened, so the PDF reader could not load. Reload the page and choose the file again.',
+      );
+    }
+  }
+}
 async function loadPdfjs() {
-  const pdfjsLib = await import('pdfjs-dist');
+  const pdfjsLib = await importPdfjs();
   // In the built app, `import.meta.url` here has been observed to resolve
   // to a `file:///...` base rather than the page's real origin (the
   // hashed asset path itself is correct — only the base is wrong), which
@@ -36,7 +56,11 @@ import { extractMarkedText } from '@/lib/pdf-layout.mjs';
 export async function extractPdfText(
   bytes: Uint8Array,
 ): Promise<{ text: string; pages: number }> {
-  pdfjsLibPromise ??= loadPdfjs();
+  // A failed load must not be cached, or every later PDF fails until a reload.
+  pdfjsLibPromise ??= loadPdfjs().catch((e) => {
+    pdfjsLibPromise = null;
+    throw e;
+  });
   const pdfjsLib = await pdfjsLibPromise;
   const loadingTask = pdfjsLib.getDocument({ data: bytes });
   const doc = await loadingTask.promise;

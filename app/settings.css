@@ -161,3 +161,7 @@
 .theme-cards{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 .theme-swatch{display:inline-flex;align-items:center;gap:3px;flex:none;padding:3px;border:1.5px solid;border-radius:7px}
 .theme-swatch i{display:block;width:10px;height:14px;border-radius:3px}
+.audit-filters{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.audit-filters button{border:1px solid var(--border);background:transparent;border-radius:999px;padding:.25rem .7rem;font-size:.8rem;cursor:pointer}
+.audit-filters button[aria-pressed="true"]{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+.audit-filters select,.audit-filters input[type="text"],.audit-filters input:not([type]){border:1px solid var(--border);border-radius:.5rem;padding:.3rem .5rem;background:transparent;font-size:.8rem}

@@ -169,3 +169,22 @@ test('client lookup rules: stale replies are dropped, unknown symbols are reques
   assert.equal(canSaveCompany({ state: 'pending', company: null }), false);
   assert.equal(canSaveCompany({ state: 'resolved', company: { name: 'A', sector: ' ' } }), false);
 });
+
+test('directory search finds listed companies by symbol or name and ranks exact symbols first', async () => {
+  const { searchDirectory } = await import('../lib/company-search.ts');
+  const db = createD1(); seed(db);
+  db.sqlite.prepare("INSERT INTO security_catalog (ticker,name,source,first_seen_at,last_seen_at,sector_name,resolution_status,security_type) VALUES ('MEBLX','Mebl Extra Limited','profile','x','x','COMMERCIAL BANKS','resolved','equity')").run();
+  const hits = await searchDirectory(db, 'mebl');
+  assert.deepEqual(hits.map((h) => h.ticker), ['MEBL', 'MEBLX']);
+  assert.equal(hits[0].sector, 'Commercial Banks');
+  assert.deepEqual((await searchDirectory(db, 'meezan')).map((h) => h.ticker), ['MEBL']);
+  assert.deepEqual(await searchDirectory(db, 'HALF'), [], 'placeholder names are not listed');
+  assert.deepEqual(await searchDirectory(db, '%'), []);
+});
+
+test('the full directory list returns listed equities only', async () => {
+  const { allDirectory } = await import('../lib/company-search.ts');
+  const db = createD1(); seed(db);
+  const all = await allDirectory(db);
+  assert.deepEqual(all.map((c) => c.ticker), ['MEBL']);
+});
