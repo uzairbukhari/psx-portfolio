@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {
   DEFAULT_PREFERENCE,
+  DEFAULT_THEME,
+  THEME_STORAGE_KEY,
   THEMES,
   THEME_META,
   applyTheme,
@@ -50,6 +52,14 @@ test('init script applies the stored theme before paint', () => {
   assert.equal(run(null, true).theme, 'light');
   assert.equal(run('nonsense', true).theme, 'light');
   assert.equal(run(null, false, true).theme, 'light'); // storage blocked (private mode)
+});
+
+test('init script constants match lib/theme.ts for every theme', () => {
+  for (const id of Object.keys(THEME_META)) {
+    assert.deepEqual(run(id, false), { theme: id, scheme: THEME_META[id].scheme, color: THEME_META[id].bg });
+  }
+  assert.ok(themeInitScript().includes(`'${THEME_STORAGE_KEY}'`));
+  assert.ok(themeInitScript().includes(`d='${DEFAULT_THEME}'`));
 });
 
 test('applyTheme sets attribute, native scheme and browser colour', () => {

@@ -50,7 +50,10 @@ export function applyTheme(theme: Theme, doc: ThemeDocument) {
   doc.querySelector('meta[name=theme-color]')?.setAttribute('content', meta.bg);
 }
 
-/** Runs in <head> before first paint. Self-contained (no imports); built from the constants above so they cannot drift. */
+/**
+ * Runs in <head> before first paint. A fixed string (no interpolation, so nothing can be injected into it); the values
+ * below must match THEME_STORAGE_KEY, DEFAULT_THEME and THEME_META, which tests/theme.test.mjs enforces.
+ */
 export function themeInitScript(): string {
-  return `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},m=${JSON.stringify(THEME_META)},p=${JSON.stringify(PREFERENCES)},d=${JSON.stringify(DEFAULT_THEME)};var v=null;try{v=localStorage.getItem(k)}catch(e){}if(p.indexOf(v)<0)v=d;var t=v;if(v==='system'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':d}var e=document.documentElement;e.setAttribute('data-theme',t);e.style.colorScheme=m[t].scheme;var c=document.querySelector('meta[name=theme-color]');if(c)c.setAttribute('content',m[t].bg)}catch(e){}})();`;
+  return "(function(){try{var k='sipwise.theme',m={light:['light','#f5f7fb'],dark:['dark','#05070d'],midnight:['dark','#000000'],paper:['light','#f6f0e4']},d='light',v=null;try{v=localStorage.getItem(k)}catch(e){}if(v!=='system'&&!m.hasOwnProperty(v))v=d;var t=v;if(v==='system'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':d}var e=document.documentElement;e.setAttribute('data-theme',t);e.style.colorScheme=m[t][0];var c=document.querySelector('meta[name=theme-color]');if(c)c.setAttribute('content',m[t][1])}catch(e){}})();";
 }

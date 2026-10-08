@@ -1,6 +1,6 @@
 'use client';
 // Theme preference for the web app: persisted per device in localStorage, applied to <html data-theme>. See lib/theme.ts.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { track } from './analytics';
 import {
   applyTheme,
@@ -12,6 +12,7 @@ import {
 } from '@/lib/theme';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
+const CHANGED = 'sipwise:theme-changed';
 
 function stored(): ThemePreference {
   try {
@@ -25,23 +26,29 @@ function apply(pref: ThemePreference) {
   applyTheme(resolveTheme(pref, window.matchMedia(DARK_QUERY).matches), document);
 }
 
-export function useTheme() {
-  // Starts at the default so server and client markup match; the real value is read after mount.
-  const [preference, setPreferenceState] = useState<ThemePreference>(DEFAULT_PREFERENCE);
-  const [ready, setReady] = useState(false);
+function subscribe(onChange: () => void) {
+  // "storage" fires for other tabs; CHANGED covers this tab.
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== THEME_STORAGE_KEY) return;
+    apply(stored());
+    onChange();
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(CHANGED, onChange);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener(CHANGED, onChange);
+  };
+}
 
-  useEffect(() => {
-    setPreferenceState(stored());
-    setReady(true);
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== THEME_STORAGE_KEY) return;
-      const next = stored();
-      setPreferenceState(next);
-      apply(next);
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
+export function useTheme() {
+  // The server snapshot is the default, so markup matches during hydration; the stored value follows right after.
+  const preference = useSyncExternalStore(subscribe, stored, () => DEFAULT_PREFERENCE);
+  const ready = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // "System" follows the OS live.
   useEffect(() => {
@@ -53,13 +60,13 @@ export function useTheme() {
   }, [preference]);
 
   const setPreference = useCallback((next: ThemePreference) => {
-    setPreferenceState(next);
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, next);
     } catch {
       /* storage may be blocked; the theme still applies for this visit */
     }
     apply(next);
+    window.dispatchEvent(new Event(CHANGED));
     track('theme_changed', { theme: next });
   }, []);
 
