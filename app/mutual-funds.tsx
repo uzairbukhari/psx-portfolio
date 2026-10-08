@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, XAxis, YAxis } from 'recharts';
 import { Plus } from 'lucide-react';
 import {
@@ -21,9 +21,15 @@ import {
   type FundEntry,
 } from '@/lib/funds';
 import { dueEntries } from '@/lib/plans';
-import type { FundCatalogResponse, FundNavRow } from '@/lib/mufap';
+import {
+  latestNavs,
+  redemptionPrice,
+  type FundCatalogResponse,
+  type FundNavRow,
+} from '@/lib/mufap';
 import { money, moneyShort, today } from '@/lib/portfolio';
 import { useFundHistory } from './use-fund-data';
+import { webPublicData } from './vault-transport';
 import AssetHistory, { type HistoryRow } from './asset-history';
 import CollapsiblePanel from './collapsible-panel';
 
@@ -598,7 +604,11 @@ function FundDialog({
       (mode.kind !== 'add' && mode.prefill ? mode.prefill.date : today()),
   );
   const [unitCount, setUnitCount] = useState(
-    editEntry?.units !== undefined ? String(editEntry.units) : '',
+    editEntry?.units !== undefined
+      ? String(editEntry.units)
+      : mode.kind !== 'add' && mode.prefill
+        ? ''
+        : '1',
   );
   const [amount, setAmount] = useState(
     editEntry?.amount != null
@@ -613,7 +623,9 @@ function FundDialog({
   const [loadPct, setLoadPct] = useState(
     editEntry?.load && editEntry.amount
       ? String(Math.round((editEntry.load / editEntry.amount) * 1e4) / 100)
-      : '',
+      : editEntry
+        ? ''
+        : '0',
   );
   const [price, setPrice] = useState('');
   const [day, setDay] = useState('1');
@@ -632,6 +644,47 @@ function FundDialog({
   const latest = (mufapId: string) => navs.find((n) => n.mufapId === mufapId);
   const number = (t: string) => Number(t.replace(/,/g, ''));
   const kind = mode.kind === 'add' ? type : mode.kind;
+  // A new purchase is filled in from the fund's price on the chosen date (units times the price you would pay).
+  const mufapId = fund?.mufapId ?? picked?.mufapId;
+  const autofill =
+    kind === 'buy' && !editEntry && !(mode.kind !== 'add' && mode.prefill);
+  const [history, setHistory] = useState<{
+    id: string;
+    navs: FundNavRow[];
+  } | null>(null);
+  useEffect(() => {
+    if (!autofill || !mufapId || history?.id === mufapId) return;
+    let live = true;
+    const done = (rows: FundNavRow[]) =>
+      live && setHistory({ id: mufapId, navs: rows });
+    (webPublicData.fundHistory?.(mufapId) ?? Promise.reject())
+      .then((r) => done(r.navs))
+      .catch(() => done([]));
+    return () => {
+      live = false;
+    };
+  }, [autofill, mufapId, history?.id]);
+  const unitPrice = useMemo(() => {
+    if (!autofill || !mufapId) return null;
+    const rows = [
+      ...(history?.id === mufapId ? history.navs : []),
+      ...navs.filter((n) => n.mufapId === mufapId),
+    ];
+    const row = latestNavs(rows, date).get(mufapId);
+    if (!row) return null;
+    return row.offer > 0 ? row.offer : redemptionPrice(row);
+  }, [autofill, mufapId, history, navs, date]);
+  const suggested = (() => {
+    const u = Number(unitCount.replace(/,/g, ''));
+    return unitPrice !== null && u > 0
+      ? String(Math.round(u * unitPrice * 100) / 100)
+      : null;
+  })();
+  const [seenSuggested, setSeenSuggested] = useState<string | null>(null);
+  if (suggested !== seenSuggested) {
+    setSeenSuggested(suggested);
+    if (suggested !== null) setAmount(suggested);
+  }
   const titles = {
     add: 'Add a mutual fund',
     buy: 'Buy units',
@@ -790,7 +843,13 @@ function FundDialog({
                 <ul className="ticker-options" style={{ position: 'static' }}>
                   {matches.map((f) => (
                     <li key={f.mufapId}>
-                      <button type="button" onClick={() => setPicked(f)}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPicked(f);
+                          setQuery(f.fundName);
+                        }}
+                      >
                         <b>{f.fundName}</b>
                         <span>
                           {f.amc} · {f.category}
