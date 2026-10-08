@@ -161,3 +161,19 @@ test('usage report counts users, excludes admin activity and deletes with the ac
   await deleteUserEvents(db, 'a@x.com', 'sec');
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM analytics_events WHERE user_key=?').get(key).n, 0);
 });
+
+import { classifyError } from '../lib/error-codes.ts';
+test('client_error takes only category, code and screen from closed lists', () => {
+  assert.ok(validateEvent({ event: 'client_error', props: { area: 'import', code: 'pdf_unrecognized', screen: 'holdings' } }));
+  assert.equal(validateEvent({ event: 'client_error', props: { area: 'import', code: 'MEBL 100 shares' } }), null);
+  assert.equal(validateEvent({ event: 'client_error', props: { message: 'Failed to fetch' } }), null);
+});
+test('error messages classify into categories without keeping the text', () => {
+  const c = (m, a, d) => classifyError(m, a, d);
+  assert.deepEqual(c('Failed to fetch dynamically imported module: https://x/pdf-1.js'), { area: 'app', code: 'chunk_load' });
+  assert.deepEqual(c('We don’t recognize this broker’s statement yet. We’re working on adding your broker to Sipwise.'), { area: 'import', code: 'pdf_unrecognized' });
+  assert.deepEqual(c('No readable text was found. Scanned statements are not supported yet.'), { area: 'import', code: 'pdf_no_text' });
+  assert.deepEqual(c('Failed to fetch'), { area: 'sync', code: 'network' });
+  assert.deepEqual(c('something odd about MEBL 500'), { area: 'other', code: 'unknown' });
+  assert.deepEqual(c('boom', 'app', 'uncaught'), { area: 'app', code: 'uncaught' });
+});

@@ -4,6 +4,7 @@
 // Settings (on by default, stored on this device).
 import { validateEvent, type EventName, type EventProps } from '@/lib/analytics-events';
 import type { IncomingEvent } from '@/lib/analytics-events';
+import { classifyError, type ErrorArea, type ErrorCode } from '@/lib/error-codes';
 
 const OPT_OUT_KEY = 'sipwise.analytics.optout';
 const ANON_KEY = 'sipwise.analytics.anon';
@@ -78,4 +79,32 @@ export async function flushAnalytics() {
       body: JSON.stringify({ sessionId: session, anonId: id('localStorage', ANON_KEY), platform: 'web', events }),
     });
   } catch { /* analytics must never get in the way */ }
+}
+
+const SCREEN_BY_PATH: [RegExp, string][] = [
+  [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/reports/, 'reports'], [/^\/sip/, 'sip'],
+  [/^\/settings/, 'settings'], [/^\/notifications/, 'notifications'], [/^\/overview/, 'overview'], [/^\/$/, 'holdings'],
+];
+const reported = new Set<string>();
+
+/** Records a user-facing error for the audit log: only a category, code and screen leave the device, never the message. */
+export function reportError(message: unknown, fallbackArea: ErrorArea = 'other', fallbackCode: ErrorCode = 'unknown') {
+  if (typeof window === 'undefined') return;
+  const text = message instanceof Error ? message.message : typeof message === 'string' ? message : '';
+  const { area, code } = classifyError(text, fallbackArea, fallbackCode);
+  const path = window.location.pathname;
+  const screen = SCREEN_BY_PATH.find(([re]) => re.test(path))?.[1];
+  const key = `${area}:${code}:${screen ?? ''}`;
+  if (reported.has(key)) return; // one of each per session is enough to trace it
+  reported.add(key);
+  track('client_error', screen ? { area, code, screen } : { area, code });
+}
+
+let hookedErrors = false;
+/** Captures uncaught errors and failed chunk loads. Call once from a mounted client component. */
+export function hookGlobalErrors() {
+  if (typeof window === 'undefined' || hookedErrors) return;
+  hookedErrors = true;
+  window.addEventListener('error', (e) => reportError(e.message || '', 'app', 'uncaught'));
+  window.addEventListener('unhandledrejection', (e) => reportError(e.reason, 'app', 'uncaught'));
 }

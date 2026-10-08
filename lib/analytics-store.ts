@@ -180,3 +180,37 @@ export function shapeReport(i: {
     retention: retentionCohorts(i.signups, i.activity, i.today),
   };
 }
+
+export type AuditFilters = { days: number; area?: string; code?: string; userEmail?: string; includeAdmin?: boolean };
+export type AuditRow = { ts: string; user: string | null; platform: string; version: string | null; area: string; code: string; screen: string | null };
+
+/** The audit log for the super admin: recent client_error events with counts per category and code. */
+export async function auditLog(db: D1Database, f: AuditFilters, secret: string, now = new Date()) {
+  const days = Math.min(Math.max(Math.floor(f.days) || 7, 1), 180);
+  const since = pktDay(new Date(now.getTime() - (days - 1) * DAY_MS));
+  const where = ["event='client_error'", 'day>=?'];
+  const args: unknown[] = [since];
+  if (!f.includeAdmin) where.push('is_admin=0');
+  if (f.userEmail) { where.push('user_key=?'); args.push(await userKey(f.userEmail, secret)); }
+  const base = where.join(' AND ');
+  const all = async <T,>(sql: string, ...p: unknown[]) => (await db.prepare(sql).bind(...p).all<T>()).results;
+  const filter = (f.area ? " AND json_extract(props,'$.area')=?" : '') + (f.code ? " AND json_extract(props,'$.code')=?" : '');
+  const filterArgs = [...(f.area ? [f.area] : []), ...(f.code ? [f.code] : [])];
+  const rows = await all<{ ts: string; user_key: string | null; anon_id: string | null; platform: string; app_version: string | null; props: string | null }>(
+    `SELECT ts,user_key,anon_id,platform,app_version,props FROM analytics_events WHERE ${base}${filter} ORDER BY id DESC LIMIT 200`, ...args, ...filterArgs);
+  const byArea = await all<{ area: string; n: number }>(
+    `SELECT json_extract(props,'$.area') AS area, COUNT(*) AS n FROM analytics_events WHERE ${base} GROUP BY area ORDER BY n DESC`, ...args);
+  const byCode = await all<{ area: string; code: string; n: number; users: number }>(
+    `SELECT json_extract(props,'$.area') AS area, json_extract(props,'$.code') AS code, COUNT(*) AS n, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE ${base}${filter} GROUP BY area, code ORDER BY n DESC LIMIT 40`, ...args, ...filterArgs);
+  return {
+    generatedAt: now.toISOString(),
+    days,
+    byArea: byArea.filter((r) => r.area),
+    byCode: byCode.filter((r) => r.code),
+    rows: rows.map((r): AuditRow => {
+      const p = r.props ? (JSON.parse(r.props) as Record<string, string>) : {};
+      return { ts: r.ts, user: r.user_key ? r.user_key.slice(0, 8) : null, platform: r.platform, version: r.app_version, area: p.area ?? 'other', code: p.code ?? 'unknown', screen: p.screen ?? null };
+    }),
+  };
+}
+export type AuditReport = Awaited<ReturnType<typeof auditLog>>;
