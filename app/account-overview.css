@@ -71,6 +71,27 @@
   gap: 20px;
   align-items: center;
 }
+/* A narrow Asset mix card (three charts in a row, or a mid-width window) stacks the donut above its list. */
+.overview-panel {
+  container-type: inline-size;
+}
+@container (max-width: 480px) {
+  .overview-mix {
+    grid-template-columns: 1fr;
+  }
+  .overview-donut {
+    max-width: 200px;
+    margin: 0 auto;
+  }
+  .overview-classes li {
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+  .overview-classes em {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+}
 .overview-donut {
   aspect-ratio: 1;
   width: 100%;
