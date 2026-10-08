@@ -150,7 +150,7 @@ export default function PortfolioValueCard({
   const rangeLabel = range === 'all' ? 'all time' : RANGES.find(([v]) => v === range)![1];
 
   return (
-    <section className={chartOnly ? 'value-card value-card--chart-only' : 'panel value-card'}>
+    <section className={chartOnly ? `value-card value-card--chart-only${aside ? ' value-card--with-aside' : ''}` : 'panel value-card'}>
       <div className="value-card-body">
       <div className="value-card-left">
       {!chartOnly && <div className="value-card-top">
