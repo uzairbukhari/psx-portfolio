@@ -188,6 +188,7 @@ import {
 import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
+import { pktDate, type PricePoint } from '@/lib/price-history';
 import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
 import { flushAnalytics, hookGlobalErrors, reportError, track } from './analytics';
 
@@ -379,15 +380,44 @@ function TickerPicker({
 }) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
+  const [directory, setDirectory] = useState<
+    { ticker: string; name: string }[]
+  >([]);
   const q = query.trim().toLowerCase();
-  const matches = companies
-    .filter(
-      (c) =>
-        !q ||
-        c.ticker.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q),
-    )
-    .slice(0, 8);
+  // New companies can be any PSX symbol, so search the shared directory too (public data; only the typed text is sent).
+  useEffect(() => {
+    if (!allowNew || !q) return;
+    let live = true;
+    const timer = window.setTimeout(() => {
+      fetch(`/api/companies/search?q=${encodeURIComponent(q)}`)
+        .then(
+          (r): Promise<{ companies?: { ticker: string; name: string }[] }> =>
+            r.ok ? r.json() : Promise.resolve({ companies: [] }),
+        )
+        .then((body) => {
+          if (live) setDirectory(body.companies ?? []);
+        })
+        .catch(() => {
+          if (live) setDirectory([]);
+        });
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [q, allowNew]);
+  const own = companies.filter(
+    (c) =>
+      !q ||
+      c.ticker.toLowerCase().includes(q) ||
+      c.name.toLowerCase().includes(q),
+  );
+  const matches = [
+    ...own,
+    ...(allowNew && q ? directory : []).filter(
+      (d) => !own.some((c) => c.ticker === d.ticker),
+    ),
+  ].slice(0, 8);
   function type(text: string) {
     setQuery(text);
     setOpen(true);
@@ -439,6 +469,50 @@ function TickerPicker({
       )}
     </div>
   );
+}
+/**
+ * Fills the price field with the closing price on the chosen trade date (the last close on or before it), from the
+ * shared price history. Runs when the symbol or date changes, so a price you type afterwards is left alone.
+ */
+function TradePriceAutofill({
+  ticker,
+  date,
+  onPrice,
+}: {
+  ticker: string;
+  date: string;
+  onPrice: (price: number) => void;
+}) {
+  const cache = useRef<Record<string, PricePoint[]>>({});
+  const apply = useEffectEvent(onPrice);
+  useEffect(() => {
+    if (!/^[A-Z0-9]{2,12}$/.test(ticker) || !date) return;
+    let live = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (!cache.current[ticker]) {
+          const r = await fetch(
+            `/api/price-history?ticker=${encodeURIComponent(ticker)}`,
+          );
+          const body = r.ok
+            ? ((await r.json()) as { eod?: PricePoint[]; intraday?: PricePoint[] })
+            : {};
+          cache.current[ticker] = [...(body.eod ?? []), ...(body.intraday ?? [])];
+        }
+        const point = cache.current[ticker]
+          .filter(([sec]) => pktDate(sec) <= date)
+          .sort((a, b) => b[0] - a[0])[0];
+        if (live && point && point[1] > 0) apply(point[1]);
+      } catch {
+        /* no suggestion; the price stays whatever you typed */
+      }
+    }, 300);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [ticker, date]);
+  return null;
 }
 type VaultContext = { session: VaultSession; lock: () => void };
 type DashboardProps = {
@@ -3624,6 +3698,22 @@ function DashboardContent({
                             onChange={(e) => patchTx({ date: e.target.value })}
                           />
                         </label>
+                        {isTrade && t && !correcting && txType !== 'opening' && (
+                          <TradePriceAutofill
+                            ticker={ticker ?? ''}
+                            date={date}
+                            onPrice={(price) =>
+                              setTrade(
+                                (x) =>
+                                  x &&
+                                  x.ticker === ticker &&
+                                  x.date === date
+                                    ? { ...x, price }
+                                    : x,
+                              )
+                            }
+                          />
+                        )}
                         {isTrade && t && (
                           <>
                             <label>

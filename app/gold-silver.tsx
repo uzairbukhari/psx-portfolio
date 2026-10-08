@@ -18,6 +18,8 @@ import {
 import {
   KARATS,
   STANDARD_PIECES,
+  chooseRate,
+  purity,
   tolaFromGrams,
   type Karat,
   type Metal,
@@ -178,6 +180,7 @@ export default function GoldSilverSection({
           : undefined
       }
       assets={assets}
+      rates={rates}
       busy={busy}
       onClose={() => setOpen(null)}
       onSave={async (next, message) => {
@@ -328,6 +331,7 @@ function MetalEntryDialog({
   initialType,
   editing,
   assets,
+  rates,
   busy,
   onClose,
   onSave,
@@ -336,6 +340,7 @@ function MetalEntryDialog({
   /** Correct an existing entry in place instead of adding a new one. */
   editing?: { assetId: string; entry?: MetalEntry };
   assets: MetalAsset[];
+  rates: MetalRateRow[];
   busy: boolean;
   onClose: () => void;
   onSave: (assets: MetalAsset[], message: string) => Promise<void>;
@@ -374,6 +379,21 @@ function MetalEntryDialog({
     size === OTHER
       ? Number(customGrams)
       : (piece?.grams ?? 0) * (Number.isFinite(count) ? count : 0);
+
+  // A new purchase or sale is filled in from the public rate on the chosen date; you can overwrite it with the real figure.
+  const rateMetal = chosen?.metal ?? metal;
+  const rateKarat = rateMetal === 'silver' ? 24 : (chosen?.karat ?? karat);
+  const estimate = useMemo(() => {
+    if (existing || type === 'opening' || !(totalGrams > 0)) return null;
+    const rate = chooseRate(rates, rateMetal, date);
+    if (!rate) return null;
+    return Math.round(rate.pkrPerGram * purity(rateKarat) * totalGrams);
+  }, [existing, type, totalGrams, rates, rateMetal, rateKarat, date]);
+  const [seenEstimate, setSeenEstimate] = useState<number | null>(null);
+  if (estimate !== seenEstimate) {
+    setSeenEstimate(estimate);
+    if (estimate !== null) setAmount(String(estimate));
+  }
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault();

@@ -98,6 +98,9 @@ export default function PortfolioWorkspace({
     setDraft(null);
     setChildBusy(false);
     setSelected(id);
+    // The dashboard remounts for the new portfolio and reads its tab from the URL, so land on Holdings.
+    if (typeof window !== 'undefined' && window.location.pathname !== '/')
+      window.history.pushState(null, '', '/');
     track('portfolio_switched');
   }
   const canCreate = account.portfolios.length < MAX_PORTFOLIOS;
