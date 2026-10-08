@@ -11,6 +11,15 @@ import {
 } from '@/lib/session';
 
 export async function GET(req: Request) {
+  try {
+    return await handleCallback(req);
+  } catch (error) {
+    console.error('Google sign-in callback failed', error);
+    return redirectWithError(new URL(req.url).origin, 'oauth_failed');
+  }
+}
+
+async function handleCallback(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const cookieHeader = req.headers.get('cookie') ?? '';
   const code = url.searchParams.get('code');
@@ -20,6 +29,8 @@ export async function GET(req: Request) {
     readCookieValue(cookieHeader, 'oauth_return_to') ?? '/',
   );
 
+  // Google sends ?error=access_denied when the person cancels on the consent screen.
+  if (url.searchParams.get('error')) return redirectWithError(url.origin, 'oauth_denied');
   if (!code || !state || !expectedState || state !== expectedState)
     return redirectWithError(url.origin, 'oauth_state');
 

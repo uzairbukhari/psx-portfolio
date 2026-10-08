@@ -21,14 +21,20 @@ function GoogleMark() {
   );
 }
 
-export function GoogleButton({ returnTo }: { returnTo: string }) {
+export function GoogleButton({
+  returnTo,
+  label = 'Continue with Google',
+}: {
+  returnTo: string;
+  label?: string;
+}) {
   return (
     <a
       className="google-btn"
       href={`/api/auth/google/login?return_to=${encodeURIComponent(returnTo)}`}
       target="_top"
     >
-      <GoogleMark /> Continue with Google
+      <GoogleMark /> {label}
     </a>
   );
 }

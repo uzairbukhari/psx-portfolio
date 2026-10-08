@@ -16,9 +16,12 @@ import './landing.css';
 const ERROR_COPY: Record<string, string> = {
   oauth_email:
     "That Google account isn't allowed here, or its email isn't verified. Try a different account.",
-  oauth_state: 'Sign-in was interrupted. Try again.',
-  oauth_token: 'Sign-in was interrupted. Try again.',
-  oauth_userinfo: 'Google did not return your profile. Try again.',
+  oauth_state:
+    'Your sign-in session expired or was opened in a different browser. Please try again.',
+  oauth_token: 'Google sign-in was interrupted. Please try again.',
+  oauth_userinfo: 'Google did not return your profile. Please try again.',
+  oauth_denied: 'Sign-in was cancelled. You can try again whenever you like.',
+  oauth_failed: 'Something went wrong while signing you in. Please try again.',
   oauth_config: 'Sign-in is not configured on this server yet.',
 };
 
