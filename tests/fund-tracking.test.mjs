@@ -26,6 +26,6 @@ test('the cron Worker runs the fund refresh on weekday nights only', () => {
     wrangler.replace(/\/\/[^\n]*/g, ''),
   );
   assert.ok(wrangler.includes('"30 17 * * 1-5"'));
-  assert.match(worker, /MUFAP_CRON = '30 17 \* \* 1-5'/);
+  assert.match(worker, /MUFAP_CRONS = new Set\(\['30 17 \* \* 1-5'/);
   assert.ok(cron);
 });

@@ -30,7 +30,8 @@ async function startDueScrapers(env: Env, scheduledTime: number) {
   }
 }
 
-const MUFAP_CRON = '30 17 * * 1-5';
+// MUFAP publishes at no fixed hour, so besides the nightly run (22:30 PKT) it is read again mid-morning and mid-afternoon.
+const MUFAP_CRONS = new Set(['30 17 * * 1-5', '0 5 * * 1-5', '0 9 * * 1-5']);
 
 export default {
   async fetch() {
@@ -42,7 +43,7 @@ export default {
     ctx: ExecutionContext,
   ) {
     // MUFAP blocks GitHub's runners but answers Cloudflare, so the fund prices are fetched here (public data, no user data).
-    if (controller.cron === MUFAP_CRON) {
+    if (MUFAP_CRONS.has(controller.cron)) {
       ctx.waitUntil(
         (async () => {
           // Two independent public sources: one failing must not stop the other.
