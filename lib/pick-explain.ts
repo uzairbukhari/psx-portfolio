@@ -4,12 +4,15 @@
 import type { MonthlyPick } from './monthly-picks.ts';
 
 export type PickExplanation = {
-  /** One-sentence plain summary shown under the numbers. */
+  /** Short plain summary shown under the numbers. */
   summary: string;
-  whySelected: string;
-  whatWouldChange: string;
+  /** One short sentence on where it ranked, then one sentence per fact. */
+  headline: string;
+  whyPoints: string[];
+  changePoints: string[];
   risks: string[];
-  newsAndPlans: string[];
+  news: { date: string; title: string }[];
+  newsNote: string;
 };
 
 const abs = (n: number) => Math.round(Math.abs(n) * 100) / 100;
@@ -59,20 +62,18 @@ export function explainPick(pick: MonthlyPick, rank: number, total: number): Pic
   const facts = [value?.text, grow?.text, move?.text].filter((x): x is string => !!x);
 
   const score = m?.score != null ? ` It scored ${abs(m.score)} out of 100.` : '';
-  const whySelected = facts.length
-    ? `It came ${rank === 1 ? 'first' : `number ${rank}`} out of ${total} ${total === 1 ? 'company' : 'companies'} on your list.${score} ${facts.join(' ')} ${CONFIDENCE[pick.confidence]}`
-    : (pick.whySelected ?? `It came number ${rank} out of ${total} on your list.${score}`);
+  const headline = `It came ${rank === 1 ? 'first' : `number ${rank}`} out of ${total} ${total === 1 ? 'company' : 'companies'} on your list.${score}`;
+  const whyPoints = facts.length ? [...facts, CONFIDENCE[pick.confidence]] : [pick.whySelected ?? 'Ranked by its score among your list.'];
 
-  const changes: string[] = [];
-  if (grow?.up) changes.push('the next quarterly results show profits falling instead of growing');
-  else if (grow?.down) changes.push('the next results show profits recovering');
-  if (value?.cheap) changes.push('the share price rises sharply, so it is no longer cheap compared with its profit');
-  else if (value?.pricey) changes.push('the share price falls back, making it cheaper compared with its profit');
-  if (move?.down) changes.push('the price stops falling and starts to recover');
-  else if (move?.up) changes.push('the price drops quickly after a long climb');
-  const whatWouldChange = changes.length
-    ? `Our view would change if ${changes.join(', or ')}. We re-check the numbers every time you run Monthly Picks.`
-    : (pick.invalidation ?? 'New company results or a big move in the share price could change this view.');
+  const changePoints: string[] = [];
+  if (grow?.up) changePoints.push('The next results show profits falling instead of growing.');
+  else if (grow?.down) changePoints.push('The next results show profits recovering.');
+  if (value?.cheap) changePoints.push('The share price rises sharply, so it is no longer cheap compared with its profit.');
+  else if (value?.pricey) changePoints.push('The share price falls back, making it cheaper compared with its profit.');
+  if (move?.down) changePoints.push('The price stops falling and starts to recover.');
+  else if (move?.up) changePoints.push('The price drops quickly after a long climb.');
+  if (!changePoints.length) changePoints.push(pick.invalidation ?? 'New company results or a big move in the share price could change this view.');
+  changePoints.push('We re-check the numbers every time you run Monthly Picks.');
 
   const risks: string[] = [];
   if (value?.cheap) risks.push('A very low price compared with profit can mean investors expect profits to fall. Cheap shares are not always bargains.');
@@ -85,12 +86,12 @@ export function explainPick(pick: MonthlyPick, rank: number, total: number): Pic
 
   const news = pick.catalysts.map((line) => {
     const match = /^(\d{4}-\d{2}-\d{2}|[A-Z][a-z]{2} \d{1,2}, \d{4}):\s*(.*)$/.exec(line);
-    return match ? `${match[1]}: ${readableTitle(match[2])}` : readableTitle(line);
+    return match ? { date: match[1], title: readableTitle(match[2]) } : { date: '', title: readableTitle(line) };
   });
-  const newsAndPlans = news.length
-    ? [...news, 'These are the company’s latest filings with PSX. We list them but have not judged whether they are good or bad news.']
-    : ['No recent company announcements were found for this pick.'];
+  const newsNote = news.length
+    ? 'These are the company’s latest filings with PSX. We list them but have not judged whether they are good or bad news.'
+    : 'No recent company announcements were found for this pick.';
 
   const summary = [grow?.text, move?.text].filter((x): x is string => !!x).join(' ') || value?.text || pick.thesis;
-  return { summary, whySelected, whatWouldChange, risks, newsAndPlans };
+  return { summary, headline, whyPoints, changePoints, risks, news, newsNote };
 }

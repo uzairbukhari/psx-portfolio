@@ -186,12 +186,34 @@ export default function PicksResults({ run, portfolio, extraNames, onRefreshPric
             </div>
             <details className="mp-more">
               <summary>Why this pick, risks and news</summary>
-              <p><b>Why it was chosen:</b> {plain.whySelected}</p>
-              <p><b>What would change this view:</b> {plain.whatWouldChange}</p>
-              <div className="mp-reasons">
-                <div><b>Risks to know about</b><ul>{plain.risks.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                <div><b>News and company plans</b><ul>{plain.newsAndPlans.map((item) => <li key={item}>{item}</li>)}</ul></div>
-              </div>
+              <section className="mp-sec">
+                <h4>Why it was chosen</h4>
+                <p className="mp-sec__lead">{plain.headline}</p>
+                <ul className="mp-points">{plain.whyPoints.map((item) => <li key={item}>{item}</li>)}</ul>
+              </section>
+              <section className="mp-sec">
+                <h4>What would change this view</h4>
+                <ul className="mp-points">{plain.changePoints.map((item) => <li key={item}>{item}</li>)}</ul>
+              </section>
+              <section className="mp-sec mp-sec--risk">
+                <h4>Risks to know about</h4>
+                <ul className="mp-points mp-points--risk">{plain.risks.map((item) => <li key={item}>{item}</li>)}</ul>
+              </section>
+              <section className="mp-sec">
+                <h4>News and company plans</h4>
+                {!!plain.news.length && (
+                  <ul className="mp-news">
+                    {plain.news.map((item) => (
+                      <li key={`${item.date}${item.title}`}>
+                        {item.date && <time>{item.date}</time>}
+                        <span>{item.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mp-sec__note">{plain.newsNote}</p>
+              </section>
+              <h4 className="mp-sources-title">Sources</h4>
               <Sources items={sourceItems(pick)} />
             </details>
           </article>
