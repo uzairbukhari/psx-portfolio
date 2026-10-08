@@ -298,7 +298,7 @@ export function DividendSyncView({
                     {c.rateSource === 'percent-of-face-value' && c.faceValue !== null && (
                       <small>
                         face value Rs {c.faceValue} ·{' '}
-                        {c.faceValueSource === 'verified' ? 'verified' : c.faceValueSource === 'account' ? 'your value' : assumed.includes(c.announcement.ticker) ? 'assumed' : 'entered'}
+                        {c.faceValueSource === 'verified' ? 'verified' : c.faceValueSource === 'ai' ? 'found by AI' : c.faceValueSource === 'account' ? 'your value' : assumed.includes(c.announcement.ticker) ? 'assumed' : 'entered'}
                       </small>
                     )}
                   </td>

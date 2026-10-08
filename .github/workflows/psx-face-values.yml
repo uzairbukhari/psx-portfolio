@@ -2,7 +2,8 @@ name: PSX face values
 
 # Gathers verified face-value evidence (security_face_values) from companies' own PSX disclosures and, where
 # given, curated official-document entries. Runs weekly for held companies with no evidence, and on demand
-# (`tickers` input) when a dividend review needs a face value. Production database only; the Worker never
+# (`tickers` input) when a dividend review needs a face value. Companies with no extractable statement then go
+# to a capped AI web lookup (see lib/ai-face-value.ts). Production database only; the Worker never
 # dispatches this from staging.
 on:
   schedule:
@@ -40,6 +41,14 @@ jobs:
           TICKERS: ${{ inputs.tickers }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # AI lookup for companies the extractor finds nothing for (skipped without a key). Public tickers only.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_RESEARCH_PROVIDER: ${{ vars.AI_RESEARCH_PROVIDER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_LAB_ENABLED: ${{ vars.AI_LAB_ENABLED }}
+          AI_RESEARCH_MODEL_READ: ${{ vars.AI_RESEARCH_MODEL_READ }}
+          AI_RESEARCH_MONTHLY_CAP_USD: ${{ vars.AI_RESEARCH_MONTHLY_CAP_USD }}
+          FACE_VALUE_AI_MONTHLY_CAP_USD: ${{ vars.FACE_VALUE_AI_MONTHLY_CAP_USD }}
       - name: Open or update a failure issue
         if: failure()
         env:

@@ -10,7 +10,9 @@
 //  - nothing here is derived from, or written back from, a user's portfolio.
 // Pure module (no Worker or D1 imports); the D1 statements are built here so the script and tests share them.
 
-export type FaceValueStatus = 'verified' | 'conflict';
+// 'ai' = found by a web lookup and confirmed only by a quoted sentence on the cited page (not by the extractor):
+// usable, but always labelled as AI-found.
+export type FaceValueStatus = 'verified' | 'ai' | 'conflict';
 export type FaceValueEvidence = {
   faceValue: number;
   /** First date (YYYY-MM-DD) the value applies from; '' = from the earliest date the evidence covers. */
@@ -164,6 +166,13 @@ export function mergeFaceValueEvidence(existing: readonly FaceValueEvidence[], f
   const writes = new Map<string, FaceValueEvidence>();
   for (const incoming of found) {
     const current = byStart.get(incoming.effectiveFrom);
+    // Verified evidence replaces an AI-found value for the same start date; an AI value never overrides or contests one.
+    if (current && current.status === 'ai' && incoming.status === 'verified') {
+      byStart.set(incoming.effectiveFrom, incoming);
+      writes.set(incoming.effectiveFrom, incoming);
+      continue;
+    }
+    if (current && current.status !== 'ai' && incoming.status === 'ai') continue;
     if (!current) {
       byStart.set(incoming.effectiveFrom, incoming);
       writes.set(incoming.effectiveFrom, incoming);
@@ -202,7 +211,7 @@ export const faceValueParams = (ticker: string, e: FaceValueEvidence) => [
 type StoredFace = { ticker: string; effective_from: string; face_value: number; source_url: string; source_label: string | null; evidence: string | null; verified_at: string; status: string };
 export const evidenceFromStored = (r: StoredFace): FaceValueEvidence => ({
   faceValue: r.face_value, effectiveFrom: r.effective_from, sourceUrl: r.source_url, sourceLabel: r.source_label,
-  evidence: r.evidence, verifiedAt: r.verified_at, status: r.status === 'conflict' ? 'conflict' : 'verified',
+  evidence: r.evidence, verifiedAt: r.verified_at, status: r.status === 'conflict' ? 'conflict' : r.status === 'ai' ? 'ai' : 'verified',
 });
 
 /** Evidence rows for the given tickers (chunked under D1's bound-parameter limit). */
