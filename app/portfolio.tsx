@@ -2802,20 +2802,20 @@ function DashboardContent({
                     fundNavs={fundData.navs}
                     planNavs={planNavs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
-                    aside={
-                      widePulse ? (
-                        <PsxMarketPulse
-                          ref={pulseRef}
-                          onOpenShortlist={() => setTab('sip')}
-                          onRefresh={refresh}
-                          refreshing={busy}
-                          {...pulseWatch}
-                        />
-                      ) : undefined
-                    }
                     chart={
                       <PortfolioValueCard
                         chartOnly
+                        aside={
+                          widePulse ? (
+                            <PsxMarketPulse
+                              ref={pulseRef}
+                              onOpenShortlist={() => setTab('sip')}
+                              onRefresh={refresh}
+                              refreshing={busy}
+                              {...pulseWatch}
+                            />
+                          ) : undefined
+                        }
                         p={p}
                         value={value}
                         cost={cost}
@@ -3179,7 +3179,7 @@ function DashboardContent({
                     </section>
                   </CollapsiblePanel>
                 )}
-                {widePulse === false && (
+                {widePulse === false && (!isAll || held.length > 0) && (
                   <PsxMarketPulse
                     ref={pulseRef}
                     onOpenShortlist={() => setTab('sip')}

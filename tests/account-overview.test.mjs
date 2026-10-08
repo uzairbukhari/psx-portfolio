@@ -204,3 +204,18 @@ test('invested per month counts money put in over the last 12 months, not sales'
   assert.equal(o.invested.months.find((m) => m.month === '2026-09').amount, 0);
   assert.equal(o.invested.total, 2000);
 });
+
+test('income explains a zero: dated last year, or received without a payment date', () => {
+  const o = accountOverview(
+    [{ id: 'x', name: 'X', portfolio: { ...a, dividends: [
+      { ...a.dividends[0], id: 'old', paymentDate: '2026-03-10' },
+      { ...a.dividends[0], id: 'nodate', source: 'auto', status: 'received', paymentDateUnknown: true },
+    ] } }],
+    '2026-10-08',
+  );
+  assert.equal(o.income.received, 0);
+  assert.equal(o.income.previousTaxYear, '2025-26');
+  assert.equal(o.income.receivedPrevious, 1000);
+  assert.equal(o.income.unknownDateCount, 1);
+  assert.equal(o.income.unknownDateAmount, 1000);
+});

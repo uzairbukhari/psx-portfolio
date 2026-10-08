@@ -34,6 +34,27 @@ export default function SystemHealth() {
     }
   }, []);
 
+  const [funds, setFunds] = useState<{ busy: boolean; message?: string; failed?: boolean }>({ busy: false });
+  const refreshFunds = async () => {
+    setFunds({ busy: true });
+    try {
+      const res = await fetch('/api/admin/refresh-funds', { method: 'POST' });
+      const body = (await readJson(res)) as {
+        error?: string;
+        funds?: { funds: number; tracked: number; prices: number; newest: string };
+        plans?: unknown;
+      };
+      if (!res.ok || !body.funds) throw new Error(body.error ?? 'Could not refresh fund prices.');
+      const f = body.funds;
+      setFunds({
+        busy: false,
+        message: `${f.funds} funds read, ${f.prices} prices stored for ${f.tracked} held funds. MUFAP's newest price date: ${f.newest || 'none'}.`,
+      });
+    } catch (e) {
+      setFunds({ busy: false, failed: true, message: e instanceof Error ? e.message : 'Could not refresh fund prices.' });
+    }
+  };
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
@@ -78,7 +99,13 @@ export default function SystemHealth() {
       )}
       <button type="button" className="secondary compact" disabled={loading} onClick={() => void load()}>
         {loading ? 'Refreshing…' : 'Refresh'}
+      </button>{' '}
+      <button type="button" className="secondary compact" disabled={funds.busy} onClick={() => void refreshFunds()}>
+        {funds.busy ? 'Fetching from MUFAP…' : 'Refresh fund prices now'}
       </button>
+      {funds.message && (
+        <p role={funds.failed ? 'alert' : 'status'} className={funds.failed ? 'notice error' : 'notice'}>{funds.message}</p>
+      )}
     </div>
   );
 }

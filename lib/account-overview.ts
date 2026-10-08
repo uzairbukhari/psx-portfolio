@@ -92,6 +92,11 @@ export type AccountOverview = {
     taxYear: string;
     /** Dividends received in the current tax year (gross). */
     received: number;
+    /** Dividends received in the tax year before, and received ones confirmed without a payment date (in neither year). */
+    previousTaxYear: string;
+    receivedPrevious: number;
+    unknownDateCount: number;
+    unknownDateAmount: number;
     /** All dividends received so far (gross). */
     receivedTotal: number;
     /** Announced, unconfirmed dividends: a planning figure, never income. */
@@ -278,16 +283,25 @@ export function accountOverview(
   const taxYear = taxYearOf(asOf);
   const months = lastMonths(asOf, 12);
   const byMonth = new Map(months.map((m) => [m, 0]));
+  const previousTaxYear = taxYearOf(`${Number(taxYear.slice(0, 4)) - 1}-12-31`);
   let received = 0;
+  let receivedPrevious = 0;
+  let unknownDateCount = 0;
+  let unknownDateAmount = 0;
   let receivedTotal = 0;
   const dividendFlows: CashFlow[] = [];
   for (const entry of consolidated.breakdown)
     for (const d of entry.tax.dividends) {
       if (d.status !== 'received') continue;
       receivedTotal += d.grossAmount;
-      if (d.paymentDateUnknown) continue;
+      if (d.paymentDateUnknown) {
+        unknownDateCount += 1;
+        unknownDateAmount += d.grossAmount;
+        continue;
+      }
       const paid = d.paymentDate ?? d.date;
       if (taxYearOf(paid) === taxYear) received += d.grossAmount;
+      else if (taxYearOf(paid) === previousTaxYear) receivedPrevious += d.grossAmount;
       const month = paid.slice(0, 7);
       if (byMonth.has(month))
         byMonth.set(month, (byMonth.get(month) ?? 0) + d.grossAmount);
@@ -306,6 +320,7 @@ export function accountOverview(
         continue;
       receivedTotal += e.amount;
       if (taxYearOf(e.date) === taxYear) received += e.amount;
+      else if (taxYearOf(e.date) === previousTaxYear) receivedPrevious += e.amount;
       const month = e.date.slice(0, 7);
       if (byMonth.has(month))
         byMonth.set(month, (byMonth.get(month) ?? 0) + e.amount);
@@ -409,6 +424,10 @@ export function accountOverview(
     income: {
       taxYear,
       received: round(received),
+      previousTaxYear,
+      receivedPrevious: round(receivedPrevious),
+      unknownDateCount,
+      unknownDateAmount: round(unknownDateAmount),
       receivedTotal: round(receivedTotal),
       expected: consolidated.breakdown.reduce(
         (n, e) => n + e.tax.expectedDividends.grossAmount,

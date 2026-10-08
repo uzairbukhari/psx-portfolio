@@ -70,17 +70,15 @@ export default function AccountOverview({
   planNavs = [],
   chart,
   onOpenPortfolio,
-  aside,
 }: {
   parts: (DisplayPart & { locked?: boolean })[];
   asOf: string;
   metalRates: MetalRateRow[];
   fundNavs?: FundNavRow[];
   planNavs?: PlanNavRow[];
-  /** The value-over-time chart, rendered by the page because it loads price history itself. */
+  /** The stocks value chart (with the market pulse beside it), rendered by the page because it loads price history itself. Only shown when stocks are held. */
   chart: ReactNode;
   onOpenPortfolio: (id: string) => void;
-  aside?: ReactNode;
 }) {
   const o = useMemo(
     () => accountOverview(parts, asOf, { metalRates, fundNavs, planNavs }),
@@ -90,6 +88,8 @@ export default function AccountOverview({
   const staleDays = total.oldestQuoteDate
     ? daysBetween(total.oldestQuoteDate, asOf)
     : null;
+  // No PSX stocks held: the market pulse, the stocks chart and the sector split have nothing to show.
+  const hasStocks = o.classes.some((c) => c.key === 'stocks');
   const sectorData = o.sectors.map((s, i) => ({
     ...s,
     fill:
@@ -163,19 +163,27 @@ export default function AccountOverview({
               <small>
                 {income.expectedCount > 0
                   ? `${moneyShort(income.expected)} more expected (not income yet)`
-                  : `Tax year ${income.taxYear}`}
+                  : income.received > 0 || income.receivedTotal === 0
+                    ? `Tax year ${income.taxYear}`
+                    : income.unknownDateCount > 0
+                      ? `${income.unknownDateCount} received without a payment date, not counted · add the date to include`
+                      : `None paid in tax year ${income.taxYear} (from 1 July) · ${moneyShort(income.receivedPrevious)} in ${income.previousTaxYear}`}
               </small>
             </dd>
           </div>
         </dl>
-        {aside && <div className="overview-hero__aside">{aside}</div>}
       </section>
 
-      <section className="panel overview-panel" aria-label="Value over time">
-        {chart}
-      </section>
+      {hasStocks && (
+        <section
+          className="panel overview-panel overview-market"
+          aria-label="Stocks and market"
+        >
+          {chart}
+        </section>
+      )}
 
-      <div className="overview-grid">
+      <div className="overview-grid" data-cols={hasStocks ? 2 : 3}>
         <section className="panel overview-panel" aria-label="Asset mix">
           <div className="report-heading">
             <div>
@@ -255,6 +263,7 @@ export default function AccountOverview({
           )}
         </section>
 
+        {hasStocks && (
         <section className="panel overview-panel" aria-label="Sectors">
           <div className="report-heading">
             <div>
@@ -292,9 +301,7 @@ export default function AccountOverview({
             </p>
           )}
         </section>
-      </div>
-
-      <div className="overview-grid">
+        )}
         <section className="panel overview-panel" aria-label="Portfolios">
           <div className="report-heading">
             <div>
