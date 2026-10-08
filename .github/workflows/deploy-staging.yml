@@ -106,7 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.merge.outputs.sha }}
+          ref: staging
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -126,7 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.merge.outputs.sha }}
+          ref: staging
       # Until the owner creates the staging D1 database and pastes its id into
       # wrangler.jsonc (env.staging), there is nothing to deploy to: skip cleanly.
       - name: Check staging database is configured
