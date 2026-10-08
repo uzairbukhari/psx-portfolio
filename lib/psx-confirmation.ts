@@ -2,7 +2,8 @@
 // from the same back-office software (Youngs Capital, Syed Faraz Equities, and others using that template).
 // Pure: text in, a BrokerStatement out, reviewed in the broker import dialog. Only the confirmation fills are
 // read; the ledger lines, bank details, address and name are ignored, so none of them reach the portfolio.
-import type { BrokerStatement, BrokerTrade } from './broker-import.ts';
+import type { BrokerHolding, BrokerStatement, BrokerTrade } from './broker-import.ts';
+import { executionDateFromSettlement } from './psx-calendar.ts';
 
 const fillPattern = new RegExp(
   `^\\s*([A-Z][A-Z0-9]{1,11})\\s+(\\d[\\d,]*)\\s+(\\d[\\d,]*\\.\\d+)((?:\\s+-?\\d[\\d,]*\\.\\d{2}){8})\\s+([A-Za-z]+)\\s*$`,
@@ -85,4 +86,74 @@ export function parsePsxConfirmation(text: string): BrokerStatement {
   });
   if (!trades.length) throw Error('No trades were found in this statement.');
   return { broker, account, report: 'trades', trades, holdings: [], warnings };
+}
+
+/**
+ * The same back-office software's account ledger ("Statement of Account" with dated BUY/SELL narrations and an
+ * "Inventory Position" table, no 4.19 confirmation section). Detected apart from the confirmation template.
+ */
+export function detectPsxLedger(text: string): boolean {
+  return (
+    /STATEMENT\s+OF\s+ACCOUNT/i.test(text) &&
+    /TREC\s+NO/i.test(text) &&
+    /INVENTORY\s+POSITION/i.test(text) &&
+    /^\s*[A-Z]{2}\d{4,}\s+\d{2}-\d{2}-\d{2}\s+T\+\d\s+(?:BUY|SELL)\s+#/m.test(text)
+  );
+}
+
+const ledgerTrade =
+  /^\s*[A-Z]{2}\d{4,}\s+(\d{2})-(\d{2})-(\d{2})\s+T\+(\d)\s+(BUY|SELL)\s+#\s*\d+\s+([A-Z][A-Z0-9]{1,11})\s+(\d[\d,]*)\s+@\s+(\d[\d,]*\.\d+)\s+(\d[\d,]*\.\d{2})\s+-\s+\d[\d,]*\.\d{2}\s+Cr(?:\s+(\d{2})-(\d{2})-(\d{2}))?\s*$/;
+const inventoryRow =
+  /^\s*([A-Z][A-Z0-9]{1,11})\s+\S.*?\s+(\d[\d,]*)\s+(\d[\d,]*)\s+\d[\d,]*\.\d+\s+-?\d[\d,]*\s+\d[\d,]*\.\d+\s+-?\d[\d,]*\s+-?\d[\d,]*\s*$/;
+
+export function parsePsxLedger(text: string): BrokerStatement {
+  if (!detectPsxLedger(text)) throw Error('Choose a PSX broker Statement of Account (PDF).');
+  const lines = text.split(/\r?\n/);
+  const nameLine = lines.find((l) => /\S/.test(l) && !/^---\s*PDF PAGE/.test(l));
+  const broker = nameLine ? brokerNameOf(nameLine) : '';
+  if (!broker) throw Error('The broker name could not be read from this statement.');
+  const dateMatch = /Trade\s+Date\s*:\s*(\d{2})-(\d{2})-(\d{4})/i.exec(text);
+  if (!dateMatch) throw Error('The statement is missing its Trade Date.');
+  const asOf = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+  const account = /^\s*([A-Z]{1,5}\d{2,8})\s*-\s*\S/m.exec(text)?.[1] ?? '';
+
+  const trades: BrokerTrade[] = [];
+  const holdings: BrokerHolding[] = [];
+  const warnings: string[] = [];
+  let inventory = false;
+  lines.forEach((line, i) => {
+    if (/^\s*INVENTORY\s+POSITION\s*$/i.test(line)) inventory = true;
+    else if (/^\s*FLOATING\s+POSITION\s*$/i.test(line)) inventory = false;
+    const t = ledgerTrade.exec(line);
+    if (t) {
+      const [, d, m, y, settle, sideWord, ticker, qty, rate, amount, td, tm, ty] = t;
+      const side = sideWord === 'BUY' ? 'buy' : 'sell';
+      const entry = `20${y}-${m}-${d}`;
+      // The trailing date is the day the trade executed; otherwise walk back from the entry date.
+      const date = td ? `20${ty}-${tm}-${td}` : executionDateFromSettlement(entry, Number(settle) === 2 ? 2 : 1).date;
+      const shares = Number(qty.replace(/,/g, ''));
+      const net = money(amount);
+      let price = money(rate);
+      const gross = r2(shares * price);
+      let fees = r2(side === 'buy' ? net - gross : gross - net);
+      if (fees < 0) {
+        // The ledger rate is a rounded average, so the net amount can sit under shares x rate: keep cash exact.
+        price = Math.round((net / shares) * 10000) / 10000;
+        fees = 0;
+      }
+      if (!Number.isSafeInteger(shares) || shares <= 0 || !(price > 0)) throw Error(`The ${ticker} ledger line has an invalid quantity or rate.`);
+      trades.push({ ticker, date, side, shares, price, fees, reference: null, line: i + 1 });
+      return;
+    }
+    if (/^\s*[A-Z]{2}\d{4,}\s+\d{2}-\d{2}-\d{2}\s+T\+\d\s+(?:BUY|SELL)\b/.test(line))
+      throw Error(`A trade line in this statement could not be read: "${line.trim().slice(0, 60)}".`);
+    if (inventory) {
+      const h = inventoryRow.exec(line);
+      if (h) holdings.push({ ticker: h[1], asOf, shares: Number(h[3].replace(/,/g, '')), line: i + 1 });
+    }
+  });
+  if (!trades.length && !holdings.length) throw Error('No trades were found in this statement.');
+  if (holdings.length)
+    warnings.push('Holdings are the broker’s inventory on the statement date; shares not explained by the listed trades are offered as balance adjustments.');
+  return { broker, account, report: trades.length && holdings.length ? 'both' : trades.length ? 'trades' : 'holdings', trades, holdings, warnings };
 }
