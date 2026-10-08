@@ -146,3 +146,13 @@ test('account ledger: trades and inventory, rounded-rate buys keep the net cash'
   assert.equal(s.trades[0].price * 10, 3051.08);
   assert.deepEqual(s.holdings.map((h) => [h.ticker, h.shares, h.asOf]), [['AAA', 5, '2026-10-08']]);
 });
+
+test('account ledger: debit balances (Dr) and price-difference lines', () => {
+  const text = ledger.replace('INVENTORY POSITION', `CV020096 27-02-26 T+1 BUY # 170040 AAA 200 @ 614.09 122,817.64 37,865.00 Dr 26-02-26
+CV020066 20-02-26 T+1 Difference # 28585 AAA 30 @ 1.21 36.20 - 238,459.94 Cr 19-02-26
+INVENTORY POSITION`);
+  const s = parsePsxLedger(text);
+  assert.equal(s.trades.length, 3);
+  assert.equal(s.trades[2].shares, 200);
+  assert.ok(s.warnings.some((w) => /price-difference/.test(w)));
+});
