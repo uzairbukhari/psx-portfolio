@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { detectPsxConfirmation, parsePsxConfirmation } from '../lib/psx-confirmation.ts';
+import { detectPsxConfirmation, parsePsxConfirmation, detectPsxLedger, parsePsxLedger } from '../lib/psx-confirmation.ts';
 import { planBrokerImport, applyBrokerImport, validateBrokerStatement } from '../lib/broker-import.ts';
 import { detectPdfImport } from '../lib/import-detect.ts';
 
@@ -119,3 +119,30 @@ for (const [env, broker, trades] of [['YOUNGS_LOCAL_PDF', 'Youngs Capital', 1], 
     assert.deepEqual(s.warnings, []);
   });
 }
+
+// Invented account ledger: no real names, accounts or addresses.
+const ledger = `
+--- PDF PAGE 1 ---
+TEST BROKER (PVT) LIMITED
+TREC NO: 1
+Trade Date :08-10-2026 Settlement Date : 09-10-2026
+TC0001-TEST CLIENT CDC ID : 000000
+STATEMENT OF ACCOUNT
+Entry # Date Narration Debit Credit Balance Cheque # Chq. Dt
+CV070001 02-07-26 T+1 BUY # 217 AAA 10 @ 305.11 3,051.08 - 157,873.75 Cr 01-07-26
+CV070100 29-07-26 T+1 SELL # 14496 AAA 5 @ 296.36 1,481.58 - 21,836.19 Cr 28-07-26
+GV070203 30-07-26 ESL ACCOUNT MAINTENANCE JULY 2026 96.66 - 21,739.53 Cr
+INVENTORY POSITION
+Item Name Unsettled Qty Net Quantity Avg. Rate Amount Closing Market Value M2M Profit/Loss
+AAA ALPHA TEST COMPANY LIM 0 5 305.11 1,526 320.00 1,600 74
+FLOATING POSITION
+`;
+test('account ledger: trades and inventory, rounded-rate buys keep the net cash', () => {
+  assert.equal(detectPsxConfirmation(ledger), false);
+  assert.equal(detectPsxLedger(ledger), true);
+  const s = parsePsxLedger(ledger);
+  assert.equal(s.report, 'both');
+  assert.deepEqual(s.trades.map((t) => [t.date, t.side, t.shares, t.fees]), [['2026-07-01', 'buy', 10, 0], ['2026-07-28', 'sell', 5, 0.22]]);
+  assert.equal(s.trades[0].price * 10, 3051.08);
+  assert.deepEqual(s.holdings.map((h) => [h.ticker, h.shares, h.asOf]), [['AAA', 5, '2026-10-08']]);
+});
