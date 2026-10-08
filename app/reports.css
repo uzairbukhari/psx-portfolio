@@ -13,7 +13,7 @@
 .reports-priced-value.pos strong{color:var(--success);text-shadow:0 0 24px var(--success-glow)}
 .reports-priced-value.neg strong{color:var(--danger);text-shadow:0 0 24px var(--danger-glow)}
 .reports-summary{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
-.reports-summary article{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.02)}
+.reports-summary article{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:rgb(var(--ch-tint) / .02)}
 .reports-summary span,.reports-summary small{display:block;color:var(--muted-foreground);font-size:12px}
 .reports-summary span{text-transform:uppercase;letter-spacing:.7px;font-weight:700}
 .reports-summary strong{display:block;margin:2px 0;font-size:16px;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
@@ -24,7 +24,7 @@
 .reports[data-view="income"] .report-panel:not([data-group="income"]),
 .reports[data-view="activity"] .report-panel:not([data-group="activity"]){display:none}
 .report-panel{border-radius:14px;transition:border-color .15s ease}
-.report-panel:hover{border-color:rgba(59,130,246,.35)}
+.report-panel:hover{border-color:rgb(var(--ch-primary) / .35)}
 @media(max-width:900px){
   .reports-hero-stats,.reports-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .reports-priced-value{padding:12px}
@@ -36,5 +36,5 @@
 }
 @media(max-width:760px){.reports-tabs{top:52px}}
 .chart-info{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:8px;padding:0;vertical-align:middle;border:0;border-radius:50%;background:transparent;color:var(--muted-foreground);cursor:help;transition:color .15s ease,background-color .15s ease}
-.chart-info:hover,.chart-info:focus-visible{color:var(--primary);background:rgba(59,130,246,.14)}
+.chart-info:hover,.chart-info:focus-visible{color:var(--primary);background:rgb(var(--ch-primary) / .14)}
 .chart-info:focus-visible{outline:2px solid var(--primary);outline-offset:1px}

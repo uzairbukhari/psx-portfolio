@@ -34,13 +34,13 @@ export function NetWorthPreview() {
         <svg className="spark" viewBox="0 0 400 70" preserveAspectRatio="none">
           <defs>
             <linearGradient id="lp-spark" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#3b82f6" stopOpacity=".35" />
-              <stop offset="1" stopColor="#3b82f6" stopOpacity="0" />
+              <stop offset="0" stopColor="var(--primary)" stopOpacity=".35" />
+              <stop offset="1" stopColor="var(--primary)" stopOpacity="0" />
             </linearGradient>
           </defs>
           <path d={`${LINE} L400 70 L0 70Z`} fill="url(#lp-spark)" />
-          <path d={LINE} fill="none" stroke="#60a5fa" strokeWidth="2" />
-          <circle cx="400" cy="10" r="3.5" fill="#22e0a0" />
+          <path d={LINE} fill="none" stroke="var(--primary-2)" strokeWidth="2" />
+          <circle cx="400" cy="10" r="3.5" fill="var(--success)" />
         </svg>
         <div className="mix">
           {MIX.map(([name, , pct, color]) => (

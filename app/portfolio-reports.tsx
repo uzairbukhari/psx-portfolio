@@ -48,7 +48,7 @@ const cumulativeConfig = {
 
 const dividendActivityConfig = {
   net: { label: 'Net received', color: 'var(--primary)' },
-  gross: { label: 'Gross declared', color: '#7f93b8' },
+  gross: { label: 'Gross declared', color: 'var(--chart-neutral)' },
 } satisfies ChartConfig;
 
 const dividendCompanyConfig = {
@@ -67,19 +67,19 @@ const performanceConfig = {
   gainPercent: { label: 'Gain / loss', color: 'var(--success)' },
 } satisfies ChartConfig;
 
-// Validated against this app's dark surface (#05070d) with
+// Per-theme values live in globals.css (--cat-1..7). The dark values were validated against #05070d with
 // scripts/validate_palette.js from the dataviz skill: fixed hue order,
 // worst adjacent CVD ΔE 8.4, worst adjacent normal-vision ΔE 19.3.
 const sectorColors = [
-  '#3987e5',
-  '#d95926',
-  '#199e70',
-  '#c98500',
-  '#d55181',
-  '#008300',
-  '#9085e9',
+  'var(--cat-1)',
+  'var(--cat-2)',
+  'var(--cat-3)',
+  'var(--cat-4)',
+  'var(--cat-5)',
+  'var(--cat-6)',
+  'var(--cat-7)',
 ];
-const OTHER_SECTOR_COLOR = '#5b6b85';
+const OTHER_SECTOR_COLOR = 'var(--chart-other)';
 
 function foldSectors(sectors: SectorPoint[], cap = sectorColors.length) {
   if (sectors.length <= cap) return sectors;
@@ -601,7 +601,7 @@ export default function PortfolioReports({
                     }}
                   />
                   <ChartTooltip
-                    cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                    cursor={{ fill: 'var(--chart-cursor)' }}
                     content={
                       <ChartTooltipContent
                         formatter={(value, name, item) => {
@@ -803,7 +803,7 @@ export default function PortfolioReports({
                   }
                 />
                 <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  cursor={{ fill: 'var(--chart-cursor)' }}
                   content={
                     <ChartTooltipContent
                       formatter={(_value, _name, item) => {
@@ -871,7 +871,7 @@ export default function PortfolioReports({
                     y2="0"
                   >
                     <stop offset="0%" stopColor="var(--primary)" />
-                    <stop offset="100%" stopColor="#7dd3fc" />
+                    <stop offset="100%" stopColor="var(--primary-3)" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid horizontal={false} />
@@ -897,7 +897,7 @@ export default function PortfolioReports({
                   axisLine={false}
                 />
                 <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  cursor={{ fill: 'var(--chart-cursor)' }}
                   content={
                     <ChartTooltipContent
                       hideLabel
@@ -980,7 +980,7 @@ export default function PortfolioReports({
                 <defs>
                   <linearGradient id="allocationFill" x1="0" y1="0" x2="1" y2="0">
                     <stop offset="0%" stopColor="var(--primary)" />
-                    <stop offset="100%" stopColor="#7dd3fc" />
+                    <stop offset="100%" stopColor="var(--primary-3)" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid horizontal={false} />
@@ -1002,7 +1002,7 @@ export default function PortfolioReports({
                   axisLine={false}
                 />
                 <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  cursor={{ fill: 'var(--chart-cursor)' }}
                   content={
                     <ChartTooltipContent
                       hideLabel
@@ -1083,7 +1083,7 @@ export default function PortfolioReports({
                   />
                   <ReferenceLine x={0} stroke="var(--border)" />
                   <ChartTooltip
-                    cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                    cursor={{ fill: 'var(--chart-cursor)' }}
                     content={
                       <ChartTooltipContent
                         hideLabel
@@ -1169,7 +1169,7 @@ export default function PortfolioReports({
                 />
                 <ReferenceLine y={0} stroke="var(--border)" />
                 <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  cursor={{ fill: 'var(--chart-cursor)' }}
                   content={
                     <ChartTooltipContent
                       formatter={(_value, _name, item) => {
@@ -1248,7 +1248,7 @@ export default function PortfolioReports({
                 />
                 <ReferenceLine x={0} stroke="var(--border)" />
                 <ChartTooltip
-                  cursor={{ fill: 'rgba(148,178,225,.12)' }}
+                  cursor={{ fill: 'var(--chart-cursor)' }}
                   content={
                     <ChartTooltipContent
                       hideLabel

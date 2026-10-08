@@ -8,6 +8,7 @@ import './ai-lab.css';
 import './reports.css';
 import './account-overview.css';
 import './settings.css';
+import { DEFAULT_THEME, THEME_META, themeInitScript } from '@/lib/theme';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -34,8 +35,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme={DEFAULT_THEME}
+      suppressHydrationWarning
       data-app-env={env.APP_ENV === 'staging' ? 'staging' : undefined}
     >
+      <head>
+        <meta name="theme-color" content={THEME_META[DEFAULT_THEME].bg} />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+      </head>
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

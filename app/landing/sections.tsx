@@ -142,7 +142,7 @@ export function PlanSection() {
               <span className="mono">{amount}</span>
             </div>
           ))}
-          <p style={{ margin: '14px 0 0', fontSize: 12, color: '#6f86ab' }}>
+          <p style={{ margin: '14px 0 0', fontSize: 12, color: 'var(--lp-dim)' }}>
             Illustration. Picks are ranked on your device and are not advice.
           </p>
         </div>
@@ -155,7 +155,7 @@ export function PrivacySection() {
   return (
     <section className="block privacy" id="privacy">
       <div className="lp-wrap">
-        <div className="kicker" style={{ color: '#5fe3b6' }}>
+        <div className="kicker" style={{ color: 'var(--success)' }}>
           Private by design
         </div>
         <h2>We can&rsquo;t see your portfolio. Nobody can.</h2>

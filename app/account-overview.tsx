@@ -22,23 +22,23 @@ import { daysBetween } from '@/lib/performance';
 import type { MetalRateRow } from '@/lib/metal-rates';
 
 const CLASS_COLORS: Record<AssetClassKey, string> = {
-  stocks: '#3987e5',
-  gold: '#c98500',
-  silver: '#9aa7b8',
-  plans: '#199e70',
-  funds: '#9085e9',
+  stocks: 'var(--cat-1)',
+  gold: 'var(--cat-4)',
+  silver: 'var(--chart-neutral)',
+  plans: 'var(--cat-3)',
+  funds: 'var(--cat-7)',
 };
 const SECTOR_COLORS = [
-  '#3987e5',
-  '#d95926',
-  '#199e70',
-  '#c98500',
-  '#d55181',
-  '#008300',
-  '#9085e9',
+  'var(--cat-1)',
+  'var(--cat-2)',
+  'var(--cat-3)',
+  'var(--cat-4)',
+  'var(--cat-5)',
+  'var(--cat-6)',
+  'var(--cat-7)',
 ];
 const investedKeys: AssetClassKey[] = ['stocks', 'funds', 'plans', 'gold', 'silver'];
-const OTHER_COLOR = '#5b6b85';
+const OTHER_COLOR = 'var(--chart-other)';
 
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
 const pct = (n: number | null, digits = 1) =>
