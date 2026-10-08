@@ -102,7 +102,7 @@ export function detectPsxLedger(text: string): boolean {
 }
 
 const ledgerTrade =
-  /^\s*[A-Z]{2}\d{4,}\s+(\d{2})-(\d{2})-(\d{2})\s+T\+(\d)\s+(BUY|SELL)\s+#\s*\d+\s+([A-Z][A-Z0-9]{1,11})\s+(\d[\d,]*)\s+@\s+(\d[\d,]*\.\d+)\s+(\d[\d,]*\.\d{2})\s+-\s+\d[\d,]*\.\d{2}\s+Cr(?:\s+(\d{2})-(\d{2})-(\d{2}))?\s*$/;
+  /^\s*[A-Z]{2}\d{4,}\s+(\d{2})-(\d{2})-(\d{2})\s+T\+(\d)\s+(BUY|SELL)\s+#\s*\d+\s+([A-Z][A-Z0-9]{1,11})\s+(\d[\d,]*)\s+@\s+(\d[\d,]*\.\d+)\s+(\d[\d,]*\.\d{2})(?:\s+-)?\s+\d[\d,]*\.\d{2}\s+(?:Cr|Dr)(?:\s+(\d{2})-(\d{2})-(\d{2}))?\s*$/;
 const inventoryRow =
   /^\s*([A-Z][A-Z0-9]{1,11})\s+\S.*?\s+(\d[\d,]*)\s+(\d[\d,]*)\s+\d[\d,]*\.\d+\s+-?\d[\d,]*\s+\d[\d,]*\.\d+\s+-?\d[\d,]*\s+-?\d[\d,]*\s*$/;
 
@@ -121,6 +121,7 @@ export function parsePsxLedger(text: string): BrokerStatement {
   const holdings: BrokerHolding[] = [];
   const warnings: string[] = [];
   let inventory = false;
+  let differences = 0;
   lines.forEach((line, i) => {
     if (/^\s*INVENTORY\s+POSITION\s*$/i.test(line)) inventory = true;
     else if (/^\s*FLOATING\s+POSITION\s*$/i.test(line)) inventory = false;
@@ -145,6 +146,10 @@ export function parsePsxLedger(text: string): BrokerStatement {
       trades.push({ ticker, date, side, shares, price, fees, reference: null, line: i + 1 });
       return;
     }
+    if (/^\s*[A-Z]{2}\d{4,}\s+\d{2}-\d{2}-\d{2}\s+T\+\d\s+Difference\b/.test(line)) {
+      differences++;
+      return;
+    }
     if (/^\s*[A-Z]{2}\d{4,}\s+\d{2}-\d{2}-\d{2}\s+T\+\d\s+(?:BUY|SELL)\b/.test(line))
       throw Error(`A trade line in this statement could not be read: "${line.trim().slice(0, 60)}".`);
     if (inventory) {
@@ -153,6 +158,8 @@ export function parsePsxLedger(text: string): BrokerStatement {
     }
   });
   if (!trades.length && !holdings.length) throw Error('No trades were found in this statement.');
+  if (differences)
+    warnings.push(`${differences} small price-difference adjustment${differences === 1 ? '' : 's'} in the ledger ${differences === 1 ? 'was' : 'were'} skipped: they move no shares.`);
   if (holdings.length)
     warnings.push('Holdings are the broker’s inventory on the statement date; shares not explained by the listed trades are offered as balance adjustments.');
   return { broker, account, report: trades.length && holdings.length ? 'both' : trades.length ? 'trades' : 'holdings', trades, holdings, warnings };
