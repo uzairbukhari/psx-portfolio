@@ -97,11 +97,11 @@ export type PriceHistoryResponse = {
   eodMeta?: import('./market-meta.ts').DataMeta;
   intradayMeta?: import('./market-meta.ts').DataMeta;
   /** Additive: state of an on-demand history fetch for this symbol (`none` when nobody asked). */
-  request?: import('./workflow-requests.ts').TickerState;
+  request?: RefreshTickerState;
 };
 /** POST /api/price-history: ask for a symbol's history to be fetched now. */
 export type PriceHistoryRequestResponse = {
-  request: import('./workflow-requests.ts').TickerState;
+  request: RefreshTickerState;
   /** False when nothing could be started (no dispatch configured, staging); `reason` says why. */
   started: boolean;
   reason?: string;
