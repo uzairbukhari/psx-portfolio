@@ -227,6 +227,8 @@ export type Portfolio = {
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
+  /** Companies the person took off the Monthly Picks list without deleting them from the ledger. */
+  monthlyPicksHidden?: string[];
   /** Finished Monthly Picks runs, computed on the device and kept only inside the encrypted portfolio. */
   monthlyPicksRuns?: import('./picks-local.ts').StoredPicksRun[];
   /** Experimental AI Lab runs (super admin), kept apart from Monthly Picks and stored only in the encrypted portfolio. */
@@ -1346,6 +1348,13 @@ export function validate(p: Portfolio) {
     )
       throw new UserError('Invalid Monthly Picks shortlist.');
   }
+  if (
+    p.monthlyPicksHidden !== undefined &&
+    (!Array.isArray(p.monthlyPicksHidden) ||
+      p.monthlyPicksHidden.length > 2000 ||
+      p.monthlyPicksHidden.some((ticker) => typeof ticker !== 'string' || !/^[A-Z0-9]{2,12}$/.test(ticker)))
+  )
+    throw new UserError('Invalid Monthly Picks hidden list.');
   if (p.monthlyPicksRuns !== undefined) {
     const runs = p.monthlyPicksRuns;
     if (

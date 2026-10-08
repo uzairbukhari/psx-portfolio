@@ -76,10 +76,7 @@ export default function PicksSetup(props: Props) {
   }, [find]);
 
   const saved = useMemo(() => new Set(portfolio.companies.map((company) => company.ticker)), [portfolio.companies]);
-  const held = useMemo(
-    () => new Set([...portfolio.trades.map((t) => t.ticker), ...(portfolio.dividends ?? []).map((d) => d.ticker)]),
-    [portfolio.trades, portfolio.dividends],
-  );
+  const hiddenSet = useMemo(() => new Set(portfolio.monthlyPicksHidden ?? []), [portfolio.monthlyPicksHidden]);
 
   async function run(ticker: string, action: () => Promise<void>) {
     setListError('');
@@ -102,13 +99,13 @@ export default function PicksSetup(props: Props) {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return portfolio.companies.filter(
-      (company) => !needle || company.ticker.toLowerCase().includes(needle) || company.name.toLowerCase().includes(needle),
+      (company) => !hiddenSet.has(company.ticker) && (!needle || company.ticker.toLowerCase().includes(needle) || company.name.toLowerCase().includes(needle)),
     );
-  }, [portfolio.companies, query]);
+  }, [portfolio.companies, hiddenSet, query]);
 
   const targeted = useMemo(
-    () => portfolio.companies.filter((company: Company) => company.target > 0).map((company) => company.ticker).slice(0, MAX_SHORTLIST),
-    [portfolio.companies],
+    () => portfolio.companies.filter((company: Company) => company.target > 0 && !hiddenSet.has(company.ticker)).map((company) => company.ticker).slice(0, MAX_SHORTLIST),
+    [portfolio.companies, hiddenSet],
   );
   const notFresh = shortlist.filter((ticker) => facts[ticker]?.state !== 'fresh');
   const noData = notFresh.filter((ticker) => !facts[ticker] || facts[ticker]!.state === 'missing' || facts[ticker]!.state === 'failed');
@@ -222,7 +219,7 @@ export default function PicksSetup(props: Props) {
         <div className="mp-shortlist__top">
           <div>
             <h3>Shortlist <span className="mp-count">{shortlist.length}/{MAX_SHORTLIST}</span></h3>
-            <p className="muted">Tick to include a company; click a card to open its page. Use × to take a company off your list (companies with transactions stay).</p>
+            <p className="muted">Tick to include a company; click a card to open its page. Use × to take a company off this list; your transactions are never touched.</p>
             <p className="muted" aria-label="Counts">
               {(() => {
                 const c = portfolioCounts(portfolio, shortlist);
@@ -232,7 +229,7 @@ export default function PicksSetup(props: Props) {
           </div>
           <div className="mp-shortlist__tools">
             {!!targeted.length && <button type="button" className="link-button" onClick={() => setShortlist(targeted)}>Target holdings</button>}
-            <button type="button" className="link-button" onClick={() => setShortlist(portfolio.companies.slice(0, MAX_SHORTLIST).map((company) => company.ticker))}>First {MAX_SHORTLIST}</button>
+            <button type="button" className="link-button" onClick={() => setShortlist(portfolio.companies.filter((company) => !hiddenSet.has(company.ticker)).slice(0, MAX_SHORTLIST).map((company) => company.ticker))}>First {MAX_SHORTLIST}</button>
             <button type="button" className="link-button" disabled={!shortlist.length} onClick={() => setShortlist([])}>Clear</button>
             <label className="mp-search">
               <Search size={15} />
@@ -253,7 +250,7 @@ export default function PicksSetup(props: Props) {
               {hits.map((hit) => (
                 <li key={hit.ticker}>
                   <span className="mp-option__text"><b>{hit.ticker}</b><small title={hit.name}>{hit.name}{hit.sector ? ` · ${hit.sector}` : ''}</small></span>
-                  {saved.has(hit.ticker)
+                  {saved.has(hit.ticker) && !hiddenSet.has(hit.ticker)
                     ? <span className="muted">Already in your list</span>
                     : <button type="button" className="secondary compact" disabled={!!working || props.busy} onClick={() => void add(hit)}>{working === hit.ticker ? 'Adding…' : 'Add to list'}</button>}
                 </li>
@@ -290,15 +287,13 @@ export default function PicksSetup(props: Props) {
                   </span>
                   <span className={`mp-fresh mp-fresh--${fresh.state}`} title={fresh.hint}>{fresh.label}</span>
                 </a>
-                {!held.has(company.ticker) && (
-                  <button
+                <button
                     type="button" className="mp-option__remove" disabled={!!working || props.busy}
                     aria-label={`Remove ${company.ticker} from your list`} title="Remove from your list"
                     onClick={() => void run(company.ticker, () => props.onRemoveCompany(company.ticker))}
                   >
                     <X size={14} />
-                  </button>
-                )}
+                </button>
               </div>
             );
           })}

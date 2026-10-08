@@ -26,3 +26,12 @@ test('falls back to stored text when a saved run has no metrics, and says when t
   assert.deepEqual(e.newsAndPlans, ['No recent company announcements were found for this pick.']);
   assert.equal(readableTitle('Mixed Case stays'), 'Mixed Case stays');
 });
+
+test('the Monthly Picks hidden list is validated and survives for held companies', async () => {
+  const { blankPortfolio, validate } = await import('../lib/portfolio.ts');
+  const p = blankPortfolio();
+  p.monthlyPicksHidden = ['MEBL', 'LUCK'];
+  assert.doesNotThrow(() => validate(p));
+  p.monthlyPicksHidden = ['bad ticker'];
+  assert.throws(() => validate(p), /hidden list/);
+});

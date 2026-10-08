@@ -1231,6 +1231,7 @@ function DashboardContent({
       quotes,
       budgets: picksHome.portfolio.budgets,
       monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
+      monthlyPicksHidden: picksHome.portfolio.monthlyPicksHidden,
       monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
     };
   }, [workspace, picksHome, p]);
@@ -3074,20 +3075,24 @@ function DashboardContent({
                   const home = picksHome?.portfolio ?? p;
                   if (!home) return;
                   const next = clone(home);
-                  if (next.companies.some((c) => c.ticker === found.ticker)) return;
-                  next.companies.push({
-                    ticker: found.ticker,
-                    name: found.name,
-                    sector: found.sector,
-                    target: 0,
-                    approved: false,
-                    screenDate: '',
-                    note: '',
-                  });
+                  const hidden = (next.monthlyPicksHidden ?? []).includes(found.ticker);
+                  const known = (picksPortfolio ?? home).companies.some((c) => c.ticker === found.ticker);
+                  if (!hidden && known) return;
+                  if (hidden) next.monthlyPicksHidden = next.monthlyPicksHidden!.filter((t) => t !== found.ticker);
+                  if (!known)
+                    next.companies.push({
+                      ticker: found.ticker,
+                      name: found.name,
+                      sector: found.sector,
+                      target: 0,
+                      approved: false,
+                      screenDate: '',
+                      note: '',
+                    });
                   const multi = !!picksHome && workspace!.account.portfolios.length > 1;
                   await save(
                     next,
-                    `${found.ticker} added to your companies.`,
+                    `${found.ticker} added to your Monthly Picks list.`,
                     multi ? { target: { id: picksHome!.id }, reload: true } : {},
                   );
                 }}
@@ -3096,19 +3101,21 @@ function DashboardContent({
                   const used = (part: Portfolio) =>
                     part.trades.some((t) => t.ticker === ticker) ||
                     (part.dividends ?? []).some((d) => d.ticker === ticker);
-                  if (parts.length ? parts.some((x) => used(x.portfolio)) : p && used(p))
-                    throw Error(`${ticker} has transactions in your ledger, so it cannot be removed.`);
+                  const inLedger = parts.length ? parts.some((x) => used(x.portfolio)) : !!p && used(p);
+                  const elsewhere = parts.slice(1).some((x) => x.portfolio.companies.some((c) => c.ticker === ticker));
                   const home = picksHome?.portfolio ?? p;
                   if (!home) return;
-                  if (parts.slice(1).some((x) => x.portfolio.companies.some((c) => c.ticker === ticker)))
-                    throw Error(`${ticker} is also saved in another portfolio. Remove it there first.`);
                   const next = clone(home);
-                  next.companies = next.companies.filter((c) => c.ticker !== ticker);
                   next.monthlyPicksShortlist = (next.monthlyPicksShortlist ?? []).filter((t) => t !== ticker);
+                  // A company with transactions (or saved in another portfolio) stays in the ledger and is only
+                  // hidden from the Monthly Picks list; an unused one is deleted.
+                  const keep = inLedger || elsewhere;
+                  if (keep) next.monthlyPicksHidden = [...new Set([...(next.monthlyPicksHidden ?? []), ticker])];
+                  else next.companies = next.companies.filter((c) => c.ticker !== ticker);
                   const multi = !!picksHome && parts.length > 1;
                   await save(
                     next,
-                    `${ticker} removed from your companies.`,
+                    `${ticker} removed from your Monthly Picks list.`,
                     multi ? { target: { id: picksHome!.id }, reload: true } : {},
                   );
                 }}

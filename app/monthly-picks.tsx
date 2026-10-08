@@ -32,7 +32,7 @@ export default function MonthlyPicks({
 }: Props) {
   const initial = portfolio.monthlyPicksShortlist?.length
     ? portfolio.monthlyPicksShortlist
-    : portfolio.companies.filter((company) => company.target > 0).map((company) => company.ticker);
+    : portfolio.companies.filter((company) => company.target > 0 && !portfolio.monthlyPicksHidden?.includes(company.ticker)).map((company) => company.ticker);
   const [shortlist, setShortlist] = useState<string[]>(initial.slice(0, MAX_SHORTLIST));
   const [amount, setAmount] = useState(portfolio.budgets[month] ?? 100000);
   const [starting, setStarting] = useState(false);
