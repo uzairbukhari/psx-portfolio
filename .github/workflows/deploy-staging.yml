@@ -20,12 +20,18 @@ on:
         required: false
         default: false
 
+# Least privilege by default; only the merge job needs to push the staging branch.
+permissions:
+  contents: read
+
 # One shared staging. Runs queue instead of cancelling so a half-finished branch update is never abandoned;
 # the merge job re-merges every open PR, so a run GitHub drops from the queue loses nothing.
 concurrency:
   group: deploy-staging
   cancel-in-progress: false
 
+# No npm cache below: these jobs run merged PR code, which must not be able to poison a cache that the
+# default branch's workflows restore.
 jobs:
   merge:
     # Fork PRs get no secrets and must not reach the staging environment.
@@ -104,7 +110,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
       - name: Unit tests
@@ -137,7 +142,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
       - if: steps.configured.outputs.ready == 'true'
         run: npm ci
       - name: Apply staging D1 migrations
