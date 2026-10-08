@@ -376,9 +376,12 @@ function TickerPicker({
   companies,
   allowNew,
   disabled,
+  onPick,
 }: {
   value: string;
   onChange: (ticker: string) => void;
+  /** The directory entry (name, sector) behind a selected symbol that is not one of your companies. */
+  onPick?: (hit: { ticker: string; name: string; sector: string }) => void;
   companies: Company[];
   allowNew: boolean;
   disabled?: boolean;
@@ -386,8 +389,11 @@ function TickerPicker({
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [directory, setDirectory] = useState<
-    { ticker: string; name: string }[]
+    { ticker: string; name: string; sector?: string }[]
   >([]);
+  const report = (hit: { ticker: string; name: string; sector?: string }) =>
+    onPick?.({ ticker: hit.ticker, name: hit.name, sector: hit.sector ?? '' });
+  const reportFromFetch = useEffectEvent(report);
   const q = query.trim().toLowerCase();
   const choose = useEffectEvent(onChange);
   // New companies can be any PSX symbol, so search the shared directory too (public data; only the typed text is sent).
@@ -397,7 +403,9 @@ function TickerPicker({
     const timer = window.setTimeout(() => {
       fetch(`/api/companies/search?q=${encodeURIComponent(q)}`)
         .then(
-          (r): Promise<{ companies?: { ticker: string; name: string }[] }> =>
+          (r): Promise<{
+            companies?: { ticker: string; name: string; sector?: string }[];
+          }> =>
             r.ok ? r.json() : Promise.resolve({ companies: [] }),
         )
         .then((body) => {
@@ -406,7 +414,10 @@ function TickerPicker({
           setDirectory(found);
           // A symbol typed out in full is selected once the directory confirms it exists.
           const exact = found.find((c) => c.ticker.toLowerCase() === q);
-          if (exact) choose(exact.ticker);
+          if (exact) {
+            reportFromFetch(exact);
+            choose(exact.ticker);
+          }
         })
         .catch(() => {
           if (live) setDirectory([]);
@@ -439,6 +450,7 @@ function TickerPicker({
     const listed = directory.find(
       (c) => c.ticker.toLowerCase() === text.trim().toLowerCase(),
     );
+    if (listed) report(listed);
     onChange(exact ? exact.ticker : listed ? listed.ticker : '');
   }
   return (
@@ -473,6 +485,8 @@ function TickerPicker({
                 e.preventDefault();
                 setQuery(c.ticker);
                 setOpen(false);
+                const hit = directory.find((d) => d.ticker === c.ticker);
+                if (hit) report(hit);
                 onChange(c.ticker);
               }}
             >
@@ -802,7 +816,6 @@ function DashboardContent({
     [company, setCompany] = useState<Company | null>(null),
     [creatingCompany, setCreatingCompany] = useState(false),
     [txType, setTxType] = useState<TxType>('buy'),
-    [txCompany, setTxCompany] = useState({ name: '', sector: '' }),
     [quoteTicker, setQuoteTicker] = useState(''),
     [quotePrice, setQuotePrice] = useState(''),
     [quoteDate, setQuoteDate] = useState(today()),
@@ -829,6 +842,23 @@ function DashboardContent({
       ? ''
       : trade.ticker;
   const txLookup = useCompanyLookup(txNewTicker);
+  // The directory entry behind the symbol you picked. It stands in while the background lookup has not verified the
+  // company (that lookup cannot run on staging), so a listed company can always be added; a missing sector is chosen.
+  const [txHint, setTxHint] = useState<{
+    ticker: string;
+    name: string;
+    sector: string;
+  } | null>(null);
+  const [txSector, setTxSector] = useState('');
+  const txFromLookup = lookupReady(txLookup, txNewTicker);
+  const txHinted =
+    !txFromLookup && txHint?.ticker === txNewTicker && !!txHint.name.trim();
+  const txResolved = txFromLookup
+    ? txLookup.company
+    : txHinted
+      ? { name: txHint.name, sector: txHint.sector || txSector }
+      : null;
+  const txCompanyReady = !!txResolved?.name.trim() && !!txResolved.sector.trim();
   const companyLookup = useCompanyLookup(
     creatingCompany && company ? company.ticker : '',
   );
@@ -842,13 +872,6 @@ function DashboardContent({
         : c,
     );
   }, [creatingCompany, companyLookup.company]);
-  useEffect(() => {
-    const name = txLookup.company?.name ?? '';
-    const sector = txLookup.company?.sector ?? '';
-    setTxCompany((c) =>
-      c.name === name && c.sector === sector ? c : { name, sector },
-    );
-  }, [txLookup.company]);
   const [holdingsSort, setHoldingsSort] = useState<{
       key: HoldingsSortKey;
       dir: 'asc' | 'desc';
@@ -2012,7 +2035,8 @@ function DashboardContent({
     setEditingDividend(null);
     setEditingStockSplit(null);
     setTxType(type);
-    setTxCompany({ name: '', sector: '' });
+    setTxHint(null);
+    setTxSector('');
     setTrade(
       blankTrade(
         ticker,
@@ -2297,14 +2321,16 @@ function DashboardContent({
     if (isNew) {
       if (!/^[A-Z0-9]{2,12}$/.test(trade.ticker))
         throw Error('Enter a valid PSX symbol (2-12 letters or digits).');
-      if (!lookupReady(txLookup, trade.ticker))
+      if (!txCompanyReady || !txResolved)
         throw Error(
-          'Wait for the company details to be found before saving a new company.',
+          txHinted
+            ? 'Choose the company sector before saving a new company.'
+            : 'Wait for the company details to be found before saving a new company.',
         );
       next.companies.push({
         ticker: trade.ticker,
-        name: txLookup.company!.name,
-        sector: txLookup.company!.sector,
+        name: txResolved.name,
+        sector: txResolved.sector,
         target: 0,
         approved: false,
         screenDate: '',
@@ -3751,6 +3777,7 @@ function DashboardContent({
                             }
                             disabled={correcting && !isTrade}
                             onChange={(v) => patchTx({ ticker: v })}
+                            onPick={setTxHint}
                           />
                         </div>
                         {addNew && (
@@ -3765,34 +3792,53 @@ function DashboardContent({
                                 together.
                               </span>
                             </p>
-                            <CompanyLookupNote
-                              lookup={txLookup}
-                              ticker={ticker ?? ''}
-                            />
+                            {txHinted ? (
+                              <p className="muted">
+                                Name{txHint.sector ? ' and sector' : ''} taken
+                                from the PSX company list.
+                                {txHint.sector
+                                  ? ''
+                                  : ' Its sector is not verified yet, so choose it below.'}
+                              </p>
+                            ) : (
+                              <CompanyLookupNote
+                                lookup={txLookup}
+                                ticker={ticker ?? ''}
+                              />
+                            )}
                             <div className="form-grid">
                               <label>
                                 Company name
                                 <input
                                   readOnly
-                                  value={
-                                    lookupReady(txLookup, ticker ?? '')
-                                      ? txCompany.name
-                                      : ''
-                                  }
+                                  value={txResolved?.name ?? ''}
                                   placeholder="Found from the PSX directory"
                                 />
                               </label>
                               <label>
                                 Sector
-                                <input
-                                  readOnly
-                                  value={
-                                    lookupReady(txLookup, ticker ?? '')
-                                      ? txCompany.sector
-                                      : ''
-                                  }
-                                  placeholder="Found from the PSX directory"
-                                />
+                                {txHinted && !txHint.sector ? (
+                                  <select
+                                    value={txSector}
+                                    required
+                                    onChange={(e) => setTxSector(e.target.value)}
+                                  >
+                                    <option value="" disabled>
+                                      Select sector
+                                    </option>
+                                    {[...SECTORS].sort().map((sector) => (
+                                      <option key={sector} value={sector}>
+                                        {sector}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    readOnly
+                                    value={txResolved?.sector ?? ''}
+                                    placeholder="Found from the PSX directory"
+                                  />
+                                )}
                               </label>
                             </div>
                           </div>
@@ -4082,7 +4128,7 @@ function DashboardContent({
                         <button
                           disabled={
                             busy ||
-                            (addNew && !lookupReady(txLookup, ticker ?? ''))
+                            (addNew && !txCompanyReady)
                           }
                           type="submit"
                         >
