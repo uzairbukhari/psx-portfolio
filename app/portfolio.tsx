@@ -3070,6 +3070,48 @@ function DashboardContent({
                     { target: { id: picksHome.id }, reload: true },
                   );
                 }}
+                onAddCompany={async (found) => {
+                  const home = picksHome?.portfolio ?? p;
+                  if (!home) return;
+                  const next = clone(home);
+                  if (next.companies.some((c) => c.ticker === found.ticker)) return;
+                  next.companies.push({
+                    ticker: found.ticker,
+                    name: found.name,
+                    sector: found.sector,
+                    target: 0,
+                    approved: false,
+                    screenDate: '',
+                    note: '',
+                  });
+                  const multi = !!picksHome && workspace!.account.portfolios.length > 1;
+                  await save(
+                    next,
+                    `${found.ticker} added to your companies.`,
+                    multi ? { target: { id: picksHome!.id }, reload: true } : {},
+                  );
+                }}
+                onRemoveCompany={async (ticker) => {
+                  const parts = workspace?.account.portfolios ?? [];
+                  const used = (part: Portfolio) =>
+                    part.trades.some((t) => t.ticker === ticker) ||
+                    (part.dividends ?? []).some((d) => d.ticker === ticker);
+                  if (parts.length ? parts.some((x) => used(x.portfolio)) : p && used(p))
+                    throw Error(`${ticker} has transactions in your ledger, so it cannot be removed.`);
+                  const home = picksHome?.portfolio ?? p;
+                  if (!home) return;
+                  if (parts.slice(1).some((x) => x.portfolio.companies.some((c) => c.ticker === ticker)))
+                    throw Error(`${ticker} is also saved in another portfolio. Remove it there first.`);
+                  const next = clone(home);
+                  next.companies = next.companies.filter((c) => c.ticker !== ticker);
+                  next.monthlyPicksShortlist = (next.monthlyPicksShortlist ?? []).filter((t) => t !== ticker);
+                  const multi = !!picksHome && parts.length > 1;
+                  await save(
+                    next,
+                    `${ticker} removed from your companies.`,
+                    multi ? { target: { id: picksHome!.id }, reload: true } : {},
+                  );
+                }}
                 onRecordBuys={recordPicks}
                 onRefreshPrices={refresh}
                 onOpenCompany={openCompany}

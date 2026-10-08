@@ -21,12 +21,14 @@ type Props = {
   onManualPrice: (ticker: string) => void;
   onRecordBuys?: (picks: { ticker: string; shares: number; price: number | null }[], month: string) => void;
   onOpenCompany: (ticker: string) => void;
+  onAddCompany: (company: { ticker: string; name: string; sector: string }) => Promise<void>;
+  onRemoveCompany: (ticker: string) => Promise<void>;
 };
 
 const STATUS_LABEL: Record<string, string> = { completed: 'Done', failed: 'Failed' };
 
 export default function MonthlyPicks({
-  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys,
+  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys, onAddCompany, onRemoveCompany,
 }: Props) {
   const initial = portfolio.monthlyPicksShortlist?.length
     ? portfolio.monthlyPicksShortlist
@@ -111,6 +113,11 @@ export default function MonthlyPicks({
         collapsed={!expanded && (active || !!current?.result)}
         onExpand={() => setExpanded(true)}
         onOpenCompany={onOpenCompany}
+        onAddCompany={onAddCompany}
+        onRemoveCompany={async (ticker) => {
+          await onRemoveCompany(ticker);
+          setShortlist((current) => current.filter((item) => item !== ticker));
+        }}
       />
 
       {recs.error && (

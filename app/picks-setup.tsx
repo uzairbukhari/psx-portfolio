@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { DatabaseZap, Loader2, Search, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { DatabaseZap, Loader2, Plus, Search, Sparkles, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { money, today, type Company, type Portfolio } from '@/lib/portfolio';
 import { portfolioCounts } from '@/lib/portfolio-counts';
@@ -30,7 +30,11 @@ type Props = {
   collapsed: boolean;
   onExpand: () => void;
   onOpenCompany: (ticker: string) => void;
+  onAddCompany: (company: { ticker: string; name: string; sector: string }) => Promise<void>;
+  onRemoveCompany: (ticker: string) => Promise<void>;
 };
+
+type Hit = { ticker: string; name: string; sector: string };
 
 function freshness(info: FactsInfo | undefined, dispatchEnabled: boolean) {
   if (!info || info.state === 'missing')
@@ -43,6 +47,57 @@ function freshness(info: FactsInfo | undefined, dispatchEnabled: boolean) {
 export default function PicksSetup(props: Props) {
   const { portfolio, shortlist, setShortlist, facts, dispatchEnabled } = props;
   const [query, setQuery] = useState('');
+  const [find, setFind] = useState('');
+  const [hits, setHits] = useState<Hit[]>([]);
+  const [finding, setFinding] = useState(false);
+  const [listError, setListError] = useState('');
+  const [working, setWorking] = useState('');
+
+  useEffect(() => {
+    const text = find.trim();
+    if (!text) return;
+    let live = true;
+    const timer = window.setTimeout(async () => {
+      setFinding(true);
+      try {
+        const response = await fetch(`/api/companies/search?q=${encodeURIComponent(text)}`);
+        const body = (await response.json().catch(() => ({}))) as { companies?: Hit[] };
+        if (live) setHits(response.ok ? (body.companies ?? []) : []);
+      } catch {
+        if (live) setHits([]);
+      } finally {
+        if (live) setFinding(false);
+      }
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [find]);
+
+  const saved = useMemo(() => new Set(portfolio.companies.map((company) => company.ticker)), [portfolio.companies]);
+  const held = useMemo(
+    () => new Set([...portfolio.trades.map((t) => t.ticker), ...(portfolio.dividends ?? []).map((d) => d.ticker)]),
+    [portfolio.trades, portfolio.dividends],
+  );
+
+  async function run(ticker: string, action: () => Promise<void>) {
+    setListError('');
+    setWorking(ticker);
+    try {
+      await action();
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : 'That did not work. Try again.');
+    } finally {
+      setWorking('');
+    }
+  }
+  const add = (hit: Hit) =>
+    run(hit.ticker, async () => {
+      await props.onAddCompany(hit);
+      if (shortlist.length < MAX_SHORTLIST) setShortlist([...shortlist, hit.ticker]);
+      setFind('');
+    });
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -167,7 +222,7 @@ export default function PicksSetup(props: Props) {
         <div className="mp-shortlist__top">
           <div>
             <h3>Shortlist <span className="mp-count">{shortlist.length}/{MAX_SHORTLIST}</span></h3>
-            <p className="muted">Tick to include a company; click a card to open its page.</p>
+            <p className="muted">Tick to include a company; click a card to open its page. Use × to take a company off your list (companies with transactions stay).</p>
             <p className="muted" aria-label="Counts">
               {(() => {
                 const c = portfolioCounts(portfolio, shortlist);
@@ -181,9 +236,31 @@ export default function PicksSetup(props: Props) {
             <button type="button" className="link-button" disabled={!shortlist.length} onClick={() => setShortlist([])}>Clear</button>
             <label className="mp-search">
               <Search size={15} />
-              <input aria-label="Search companies" placeholder="Search name or ticker" value={query} onChange={(event) => setQuery(event.target.value)} />
+              <input aria-label="Search companies" placeholder="Filter this list" value={query} onChange={(event) => setQuery(event.target.value)} />
             </label>
           </div>
+        </div>
+
+        <div className="mp-addco">
+          <label className="mp-search mp-addco__field">
+            <Plus size={15} />
+            <input aria-label="Find any PSX company to add" placeholder="Add any PSX company: search by name or symbol" value={find} onChange={(event) => setFind(event.target.value)} />
+          </label>
+          {find.trim() && (
+            <ul className="mp-addco__results" aria-label="PSX companies found">
+              {finding && <li className="muted">Searching…</li>}
+              {!finding && !hits.length && <li className="muted">No PSX company matches that.</li>}
+              {hits.map((hit) => (
+                <li key={hit.ticker}>
+                  <span className="mp-option__text"><b>{hit.ticker}</b><small title={hit.name}>{hit.name}{hit.sector ? ` · ${hit.sector}` : ''}</small></span>
+                  {saved.has(hit.ticker)
+                    ? <span className="muted">Already in your list</span>
+                    : <button type="button" className="secondary compact" disabled={!!working || props.busy} onClick={() => void add(hit)}>{working === hit.ticker ? 'Adding…' : 'Add to list'}</button>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {listError && <p className="mp-hint mp-hint--warn" role="alert">{listError}</p>}
         </div>
 
         <div className="mp-picker">
@@ -213,6 +290,15 @@ export default function PicksSetup(props: Props) {
                   </span>
                   <span className={`mp-fresh mp-fresh--${fresh.state}`} title={fresh.hint}>{fresh.label}</span>
                 </a>
+                {!held.has(company.ticker) && (
+                  <button
+                    type="button" className="mp-option__remove" disabled={!!working || props.busy}
+                    aria-label={`Remove ${company.ticker} from your list`} title="Remove from your list"
+                    onClick={() => void run(company.ticker, () => props.onRemoveCompany(company.ticker))}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             );
           })}
