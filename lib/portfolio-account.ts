@@ -455,5 +455,7 @@ export function dashboardPortfolio(
   // Monthly Picks keeps its shortlist in the account's first portfolio; the All view follows it.
   const shortlist = account.portfolios[0]?.portfolio.monthlyPicksShortlist;
   if (shortlist?.length) result.monthlyPicksShortlist = [...shortlist];
+  const list = account.portfolios[0]?.portfolio.monthlyPicksList;
+  if (list) result.monthlyPicksList = list.map((entry) => ({ ...entry }));
   return result;
 }

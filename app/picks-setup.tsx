@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { DatabaseZap, Loader2, Search, Sparkles } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Check, DatabaseZap, Loader2, Plus, Search, Sparkles, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { money, today, type Company, type Portfolio } from '@/lib/portfolio';
-import { portfolioCounts } from '@/lib/portfolio-counts';
+import { money, today, type Portfolio } from '@/lib/portfolio';
 import type { FactsInfo } from './use-recommendations';
+import { searchCompanies, useDirectory, type DirectoryCompany } from './use-directory';
 
 export const MAX_SHORTLIST = 15;
 
@@ -30,6 +30,10 @@ type Props = {
   collapsed: boolean;
   onExpand: () => void;
   onOpenCompany: (ticker: string) => void;
+  /** The Monthly Picks list: the only companies this screen offers. Edits are instant; saving happens in the background. */
+  list: { ticker: string; name: string }[];
+  onAddToList: (entries: { ticker: string; name: string }[]) => void;
+  onRemoveFromList: (ticker: string) => void;
 };
 
 function freshness(info: FactsInfo | undefined, dispatchEnabled: boolean) {
@@ -43,24 +47,42 @@ function freshness(info: FactsInfo | undefined, dispatchEnabled: boolean) {
 export default function PicksSetup(props: Props) {
   const { portfolio, shortlist, setShortlist, facts, dispatchEnabled } = props;
   const [query, setQuery] = useState('');
+  const [find, setFind] = useState('');
+  const [cursor, setCursor] = useState(0);
+  const findRef = useRef<HTMLInputElement>(null);
+  const directory = useDirectory();
+  const listed = useMemo(() => new Set(props.list.map((entry) => entry.ticker)), [props.list]);
+  const results = useMemo(() => searchCompanies(directory.companies, find, 8), [directory.companies, find]);
+  const active = Math.min(cursor, Math.max(results.length - 1, 0));
+
+  function addFound(company: DirectoryCompany) {
+    if (!listed.has(company.ticker)) {
+      props.onAddToList([{ ticker: company.ticker, name: company.name }]);
+      if (shortlist.length < MAX_SHORTLIST && !shortlist.includes(company.ticker)) setShortlist([...shortlist, company.ticker]);
+    }
+    setFind('');
+    setCursor(0);
+    findRef.current?.focus();
+  }
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return portfolio.companies.filter(
+    return props.list.filter(
       (company) => !needle || company.ticker.toLowerCase().includes(needle) || company.name.toLowerCase().includes(needle),
     );
-  }, [portfolio.companies, query]);
+  }, [props.list, query]);
 
-  const targeted = useMemo(
-    () => portfolio.companies.filter((company: Company) => company.target > 0).map((company) => company.ticker).slice(0, MAX_SHORTLIST),
-    [portfolio.companies],
-  );
+  const missingOwn = portfolio.companies.filter((company) => !listed.has(company.ticker)).map((company) => ({ ticker: company.ticker, name: company.name }));
   const notFresh = shortlist.filter((ticker) => facts[ticker]?.state !== 'fresh');
   const noData = notFresh.filter((ticker) => !facts[ticker] || facts[ticker]!.state === 'missing' || facts[ticker]!.state === 'failed');
 
   function toggle(ticker: string) {
     if (shortlist.includes(ticker)) setShortlist(shortlist.filter((item) => item !== ticker));
     else if (shortlist.length < MAX_SHORTLIST) setShortlist([...shortlist, ticker]);
+  }
+  function removeFromList(ticker: string) {
+    props.onRemoveFromList(ticker);
+    if (shortlist.includes(ticker)) setShortlist(shortlist.filter((item) => item !== ticker));
   }
 
   const amountValid = Number.isFinite(props.amount) && props.amount > 0 && props.amount <= 1e9;
@@ -167,23 +189,58 @@ export default function PicksSetup(props: Props) {
         <div className="mp-shortlist__top">
           <div>
             <h3>Shortlist <span className="mp-count">{shortlist.length}/{MAX_SHORTLIST}</span></h3>
-            <p className="muted">Tick to include a company; click a card to open its page.</p>
-            <p className="muted" aria-label="Counts">
-              {(() => {
-                const c = portfolioCounts(portfolio, shortlist);
-                return `${c.savedCompanies} saved · ${c.holdings} held · ${c.shortlisted} shortlisted`;
-              })()}
-            </p>
+            <p className="muted">Your own list of companies for Monthly Picks. Tick the ones to rank this month; × removes a company from the list. It never changes your portfolio or transactions.</p>
+            <p className="muted" aria-label="Counts">{props.list.length} on your list · {shortlist.length} ticked</p>
           </div>
           <div className="mp-shortlist__tools">
-            {!!targeted.length && <button type="button" className="link-button" onClick={() => setShortlist(targeted)}>Target holdings</button>}
-            <button type="button" className="link-button" onClick={() => setShortlist(portfolio.companies.slice(0, MAX_SHORTLIST).map((company) => company.ticker))}>First {MAX_SHORTLIST}</button>
-            <button type="button" className="link-button" disabled={!shortlist.length} onClick={() => setShortlist([])}>Clear</button>
-            <label className="mp-search">
-              <Search size={15} />
-              <input aria-label="Search companies" placeholder="Search name or ticker" value={query} onChange={(event) => setQuery(event.target.value)} />
-            </label>
+            {!!missingOwn.length && <button type="button" className="link-button" onClick={() => props.onAddToList(missingOwn)}>Add my {missingOwn.length} saved {missingOwn.length === 1 ? 'company' : 'companies'}</button>}
+            <button type="button" className="link-button" disabled={!shortlist.length} onClick={() => setShortlist([])}>Clear ticks</button>
+            {props.list.length > 8 && (
+              <label className="mp-search">
+                <Search size={15} />
+                <input aria-label="Filter your list" placeholder="Filter your list" value={query} onChange={(event) => setQuery(event.target.value)} />
+              </label>
+            )}
           </div>
+        </div>
+
+        <div className="mp-addco">
+          <label className="mp-search mp-addco__field">
+            <Plus size={15} />
+            <input
+              ref={findRef}
+              aria-label="Search all PSX companies to add"
+              placeholder="Search all PSX companies: type a name or symbol, press Enter to add"
+              value={find}
+              autoComplete="off"
+              onChange={(event) => { setFind(event.target.value); setCursor(0); }}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowDown') { event.preventDefault(); setCursor(Math.min(active + 1, results.length - 1)); }
+                else if (event.key === 'ArrowUp') { event.preventDefault(); setCursor(Math.max(active - 1, 0)); }
+                else if (event.key === 'Enter') { event.preventDefault(); if (results[active]) addFound(results[active]); }
+                else if (event.key === 'Escape') setFind('');
+              }}
+            />
+            {find && <button type="button" className="mp-addco__clear" aria-label="Clear search" onClick={() => { setFind(''); findRef.current?.focus(); }}><X size={14} /></button>}
+          </label>
+          {find.trim() && (
+            <ul className="mp-addco__results" aria-label="PSX companies found">
+              {directory.loading && <li className="muted">Loading the PSX company list…</li>}
+              {directory.error && <li className="muted">{directory.error}</li>}
+              {!directory.loading && !directory.error && !results.length && <li className="muted">No PSX company matches that.</li>}
+              {results.map((hit, index) => {
+                const added = listed.has(hit.ticker);
+                return (
+                  <li key={hit.ticker} className={index === active ? 'active' : undefined}>
+                    <button type="button" className="mp-addco__row" disabled={added} onMouseEnter={() => setCursor(index)} onClick={() => addFound(hit)}>
+                      <span className="mp-option__text"><b>{hit.ticker}</b><small title={hit.name}>{hit.name}{hit.sector ? ` · ${hit.sector}` : ''}</small></span>
+                      {added ? <span className="mp-addco__state"><Check size={14} /> In your list</span> : <span className="mp-addco__state mp-addco__state--add"><Plus size={14} /> Add</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         <div className="mp-picker">
@@ -213,11 +270,19 @@ export default function PicksSetup(props: Props) {
                   </span>
                   <span className={`mp-fresh mp-fresh--${fresh.state}`} title={fresh.hint}>{fresh.label}</span>
                 </a>
+                <button
+                    type="button" className="mp-option__remove"
+                    aria-label={`Remove ${company.ticker} from your list`} title="Remove from your list"
+                    onClick={() => removeFromList(company.ticker)}
+                  >
+                    <X size={14} />
+                </button>
               </div>
             );
           })}
         </div>
-        {!filtered.length && <p className="muted">No company matches that search.</p>}
+        {!props.list.length && <p className="muted">Your list is empty. Search above to add PSX companies.</p>}
+        {!!props.list.length && !filtered.length && <p className="muted">No company on your list matches that.</p>}
       </div>
 
       <div className="mp-actionbar">

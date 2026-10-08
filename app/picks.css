@@ -82,7 +82,7 @@
 .mp-badge--low,.mp-badge--neutral,.mp-badge--insufficient{background:rgba(255,255,255,.08);color:var(--muted-foreground)}
 
 /* Pick cards */
-.mp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.mp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;align-items:start}
 .mp-card{display:flex;flex-direction:column;gap:14px;border:1px solid var(--card-border);border-radius:var(--radius);background:var(--card);padding:18px 20px;min-width:0;transition:border-color .15s ease}
 .mp-card:hover{border-color:rgba(59,130,246,.4)}
 .mp-card__head{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:12px;align-items:center}
@@ -217,3 +217,38 @@
 .mp-howto__steps li span:last-child{color:var(--muted-foreground);font-size:13px;line-height:1.45}
 .mp-howto__note{margin:10px 0 0;font-size:12.5px}
 .mp-beta{margin-left:6px;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid currentColor;opacity:.75}
+
+.mp-addco{margin:0 0 12px}
+.mp-addco__field{width:100%}
+.mp-addco__results{list-style:none;margin:8px 0 0;padding:0;border:1px solid var(--border);border-radius:10px;max-height:260px;overflow:auto}
+.mp-addco__results li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.mp-addco__results li:last-child{border-bottom:0}
+.mp-option__remove{flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0!important;border:0!important;border-radius:6px;background:transparent!important;box-shadow:none!important;color:var(--muted-foreground)!important;cursor:pointer;transform:none!important}
+.mp-option__remove:hover{color:var(--foreground)!important;background:rgba(255,255,255,.08)!important}
+.mp-option__remove:disabled{opacity:.4;cursor:not-allowed}
+
+.mp-addco__row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;color:inherit!important;text-align:left;cursor:pointer;transform:none!important;min-height:36px}
+.mp-addco__row:disabled{cursor:default;opacity:.7}
+.mp-addco__results li{padding:4px 12px}
+.mp-addco__results li.active{background:rgba(59,130,246,.12)}
+.mp-addco__state{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted-foreground);white-space:nowrap}
+.mp-addco__state--add{color:var(--primary);font-weight:600}
+.mp-addco__clear{display:inline-flex;padding:2px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--muted-foreground)!important;cursor:pointer;transform:none!important}
+
+.mp-more{display:block}
+.mp-more[open] summary{margin-bottom:6px}
+.mp-sec{padding:14px 0;border-top:1px solid var(--border)}
+.mp-sec:first-of-type{border-top:0}
+.mp-sec h4,.mp-sources-title{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground)}
+.mp-sources-title{margin-top:6px;padding-top:14px;border-top:1px solid var(--border)}
+.mp-sec__lead{margin:0 0 8px;font-size:14px;font-weight:600;line-height:1.5}
+.mp-sec__note{margin:10px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted-foreground)}
+.mp-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.mp-points li{position:relative;padding-left:18px;font-size:14px;line-height:1.5;color:var(--foreground)}
+.mp-points li::before{content:'';position:absolute;left:3px;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--primary)}
+.mp-points--risk li{padding:8px 10px 8px 26px;border-radius:8px;background:rgba(245,158,11,.08);color:var(--foreground)}
+.mp-points--risk li::before{left:11px;top:1.05em;background:#f59e0b}
+.mp-news{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.mp-news li{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.04);font-size:14px;line-height:1.45}
+.mp-news time{font-size:12px;font-weight:600;color:var(--primary)}
+.mp-more .source-links{margin-top:0;flex-direction:column;gap:8px}

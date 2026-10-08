@@ -1231,6 +1231,7 @@ function DashboardContent({
       quotes,
       budgets: picksHome.portfolio.budgets,
       monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
+      monthlyPicksList: picksHome.portfolio.monthlyPicksList,
       monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
     };
   }, [workspace, picksHome, p]);
@@ -3063,6 +3064,7 @@ function DashboardContent({
                     {
                       ...picksHome.portfolio,
                       monthlyPicksShortlist: next.monthlyPicksShortlist,
+                      monthlyPicksList: next.monthlyPicksList,
                       budgets: next.budgets,
                       monthlyPicksRuns: next.monthlyPicksRuns,
                     },
