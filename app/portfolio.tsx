@@ -1231,7 +1231,7 @@ function DashboardContent({
       quotes,
       budgets: picksHome.portfolio.budgets,
       monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
-      monthlyPicksHidden: picksHome.portfolio.monthlyPicksHidden,
+      monthlyPicksList: picksHome.portfolio.monthlyPicksList,
       monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
     };
   }, [workspace, picksHome, p]);
@@ -3064,59 +3064,12 @@ function DashboardContent({
                     {
                       ...picksHome.portfolio,
                       monthlyPicksShortlist: next.monthlyPicksShortlist,
+                      monthlyPicksList: next.monthlyPicksList,
                       budgets: next.budgets,
                       monthlyPicksRuns: next.monthlyPicksRuns,
                     },
                     message,
                     { target: { id: picksHome.id }, reload: true },
-                  );
-                }}
-                onAddCompany={async (found) => {
-                  const home = picksHome?.portfolio ?? p;
-                  if (!home) return;
-                  const next = clone(home);
-                  const hidden = (next.monthlyPicksHidden ?? []).includes(found.ticker);
-                  const known = (picksPortfolio ?? home).companies.some((c) => c.ticker === found.ticker);
-                  if (!hidden && known) return;
-                  if (hidden) next.monthlyPicksHidden = next.monthlyPicksHidden!.filter((t) => t !== found.ticker);
-                  if (!known)
-                    next.companies.push({
-                      ticker: found.ticker,
-                      name: found.name,
-                      sector: found.sector,
-                      target: 0,
-                      approved: false,
-                      screenDate: '',
-                      note: '',
-                    });
-                  const multi = !!picksHome && workspace!.account.portfolios.length > 1;
-                  await save(
-                    next,
-                    `${found.ticker} added to your Monthly Picks list.`,
-                    multi ? { target: { id: picksHome!.id }, reload: true } : {},
-                  );
-                }}
-                onRemoveCompany={async (ticker) => {
-                  const parts = workspace?.account.portfolios ?? [];
-                  const used = (part: Portfolio) =>
-                    part.trades.some((t) => t.ticker === ticker) ||
-                    (part.dividends ?? []).some((d) => d.ticker === ticker);
-                  const inLedger = parts.length ? parts.some((x) => used(x.portfolio)) : !!p && used(p);
-                  const elsewhere = parts.slice(1).some((x) => x.portfolio.companies.some((c) => c.ticker === ticker));
-                  const home = picksHome?.portfolio ?? p;
-                  if (!home) return;
-                  const next = clone(home);
-                  next.monthlyPicksShortlist = (next.monthlyPicksShortlist ?? []).filter((t) => t !== ticker);
-                  // A company with transactions (or saved in another portfolio) stays in the ledger and is only
-                  // hidden from the Monthly Picks list; an unused one is deleted.
-                  const keep = inLedger || elsewhere;
-                  if (keep) next.monthlyPicksHidden = [...new Set([...(next.monthlyPicksHidden ?? []), ticker])];
-                  else next.companies = next.companies.filter((c) => c.ticker !== ticker);
-                  const multi = !!picksHome && parts.length > 1;
-                  await save(
-                    next,
-                    `${ticker} removed from your Monthly Picks list.`,
-                    multi ? { target: { id: picksHome!.id }, reload: true } : {},
                   );
                 }}
                 onRecordBuys={recordPicks}

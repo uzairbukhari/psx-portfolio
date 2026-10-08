@@ -181,3 +181,10 @@ test('directory search finds listed companies by symbol or name and ranks exact 
   assert.deepEqual(await searchDirectory(db, 'HALF'), [], 'placeholder names are not listed');
   assert.deepEqual(await searchDirectory(db, '%'), []);
 });
+
+test('the full directory list returns listed equities only', async () => {
+  const { allDirectory } = await import('../lib/company-search.ts');
+  const db = createD1(); seed(db);
+  const all = await allDirectory(db);
+  assert.deepEqual(all.map((c) => c.ticker), ['MEBL']);
+});

@@ -27,11 +27,17 @@ test('falls back to stored text when a saved run has no metrics, and says when t
   assert.equal(readableTitle('Mixed Case stays'), 'Mixed Case stays');
 });
 
-test('the Monthly Picks hidden list is validated and survives for held companies', async () => {
+test('the Monthly Picks list is validated; a ticked ticker may be on the list without being a saved company', async () => {
   const { blankPortfolio, validate } = await import('../lib/portfolio.ts');
   const p = blankPortfolio();
-  p.monthlyPicksHidden = ['MEBL', 'LUCK'];
+  p.monthlyPicksList = [{ ticker: 'MEBL', name: 'Meezan Bank Limited' }, { ticker: 'LUCK', name: 'Lucky Cement' }];
+  p.monthlyPicksShortlist = ['LUCK'];
   assert.doesNotThrow(() => validate(p));
-  p.monthlyPicksHidden = ['bad ticker'];
-  assert.throws(() => validate(p), /hidden list/);
+  p.monthlyPicksShortlist = ['NOPE'];
+  assert.throws(() => validate(p), /shortlist/);
+  p.monthlyPicksShortlist = [];
+  p.monthlyPicksList = [{ ticker: 'bad ticker', name: 'x' }];
+  assert.throws(() => validate(p), /Monthly Picks list/);
+  p.monthlyPicksList = [{ ticker: 'MEBL', name: 'a' }, { ticker: 'MEBL', name: 'b' }];
+  assert.throws(() => validate(p), /Monthly Picks list/);
 });

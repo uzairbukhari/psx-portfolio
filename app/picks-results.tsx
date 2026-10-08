@@ -36,10 +36,11 @@ type Props = {
   onRefreshPrices: () => void;
   onManualPrice: (ticker: string) => void;
   onOpenCompany: (ticker: string) => void;
+  extraNames?: Record<string, string>;
   onRecordBuys?: (picks: { ticker: string; shares: number; price: number | null }[], month: string) => void;
 };
 
-export default function PicksResults({ run, portfolio, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys }: Props) {
+export default function PicksResults({ run, portfolio, extraNames, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys }: Props) {
   // Keep the SPA (no reload) for plain clicks; modified clicks fall through to the real link.
   const open_ = (ticker: string) => (event: React.MouseEvent) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -58,7 +59,7 @@ export default function PicksResults({ run, portfolio, onRefreshPrices, onManual
   );
   const summary = useMemo(() => summarizeEstimates(estimates, run.amount), [estimates, run.amount]);
   const recordable = estimates.filter((pick) => pick.shares !== null && pick.shares > 0 && pick.price !== null && pick.price > 0);
-  const names = useMemo(() => new Map(portfolio.companies.map((company) => [company.ticker, company.name])), [portfolio.companies]);
+  const names = useMemo(() => new Map([...Object.entries(extraNames ?? {}), ...portfolio.companies.map((company): [string, string] => [company.ticker, company.name])]), [portfolio.companies, extraNames]);
 
   const [filter, setFilter] = useState<(typeof OUTLOOKS)[number] | 'All'>('All');
   const [sort, setSort] = useState<'score' | 'ticker'>('score');

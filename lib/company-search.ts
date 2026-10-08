@@ -25,3 +25,18 @@ export async function searchDirectory(db: D1Database, rawQuery: string | null, l
     .all<{ ticker: string; name: string; sector_name: string | null }>();
   return rows.results.map((row) => ({ ticker: row.ticker, name: row.name, sector: row.sector_name ? readableSector(row.sector_name) : '' }));
 }
+
+/** Every listed equity in the directory (about 500 rows), so the picker can search on the device with no waiting. */
+export async function allDirectory(db: D1Database, limit = 2000): Promise<CompanySearchHit[]> {
+  const rows = await db
+    .prepare(
+      `SELECT ticker,name,sector_name FROM security_catalog
+       WHERE name <> '' AND UPPER(name) <> ticker
+         AND COALESCE(listing_status,'listed') <> 'delisted'
+         AND COALESCE(security_type,'equity') = 'equity'
+       ORDER BY ticker LIMIT ?`,
+    )
+    .bind(limit)
+    .all<{ ticker: string; name: string; sector_name: string | null }>();
+  return rows.results.map((row) => ({ ticker: row.ticker, name: row.name, sector: row.sector_name ? readableSector(row.sector_name) : '' }));
+}

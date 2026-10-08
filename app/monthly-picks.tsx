@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { money, type Portfolio } from '@/lib/portfolio';
 import PicksProgress from './picks-progress';
 import PicksResults from './picks-results';
 import PicksSetup, { MAX_SHORTLIST } from './picks-setup';
 import { TabLoader } from './tab-loader';
+import { useListQuotes } from './use-list-quotes';
 import { useRecommendations, type Recommendation } from './use-recommendations';
 import { inputDifferences } from '@/lib/monthly-picks-flow';
 
@@ -21,24 +22,97 @@ type Props = {
   onManualPrice: (ticker: string) => void;
   onRecordBuys?: (picks: { ticker: string; shares: number; price: number | null }[], month: string) => void;
   onOpenCompany: (ticker: string) => void;
-  onAddCompany: (company: { ticker: string; name: string; sector: string }) => Promise<void>;
-  onRemoveCompany: (ticker: string) => Promise<void>;
 };
 
 const STATUS_LABEL: Record<string, string> = { completed: 'Done', failed: 'Failed' };
 
 export default function MonthlyPicks({
-  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys, onAddCompany, onRemoveCompany,
+  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys,
 }: Props) {
+  type Entry = { ticker: string; name: string };
+  // The list is its own thing. Until the person edits it for the first time it mirrors their saved companies.
+  const [list, setListState] = useState<Entry[]>(
+    () => portfolio.monthlyPicksList ?? portfolio.companies.map((company) => ({ ticker: company.ticker, name: company.name })),
+  );
   const initial = portfolio.monthlyPicksShortlist?.length
     ? portfolio.monthlyPicksShortlist
-    : portfolio.companies.filter((company) => company.target > 0 && !portfolio.monthlyPicksHidden?.includes(company.ticker)).map((company) => company.ticker);
-  const [shortlist, setShortlist] = useState<string[]>(initial.slice(0, MAX_SHORTLIST));
+    : portfolio.companies.filter((company) => company.target > 0).map((company) => company.ticker);
+  const [shortlist, setShortlist] = useState<string[]>(initial.filter((t) => list.some((e) => e.ticker === t)).slice(0, MAX_SHORTLIST));
   const [amount, setAmount] = useState(portfolio.budgets[month] ?? 100000);
   const [starting, setStarting] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const recs = useRecommendations({ portfolio, tickers: shortlist, onSave });
   const { current } = recs;
+
+  // List edits are instant on screen and saved in the background a moment after the last change (and when leaving).
+  const latest = useRef({ list, shortlist, portfolio, onSave });
+  const dirty = useRef(false);
+  const failures = useRef(0);
+  const timer = useRef<number | undefined>(undefined);
+  const setErrorRef = useRef(recs.setError);
+  const flushRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    latest.current = { list, shortlist, portfolio, onSave };
+    setErrorRef.current = recs.setError;
+  });
+  const flush = useCallback(async () => {
+    window.clearTimeout(timer.current);
+    if (!dirty.current) return;
+    dirty.current = false;
+    const { list: l, shortlist: sl, portfolio: pf, onSave: save } = latest.current;
+    try {
+      await save({ ...pf, monthlyPicksList: l, monthlyPicksShortlist: sl }, 'Monthly Picks list saved.');
+      failures.current = 0;
+    } catch (error) {
+      dirty.current = true;
+      failures.current += 1;
+      // Often just another save in progress: try again quietly before telling the person.
+      if (failures.current < 3) timer.current = window.setTimeout(() => void flushRef.current(), 2500);
+      else setErrorRef.current(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
+  const schedule = useCallback(() => {
+    dirty.current = true;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => void flush(), 1200);
+  }, [flush]);
+  useEffect(() => () => void flush(), [flush]);
+
+  const addToList = useCallback((entries: Entry[]) => {
+    setListState((current) => {
+      const have = new Set(current.map((e) => e.ticker));
+      const fresh = entries.filter((e) => !have.has(e.ticker));
+      return fresh.length ? [...fresh, ...current] : current;
+    });
+    schedule();
+  }, [schedule]);
+  const removeFromList = useCallback((ticker: string) => {
+    setListState((current) => current.filter((e) => e.ticker !== ticker));
+    schedule();
+  }, [schedule]);
+
+  // List companies need not be saved companies, so their prices are held in memory rather than in the portfolio.
+  const listQuotes = useListQuotes(useMemo(() => list.map((e) => e.ticker), [list]));
+  const [manualQuotes, setManualQuotes] = useState<Record<string, import('@/lib/portfolio').Quote>>({});
+  const [priceFor, setPriceFor] = useState<string | null>(null);
+  const [priceText, setPriceText] = useState('');
+  const pricedPortfolio = useMemo(() => {
+    const quotes = { ...listQuotes.quotes, ...manualQuotes };
+    for (const [ticker, quote] of Object.entries(portfolio.quotes)) {
+      const other = quotes[ticker];
+      if (!other || quote.date >= other.date) quotes[ticker] = quote;
+    }
+    return { ...portfolio, quotes };
+  }, [portfolio, listQuotes.quotes, manualQuotes]);
+  // A list company that is not a saved company has no page in the app, so it opens on PSX instead.
+  const openCompany = (ticker: string) =>
+    portfolio.companies.some((company) => company.ticker === ticker)
+      ? onOpenCompany(ticker)
+      : void window.open(`https://dps.psx.com.pk/company/${ticker}`, '_blank', 'noopener');
+  const listNames = useMemo(() => Object.fromEntries(list.map((e) => [e.ticker, e.name])), [list]);
 
   const currentMatches =
     current !== null &&
@@ -53,9 +127,11 @@ export default function MonthlyPicks({
     setExpanded(false);
     try {
       const shortlistChanged = JSON.stringify(portfolio.monthlyPicksShortlist ?? []) !== JSON.stringify(shortlist);
-      if (shortlistChanged || portfolio.budgets[month] !== amount) {
+      window.clearTimeout(timer.current);
+      if (shortlistChanged || dirty.current || portfolio.budgets[month] !== amount) {
+        dirty.current = false;
         await onSave(
-          { ...portfolio, monthlyPicksShortlist: shortlist, budgets: { ...portfolio.budgets, [month]: amount } },
+          { ...portfolio, monthlyPicksList: list, monthlyPicksShortlist: shortlist, budgets: { ...portfolio.budgets, [month]: amount } },
           'Monthly Picks inputs saved.',
         );
       }
@@ -101,6 +177,7 @@ export default function MonthlyPicks({
     <div className="monthly-picks">
       <PicksSetup
         portfolio={portfolio}
+        list={list} onAddToList={addToList} onRemoveFromList={removeFromList}
         month={month} setMonth={setMonth}
         amount={amount} setAmount={setAmount}
         feePct={feePct} setFeePct={setFeePct}
@@ -112,12 +189,7 @@ export default function MonthlyPicks({
         onRefreshFacts={(tickers) => void refreshFacts(tickers)}
         collapsed={!expanded && (active || !!current?.result)}
         onExpand={() => setExpanded(true)}
-        onOpenCompany={onOpenCompany}
-        onAddCompany={onAddCompany}
-        onRemoveCompany={async (ticker) => {
-          await onRemoveCompany(ticker);
-          setShortlist((current) => current.filter((item) => item !== ticker));
-        }}
+        onOpenCompany={openCompany}
       />
 
       {recs.error && (
@@ -126,6 +198,28 @@ export default function MonthlyPicks({
           <button type="button" className="link-button" onClick={() => recs.setError(null)}>Dismiss</button>
         </div>
       )}
+
+      {priceFor && (
+        <form
+          className="notice mp-price"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const price = Number(priceText);
+            if (!(price > 0)) return;
+            const date = new Date().toISOString().slice(0, 10);
+            setManualQuotes((current) => ({ ...current, [priceFor]: { price, date, asOf: `${date} · manually entered`, manual: true, source: `https://dps.psx.com.pk/company/${priceFor}`, fetchedAt: new Date().toISOString() } }));
+            setPriceFor(null);
+          }}
+        >
+          <label>{priceFor} price per share (PKR)
+            <input type="number" min="0.0001" step="any" required value={priceText} onChange={(event) => setPriceText(event.target.value)} />
+          </label>
+          <button type="submit" className="compact">Use this price</button>
+          <button type="button" className="link-button" onClick={() => setPriceFor(null)}>Cancel</button>
+          <small>Used for this estimate while this page is open. {priceFor} is on your Monthly Picks list, not in your portfolio.</small>
+        </form>
+      )}
+      {listQuotes.message && <p className="muted">{listQuotes.message}</p>}
 
       {recs.progress && <PicksProgress progress={recs.progress} />}
 
@@ -146,7 +240,11 @@ export default function MonthlyPicks({
       )}
 
       {current?.result && !active && (
-        <PicksResults run={current} portfolio={portfolio} onRefreshPrices={() => void onRefreshPrices()} onManualPrice={onManualPrice} onOpenCompany={onOpenCompany} onRecordBuys={onRecordBuys} />
+        <PicksResults run={current} portfolio={pricedPortfolio} extraNames={listNames} onRefreshPrices={() => void Promise.all([onRefreshPrices(), listQuotes.refresh()])} onManualPrice={(ticker) => {
+          if (portfolio.companies.some((c) => c.ticker === ticker)) return onManualPrice(ticker);
+          setPriceFor(ticker);
+          setPriceText(String(pricedPortfolio.quotes[ticker]?.price ?? ''));
+        }} onOpenCompany={openCompany} onRecordBuys={onRecordBuys} />
       )}
 
       {!current && !recs.error && (
