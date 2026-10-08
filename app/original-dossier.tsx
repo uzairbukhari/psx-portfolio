@@ -791,7 +791,7 @@ function FinancialChart({
                   values[i] === null
                     ? 0
                     : Math.max(3, (Math.abs(values[i]!) / max) * 100) + '%',
-                background: (values[i] ?? 0) < 0 ? '#b96653' : undefined,
+                background: (values[i] ?? 0) < 0 ? 'var(--danger)' : undefined,
               }}
             />
           </div>

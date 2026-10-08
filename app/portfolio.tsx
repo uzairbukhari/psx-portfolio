@@ -110,6 +110,7 @@ import ResearchDesk from './research-desk';
 import AiLab from './ai-lab';
 import { SignIn, LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
+import { ThemeMenuItems } from './theme-menu';
 import NotificationsView from './notifications-view';
 import TargetsEditor from './targets-editor';
 import SettingsView from './settings-view';
@@ -2514,6 +2515,7 @@ function DashboardContent({
                     <DropdownMenuItem onClick={() => setTab('settings')}>
                       <Settings size={15} /> Settings
                     </DropdownMenuItem>
+                    <ThemeMenuItems />
                     {vault && (
                       <DropdownMenuItem onClick={vault.lock}>
                         <LockKeyhole size={15} /> Lock vault
