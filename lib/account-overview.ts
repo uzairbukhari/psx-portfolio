@@ -3,7 +3,7 @@
 // Every portfolio is calculated on its own first (`consolidatedAccount`), and only then added together, so cost
 // basis is never mixed across portfolios. A figure that cannot be known (a missing price or an unknown cost)
 // is reported as null with a reason, never as zero.
-import { valueAsset } from './assets.ts';
+import { valueAsset, type Asset, type AssetValue } from './assets.ts';
 import type { MetalRateRow } from './metal-rates.ts';
 import type { FundNavRow } from './mufap.ts';
 import type { PlanNavRow } from './plans.ts';
@@ -161,9 +161,13 @@ export function accountOverview(
       ),
     })),
   );
+  // A fund with no price yet is left out of cost, gain and returns until its price is known (it adds no value either).
+  const unpricedFund = (m: { asset: Asset; v: AssetValue }) =>
+    m.asset.kind === 'fund' && m.v.value === null;
   const assetClass = (key: AssetClassKey): ClassTotal | null => {
-    const mine = assetValues.filter((m) => m.v.classKey === key);
-    if (!mine.length) return null;
+    const all = assetValues.filter((m) => m.v.classKey === key);
+    if (!all.length) return null;
+    const mine = all.filter((m) => !unpricedFund(m));
     const value = round(mine.reduce((n, m) => n + (m.v.value ?? 0), 0));
     const cost = sumKnown(mine.map((m) => m.v.cost));
     const gain =
@@ -178,8 +182,8 @@ export function accountOverview(
       cost,
       gain,
       gainPercent: percent(gain, cost),
-      count: mine.filter((m) => m.v.open).length,
-      incomplete: mine.some((m) => m.v.value === null || m.v.cost === null),
+      count: all.filter((m) => m.v.open).length,
+      incomplete: all.some((m) => m.v.value === null || m.v.cost === null),
     };
   };
   const otherClasses = (['gold', 'silver', 'plans', 'funds'] as const)
@@ -205,9 +209,10 @@ export function accountOverview(
   ].map((c): ClassTotal => ({ ...c, share: share(c.value, total) }));
 
   const portfolios: PortfolioTotal[] = consolidated.breakdown.map((entry) => {
-    const own = assetValues.filter((m) =>
+    const ownAll = assetValues.filter((m) =>
       entry.portfolio.assets?.includes(m.asset),
     );
+    const own = ownAll.filter((m) => !unpricedFund(m));
     const value = round(
       entry.summary.value + own.reduce((n, m) => n + (m.v.value ?? 0), 0),
     );
@@ -230,10 +235,11 @@ export function accountOverview(
       gain,
       gainPercent: percent(gain, cost),
       share: share(value, total),
-      heldCount: entry.summary.heldCount + own.filter((m) => m.v.open).length,
+      heldCount:
+        entry.summary.heldCount + ownAll.filter((m) => m.v.open).length,
       missingPrice:
         entry.summary.missingPrice.length +
-        own.filter((m) => m.v.value === null).length,
+        ownAll.filter((m) => m.v.value === null).length,
       unknownCost:
         entry.summary.unknownCost.length +
         own.filter((m) => m.v.cost === null).length,
@@ -338,7 +344,9 @@ export function accountOverview(
     );
 
   const metalMissing = assetValues.filter((m) => m.v.value === null);
-  const metalUnknown = assetValues.filter((m) => m.v.unknownCost);
+  const metalUnknown = assetValues.filter(
+    (m) => m.v.unknownCost && !unpricedFund(m),
+  );
   if (metalMissing.length)
     incomplete.push(
       `Needs a ${[...new Set(metalMissing.map((m) => (m.asset.kind === 'metal' ? `${m.asset.metal} rate` : 'fund price')))].join(' and ')}.`,
@@ -362,14 +370,14 @@ export function accountOverview(
     ...consolidated.breakdown.flatMap(
       (entry) => moneyInFlows(entry.portfolio).flows,
     ),
-    ...assetValues.flatMap((m) => m.v.flows),
+    ...assetValues.filter((m) => !unpricedFund(m)).flatMap((m) => m.v.flows),
     ...dividendFlows,
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const unknownCostFlows = consolidated.breakdown.some(
     (entry) => moneyInFlows(entry.portfolio).unknownCost.length > 0,
   );
   const blockedBy =
-    summary.missingPrice.length || metalMissing.length
+    summary.missingPrice.length || metalMissing.some((m) => !unpricedFund(m))
       ? 'Needs a price for every holding.'
       : unknownCostFlows || summary.unknownCost.length || metalUnknown.length
         ? 'Needs the cost of every holding.'

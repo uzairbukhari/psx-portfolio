@@ -154,28 +154,31 @@ export default function MutualFundsSection({
       const amc = r.asset.amc || 'Other providers';
       by.set(amc, [...(by.get(amc) ?? []), r]);
     }
+    // A fund with no price yet is left out of value and gain until its price is known.
     return [...by]
-      .map(([amc, list]) => ({
-        amc,
-        rows: list,
-        value: list.every((r) => r.v.value !== null)
-          ? list.reduce((a, r) => a + (r.v.value ?? 0), 0)
-          : null,
-        gain: list.every((r) => r.v.gain !== null)
-          ? list.reduce((a, r) => a + (r.v.gain ?? 0), 0)
-          : null,
-      }))
+      .map(([amc, all]) => {
+        const list = all.filter((r) => r.v.value !== null);
+        return {
+          amc,
+          rows: all,
+          value: list.reduce((a, r) => a + (r.v.value ?? 0), 0),
+          gain: list.every((r) => r.v.gain !== null)
+            ? list.reduce((a, r) => a + (r.v.gain ?? 0), 0)
+            : null,
+        };
+      })
       .sort((a, b) => a.amc.localeCompare(b.amc));
   }, [rows]);
   const totals = useMemo(() => {
-    const known = rows.every((r) => r.v.value !== null);
+    // Funds still waiting for a price are ignored here (value, cost and gain) until it is known.
+    const priced = rows.filter((r) => r.v.value !== null);
     return {
-      value: known ? rows.reduce((a, r) => a + (r.v.value ?? 0), 0) : null,
-      cost: rows.every((r) => r.v.cost !== null)
-        ? rows.reduce((a, r) => a + (r.v.cost ?? 0), 0)
+      value: priced.reduce((a, r) => a + (r.v.value ?? 0), 0),
+      cost: priced.every((r) => r.v.cost !== null)
+        ? priced.reduce((a, r) => a + (r.v.cost ?? 0), 0)
         : null,
-      gain: rows.every((r) => r.v.gain !== null)
-        ? rows.reduce((a, r) => a + (r.v.gain ?? 0), 0)
+      gain: priced.every((r) => r.v.gain !== null)
+        ? priced.reduce((a, r) => a + (r.v.gain ?? 0), 0)
         : null,
       dividends: rows.reduce((a, r) => a + r.v.dividends, 0),
       held: rows.filter((r) => r.v.units > 0).length,

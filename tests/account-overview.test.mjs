@@ -219,3 +219,20 @@ test('income explains a zero: dated last year, or received without a payment dat
   assert.equal(o.income.unknownDateCount, 1);
   assert.equal(o.income.unknownDateAmount, 1000);
 });
+
+test('a fund with no price yet is left out of cost and gain instead of blanking them', () => {
+  const fund = {
+    id: 'f1', kind: 'fund', name: 'No price', mufapId: '999', amc: 'X', fundName: 'X', category: 'Money Market',
+    note: '', manualNavs: [], rules: [],
+    entries: [{ id: 'e1', date: '2026-01-05', type: 'buy', units: 100, amount: 10000, note: '' }],
+  };
+  const withFund = accountOverview(
+    [{ id: 'x', name: 'X', portfolio: { ...a, assets: [fund] } }],
+    '2026-10-08',
+  );
+  const without = accountOverview([{ id: 'x', name: 'X', portfolio: a }], '2026-10-08');
+  assert.notEqual(withFund.total.gain, null);
+  assert.equal(withFund.total.gain, without.total.gain);
+  assert.equal(withFund.total.cost, without.total.cost);
+  assert.ok(withFund.total.incomplete.some((m) => m.includes('fund price')));
+});
