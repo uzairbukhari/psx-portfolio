@@ -9,7 +9,11 @@ import type {
 import type { PublicData } from './portfolio-view.ts';
 import type { MetalRateRow } from './metal-rates.ts';
 import type { PlanNavRow } from './plans.ts';
-import type { FundCatalogResponse, FundHistoryResponse } from './mufap.ts';
+import type {
+  FundCatalogResponse,
+  FundHistoryResponse,
+  FundPayoutRow,
+} from './mufap.ts';
 
 export type PublicCall = <T>(
   path: string,
@@ -65,6 +69,16 @@ export function createPublicData(call: PublicCall): PublicData {
         mufapIds,
         ...(retry ? { retry: true } : {}),
       });
+    },
+    async fundPayouts(mufapIds) {
+      const parts = await Promise.all(
+        chunks(mufapIds, 50).map((part) =>
+          call<{ payouts: FundPayoutRow[] }>(
+            `/api/public-data/funds?payouts=${encodeURIComponent(part.join(','))}`,
+          ),
+        ),
+      );
+      return parts.flatMap((p) => p.payouts);
     },
     fundHistory: (mufapId) =>
       call<FundHistoryResponse>(

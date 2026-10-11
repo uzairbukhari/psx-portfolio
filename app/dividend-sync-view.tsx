@@ -13,6 +13,7 @@ import {
 } from '@/lib/dividend-history';
 import { money, today, type Portfolio } from '@/lib/portfolio';
 import { undoAutoBatch } from '@/lib/dividend-auto';
+import { undoFundPayoutBatch } from '@/lib/fund-payouts';
 import { historicalTickers } from '@/lib/dividend-history';
 import { useConfirm } from '@/components/confirm-dialog';
 import './import-review.css';
@@ -195,6 +196,9 @@ export function DividendSyncView({
   const batches = useMemo(() => {
     const out = new Map<string, number>();
     for (const d of portfolio.dividends ?? []) if (d.autoBatch && !d.voided) out.set(d.autoBatch, (out.get(d.autoBatch) ?? 0) + 1);
+    for (const a of portfolio.assets ?? [])
+      if (a.kind === 'fund')
+        for (const e of a.entries) if (e.source === 'auto' && e.autoBatch && !e.voided) out.set(e.autoBatch, (out.get(e.autoBatch) ?? 0) + 1);
     return [...out];
   }, [portfolio]);
   async function undo(batch: string) {
@@ -205,7 +209,7 @@ export function DividendSyncView({
     });
     if (!ok) return;
     const next = JSON.parse(JSON.stringify(portfolio)) as Portfolio;
-    const n = undoAutoBatch(next, batch);
+    const n = undoAutoBatch(next, batch) + undoFundPayoutBatch(next.assets ?? [], batch);
     await onSave(next, `${n} automatic dividend${n === 1 ? '' : 's'} voided.`);
   }
 

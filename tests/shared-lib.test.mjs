@@ -53,6 +53,7 @@ const SHARED = [
   'portfolio-view',
   'assets',
   'plans',
+  'fund-payouts',
   'funds',
   'mufap',
   'metal-rates',

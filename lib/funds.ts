@@ -23,6 +23,15 @@ export type FundEntry = {
   recurringId?: string;
   note: string;
   voided?: boolean;
+  /** `auto` = added by the payout sync from MUFAP's payout table, not typed by you. */
+  source?: 'auto';
+  /** Worked out from payout per unit, units held and a tax rate, not read from a statement; recalculated until you edit it. */
+  estimated?: boolean;
+  /** One id per sync run, so a run can be undone in one step. */
+  autoBatch?: string;
+  /** The payout per unit and the price after the payout that this entry was worked out from. */
+  perUnit?: number;
+  exNav?: number;
 };
 export type FundAsset = {
   id: string;
@@ -38,6 +47,10 @@ export type FundAsset = {
   manualNavs: { id: string; date: string; nav: number; voided?: boolean }[];
   rules: PlanRule[];
   closed?: boolean;
+  /** What happens to this fund's payouts: extra units (the default) or cash paid out. */
+  payoutMode?: 'reinvest' | 'cash';
+  /** Share of a payout withheld as tax (0 to 1); defaults to the filer rate for money market and income funds. */
+  payoutTaxRate?: number;
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -273,9 +286,26 @@ export function validateFund(fund: FundAsset, today: string) {
         e.type !== 'buy')
     )
       throw new Error('The load must be less than the amount paid.');
+    if (
+      (e.source !== undefined && e.source !== 'auto') ||
+      (e.estimated !== undefined && typeof e.estimated !== 'boolean') ||
+      (e.autoBatch !== undefined &&
+        (typeof e.autoBatch !== 'string' || e.autoBatch.length > 64)) ||
+      (e.perUnit !== undefined && !(Number.isFinite(e.perUnit) && e.perUnit > 0)) ||
+      (e.exNav !== undefined && !(Number.isFinite(e.exNav) && e.exNav > 0))
+    )
+      throw new Error('Invalid automatic payout details.');
     if (typeof e.note !== 'string' || e.note.length > 500)
       throw new Error('Entry note is too long.');
   }
+  if (
+    (fund.payoutMode !== undefined &&
+      fund.payoutMode !== 'reinvest' &&
+      fund.payoutMode !== 'cash') ||
+    (fund.payoutTaxRate !== undefined &&
+      !(Number.isFinite(fund.payoutTaxRate) && fund.payoutTaxRate >= 0 && fund.payoutTaxRate < 1))
+  )
+    throw new Error('Invalid payout settings.');
   for (const m of fund.manualNavs) {
     if (
       !m ||
