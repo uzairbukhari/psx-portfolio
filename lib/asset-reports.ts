@@ -117,7 +117,7 @@ export function fundReport(
     invested: cents(buys.reduce((t, b) => t + b.amount, 0)),
     value,
     gain: value === null || cost === null ? null : cents(value - cost),
-    dividends: cents(valued.reduce((t, x) => t + x.v.dividends, 0)),
+    dividends: cents(valued.reduce((t, x) => t + x.v.income, 0)),
   };
 }
 

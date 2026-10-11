@@ -21,6 +21,16 @@ export type FundNavRow = {
   repurchase: number;
   fetchedAt?: string;
 };
+export type FundPayoutRow = {
+  mufapId: string;
+  /** The payout date MUFAP lists (YYYY-MM-DD). */
+  payoutDate: string;
+  /** Rupees per unit paid out. */
+  perUnit: number;
+  /** The price after the payout, which is the price a reinvestment is made at. */
+  exNav: number;
+};
+export type FundPayoutsResponse = { payouts: FundPayoutRow[] };
 export type FundCatalogResponse = {
   funds: (FundCatalogRow & { latest: FundNavRow | null })[];
 };
@@ -129,6 +139,35 @@ export function latestNavs(
     if (asOf && row.date > asOf) continue;
     const current = out.get(row.mufapId);
     if (!current || row.date > current.date) out.set(row.mufapId, row);
+  }
+  return out;
+}
+
+/**
+ * Reads MUFAP's Payouts table (Industry Stats > Daily > Payouts): Sector, AMC, Fund (linked with FundID), Category,
+ * Inception, Payout (per unit), Ex-NAV, Payout date. A row needs the fund link, a valid date and amounts above zero.
+ */
+export function parseMufapPayouts(html: string): FundPayoutRow[] {
+  const out: FundPayoutRow[] = [];
+  const seen = new Set<string>();
+  for (const row of html.match(/<tr[\s\S]*?<\/tr>/gi) ?? []) {
+    const idMatch = /FundID=(\d+)/i.exec(row);
+    if (!idMatch) continue;
+    const cells = (row.match(/<td[\s\S]*?<\/td>/gi) ?? []).map(decode);
+    if (cells.length < 8) continue;
+    const [, , , , , perUnit, exNav, payoutDate] = cells;
+    const date = mufapDate(payoutDate);
+    const per = price(perUnit);
+    const ex = price(exNav);
+    const key = `${idMatch[1]}|${date}`;
+    if (!date || !(per > 0) || !(ex > 0) || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      mufapId: idMatch[1],
+      payoutDate: date,
+      perUnit: per,
+      exNav: ex,
+    });
   }
   return out;
 }

@@ -4,6 +4,8 @@ import type {
   FundCatalogResponse,
   FundHistoryResponse,
   FundNavRow,
+  FundPayoutRow,
+  FundPayoutsResponse,
 } from './mufap.ts';
 
 type FundDb = {
@@ -80,4 +82,31 @@ export async function readFundHistory(
     .bind(mufapId)
     .all<NavRow>();
   return { mufapId, navs: rows.results.map(toNav) };
+}
+
+/** Payouts of the funds asked for, newest first. Only public ids are sent, never units or amounts. */
+export async function readFundPayouts(
+  db: FundDb,
+  mufapIds: string[],
+): Promise<FundPayoutsResponse> {
+  const ids = [...new Set(mufapIds)].filter((id) => /^\d{1,8}$/.test(id));
+  if (!ids.length || ids.length > 50) throw new Error('Invalid fund list.');
+  const rows = await db
+    .prepare(
+      `SELECT mufap_id,payout_date,per_unit,ex_nav FROM fund_payouts WHERE mufap_id IN (${ids.map(() => '?').join(',')}) ORDER BY payout_date DESC`,
+    )
+    .bind(...ids)
+    .all<{
+      mufap_id: string;
+      payout_date: string;
+      per_unit: number;
+      ex_nav: number;
+    }>();
+  const payouts: FundPayoutRow[] = rows.results.map((r) => ({
+    mufapId: r.mufap_id,
+    payoutDate: r.payout_date,
+    perUnit: r.per_unit,
+    exNav: r.ex_nav,
+  }));
+  return { payouts };
 }

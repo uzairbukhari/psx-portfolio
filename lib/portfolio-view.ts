@@ -17,6 +17,8 @@ import {
   newTickers,
 } from './company-enrichment.ts';
 import { planAutoDividendUpdate } from './dividend-sync.ts';
+import { planFundPayouts } from './fund-payouts.ts';
+import type { FundAsset } from './funds.ts';
 import { mergeQuotes } from './quote-merge.ts';
 import { validate, type Portfolio } from './portfolio.ts';
 import {
@@ -43,6 +45,10 @@ export type PublicData = {
   }>;
   /** Tells the server which funds are held (public MUFAP ids only) so their price is stored nightly. */
   trackFunds?(mufapIds: string[], retry?: boolean): Promise<{ error?: string }>;
+  /** MUFAP payouts of these funds (public ids only). */
+  fundPayouts?(
+    mufapIds: string[],
+  ): Promise<import('./mufap.ts').FundPayoutRow[]>;
   /** One fund's price history. */
   fundHistory?(
     mufapId: string,
@@ -230,22 +236,57 @@ export async function loadAccountView(
         ? publicData.companies(placeholders).catch(() => [])
         : [],
     ]);
-    if (syncDividends && market && !session.offline) {
+    const fundIds = [
+      ...new Set(
+        account.portfolios.flatMap((p) =>
+          p.locked
+            ? []
+            : (p.portfolio.assets ?? []).flatMap((a) =>
+                a.kind === 'fund' && !a.closed ? [a.mufapId] : [],
+              ),
+        ),
+      ),
+    ];
+    const payouts =
+      syncDividends && fundIds.length && publicData.fundPayouts
+        ? await publicData.fundPayouts(fundIds).catch(() => [])
+        : [];
+    if (syncDividends && (market || payouts.length) && !session.offline) {
       let changed = false;
+      const batch = `fund-${new Date().toISOString().slice(0, 19)}`;
       const updated = {
         ...account,
         portfolios: account.portfolios.map((entry) => {
           if (entry.locked) return entry;
-          const update = planAutoDividendUpdate(
-            entry.portfolio,
-            market.announcements ?? [],
-            undefined,
-            undefined,
-            market.faceValues ?? {},
-          );
-          if (!update) return entry;
+          let next = entry.portfolio;
+          let touched = false;
+          const update = market
+            ? planAutoDividendUpdate(
+                next,
+                market.announcements ?? [],
+                undefined,
+                undefined,
+                market.faceValues ?? {},
+              )
+            : null;
+          if (update) {
+            next = update.next;
+            touched = true;
+          }
+          if (payouts.length && next.assets?.some((a) => a.kind === 'fund')) {
+            const today = new Date().toISOString().slice(0, 10);
+            const assets = next.assets.map((a) => {
+              if (a.kind !== 'fund') return a;
+              const plan = planFundPayouts(a as FundAsset, payouts, today, batch);
+              if (!plan) return a;
+              touched = true;
+              return { ...a, entries: plan.entries } as FundAsset;
+            });
+            if (touched) next = { ...next, assets };
+          }
+          if (!touched) return entry;
           changed = true;
-          return { ...entry, portfolio: update.next };
+          return { ...entry, portfolio: next };
         }),
       };
       if (changed) {

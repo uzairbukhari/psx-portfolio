@@ -34,6 +34,7 @@ import {
   type FundNavRow,
 } from '@/lib/mufap';
 import { money, moneyShort, today } from '@/lib/portfolio';
+import FundMatchDialog from './fund-match-dialog';
 import { useFundHistory } from './use-fund-data';
 import { webPublicData } from './vault-transport';
 import CollapsiblePanel from './collapsible-panel';
@@ -45,6 +46,7 @@ export const fundKey = (o: OwnedFund) =>
 type Catalog = FundCatalogResponse['funds'];
 type Mode =
   | { kind: 'add' }
+  | { kind: 'match'; fundId: string }
   | {
       kind:
         | 'buy'
@@ -153,7 +155,7 @@ export default function MutualFundsSection({
     setSeenRequest(addRequest);
     if (addRequest > 0 && canEdit) setMode({ kind: 'add' });
   }
-const priceButton = (
+  const priceButton = (
     <button
       type="button"
       className="secondary compact"
@@ -196,7 +198,7 @@ const priceButton = (
       gain: priced.every((r) => r.v.gain !== null)
         ? priced.reduce((a, r) => a + (r.v.gain ?? 0), 0)
         : null,
-      dividends: rows.reduce((a, r) => a + r.v.dividends, 0),
+      dividends: rows.reduce((a, r) => a + r.v.income, 0),
       held: rows.filter((r) => r.v.units > 0).length,
     };
   }, [rows]);
@@ -215,7 +217,23 @@ const priceButton = (
     );
   }
 
-  const dialog = mode ? (
+  const matchTarget =
+    mode?.kind === 'match' ? funds.find((f) => f.id === mode.fundId) : undefined;
+  const dialog = matchTarget ? (
+    <FundMatchDialog
+      fund={matchTarget}
+      navs={navs}
+      busy={busy}
+      onClose={() => setMode(null)}
+      onSave={async (next, message) => {
+        await onChange(
+          funds.map((f) => (f.id === next.id ? next : f)),
+          message,
+        );
+        setMode(null);
+      }}
+    />
+  ) : mode && mode.kind !== 'match' ? (
     <FundDialog
       mode={mode}
       funds={funds}
@@ -314,6 +332,12 @@ const priceButton = (
                       {label}
                     </DropdownMenuItem>
                   ))}
+                  <DropdownMenuItem
+                    disabled={busy}
+                    onClick={() => setMode({ kind: 'match', fundId: asset.id })}
+                  >
+                    Match my statement
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -358,8 +382,11 @@ const priceButton = (
               {v.realized === null ? '—' : signed(v.realized)}
             </strong>
             <small>
-              {moneyShort(v.dividends)} in dividends · bought{' '}
-              {moneyShort(v.bought.amount)} · redeemed{' '}
+              {moneyShort(v.income)} in dividends
+              {v.reinvested > 0
+                ? ` (${moneyShort(v.reinvested)} reinvested)`
+                : ''}{' '}
+              · bought {moneyShort(v.bought.amount)} · redeemed{' '}
               {moneyShort(v.redeemed.amount)}
             </small>
           </article>
@@ -587,9 +614,7 @@ const priceButton = (
                           )}
                         </td>
                         <td data-label="Value" className="amount">
-                          {v.value === null
-                            ? priceButton
-                            : moneyShort(v.value)}
+                          {v.value === null ? priceButton : moneyShort(v.value)}
                         </td>
                         <td data-label="Gain / loss" className={tone(v.gain)}>
                           {v.gain === null
@@ -604,7 +629,7 @@ const priceButton = (
                               ? 'cost not known'
                               : signed(v.realized)}
                           </span>
-                          <small>{moneyShort(v.dividends)} in dividends</small>
+                          <small>{moneyShort(v.income)} in dividends</small>
                         </td>
                       </tr>
                     </tbody>
@@ -846,7 +871,7 @@ function FundDialog({
   onClose,
   onSave,
 }: {
-  mode: Mode;
+  mode: Exclude<Mode, { kind: 'match' }>;
   funds: FundAsset[];
   catalog: Catalog;
   navs: FundNavRow[];

@@ -1,16 +1,26 @@
 import { db, failure, identity } from '@/lib/server';
-import { readFundCatalog, readFundHistory } from '@/lib/fund-store';
+import {
+  readFundCatalog,
+  readFundHistory,
+  readFundPayouts,
+} from '@/lib/fund-store';
 import { trackFunds } from '@/lib/mufap-refresh';
 import { UserError } from '@/lib/user-error';
 
 /**
  * Mutual fund directory with the newest price of every fund; with `?fund=<MUFAP id>` that one fund's price history
- * instead. Fund names are public, and no amount, unit count or date of yours is ever part of the request.
+ * instead; with `?payouts=<id>,<id>` those funds' payouts. Fund names are public, and no amount, unit count or date of yours is ever part of the request.
  */
 export async function GET(req: Request) {
   try {
     await identity(req);
-    const fund = new URL(req.url).searchParams.get('fund');
+    const params = new URL(req.url).searchParams;
+    const payoutIds = params.get('payouts');
+    if (payoutIds !== null)
+      return Response.json(await readFundPayouts(db(), payoutIds.split(',')), {
+        headers: { 'Cache-Control': 'private, max-age=900' },
+      });
+    const fund = params.get('fund');
     if (fund !== null && !/^\d{1,8}$/.test(fund))
       throw new UserError('Invalid fund id.');
     const body =
@@ -33,9 +43,12 @@ export async function POST(req: Request) {
       mufapIds?: unknown;
       retry?: unknown;
     } | null;
-    return Response.json(await trackFunds(db(), body?.mufapIds, body?.retry === true), {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    return Response.json(
+      await trackFunds(db(), body?.mufapIds, body?.retry === true),
+      {
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
   } catch (e) {
     return failure(e);
   }

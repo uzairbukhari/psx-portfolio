@@ -23,6 +23,15 @@ export type FundEntry = {
   recurringId?: string;
   note: string;
   voided?: boolean;
+  /** `auto` = added by the payout sync from MUFAP's payout table, not typed by you. */
+  source?: 'auto';
+  /** Worked out from payout per unit, units held and a tax rate, not read from a statement; recalculated until you edit it. */
+  estimated?: boolean;
+  /** One id per sync run, so a run can be undone in one step. */
+  autoBatch?: string;
+  /** The payout per unit and the price after the payout that this entry was worked out from. */
+  perUnit?: number;
+  exNav?: number;
 };
 export type FundAsset = {
   id: string;
@@ -38,6 +47,10 @@ export type FundAsset = {
   manualNavs: { id: string; date: string; nav: number; voided?: boolean }[];
   rules: PlanRule[];
   closed?: boolean;
+  /** What happens to this fund's payouts: extra units (the default) or cash paid out. */
+  payoutMode?: 'reinvest' | 'cash';
+  /** Share of a payout withheld as tax (0 to 1); defaults to the filer rate for money market and income funds. */
+  payoutTaxRate?: number;
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -66,6 +79,10 @@ export type FundPosition = {
   realized: number | null;
   /** Cash dividends received (gross of nothing: the amount received). */
   dividends: number;
+  /** Dividends the fund paid as extra units (the rupees reinvested). Income, but no cash moved. */
+  reinvested: number;
+  /** All dividend income: cash received plus reinvested. */
+  income: number;
   bought: { units: number; amount: number };
   redeemed: { units: number; amount: number };
   history: (FundEntry & { heldAfter: number; realizedGain: number | null })[];
@@ -76,6 +93,7 @@ export function fundPosition(fund: FundAsset): FundPosition {
   let cost: number | null = 0;
   let realized: number | null = 0;
   let dividends = 0;
+  let reinvested = 0;
   const bought = { units: 0, amount: 0 };
   const redeemed = { units: 0, amount: 0 };
   const history: FundPosition['history'] = [];
@@ -108,6 +126,7 @@ export function fundPosition(fund: FundAsset): FundPosition {
     } else {
       units += e.units ?? 0;
       cost = cost === null || e.amount === null ? null : cost + e.amount;
+      if (e.type === 'reinvest') reinvested += e.amount ?? 0;
       if (e.type === 'buy') {
         bought.units += e.units ?? 0;
         bought.amount += e.amount ?? 0;
@@ -121,6 +140,8 @@ export function fundPosition(fund: FundAsset): FundPosition {
     averageNav: cost === null || !units ? null : cost / units,
     realized: realized === null ? null : cents(realized),
     dividends: cents(dividends),
+    reinvested: cents(reinvested),
+    income: cents(dividends + reinvested),
     bought: { units: units6(bought.units), amount: cents(bought.amount) },
     redeemed: { units: units6(redeemed.units), amount: cents(redeemed.amount) },
     history,
@@ -265,9 +286,26 @@ export function validateFund(fund: FundAsset, today: string) {
         e.type !== 'buy')
     )
       throw new Error('The load must be less than the amount paid.');
+    if (
+      (e.source !== undefined && e.source !== 'auto') ||
+      (e.estimated !== undefined && typeof e.estimated !== 'boolean') ||
+      (e.autoBatch !== undefined &&
+        (typeof e.autoBatch !== 'string' || e.autoBatch.length > 64)) ||
+      (e.perUnit !== undefined && !(Number.isFinite(e.perUnit) && e.perUnit > 0)) ||
+      (e.exNav !== undefined && !(Number.isFinite(e.exNav) && e.exNav > 0))
+    )
+      throw new Error('Invalid automatic payout details.');
     if (typeof e.note !== 'string' || e.note.length > 500)
       throw new Error('Entry note is too long.');
   }
+  if (
+    (fund.payoutMode !== undefined &&
+      fund.payoutMode !== 'reinvest' &&
+      fund.payoutMode !== 'cash') ||
+    (fund.payoutTaxRate !== undefined &&
+      !(Number.isFinite(fund.payoutTaxRate) && fund.payoutTaxRate >= 0 && fund.payoutTaxRate < 1))
+  )
+    throw new Error('Invalid payout settings.');
   for (const m of fund.manualNavs) {
     if (
       !m ||

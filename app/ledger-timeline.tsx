@@ -283,7 +283,7 @@ export function buildAssetEntries(
                     : e.type === 'reinvest'
                       ? 'Reinvested'
                       : 'Purchase',
-            detail: `${units || 'Cash payout'}${e.type === 'reinvest' ? ' · dividend reinvested' : ''}${where}`,
+            detail: `${units || 'Cash payout'}${e.type === 'reinvest' ? ' · dividend reinvested' : ''}${e.estimated ? ' · estimated' : ''}${where}`,
             fees: null,
             amount: e.amount,
             inflow: e.type === 'redeem' || e.type === 'dividend',
