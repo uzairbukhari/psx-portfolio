@@ -2082,6 +2082,14 @@ function DashboardContent({
     window.scrollTo({ top: 0 });
   }
   function openFund(key: string) {
+    // From the All view a fund opens inside its own portfolio, where it can be edited.
+    const owner = ownedFunds.find((o) => fundKey(o) === key) as
+      | (OwnedFund & { portfolioId?: string })
+      | undefined;
+    if (isAll && owner?.portfolioId) {
+      workspace?.choose(owner.portfolioId);
+      key = owner.asset.id;
+    }
     setFundFocus(key);
     const path = '/funds/' + encodeURIComponent(key);
     setTabState('fund');

@@ -105,7 +105,7 @@
   font-size: 14px;
 }
 .overview-classes i,
-.overview-sectors i:first-child {
+.overview-sectors li > span:first-child > i {
   display: inline-block;
   width: 9px;
   height: 9px;
@@ -127,6 +127,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.overview-sectors .bar {
+  display: block;
+  margin: 0;
+}
+.overview-sectors .bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
 }
 .overview-sectors b {
   text-align: right;
@@ -364,6 +373,7 @@ button.overview-portfolio:not([data-slot]):focus-visible {
   font-size: 13px;
 }
 .overview-portfolio .bar {
+  display: block;
   margin: 6px 0 2px;
 }
 .overview-portfolio small {
