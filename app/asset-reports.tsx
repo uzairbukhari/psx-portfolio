@@ -155,7 +155,7 @@ function FundReports({ portfolio, navs }: { portfolio: Portfolio; navs: FundNavR
           <Stat label="Invested" value={moneyShort(report.invested)} note="Purchases, including fees" />
           <Stat label="Current value" value={report.value === null ? '—' : moneyShort(report.value)} note="Units × latest repurchase price" />
           <Stat label="Unrealised gain / loss" value={report.gain === null ? '—' : signed(report.gain)} note="Value less remaining cost" tone={report.gain === null ? '' : report.gain >= 0 ? 'pos' : 'neg'} />
-          <Stat label="Dividends received" value={moneyShort(report.dividends)} note="Cash dividends recorded" />
+          <Stat label="Dividends received" value={moneyShort(report.dividends)} note="Cash and reinvested dividends recorded" />
         </div>
       </div>
       <div className="reports-grid" style={{ marginBottom: 20 }}>

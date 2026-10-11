@@ -267,3 +267,22 @@ test('a MUFAP price dated the next business day still values the fund', async ()
   assert.equal(valueFund(fund, [row('2026-10-12')], '2026-10-11').value, 10430.31);
   assert.equal(valueFund(fund, [row('2026-10-20')], '2026-10-11').value, null);
 });
+
+test('reinvested dividends are income and cost, but not cash flows', () => {
+  const f = fund({
+    entries: [
+      e('b1', 'buy', '2026-05-04', 9.121, 1000),
+      e('r1', 'reinvest', '2026-06-29', 0.8437, 88),
+      e('d1', 'dividend', '2026-07-10', undefined, 10),
+    ],
+  });
+  const p = fundPosition(f);
+  assert.equal(p.reinvested, 88);
+  assert.equal(p.dividends, 10);
+  assert.equal(p.income, 98);
+  assert.equal(p.cost, 1088);
+  assert.deepEqual(
+    fundFlows(f).map((x) => x.amount),
+    [1000, -10],
+  );
+});

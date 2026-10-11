@@ -66,6 +66,10 @@ export type FundPosition = {
   realized: number | null;
   /** Cash dividends received (gross of nothing: the amount received). */
   dividends: number;
+  /** Dividends the fund paid as extra units (the rupees reinvested). Income, but no cash moved. */
+  reinvested: number;
+  /** All dividend income: cash received plus reinvested. */
+  income: number;
   bought: { units: number; amount: number };
   redeemed: { units: number; amount: number };
   history: (FundEntry & { heldAfter: number; realizedGain: number | null })[];
@@ -76,6 +80,7 @@ export function fundPosition(fund: FundAsset): FundPosition {
   let cost: number | null = 0;
   let realized: number | null = 0;
   let dividends = 0;
+  let reinvested = 0;
   const bought = { units: 0, amount: 0 };
   const redeemed = { units: 0, amount: 0 };
   const history: FundPosition['history'] = [];
@@ -108,6 +113,7 @@ export function fundPosition(fund: FundAsset): FundPosition {
     } else {
       units += e.units ?? 0;
       cost = cost === null || e.amount === null ? null : cost + e.amount;
+      if (e.type === 'reinvest') reinvested += e.amount ?? 0;
       if (e.type === 'buy') {
         bought.units += e.units ?? 0;
         bought.amount += e.amount ?? 0;
@@ -121,6 +127,8 @@ export function fundPosition(fund: FundAsset): FundPosition {
     averageNav: cost === null || !units ? null : cost / units,
     realized: realized === null ? null : cents(realized),
     dividends: cents(dividends),
+    reinvested: cents(reinvested),
+    income: cents(dividends + reinvested),
     bought: { units: units6(bought.units), amount: cents(bought.amount) },
     redeemed: { units: units6(redeemed.units), amount: cents(redeemed.amount) },
     history,

@@ -318,11 +318,11 @@ export function accountOverview(
       });
     }
 
-  // Cash dividends from mutual funds are income too. Their cash-back flows are already part of the fund's flows.
+  // Fund dividends are income too, paid in cash or reinvested as units. Cash ones are already flows of the fund; reinvested ones move no cash.
   for (const { asset } of assetValues) {
     if (asset.kind !== 'fund') continue;
     for (const e of asset.entries) {
-      if (e.type !== 'dividend' || e.voided || e.date > asOf || !e.amount)
+      if ((e.type !== 'dividend' && e.type !== 'reinvest') || e.voided || e.date > asOf || !e.amount)
         continue;
       receivedTotal += e.amount;
       if (taxYearOf(e.date) === taxYear) received += e.amount;
