@@ -1,10 +1,13 @@
 // Fetches MUFAP's public daily NAV page and stores the fund directory and prices in the shared `fund_catalog` and
 // `fund_navs` tables. Public data only. Runs on Cloudflare (MUFAP answers Cloudflare egress, but blocks GitHub's runners).
-import { parseMufapNavs } from './mufap.ts';
+import { parseMufapNavs, parseMufapPayouts } from './mufap.ts';
 
 const URL_ = 'https://www.mufap.com.pk/Industry/IndustryStatDaily?tab=3';
+const PAYOUTS_URL = 'https://www.mufap.com.pk/Industry/IndustryStatDaily?tab=4';
 /** Far fewer than the real list means the page changed: fail loudly instead of storing a fragment. */
 const MIN_FUNDS = 50;
+/** The payouts page lists a row per fund that ever paid; far fewer means the layout changed. */
+const MIN_PAYOUTS = 20;
 
 type Statement = {
   bind(...values: unknown[]): unknown;
@@ -128,4 +131,42 @@ export async function trackFunds(db: FundDb, ids: unknown, retry = false) {
   }
   if (fresh.length || !directory || wantRetry) await refreshFunds(db);
   return { added: fresh.length };
+}
+
+/**
+ * Stores MUFAP's payouts (per unit, ex-NAV, date) for every fund, not only tracked ones: a payout is one small row, and a
+ * fund added later then already has its history. The page shows each fund's latest payout, so a night that fails to run
+ * loses a daily payer's day; clients then fall back to matching their statement.
+ */
+export async function refreshFundPayouts(db: FundDb) {
+  const response = await fetch(PAYOUTS_URL, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      Referer: 'https://www.mufap.com.pk/',
+    },
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!response.ok) throw new Error(`${response.status} from mufap.com.pk`);
+  const payouts = parseMufapPayouts(await response.text());
+  if (payouts.length < MIN_PAYOUTS)
+    throw new Error(
+      `Only ${payouts.length} payouts could be read from MUFAP; the page layout may have changed.`,
+    );
+  const now = new Date().toISOString();
+  const upsert = db.prepare(
+    `INSERT INTO fund_payouts (mufap_id,payout_date,per_unit,ex_nav,fetched_at) VALUES (?,?,?,?,?)
+     ON CONFLICT(mufap_id,payout_date) DO UPDATE SET per_unit=excluded.per_unit, ex_nav=excluded.ex_nav, fetched_at=excluded.fetched_at`,
+  );
+  const statements = payouts.map((p) =>
+    upsert.bind(p.mufapId, p.payoutDate, p.perUnit, p.exNav, now),
+  );
+  for (let i = 0; i < statements.length; i += 100)
+    await db.batch(statements.slice(i, i + 100));
+  return {
+    payouts: payouts.length,
+    newest: payouts.reduce((a, p) => (p.payoutDate > a ? p.payoutDate : a), ''),
+  };
 }

@@ -505,6 +505,18 @@ export const fundNavs = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.mufapId, t.date] })],
 );
+/** Mutual fund payouts from MUFAP's Payouts table (public data): per unit, the price it was reinvested at, and the payout date. */
+export const fundPayouts = sqliteTable(
+  'fund_payouts',
+  {
+    mufapId: text('mufap_id').notNull(),
+    payoutDate: text('payout_date').notNull(),
+    perUnit: real('per_unit').notNull(),
+    exNav: real('ex_nav').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.mufapId, t.payoutDate] })],
+);
 
 // One row per account, written at sign-in. `origin` starts 'unknown' and is settled on the first vault status read:
 // 'signup' when the account had no vault yet, 'existing' for accounts that predate analytics. Sign-up counts use

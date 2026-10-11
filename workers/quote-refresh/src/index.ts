@@ -1,4 +1,4 @@
-import { refreshFunds } from '../../../lib/mufap-refresh';
+import { refreshFundPayouts, refreshFunds } from '../../../lib/mufap-refresh';
 import { refreshPlanNavs } from '../../../lib/plan-navs';
 import { dispatchWorkflow, dueWorkflows } from '../../../lib/scrape-schedule';
 
@@ -50,6 +50,9 @@ export default {
           await refreshFunds(env.DB)
             .then((r) => console.log('Fund prices stored', r))
             .catch((e) => console.error('Fund price refresh failed', e));
+          await refreshFundPayouts(env.DB)
+            .then((r) => console.log('Fund payouts stored', r))
+            .catch((e) => console.error('Fund payout refresh failed', e));
           await refreshPlanNavs(env.DB)
             .then((r) => console.log('Plan prices stored', r))
             .catch((e) => console.error('Plan price refresh failed', e));
