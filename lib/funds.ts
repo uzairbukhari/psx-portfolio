@@ -141,6 +141,7 @@ export type FundValuation = FundPosition & {
 };
 
 const STALE_DAYS = 7;
+const MUFAP_DATE_LEAD_DAYS = 3;
 const dayNumber = (date: string) =>
   Date.parse(`${date}T00:00:00Z`) / 86_400_000;
 
@@ -150,8 +151,10 @@ export function valueFund(
   asOf: string,
 ): FundValuation {
   const position = fundPosition(fund);
+  // MUFAP dates a price by the next business day (a Sunday run is dated Monday), so a few days ahead still counts as today's.
+  const navLimit = dayNumber(asOf) + MUFAP_DATE_LEAD_DAYS;
   const mine = navs
-    .filter((n) => n.mufapId === fund.mufapId && n.date <= asOf)
+    .filter((n) => n.mufapId === fund.mufapId && dayNumber(n.date) <= navLimit)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0];
   const manual = fund.manualNavs
     .filter((m) => !m.voided && m.date <= asOf)
