@@ -126,6 +126,7 @@ import MonthlyPicks from './monthly-picks';
 import { parseFinqalabReport } from './finqalab-import';
 import { FinqalabImportDialog } from './finqalab-import-dialog';
 import { BrokerImportDialog } from './broker-import-dialog';
+import { detectJsGlobalLedger, parseJsGlobalLedger } from '@/lib/js-global-ledger';
 import { detectPsxConfirmation, detectPsxLedger, parsePsxConfirmation, parsePsxLedger } from '@/lib/psx-confirmation';
 import {
   validateBrokerStatement,
@@ -1701,6 +1702,17 @@ function DashboardContent({
           reviewing = true;
           setBrokerReview({
             statement: validateBrokerStatement(parsePsxLedger(pdf.text)),
+            fileName: f.name,
+            format: null,
+            hash,
+            method: 'local',
+          });
+          return;
+        }
+        if (!kind && pdf && !expected && detectJsGlobalLedger(pdf.text)) {
+          reviewing = true;
+          setBrokerReview({
+            statement: validateBrokerStatement(parseJsGlobalLedger(pdf.text)),
             fileName: f.name,
             format: null,
             hash,
