@@ -255,3 +255,15 @@ test('a fund cash dividend counts as income on the All dashboard while the NAV d
   assert.equal(o.total.value, 5143);
   assert.equal(o.income.receivedTotal, 300);
 });
+
+test('a MUFAP price dated the next business day still values the fund', async () => {
+  const { valueFund } = await import('../lib/funds.ts');
+  const fund = {
+    id: 'f1', kind: 'fund', name: 'F', mufapId: '13146', amc: 'X', fundName: 'X', category: 'Money Market',
+    note: '', manualNavs: [], rules: [],
+    entries: [{ id: 'e1', date: '2026-01-05', type: 'buy', units: 100, amount: 10000, note: '' }],
+  };
+  const row = (date) => ({ mufapId: '13146', date, nav: 104.3031, offer: 104.3031, repurchase: 104.3031, fetchedAt: '' });
+  assert.equal(valueFund(fund, [row('2026-10-12')], '2026-10-11').value, 10430.31);
+  assert.equal(valueFund(fund, [row('2026-10-20')], '2026-10-11').value, null);
+});
