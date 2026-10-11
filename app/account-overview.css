@@ -768,3 +768,165 @@ button.start-tile:not([data-slot]):hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Mutual funds: one compact table per provider */
+.fund-group {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.fund-group__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.fund-group__head small,
+.fund-table small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 400;
+}
+.fund-group__totals {
+  text-align: right;
+  font-weight: 600;
+}
+.fund-group__totals small.pos-text,
+.fund-table small.pos-text {
+  color: var(--success);
+}
+.fund-group__totals small.neg-text,
+.fund-table small.neg-text {
+  color: var(--danger);
+}
+.fund-table-wrap {
+  overflow-x: auto;
+}
+.fund-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.fund-table th {
+  text-align: right;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fund-table td {
+  text-align: right;
+  padding: 10px 12px;
+  vertical-align: top;
+  border-top: 1px solid var(--border);
+}
+.fund-table th:first-child,
+.fund-table td:first-child {
+  text-align: left;
+}
+.fund-table td.pos-text {
+  color: var(--success);
+}
+.fund-table td.neg-text {
+  color: var(--danger);
+}
+button.fund-row__toggle:not([data-slot]) {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.fund-row__toggle b {
+  display: block;
+}
+.fund-row__chevron {
+  margin-top: 2px;
+  flex: none;
+  transition: transform 0.15s;
+}
+tbody[data-open] .fund-row__chevron {
+  transform: rotate(180deg);
+}
+.fund-detail td {
+  text-align: left;
+  background: var(--muted);
+}
+@media (max-width: 760px) {
+  .fund-table thead {
+    display: none;
+  }
+  .fund-table,
+  .fund-table tbody,
+  .fund-table tr,
+  .fund-table td {
+    display: block;
+  }
+  .fund-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .fund-row td {
+    border: 0;
+    padding: 0;
+    text-align: left;
+  }
+  .fund-row td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted-foreground);
+  }
+  .fund-row td.fund-row__name {
+    grid-column: 1 / -1;
+  }
+  .fund-row td.fund-row__name::before {
+    display: none;
+  }
+  .fund-detail td {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+  }
+}
+
+.fund-activity .ledger-row {
+  grid-template-columns: 34px 130px minmax(0, 1fr) auto auto;
+}
+.fund-activity__actions {
+  display: flex;
+  gap: 6px;
+}
+@media (max-width: 760px) {
+  .fund-activity .ledger-row {
+    grid-template-columns: 24px auto minmax(0, 1fr) auto;
+    grid-template-areas: 'd type . amt' '. det det det' '. act act act';
+  }
+  .fund-activity .ledger-main {
+    display: block;
+    grid-area: det;
+  }
+  .fund-activity__actions {
+    grid-area: act;
+  }
+}
