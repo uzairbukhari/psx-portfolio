@@ -121,7 +121,7 @@ import {
   type AhlLedgerStatement,
 } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
-import { MAX_WATCH_TICKERS, watchTickers } from '@/lib/market-watch';
+import { MAX_WATCH_TICKERS } from '@/lib/market-watch';
 import MonthlyPicks from './monthly-picks';
 import { parseFinqalabReport } from './finqalab-import';
 import { FinqalabImportDialog } from './finqalab-import-dialog';
@@ -1512,11 +1512,11 @@ function DashboardContent({
   if (!p && !email) return <SignIn returnTo={initialPathname || '/'} />;
   if (!p) return <LoadError message={message} busy={busy} onRetry={load} />;
   // The market pulse sends only these tickers to the server; names and saved quotes are merged back in locally.
-  // The All view follows the Monthly Picks shortlist; a single portfolio follows what it holds.
+  // The All view shows the index only; a single portfolio follows what it holds.
   const pulseWatch = {
-    mode: (isAll ? 'shortlist' : 'holdings') as 'shortlist' | 'holdings',
+    mode: (isAll ? 'index' : 'holdings') as 'index' | 'holdings',
     tickers: isAll
-      ? watchTickers(p)
+      ? []
       : holdings(p)
           .filter((h) => h.shares > 0)
           .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))

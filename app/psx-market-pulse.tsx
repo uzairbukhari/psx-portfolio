@@ -38,8 +38,8 @@ interface MarketSummary {
 }
 
 interface Props {
-  /** `shortlist`: the Monthly Picks shortlist (All view). `holdings`: the biggest movers among what one portfolio holds. */
-  mode?: 'shortlist' | 'holdings';
+  /** `index`: the index only (All view). `holdings`: the biggest movers among what one portfolio holds. */
+  mode?: 'index' | 'holdings';
   onOpenShortlist: () => void;
   /** Refresh everything the page refreshes (PSX prices included), not only the market summary. */
   onRefresh?: () => void | Promise<void>;
@@ -163,7 +163,7 @@ function HoldingsMovers({ companies }: { companies: ShortlistPerformance[] | nul
 }
 
 export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
-  { mode = 'shortlist', onOpenShortlist, onRefresh, refreshing = false, tickers, names, saved },
+  { mode = 'holdings', onOpenShortlist, onRefresh, refreshing = false, tickers, names, saved },
   ref,
 ) {
   const watch = useRef({ tickers, names, saved });
@@ -432,7 +432,7 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
           {summary.breadth.excluded > 0 ? ` (${summary.breadth.excluded.toLocaleString()} without valid prices left out)` : ''}.
         </p>
       )}
-      <div className={`pulse-grid pulse-grid--shortlist${index ? '' : ' pulse-grid--solo'}`}>
+      <div className={`pulse-grid pulse-grid--shortlist${index && mode === 'holdings' ? '' : ' pulse-grid--solo'}`}>
         {index && (
           <div className="pulse-index">
             <span className="muted pulse-label">KSE100 Index</span>
@@ -456,47 +456,8 @@ export default forwardRef<PsxMarketPulseHandle, Props>(function PsxMarketPulse(
             </small>
           </div>
         )}
-        {mode === 'holdings' ? (
+        {mode === 'holdings' && (
           <HoldingsMovers companies={summary?.companies ?? null} />
-        ) : (
-        <div className="pulse-shortlist">
-          <div className="pulse-shortlist__head">
-            <div>
-              <h4>Your shortlisted companies</h4>
-              <span>Price · today</span>
-            </div>
-            <button className="quote-btn" onClick={onOpenShortlist}>Edit shortlist</button>
-          </div>
-          {summary?.companies.length ? (
-            <div className="pulse-company-list">
-              {summary.companies.map((company) => {
-                const direction = company.change === null ? '' : company.change > 0 ? 'pos' : company.change < 0 ? 'neg' : '';
-                const change =
-                  company.changePercent === null
-                    ? '—'
-                    : `${company.changePercent > 0 ? '+' : ''}${number(company.changePercent)}%`;
-                const accessibleSummary = `${company.name}, ${company.ticker}. Price ${company.price === null ? 'unavailable' : `Rs ${number(company.price)}`}. Today ${company.changePercent === null ? 'unavailable' : `${number(company.changePercent)} percent`}.`;
-                const title = `${company.name}${company.change === null ? '' : ` · ${company.change > 0 ? '+' : ''}${number(company.change)} today`}`;
-                return (
-                  <article className={`pulse-company ${direction}`} key={company.ticker} title={title} aria-label={accessibleSummary}>
-                    <b className="pulse-company__ticker"><TickerLink ticker={company.ticker} /></b>
-                    <b className={`pulse-company__change ${direction}`}>{change}</b>
-                    <b className="pulse-company__price">
-                      {company.price === null ? '—' : <><small>Rs</small> {number(company.price)}</>}
-                    </b>
-                  </article>
-                );
-              })}
-            </div>
-          ) : summary ? (
-            <div className="pulse-empty pulse-empty--shortlist">
-              <p>Choose companies in Monthly Picks to track their current performance here.</p>
-              <button className="secondary compact" onClick={onOpenShortlist}>Open Monthly Picks</button>
-            </div>
-          ) : (
-            <TabLoader label="Loading your shortlist and latest saved market data…" />
-          )}
-        </div>
         )}
       </div>
     </section>
