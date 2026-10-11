@@ -52,6 +52,7 @@ export default function PortfolioValueCard({
   newBuys,
   aside,
   chartOnly,
+  shortAside,
 }: {
   p: Portfolio;
   value: number;
@@ -65,6 +66,8 @@ export default function PortfolioValueCard({
   aside?: ReactNode;
   /** Hide the headline numbers; the page already shows them (All portfolios dashboard). */
   chartOnly?: boolean;
+  /** The aside holds only the index (no list), so the chart is kept short to match it. */
+  shortAside?: boolean;
 }) {
   const [range, setRange] = useState<ValueRange>('all');
   const [attempt, setAttempt] = useState(0);
@@ -150,7 +153,7 @@ export default function PortfolioValueCard({
   const rangeLabel = range === 'all' ? 'all time' : RANGES.find(([v]) => v === range)![1];
 
   return (
-    <section className={chartOnly ? `value-card value-card--chart-only${aside ? ' value-card--with-aside' : ''}` : 'panel value-card'}>
+    <section className={chartOnly ? `value-card value-card--chart-only${aside ? ' value-card--with-aside' : ''}${aside && shortAside ? ' value-card--short-aside' : ''}` : 'panel value-card'}>
       <div className="value-card-body">
       <div className="value-card-left">
       {!chartOnly && <div className="value-card-top">
