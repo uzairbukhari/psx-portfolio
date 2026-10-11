@@ -771,6 +771,7 @@ button.start-tile:not([data-slot]):hover {
 
 /* Mutual funds: one compact table per provider */
 .fund-group {
+  margin-top: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   margin-bottom: 14px;

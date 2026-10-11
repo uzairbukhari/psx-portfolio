@@ -590,7 +590,7 @@ export default function MutualFundsSection({
                     <th>Realised / dividends</th>
                   </tr>
                 </thead>
-                {g.rows.map(({ asset, v, due, portfolioName }) => {
+                {g.rows.map(({ asset, v, portfolioName }) => {
                   const key = fundKey({ asset, portfolioName });
                   return (
                     <tbody key={key}>
