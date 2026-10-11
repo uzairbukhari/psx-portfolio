@@ -42,7 +42,7 @@ export type PublicData = {
     error?: string;
   }>;
   /** Tells the server which funds are held (public MUFAP ids only) so their price is stored nightly. */
-  trackFunds?(mufapIds: string[]): Promise<{ error?: string }>;
+  trackFunds?(mufapIds: string[], retry?: boolean): Promise<{ error?: string }>;
   /** One fund's price history. */
   fundHistory?(
     mufapId: string,

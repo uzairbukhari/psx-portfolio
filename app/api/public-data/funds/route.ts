@@ -31,8 +31,9 @@ export async function POST(req: Request) {
     await identity(req, true);
     const body = (await req.json().catch(() => null)) as {
       mufapIds?: unknown;
+      retry?: unknown;
     } | null;
-    return Response.json(await trackFunds(db(), body?.mufapIds), {
+    return Response.json(await trackFunds(db(), body?.mufapIds, body?.retry === true), {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (e) {

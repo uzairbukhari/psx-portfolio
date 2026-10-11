@@ -17,6 +17,7 @@ type FundDb = {
 /** Most funds one signed-in request may add, and the most the shared list may ever hold. */
 const MAX_PER_REQUEST = 50;
 const MAX_TRACKED = 3000;
+const RETRY_GAP_MS = 2 * 60_000;
 
 export async function refreshFunds(db: FundDb) {
   const response = await fetch(URL_, {
@@ -85,7 +86,7 @@ export async function refreshFunds(db: FundDb) {
  * sent, never units, amounts or whose they are. A fund seen for the first time (or an empty directory) triggers one
  * fetch straight away, so its price does not wait for the night run.
  */
-export async function trackFunds(db: FundDb, ids: unknown) {
+export async function trackFunds(db: FundDb, ids: unknown, retry = false) {
   if (!Array.isArray(ids) || ids.length > MAX_PER_REQUEST)
     throw new Error('Invalid fund list.');
   const wanted = [...new Set(ids)].filter(
@@ -114,6 +115,17 @@ export async function trackFunds(db: FundDb, ids: unknown) {
     const now = new Date().toISOString();
     await db.batch(fresh.map((id) => insert.bind(id, now)));
   }
-  if (fresh.length || !directory) await refreshFunds(db);
+  // A retry asks for a fresh fetch even when nothing is new, but not more than once every couple of minutes for everyone.
+  let wantRetry = false;
+  if (retry && !fresh.length && directory) {
+    const last =
+      (
+        await db
+          .prepare('SELECT MAX(updated_at) AS t FROM fund_catalog')
+          .all<{ t: string | null }>()
+      ).results[0]?.t ?? '';
+    wantRetry = !last || Date.now() - Date.parse(last) > RETRY_GAP_MS;
+  }
+  if (fresh.length || !directory || wantRetry) await refreshFunds(db);
   return { added: fresh.length };
 }

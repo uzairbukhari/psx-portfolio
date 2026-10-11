@@ -101,7 +101,21 @@ export function useTrackFunds(mufapIds: string[], onTracked?: () => void) {
         );
       });
   }, [key, onTracked]);
-  return { error };
+  const [retrying, setRetrying] = useState(false);
+  /** Asks the server to fetch MUFAP again now (for a held fund that still has no price), then re-reads the prices. */
+  const retry = useCallback(async () => {
+    setRetrying(true);
+    try {
+      const r = await webPublicData.trackFunds?.(key ? key.split(',') : [], true);
+      setError(r?.error ?? '');
+      if (!r?.error) onTracked?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not fetch fund prices.');
+    } finally {
+      setRetrying(false);
+    }
+  }, [key, onTracked]);
+  return { error, retry, retrying };
 }
 
 /** Pak-Qatar sub-fund unit prices, fetched once per page load and only when a plan needs them. */

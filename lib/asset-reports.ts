@@ -103,11 +103,11 @@ export function fundReport(
       value: valued[i].v.value,
     }))
     .sort((a, b) => b.invested - a.invested);
-  const values = valued.map((x) => x.v.value);
-  const costs = valued.map((x) => x.v.cost);
-  const value = values.some((v) => v === null)
-    ? null
-    : cents(values.reduce<number>((t, v) => t + (v ?? 0), 0));
+  // Funds still waiting for a price are left out of value, cost and gain until it is known.
+  const priced = valued.filter((x) => x.v.value !== null);
+  const values = priced.map((x) => x.v.value);
+  const costs = priced.map((x) => x.v.cost);
+  const value = cents(values.reduce<number>((t, v) => t + (v ?? 0), 0));
   const cost = costs.some((c) => c === null)
     ? null
     : cents(costs.reduce<number>((t, c) => t + (c ?? 0), 0));
