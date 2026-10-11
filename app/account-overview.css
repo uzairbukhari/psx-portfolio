@@ -909,3 +909,24 @@ tbody[data-open] .fund-row__chevron {
     border-top: 1px solid var(--border);
   }
 }
+
+.fund-activity .ledger-row {
+  grid-template-columns: 34px 130px minmax(0, 1fr) auto auto;
+}
+.fund-activity__actions {
+  display: flex;
+  gap: 6px;
+}
+@media (max-width: 760px) {
+  .fund-activity .ledger-row {
+    grid-template-columns: 24px auto minmax(0, 1fr) auto;
+    grid-template-areas: 'd type . amt' '. det det det' '. act act act';
+  }
+  .fund-activity .ledger-main {
+    display: block;
+    grid-area: det;
+  }
+  .fund-activity__actions {
+    grid-area: act;
+  }
+}

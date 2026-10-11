@@ -96,7 +96,7 @@ import AccountOverview from './account-overview';
 import GoldSilverSection, { type OwnedMetal } from './gold-silver';
 import SavingsPlansSection, { type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
-import MutualFundsSection, { type OwnedFund } from './mutual-funds';
+import MutualFundsSection, { fundKey, type OwnedFund } from './mutual-funds';
 import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
 import CollapsiblePanel from './collapsible-panel';
 import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
@@ -3403,6 +3403,19 @@ function DashboardContent({
           <TabsContent value="fund">
             <MutualFundsSection
               focusKey={fundFocus}
+              onSwitchPortfolio={(key) => {
+                const owner = ownedFunds.find((o) => fundKey(o) === key) as
+                  | (OwnedFund & { portfolioId?: string })
+                  | undefined;
+                if (!owner?.portfolioId) return;
+                workspace?.choose(owner.portfolioId);
+                setFundFocus(owner.asset.id);
+                window.history.replaceState(
+                  null,
+                  '',
+                  '/funds/' + encodeURIComponent(owner.asset.id),
+                );
+              }}
               onBack={() => setTab('holdings')}
               owned={ownedFunds}
               catalog={fundData.funds}

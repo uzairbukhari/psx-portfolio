@@ -36,7 +36,6 @@ import {
 import { money, moneyShort, today } from '@/lib/portfolio';
 import { useFundHistory } from './use-fund-data';
 import { webPublicData } from './vault-transport';
-import AssetHistory, { type HistoryRow } from './asset-history';
 import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedFund = { asset: FundAsset; portfolioName?: string };
@@ -110,6 +109,7 @@ export default function MutualFundsSection({
   focusKey,
   onOpenFund,
   onBack,
+  onSwitchPortfolio,
   onChange,
 }: {
   owned: OwnedFund[];
@@ -124,6 +124,8 @@ export default function MutualFundsSection({
   focusKey?: string;
   onOpenFund?: (key: string) => void;
   onBack?: () => void;
+  /** On the All view a fund can only be edited inside its own portfolio; this switches to it. */
+  onSwitchPortfolio?: (key: string) => void;
   onChange: (funds: FundAsset[], message: string) => Promise<void>;
 }) {
   const asOf = today();
@@ -253,6 +255,13 @@ export default function MutualFundsSection({
                 : 'No price yet'}
             </small>
           </div>
+          {!canEdit && row.portfolioName && onSwitchPortfolio && (
+            <div className="company-actions">
+              <button onClick={() => onSwitchPortfolio(focusKey)}>
+                Open in {row.portfolioName} to record transactions
+              </button>
+            </div>
+          )}
           {canEdit && (
             <div className="company-actions">
               <button
@@ -387,78 +396,6 @@ export default function MutualFundsSection({
                 </button>
               </span>
             ))}
-          </div>
-        )}
-        {canEdit && (
-          <div className="row">
-            <button
-              type="button"
-              className="compact"
-              disabled={busy}
-              onClick={() => setMode({ kind: 'buy', fundId: asset.id })}
-            >
-              Buy
-            </button>
-            <button
-              type="button"
-              className="secondary compact"
-              disabled={busy}
-              onClick={() =>
-                setMode({
-                  kind: 'redeem',
-                  fundId: asset.id,
-                })
-              }
-            >
-              Redeem
-            </button>
-            <button
-              type="button"
-              className="secondary compact"
-              disabled={busy}
-              onClick={() =>
-                setMode({
-                  kind: 'dividend',
-                  fundId: asset.id,
-                })
-              }
-            >
-              Dividend
-            </button>
-            <button
-              type="button"
-              className="secondary compact"
-              disabled={busy}
-              onClick={() =>
-                setMode({
-                  kind: 'reinvest',
-                  fundId: asset.id,
-                })
-              }
-            >
-              Reinvested
-            </button>
-            <button
-              type="button"
-              className="secondary compact"
-              disabled={busy}
-              onClick={() =>
-                setMode({
-                  kind: 'monthly',
-                  fundId: asset.id,
-                })
-              }
-            >
-              Monthly purchase
-            </button>
-            <button
-              type="button"
-              className="secondary compact"
-              disabled={busy}
-              onClick={() => setMode({ kind: 'price', fundId: asset.id })}
-            >
-              Enter a price
-            </button>
           </div>
         )}
         {asset.rules
@@ -664,6 +601,16 @@ export default function MutualFundsSection({
   );
 }
 
+const monthHeading = (date: string) =>
+  new Date(`${date.slice(0, 7)}-15T12:00:00Z`)
+    .toLocaleDateString('en-GB', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })
+    .toUpperCase();
+
+/** The fund page's price chart and activity, laid out like the company page: a chart panel, then entries by month. */
 function FundHistory({
   asset,
   v,
@@ -679,110 +626,195 @@ function FundHistory({
   onToggle: (entryId: string) => void;
   onEdit: (kind: FundEntry['type'], entryId: string) => void;
 }) {
+  const [all, setAll] = useState(false);
   const history = useFundHistory(asset.mufapId, true);
-  const data = history.navs.map((n) => ({
-    date: n.date,
-    nav: n.repurchase > 0 ? n.repurchase : n.nav,
-  }));
-  const rows: HistoryRow[] = [...asset.entries]
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-    .map((e) => {
-      const h = v.history.find((x) => x.id === e.id);
-      const inflow = e.type === 'redeem' || e.type === 'dividend';
-      return {
-        id: e.id,
-        date: dateText(e.date),
-        tag:
-          e.type === 'redeem'
-            ? 'sell'
-            : e.type === 'dividend' || e.type === 'reinvest'
-              ? 'income'
-              : e.type === 'buy'
-                ? 'buy'
-                : 'neutral',
-        tagLabel: TYPE_LABEL[e.type],
-        title:
-          e.units === undefined ? 'Cash payout' : `${units(e.units)} units`,
-        note: e.load
-          ? `Load ${money(e.load)} · ${money((e.amount ?? 0) - e.load)} invested`
-          : e.taxWithheld
-            ? `Tax withheld ${money(e.taxWithheld)}`
-            : e.note || undefined,
-        amount:
-          e.amount === null
-            ? 'Cost unknown'
-            : e.type === 'reinvest'
-              ? money(e.amount)
-              : `${inflow ? '+' : '−'}${money(e.amount)}`,
-        amountTone: inflow ? 'pos-text' : '',
-        meta: [
-          h ? `Holding ${units(h.heldAfter)} units` : '',
-          h?.realizedGain != null ? `Gain ${signed(h.realizedGain)}` : '',
-        ].filter(Boolean),
-        voided: !!e.voided,
-        action: canEdit
-          ? {
-              label: e.voided ? 'Restore' : 'Void',
-              disabled: busy,
-              onClick: () => onToggle(e.id),
-            }
-          : undefined,
-        edit: canEdit
-          ? { disabled: busy, onClick: () => onEdit(e.type, e.id) }
-          : undefined,
-      } satisfies HistoryRow;
-    });
+  // MUFAP's stored prices, plus what you paid per unit and the latest price, so the chart has a line
+  // even while the daily history is still short.
+  const byDate = new Map<string, number>();
+  for (const e of asset.entries)
+    if (!e.voided && e.units && e.amount && e.type !== 'redeem')
+      byDate.set(e.date, e.amount / e.units);
+  for (const n of history.navs) {
+    const price = n.repurchase > 0 ? n.repurchase : n.nav;
+    if (price > 0) byDate.set(n.date, price);
+  }
+  if (v.price) byDate.set(v.price.date, v.price.nav);
+  const data = [...byDate]
+    .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
+    .map(([date, nav]) => ({ date, nav }));
+  const sparse = history.navs.length < 2;
+  const entries = [...asset.entries].sort((x, y) =>
+    x.date < y.date ? 1 : x.date > y.date ? -1 : 0,
+  );
+  const shown = all ? entries : entries.slice(0, 5);
+  const months: { month: string; items: FundEntry[] }[] = [];
+  for (const e of shown) {
+    const month = e.date.slice(0, 7);
+    const last = months.at(-1);
+    if (last?.month === month) last.items.push(e);
+    else months.push({ month, items: [e] });
+  }
+  const lo = data.length ? Math.min(...data.map((d) => d.nav)) : 0;
+  const hi = data.length ? Math.max(...data.map((d) => d.nav)) : 0;
+  const pad = (hi - lo) * 0.08 || hi * 0.02;
   return (
-    <AssetHistory rows={rows} alwaysOpen limit={5} summary="">
-      {data.length > 1 ? (
-        <ChartContainer
-          config={{
-            nav: { label: 'Redemption price', color: 'var(--primary)' },
-          }}
-          className="overview-income"
-        >
-          <LineChart
-            data={data}
-            margin={{ top: 8, right: 8, bottom: 0, left: 8 }}
+    <>
+      <section className="panel">
+        <div className="company-chart-head">
+          <div>
+            <h3>Price per unit</h3>
+            <small className="muted">
+              {sparse
+                ? 'Built from your purchase prices and the latest MUFAP price. MUFAP history fills in daily.'
+                : 'MUFAP redemption price'}
+            </small>
+          </div>
+        </div>
+        {data.length > 1 ? (
+          <ChartContainer
+            config={{
+              nav: { label: 'Price per unit', color: 'var(--primary)' },
+            }}
+            className="company-chart"
           >
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              minTickGap={32}
-              fontSize={11}
-            />
-            <YAxis
-              domain={['auto', 'auto']}
-              width={52}
-              tickLine={false}
-              axisLine={false}
-              fontSize={11}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  formatter={(value) => <b>{Number(value).toFixed(4)}</b>}
-                />
-              }
-            />
-            <Line
-              dataKey="nav"
-              type="monotone"
-              stroke="var(--primary)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ChartContainer>
-      ) : (
-        <p className="report-source">
-          {history.error ||
-            'The price chart builds up day by day from when this feature started; there is nothing older to show yet.'}
-        </p>
-      )}
-    </AssetHistory>
+            <LineChart
+              data={data}
+              margin={{ top: 10, right: 12, bottom: 4, left: 8 }}
+            >
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                minTickGap={40}
+                fontSize={11}
+                tickFormatter={(d: string) => dateText(d)}
+              />
+              <YAxis
+                domain={[lo - pad, hi + pad]}
+                width={56}
+                tickLine={false}
+                axisLine={false}
+                fontSize={11}
+                tickFormatter={(n: number) => n.toFixed(2)}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={(d) => dateText(String(d))}
+                    formatter={(value) => <b>{Number(value).toFixed(4)}</b>}
+                  />
+                }
+              />
+              <Line
+                dataKey="nav"
+                type="monotone"
+                stroke="var(--primary)"
+                strokeWidth={2}
+                dot={data.length < 12}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ChartContainer>
+        ) : (
+          <p className="muted">
+            {history.error ||
+              'There is no price history for this fund yet. It builds up day by day.'}
+          </p>
+        )}
+      </section>
+      <section className="company-section fund-activity">
+        <h2>Activity</h2>
+        {entries.length === 0 ? (
+          <p className="muted">No transactions recorded for this fund yet.</p>
+        ) : (
+          months.map(({ month, items }) => (
+            <div className="ledger-month" key={month}>
+              <h4>
+                <div>{monthHeading(month)}</div>
+              </h4>
+              {items.map((e) => {
+                const h = v.history.find((x) => x.id === e.id);
+                const inflow = e.type === 'redeem' || e.type === 'dividend';
+                const tag =
+                  e.type === 'redeem'
+                    ? 'sell'
+                    : e.type === 'dividend' || e.type === 'reinvest'
+                      ? 'dividend'
+                      : e.type === 'buy'
+                        ? 'buy'
+                        : 'opening';
+                const detail = [
+                  e.units === undefined
+                    ? 'Cash payout'
+                    : e.amount && e.units
+                      ? `${units(e.units)} units @ ${money(e.amount / e.units)}`
+                      : `${units(e.units)} units`,
+                  e.load ? `load ${money(e.load)}` : '',
+                  e.taxWithheld ? `tax ${money(e.taxWithheld)}` : '',
+                  h ? `holding ${units(h.heldAfter)}` : '',
+                  h?.realizedGain != null
+                    ? `gain ${signed(h.realizedGain)}`
+                    : '',
+                  e.note,
+                  e.voided ? 'voided' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
+                return (
+                  <div
+                    className="ledger-row"
+                    key={e.id}
+                    style={e.voided ? { opacity: 0.55 } : undefined}
+                  >
+                    <span className="ledger-date">{e.date.slice(8)}</span>
+                    <span className={`ledger-type type-${tag}`}>
+                      {TYPE_LABEL[e.type]}
+                    </span>
+                    <div className="ledger-main">
+                      <small>{detail}</small>
+                    </div>
+                    <span className="ledger-amount">
+                      {e.amount === null
+                        ? 'Cost unknown'
+                        : `${inflow ? '+' : ''}${money(e.amount)}`}
+                    </span>
+                    {canEdit && (
+                      <span className="fund-activity__actions">
+                        <button
+                          type="button"
+                          className="secondary compact"
+                          disabled={busy}
+                          onClick={() => onEdit(e.type, e.id)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary compact"
+                          disabled={busy}
+                          onClick={() => onToggle(e.id)}
+                        >
+                          {e.voided ? 'Restore' : 'Void'}
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
+        {entries.length > 5 && (
+          <button
+            type="button"
+            className="link-button ledger-older"
+            onClick={() => setAll(!all)}
+          >
+            {all ? 'Show fewer' : `Show ${entries.length - 5} older`}
+          </button>
+        )}
+      </section>
+    </>
   );
 }
 
