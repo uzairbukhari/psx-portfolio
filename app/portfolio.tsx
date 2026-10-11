@@ -215,6 +215,16 @@ const PATH_TABS: Record<string, string> = Object.fromEntries([
   ['/history', 'history'],
 ]);
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
+const FUND_PATH = new RegExp('^/funds/([^/]+)/?$');
+function fundFromPathname(pathname: string): string {
+  const match = FUND_PATH.exec(pathname);
+  if (!match) return '';
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return '';
+  }
+}
 function subscribeWide(onChange: () => void) {
   const query = window.matchMedia('(min-width: 1100px)');
   query.addEventListener('change', onChange);
@@ -233,7 +243,9 @@ function allowTab(tab: string, isAdmin: boolean): string {
 function tabFromPathname(pathname: string): string {
   return companyFromPathname(pathname)
     ? 'company'
-    : (PATH_TABS[pathname] ?? 'holdings');
+    : fundFromPathname(pathname)
+      ? 'fund'
+      : (PATH_TABS[pathname] ?? 'holdings');
 }
 type ApiResponse = {
   error?: string;
@@ -759,6 +771,9 @@ function DashboardContent({
   const [companyTicker, setCompanyTicker] = useState(() =>
     companyFromPathname(initialPathname),
   );
+  const [fundFocus, setFundFocus] = useState(() =>
+    fundFromPathname(initialPathname),
+  );
   function setTab(requested: string) {
     const next = allowTab(requested, isAdmin);
     setTabState(next);
@@ -771,6 +786,7 @@ function DashboardContent({
     function onPopState() {
       setTabState(allowTab(tabFromPathname(window.location.pathname), isAdmin));
       setCompanyTicker(companyFromPathname(window.location.pathname));
+      setFundFocus(fundFromPathname(window.location.pathname));
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -1997,7 +2013,10 @@ function DashboardContent({
   const notifications = allNotifications.filter((n) => !n.clearedAt);
   const unreadCount = notifications.filter((n) => !n.read).length;
   const chromeless =
-    tab === 'settings' || tab === 'company' || tab === 'notifications';
+    tab === 'settings' ||
+    tab === 'company' ||
+    tab === 'fund' ||
+    tab === 'notifications';
   // A portfolio with nothing in it shows only its start screen: no tabs to open.
   const hideTabs = chromeless || (p.companies.length === 0 && !hasAssets);
   const taxedDividends = taxSummary(p).dividends;
@@ -2046,6 +2065,14 @@ function DashboardContent({
     setCompanyTicker(ticker);
     const path = '/company/' + encodeURIComponent(ticker);
     setTabState('company');
+    if (window.location.pathname !== path)
+      window.history.pushState(null, '', path);
+    window.scrollTo({ top: 0 });
+  }
+  function openFund(key: string) {
+    setFundFocus(key);
+    const path = '/funds/' + encodeURIComponent(key);
+    setTabState('fund');
     if (window.location.pathname !== path)
       window.history.pushState(null, '', path);
     window.scrollTo({ top: 0 });
@@ -3285,6 +3312,7 @@ function DashboardContent({
                   message,
                 )
               }
+              onOpenFund={openFund}
             />
           </TabsContent>
           <TabsContent value="reports">
@@ -3370,6 +3398,30 @@ function DashboardContent({
               portfolio={p}
               entries={ledgerEntries(undefined)}
               onOpenCompany={openCompany}
+            />
+          </TabsContent>
+          <TabsContent value="fund">
+            <MutualFundsSection
+              focusKey={fundFocus}
+              onBack={() => setTab('holdings')}
+              owned={ownedFunds}
+              catalog={fundData.funds}
+              navs={fundData.navs}
+              catalogError={fundData.error || tracking.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(funds, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'fund'),
+                      ...funds,
+                    ],
+                  },
+                  message,
+                )
+              }
             />
           </TabsContent>
           <TabsContent value="company">

@@ -34,6 +34,8 @@ export default function AssetHistory({
   rows,
   summary,
   onOpenChange,
+  alwaysOpen = false,
+  limit = FIRST,
   children,
 }: {
   rows: HistoryRow[];
@@ -41,32 +43,38 @@ export default function AssetHistory({
   summary: string;
   /** Lets the owner load extra data (a chart) only once the history is opened. */
   onOpenChange?: (open: boolean) => void;
+  /** Skips the show/hide toggle: the record is always listed. */
+  alwaysOpen?: boolean;
+  /** How many of the newest records show before "Show older". */
+  limit?: number;
   /** Extra content shown above the list when open (a price chart). */
   children?: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(alwaysOpen);
   const [all, setAll] = useState(false);
-  const shown = all ? rows : rows.slice(0, FIRST);
+  const shown = all ? rows : rows.slice(0, limit);
   return (
     <div className="asset-history">
-      <button
-        type="button"
-        className="asset-history__toggle"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-          onOpenChange?.(!open);
-        }}
-      >
-        <ChevronDown
-          size={16}
-          aria-hidden="true"
-          className="asset-history__chevron"
-          data-open={open || undefined}
-        />
-        <span>{open ? 'Hide history' : 'Show history'}</span>
-        <small>{summary}</small>
-      </button>
+      {!alwaysOpen && (
+        <button
+          type="button"
+          className="asset-history__toggle"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen(!open);
+            onOpenChange?.(!open);
+          }}
+        >
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className="asset-history__chevron"
+            data-open={open || undefined}
+          />
+          <span>{open ? 'Hide history' : 'Show history'}</span>
+          <small>{summary}</small>
+        </button>
+      )}
       {open && (
         <div className="asset-history__body">
           {children}
@@ -120,13 +128,13 @@ export default function AssetHistory({
               </li>
             ))}
           </ol>
-          {rows.length > FIRST && (
+          {rows.length > limit && (
             <button
               type="button"
               className="link-button asset-history__more"
               onClick={() => setAll(!all)}
             >
-              {all ? 'Show fewer' : `Show ${rows.length - FIRST} older`}
+              {all ? 'Show fewer' : `Show ${rows.length - limit} older`}
             </button>
           )}
         </div>

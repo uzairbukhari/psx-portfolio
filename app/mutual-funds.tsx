@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, XAxis, YAxis } from 'recharts';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ChartContainer,
   ChartTooltip,
@@ -34,6 +40,9 @@ import AssetHistory, { type HistoryRow } from './asset-history';
 import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedFund = { asset: FundAsset; portfolioName?: string };
+/** Identifies one fund on its own page (the same fund can sit in several portfolios on the All view). */
+export const fundKey = (o: OwnedFund) =>
+  `${o.asset.id}${o.portfolioName ? `@${o.portfolioName}` : ''}`;
 type Catalog = FundCatalogResponse['funds'];
 type Mode =
   | { kind: 'add' }
@@ -57,6 +66,8 @@ type Mode =
       };
     };
 
+const ENTRY_HISTORY_LENGTH =
+  typeof window === 'undefined' ? 0 : window.history.length;
 const tone = (n: number | null) =>
   n === null ? '' : n >= 0 ? 'pos-text' : 'neg-text';
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
@@ -96,6 +107,9 @@ export default function MutualFundsSection({
   canEdit,
   busy,
   addRequest = 0,
+  focusKey,
+  onOpenFund,
+  onBack,
   onChange,
 }: {
   owned: OwnedFund[];
@@ -106,6 +120,10 @@ export default function MutualFundsSection({
   busy: boolean;
   /** Bumped by the page's + menu to open the add dialog. */
   addRequest?: number;
+  /** Shows that one fund's page instead of the provider tables. */
+  focusKey?: string;
+  onOpenFund?: (key: string) => void;
+  onBack?: () => void;
   onChange: (funds: FundAsset[], message: string) => Promise<void>;
 }) {
   const asOf = today();
@@ -128,7 +146,6 @@ export default function MutualFundsSection({
     setSeenRequest(addRequest);
     if (addRequest > 0 && canEdit) setMode({ kind: 'add' });
   }
-  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
   const groups = useMemo(() => {
     const by = new Map<string, typeof rows>();
     for (const r of rows) {
@@ -191,6 +208,314 @@ export default function MutualFundsSection({
       }}
     />
   ) : null;
+  if (focusKey !== undefined) {
+    const row = rows.find((r) => fundKey(r) === focusKey);
+    const back = (
+      <button
+        type="button"
+        data-slot="link"
+        className="back-link company-back"
+        onClick={() => {
+          if (window.history.length > ENTRY_HISTORY_LENGTH)
+            window.history.back();
+          else onBack?.();
+        }}
+      >
+        <ArrowLeft size={15} /> Back
+      </button>
+    );
+    if (!row)
+      return (
+        <div className="company-page">
+          {back}
+          <p className="muted">This fund is not in your portfolio.</p>
+          {dialog}
+        </div>
+      );
+    const { asset, v, due } = row;
+    return (
+      <div className="company-page">
+        {back}
+        <div className="company-head">
+          <div>
+            <p className="eyebrow">{asset.category.toUpperCase()}</p>
+            <h1>{asset.fundName || asset.name}</h1>
+            <p>
+              {asset.amc}
+              {row.portfolioName ? ` · ${row.portfolioName}` : ''}
+            </p>
+          </div>
+          <div className="company-price">
+            <strong>{v.price ? v.price.nav.toFixed(4) : '—'}</strong>
+            <small>
+              {v.price
+                ? `${v.price.source === 'mufap' ? 'Redemption price' : 'Price you entered'} · ${dateText(v.price.date)}${v.price.stale ? ' · STALE' : ''}`
+                : 'No price yet'}
+            </small>
+          </div>
+          {canEdit && (
+            <div className="company-actions">
+              <button
+                disabled={busy}
+                onClick={() => setMode({ kind: 'buy', fundId: asset.id })}
+              >
+                <Plus size={16} /> Buy
+              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="secondary company-more"
+                  aria-label="More actions"
+                >
+                  <MoreHorizontal size={18} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(
+                    [
+                      ['redeem', 'Redeem'],
+                      ['dividend', 'Dividend'],
+                      ['reinvest', 'Dividend reinvested'],
+                      ['monthly', 'Monthly purchase'],
+                      ['price', 'Enter a price'],
+                    ] as const
+                  ).map(([kind, label]) => (
+                    <DropdownMenuItem
+                      key={kind}
+                      disabled={busy}
+                      onClick={() => setMode({ kind, fundId: asset.id })}
+                    >
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
+        {catalogError && (
+          <p className="notice">Could not load fund prices: {catalogError}</p>
+        )}
+        {error && <p className="notice error">{error}</p>}
+        <div className="company-cards">
+          <article>
+            <span>Units held</span>
+            <strong>{units(v.units)}</strong>
+            <small>
+              Avg. cost{' '}
+              {v.averageNav === null
+                ? '—'
+                : `${v.averageNav.toFixed(4)} / unit`}
+            </small>
+          </article>
+          <article>
+            <span>Market value</span>
+            <strong>{v.value === null ? '—' : money(v.value)}</strong>
+            <small>Cost {v.cost === null ? '—' : money(v.cost)}</small>
+          </article>
+          <article>
+            <span>Gain / loss</span>
+            <strong className={tone(v.gain)}>
+              {v.gain === null ? '—' : signed(v.gain)}
+            </strong>
+            <small>
+              {v.gain === null
+                ? v.cost === null
+                  ? 'Cost not known'
+                  : 'Needs a price'
+                : 'Unrealised'}
+            </small>
+          </article>
+          <article>
+            <span>Realised / dividends</span>
+            <strong className={tone(v.realized)}>
+              {v.realized === null ? '—' : signed(v.realized)}
+            </strong>
+            <small>
+              {moneyShort(v.dividends)} in dividends · bought{' '}
+              {moneyShort(v.bought.amount)} · redeemed{' '}
+              {moneyShort(v.redeemed.amount)}
+            </small>
+          </article>
+        </div>
+        {due.length > 0 && canEdit && (
+          <div className="notice">
+            <b>Due:</b>
+            {due.map((d) => (
+              <span key={`${d.ruleId}-${d.month}`} className="row">
+                {monthText(d.month)} · {money(d.amount)}
+                <button
+                  type="button"
+                  className="compact"
+                  disabled={busy}
+                  onClick={() =>
+                    setMode({
+                      kind: 'buy',
+                      fundId: asset.id,
+                      prefill: {
+                        date: d.date,
+                        amount: d.amount,
+                        recurringId: d.ruleId,
+                        month: d.month,
+                      },
+                    })
+                  }
+                >
+                  Record purchase
+                </button>
+                <button
+                  type="button"
+                  className="secondary compact"
+                  disabled={busy}
+                  onClick={() =>
+                    void update(
+                      asset.id,
+                      (f) => ({
+                        ...f,
+                        rules: f.rules.map((r) =>
+                          r.id === d.ruleId
+                            ? {
+                                ...r,
+                                skipped: [...r.skipped, d.month],
+                              }
+                            : r,
+                        ),
+                      }),
+                      'Month skipped.',
+                    )
+                  }
+                >
+                  Skip
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {canEdit && (
+          <div className="row">
+            <button
+              type="button"
+              className="compact"
+              disabled={busy}
+              onClick={() => setMode({ kind: 'buy', fundId: asset.id })}
+            >
+              Buy
+            </button>
+            <button
+              type="button"
+              className="secondary compact"
+              disabled={busy}
+              onClick={() =>
+                setMode({
+                  kind: 'redeem',
+                  fundId: asset.id,
+                })
+              }
+            >
+              Redeem
+            </button>
+            <button
+              type="button"
+              className="secondary compact"
+              disabled={busy}
+              onClick={() =>
+                setMode({
+                  kind: 'dividend',
+                  fundId: asset.id,
+                })
+              }
+            >
+              Dividend
+            </button>
+            <button
+              type="button"
+              className="secondary compact"
+              disabled={busy}
+              onClick={() =>
+                setMode({
+                  kind: 'reinvest',
+                  fundId: asset.id,
+                })
+              }
+            >
+              Reinvested
+            </button>
+            <button
+              type="button"
+              className="secondary compact"
+              disabled={busy}
+              onClick={() =>
+                setMode({
+                  kind: 'monthly',
+                  fundId: asset.id,
+                })
+              }
+            >
+              Monthly purchase
+            </button>
+            <button
+              type="button"
+              className="secondary compact"
+              disabled={busy}
+              onClick={() => setMode({ kind: 'price', fundId: asset.id })}
+            >
+              Enter a price
+            </button>
+          </div>
+        )}
+        {asset.rules
+          .filter((r) => !r.stopped)
+          .map((r) => (
+            <p key={r.id} className="report-source">
+              Monthly purchase: {money(r.amount)} on day {r.dayOfMonth} from{' '}
+              {monthText(r.from)}
+              {canEdit && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() =>
+                      void update(
+                        asset.id,
+                        (f) => ({
+                          ...f,
+                          rules: f.rules.map((x) =>
+                            x.id === r.id ? { ...x, stopped: true } : x,
+                          ),
+                        }),
+                        'Monthly purchase stopped.',
+                      )
+                    }
+                  >
+                    Stop
+                  </button>
+                </>
+              )}
+            </p>
+          ))}
+        <FundHistory
+          asset={asset}
+          v={v}
+          canEdit={canEdit}
+          busy={busy}
+          onEdit={(kind, editId) => setMode({ kind, fundId: asset.id, editId })}
+          onToggle={(entryId) =>
+            void update(
+              asset.id,
+              (f) => ({
+                ...f,
+                entries: f.entries.map((e) =>
+                  e.id === entryId ? { ...e, voided: !e.voided } : e,
+                ),
+              }),
+              'Entry updated.',
+            )
+          }
+        />
+
+        {dialog}
+      </div>
+    );
+  }
   // A class you never used is not shown; one you have sold out stays, for its history.
   if (rows.length === 0) return dialog;
 
@@ -266,30 +591,16 @@ export default function MutualFundsSection({
                   </tr>
                 </thead>
                 {g.rows.map(({ asset, v, due, portfolioName }) => {
-                  const key = `${asset.id}-${portfolioName ?? ''}`;
-                  const isOpen = openKeys.has(key);
+                  const key = fundKey({ asset, portfolioName });
                   return (
-                    <tbody key={key} data-open={isOpen || undefined}>
+                    <tbody key={key}>
                       <tr className="fund-row">
                         <td data-label="Fund" className="fund-row__name">
                           <button
                             type="button"
                             className="fund-row__toggle"
-                            aria-expanded={isOpen}
-                            onClick={() =>
-                              setOpenKeys((s) => {
-                                const next = new Set(s);
-                                if (next.has(key)) next.delete(key);
-                                else next.add(key);
-                                return next;
-                              })
-                            }
+                            onClick={() => onOpenFund?.(key)}
                           >
-                            <ChevronDown
-                              size={16}
-                              aria-hidden="true"
-                              className="fund-row__chevron"
-                            />
                             <span>
                               <b>{asset.fundName || asset.name}</b>
                               <small>
@@ -340,210 +651,6 @@ export default function MutualFundsSection({
                           <small>{moneyShort(v.dividends)} in dividends</small>
                         </td>
                       </tr>
-                      {isOpen && (
-                        <tr className="fund-detail">
-                          <td colSpan={7}>
-                            <p className="report-source">
-                              Bought {moneyShort(v.bought.amount)} · redeemed{' '}
-                              {moneyShort(v.redeemed.amount)}
-                              {v.price
-                                ? ` · priced at ${v.price.nav.toFixed(4)} per unit (${v.price.source === 'mufap' ? 'MUFAP redemption price' : 'price you entered'})`
-                                : ' · No price available yet, so the value is not shown. You can enter one.'}
-                            </p>
-                            {due.length > 0 && canEdit && (
-                              <div className="notice">
-                                <b>Due:</b>
-                                {due.map((d) => (
-                                  <span
-                                    key={`${d.ruleId}-${d.month}`}
-                                    className="row"
-                                  >
-                                    {monthText(d.month)} · {money(d.amount)}
-                                    <button
-                                      type="button"
-                                      className="compact"
-                                      disabled={busy}
-                                      onClick={() =>
-                                        setMode({
-                                          kind: 'buy',
-                                          fundId: asset.id,
-                                          prefill: {
-                                            date: d.date,
-                                            amount: d.amount,
-                                            recurringId: d.ruleId,
-                                            month: d.month,
-                                          },
-                                        })
-                                      }
-                                    >
-                                      Record purchase
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="secondary compact"
-                                      disabled={busy}
-                                      onClick={() =>
-                                        void update(
-                                          asset.id,
-                                          (f) => ({
-                                            ...f,
-                                            rules: f.rules.map((r) =>
-                                              r.id === d.ruleId
-                                                ? {
-                                                    ...r,
-                                                    skipped: [
-                                                      ...r.skipped,
-                                                      d.month,
-                                                    ],
-                                                  }
-                                                : r,
-                                            ),
-                                          }),
-                                          'Month skipped.',
-                                        )
-                                      }
-                                    >
-                                      Skip
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {canEdit && (
-                              <div className="row">
-                                <button
-                                  type="button"
-                                  className="compact"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    setMode({ kind: 'buy', fundId: asset.id })
-                                  }
-                                >
-                                  Buy
-                                </button>
-                                <button
-                                  type="button"
-                                  className="secondary compact"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    setMode({
-                                      kind: 'redeem',
-                                      fundId: asset.id,
-                                    })
-                                  }
-                                >
-                                  Redeem
-                                </button>
-                                <button
-                                  type="button"
-                                  className="secondary compact"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    setMode({
-                                      kind: 'dividend',
-                                      fundId: asset.id,
-                                    })
-                                  }
-                                >
-                                  Dividend
-                                </button>
-                                <button
-                                  type="button"
-                                  className="secondary compact"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    setMode({
-                                      kind: 'reinvest',
-                                      fundId: asset.id,
-                                    })
-                                  }
-                                >
-                                  Reinvested
-                                </button>
-                                <button
-                                  type="button"
-                                  className="secondary compact"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    setMode({
-                                      kind: 'monthly',
-                                      fundId: asset.id,
-                                    })
-                                  }
-                                >
-                                  Monthly purchase
-                                </button>
-                                <button
-                                  type="button"
-                                  className="secondary compact"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    setMode({ kind: 'price', fundId: asset.id })
-                                  }
-                                >
-                                  Enter a price
-                                </button>
-                              </div>
-                            )}
-                            {asset.rules
-                              .filter((r) => !r.stopped)
-                              .map((r) => (
-                                <p key={r.id} className="report-source">
-                                  Monthly purchase: {money(r.amount)} on day{' '}
-                                  {r.dayOfMonth} from {monthText(r.from)}
-                                  {canEdit && (
-                                    <>
-                                      {' · '}
-                                      <button
-                                        type="button"
-                                        className="link-button"
-                                        onClick={() =>
-                                          void update(
-                                            asset.id,
-                                            (f) => ({
-                                              ...f,
-                                              rules: f.rules.map((x) =>
-                                                x.id === r.id
-                                                  ? { ...x, stopped: true }
-                                                  : x,
-                                              ),
-                                            }),
-                                            'Monthly purchase stopped.',
-                                          )
-                                        }
-                                      >
-                                        Stop
-                                      </button>
-                                    </>
-                                  )}
-                                </p>
-                              ))}
-                            <FundHistory
-                              asset={asset}
-                              v={v}
-                              canEdit={canEdit}
-                              busy={busy}
-                              onEdit={(kind, editId) =>
-                                setMode({ kind, fundId: asset.id, editId })
-                              }
-                              onToggle={(entryId) =>
-                                void update(
-                                  asset.id,
-                                  (f) => ({
-                                    ...f,
-                                    entries: f.entries.map((e) =>
-                                      e.id === entryId
-                                        ? { ...e, voided: !e.voided }
-                                        : e,
-                                    ),
-                                  }),
-                                  'Entry updated.',
-                                )
-                              }
-                            />
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   );
                 })}
@@ -572,8 +679,7 @@ function FundHistory({
   onToggle: (entryId: string) => void;
   onEdit: (kind: FundEntry['type'], entryId: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const history = useFundHistory(asset.mufapId, open);
+  const history = useFundHistory(asset.mufapId, true);
   const data = history.navs.map((n) => ({
     date: n.date,
     nav: n.repurchase > 0 ? n.repurchase : n.nav,
@@ -627,11 +733,7 @@ function FundHistory({
       } satisfies HistoryRow;
     });
   return (
-    <AssetHistory
-      rows={rows}
-      onOpenChange={setOpen}
-      summary={`${v.history.length} ${v.history.length === 1 ? 'entry' : 'entries'} and price chart`}
-    >
+    <AssetHistory rows={rows} alwaysOpen limit={5} summary="">
       {data.length > 1 ? (
         <ChartContainer
           config={{
