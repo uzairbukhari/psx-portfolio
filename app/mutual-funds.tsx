@@ -34,6 +34,7 @@ import {
   type FundNavRow,
 } from '@/lib/mufap';
 import { money, moneyShort, today } from '@/lib/portfolio';
+import FundMatchDialog from './fund-match-dialog';
 import { useFundHistory } from './use-fund-data';
 import { webPublicData } from './vault-transport';
 import CollapsiblePanel from './collapsible-panel';
@@ -45,6 +46,7 @@ export const fundKey = (o: OwnedFund) =>
 type Catalog = FundCatalogResponse['funds'];
 type Mode =
   | { kind: 'add' }
+  | { kind: 'match'; fundId: string }
   | {
       kind:
         | 'buy'
@@ -215,7 +217,23 @@ export default function MutualFundsSection({
     );
   }
 
-  const dialog = mode ? (
+  const matchTarget =
+    mode?.kind === 'match' ? funds.find((f) => f.id === mode.fundId) : undefined;
+  const dialog = matchTarget ? (
+    <FundMatchDialog
+      fund={matchTarget}
+      navs={navs}
+      busy={busy}
+      onClose={() => setMode(null)}
+      onSave={async (next, message) => {
+        await onChange(
+          funds.map((f) => (f.id === next.id ? next : f)),
+          message,
+        );
+        setMode(null);
+      }}
+    />
+  ) : mode && mode.kind !== 'match' ? (
     <FundDialog
       mode={mode}
       funds={funds}
@@ -314,6 +332,12 @@ export default function MutualFundsSection({
                       {label}
                     </DropdownMenuItem>
                   ))}
+                  <DropdownMenuItem
+                    disabled={busy}
+                    onClick={() => setMode({ kind: 'match', fundId: asset.id })}
+                  >
+                    Match my statement
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -847,7 +871,7 @@ function FundDialog({
   onClose,
   onSave,
 }: {
-  mode: Mode;
+  mode: Exclude<Mode, { kind: 'match' }>;
   funds: FundAsset[];
   catalog: Catalog;
   navs: FundNavRow[];
