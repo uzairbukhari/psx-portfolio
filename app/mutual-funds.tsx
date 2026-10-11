@@ -103,6 +103,8 @@ export default function MutualFundsSection({
   catalog,
   navs,
   catalogError,
+  onRetryPrice,
+  retrying = false,
   canEdit,
   busy,
   addRequest = 0,
@@ -116,6 +118,9 @@ export default function MutualFundsSection({
   catalog: Catalog;
   navs: FundNavRow[];
   catalogError: string;
+  /** Fetches the fund prices again; shown as a button wherever a price is still needed. */
+  onRetryPrice?: () => Promise<void>;
+  retrying?: boolean;
   canEdit: boolean;
   busy: boolean;
   /** Bumped by the page's + menu to open the add dialog. */
@@ -148,6 +153,17 @@ export default function MutualFundsSection({
     setSeenRequest(addRequest);
     if (addRequest > 0 && canEdit) setMode({ kind: 'add' });
   }
+const priceButton = (
+    <button
+      type="button"
+      className="secondary compact"
+      disabled={retrying || !onRetryPrice}
+      title="Try to fetch the price again"
+      onClick={() => void onRetryPrice?.()}
+    >
+      {retrying ? 'Fetching…' : 'Price needed'}
+    </button>
+  );
   const groups = useMemo(() => {
     const by = new Map<string, typeof rows>();
     for (const r of rows) {
@@ -320,7 +336,7 @@ export default function MutualFundsSection({
           </article>
           <article>
             <span>Market value</span>
-            <strong>{v.value === null ? '—' : money(v.value)}</strong>
+            <strong>{v.value === null ? priceButton : money(v.value)}</strong>
             <small>Cost {v.cost === null ? '—' : money(v.cost)}</small>
           </article>
           <article>
@@ -572,7 +588,7 @@ export default function MutualFundsSection({
                         </td>
                         <td data-label="Value" className="amount">
                           {v.value === null
-                            ? 'Price needed'
+                            ? priceButton
                             : moneyShort(v.value)}
                         </td>
                         <td data-label="Gain / loss" className={tone(v.gain)}>

@@ -60,9 +60,10 @@ export function createPublicData(call: PublicCall): PublicData {
         '/api/public-data/plan-navs',
       );
     },
-    async trackFunds(mufapIds) {
+    async trackFunds(mufapIds, retry) {
       return await call<{ error?: string }>('/api/public-data/funds', 'POST', {
         mufapIds,
+        ...(retry ? { retry: true } : {}),
       });
     },
     fundHistory: (mufapId) =>

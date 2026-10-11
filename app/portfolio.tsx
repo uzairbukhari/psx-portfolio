@@ -3310,6 +3310,8 @@ function DashboardContent({
               catalog={fundData.funds}
               navs={fundData.navs}
               catalogError={fundData.error || tracking.error}
+              onRetryPrice={tracking.retry}
+              retrying={tracking.retrying}
               canEdit={!isAll && !locked}
               busy={busy}
               onChange={(funds, message) =>
@@ -3433,6 +3435,8 @@ function DashboardContent({
               catalog={fundData.funds}
               navs={fundData.navs}
               catalogError={fundData.error || tracking.error}
+              onRetryPrice={tracking.retry}
+              retrying={tracking.retrying}
               canEdit={!isAll && !locked}
               busy={busy}
               onChange={(funds, message) =>
