@@ -1,26 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { DISPLAY_PARTS, money, moneyShort, today } from '@shared/portfolio.ts';
-import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
+import { moneyShort, today } from '@shared/portfolio.ts';
+import { signedAmountLabel } from '@/data/a11y';
 import { soldOutPositions } from '@/data/derive';
-import { shortDate, signedMoney, signedPercent } from '@/data/format';
+import { shortDate } from '@/data/format';
 import { HOLDING_SORTS, filterBySector, holdingFlags, pricedLine, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '@/data/holdings-view';
-import { useMetalRates } from '@/data/useMetalRates';
-import { useFundNavs } from '@/data/useFundNavs';
+import { useScope } from '@/data/useScope';
 import { MutualFunds } from '@/ui/MutualFunds';
 import { usePortfolio } from '@/data/usePortfolio';
 import { Insights } from '@/screens/Insights';
 import { useTheme } from '@/theme/ThemeProvider';
-import { AccountOverview } from '@/ui/AccountOverview';
+import { AssetMix, OverviewHero, PortfolioBreakdown } from '@/ui/AccountOverview';
+import { HoldingRow } from '@/ui/HoldingRow';
 import { AppBar } from '@/ui/AppBar';
 import { GoldSilver } from '@/ui/GoldSilver';
 import { SavingsPlans } from '@/ui/SavingsPlans';
 import { Icon } from '@/ui/Icon';
-import { Amount, Avatar, Button, Chip, EmptyState, ListRow, Loading, Notice, Screen, Segmented, SectionLabel, Sheet, StatusChip, useKitStyles } from '@/ui/kit';
+import { Amount, Avatar, Button, Chip, EmptyState, ListRow, Loading, Notice, Screen, Segmented, SectionHeader, Sheet, useKitStyles } from '@/ui/kit';
 
 type Segment = 'holdings' | 'insights';
-const fmt = new Intl.NumberFormat('en-PK');
 
 export default function Portfolio() {
   const params = useLocalSearchParams<{ segment?: string }>();
@@ -48,15 +47,8 @@ export default function Portfolio() {
   const flags = useMemo(() => (p.portfolio ? holdingFlags(p.portfolio, open, now) : new Map()), [p.portfolio, open, now]);
   const total = open.reduce((a, h) => a + (h.value ?? 0), 0);
 
-  const overviewParts = p.isAll ? p.portfolio?.[DISPLAY_PARTS] : undefined;
-  const allAssets = overviewParts
-    ? overviewParts.flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolioName: part.name })))
-    : (p.portfolio?.assets ?? []).map((asset) => ({ asset, portfolioName: undefined }));
-  const ownedMetals = allAssets.flatMap((o) => (o.asset.kind === 'metal' ? [{ ...o, asset: o.asset }] : []));
-  const ownedPlans = allAssets.flatMap((o) => (o.asset.kind === 'plan' ? [{ ...o, asset: o.asset }] : []));
-  const ownedFunds = allAssets.flatMap((o) => (o.asset.kind === 'fund' ? [{ ...o, asset: o.asset }] : []));
-  const metal = useMetalRates(ownedMetals.length > 0);
-  const fundNavs = useFundNavs(ownedFunds.length > 0);
+  const scope = useScope();
+  const { metals: ownedMetals, plans: ownedPlans, funds: ownedFunds, metal, fundNavs, overview, hasAssets } = scope;
   const bar = <AppBar title="Portfolio" />;
   const switcher = <Segmented label="Portfolio view" value={segment} onChange={setSegment} options={[{ key: 'holdings', label: 'Holdings' }, { key: 'insights', label: 'Insights' }]} />;
 
@@ -103,108 +95,76 @@ export default function Portfolio() {
         <Insights />
       ) : (
         <>
-          {overviewParts && overviewParts.length > 1 ? <AccountOverview parts={overviewParts} rates={metal.rates} fundNavs={fundNavs.navs} onOpenPortfolio={(id) => p.select(id)} /> : null}
-          {overviewParts && overviewParts.length > 1 ? <SectionLabel>All companies</SectionLabel> : null}
-          {line ? (
-            <View style={styles.row} accessible accessibilityLabel={`${line}. Market value ${totals.value ? moneyShort(totals.value) : 'not available'}.`}>
-              <Text style={[styles.muted, { flexShrink: 1 }]}>{line}</Text>
-              <Text style={styles.number}>{totals.heldCount > 0 && totals.missingPrice.length === totals.heldCount ? 'Prices needed' : moneyShort(totals.value)}</Text>
-            </View>
-          ) : null}
+          {overview ? <OverviewHero o={overview} label={p.isAll ? 'Net worth · all portfolios' : `Net worth · ${p.portfolioName}`} /> : null}
+          {overview ? <AssetMix o={overview} /> : null}
+          {overview && p.isAll ? <PortfolioBreakdown o={overview} onOpenPortfolio={(id) => p.select(id)} /> : null}
 
-          <View style={[styles.row, { flexWrap: 'wrap' }]}>
-            <Button
-              label={`Sort: ${HOLDING_SORTS.find((s) => s.key === sort)?.label}${sector ? ` · ${sector}` : ''}`}
-              variant="outline"
-              icon="filter"
-              onPress={() => setSheet(true)}
-              accessibilityHint="Opens sort and sector filter"
-            />
-            {soldOut.length ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 }}>
-                <Text style={styles.text}>Include sold</Text>
-                <Switch
-                  value={showSoldOut}
-                  onValueChange={setShowSoldOut}
-                  accessibilityLabel={`Include sold out companies, ${soldOut.length} available`}
-                  trackColor={{ true: colors.primary, false: colors.line }}
-                  thumbColor={colors.surface}
+          {open.length > 0 ? (
+            <>
+              <SectionHeader title="Stocks" count={open.length} value={totals.heldCount > 0 && totals.missingPrice.length === totals.heldCount ? 'Prices needed' : moneyShort(totals.value)} />
+              {line ? <Text style={styles.muted}>{line}</Text> : null}
+              <View style={[styles.row, { flexWrap: 'wrap' }]}>
+                <Button
+                  label={`Sort: ${HOLDING_SORTS.find((s) => s.key === sort)?.label}${sector ? ` · ${sector}` : ''}`}
+                  variant="outline"
+                  icon="filter"
+                  onPress={() => setSheet(true)}
+                  accessibilityHint="Opens sort and sector filter"
                 />
+                {soldOut.length ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 }}>
+                    <Text style={styles.text}>Include sold</Text>
+                    <Switch
+                      value={showSoldOut}
+                      onValueChange={setShowSoldOut}
+                      accessibilityLabel={`Include sold out companies, ${soldOut.length} available`}
+                      trackColor={{ true: colors.primary, false: colors.line }}
+                      thumbColor={colors.surface}
+                    />
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-
-          {totals.missingPrice.length ? (
-            <Notice tone="warn" action={{ label: pricing ? 'Refreshing…' : 'Refresh prices', onPress: () => void refreshPrices() }}>
-              {totals.missingPrice.length} {totals.missingPrice.length === 1 ? 'holding needs' : 'holdings need'} a price ({totals.missingPrice.join(', ')}), so the total is incomplete.
-            </Notice>
+              {totals.missingPrice.length ? (
+                <Notice tone="warn" action={{ label: pricing ? 'Refreshing…' : 'Refresh prices', onPress: () => void refreshPrices() }}>
+                  {totals.missingPrice.length} {totals.missingPrice.length === 1 ? 'holding needs' : 'holdings need'} a price ({totals.missingPrice.join(', ')}), so the total is incomplete.
+                </Notice>
+              ) : null}
+              {priceError ? <Notice tone="error">{priceError}</Notice> : null}
+              {shown.length === 0 ? (
+                <EmptyState icon="filter" title="No holdings in that sector" body="Choose another sector in Sort and filter." />
+              ) : (
+                <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
+                  {shown.map((h, i) => (
+                    <HoldingRow
+                      key={h.ticker}
+                      h={h}
+                      flags={flags.get(h.ticker)}
+                      weight={sort === 'weight' ? weightOf(h, total) : undefined}
+                      onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}
+                      last={i === shown.length - 1}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
           ) : null}
-          {priceError ? <Notice tone="error">{priceError}</Notice> : null}
 
-          {open.length === 0 ? (
+          <MutualFunds owned={ownedFunds} navs={fundNavs.navs} navsError={fundNavs.error} />
+          <SavingsPlans owned={ownedPlans} />
+          <GoldSilver owned={ownedMetals} rates={metal.rates} ratesError={metal.error} />
+
+          {open.length === 0 && !hasAssets ? (
             <EmptyState
               icon="holdings"
-              title="No open positions yet"
-              body="Add your first trade or import your broker history from Activity."
+              title={p.isAll ? 'Nothing in your portfolios yet' : `Nothing in ${p.portfolioName} yet`}
+              body="Add your first trade to start. Funds, savings plans and gold you add on the web show up here too."
               action={<Button label="Add a trade" icon="plus" onPress={() => router.push('/transaction')} />}
             />
-          ) : shown.length === 0 ? (
-            <EmptyState icon="filter" title="No holdings in that sector" body="Choose another sector in Sort and filter." />
-          ) : (
-            <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-              {shown.map((h, i) => {
-                const flag = flags.get(h.ticker);
-                const gainPct = h.gain === null || !h.cost ? null : (h.gain / h.cost) * 100;
-                const weight = weightOf(h, total);
-                return (
-                  <ListRow
-                    key={h.ticker}
-                    left={<Avatar ticker={h.ticker} />}
-                    title={h.ticker}
-                    wrapTitle
-                    subtitle={`${h.name}\n${fmt.format(h.shares)} sh · avg ${h.average === null ? '—' : money(h.average)}${sort === 'weight' && weight !== null ? ` · ${weight.toFixed(1)}% of value` : ''}`}
-                    footer={
-                      flag?.stale || flag?.expectedDividend || h.value === null ? (
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                          {h.value === null ? <StatusChip tone="warn" text="No price" /> : flag?.stale ? <StatusChip tone="warn" text={`Stale price · ${shortDate(h.quote!.date)}`} /> : null}
-                          {flag?.expectedDividend ? <StatusChip tone="primary" text="Expected dividend" icon="inbox" /> : null}
-                        </View>
-                      ) : undefined
-                    }
-                    right={
-                      <View style={{ alignItems: 'flex-end', gap: 2, maxWidth: '44%' }}>
-                        <Text style={styles.number}>{h.value === null ? '—' : moneyShort(h.value)}</Text>
-                        {h.gain === null ? null : <Amount value={h.gain} text={`${signedMoney(h.gain)}${gainPct === null ? '' : ` (${signedPercent(gainPct)})`}`} size={13} label="Unrealised" />}
-                      </View>
-                    }
-                    accessibilityLabel={[
-                      h.ticker,
-                      h.name,
-                      `${fmt.format(h.shares)} shares`,
-                      h.average === null ? '' : `average cost ${money(h.average)}`,
-                      h.value === null ? 'no price yet' : `value ${moneyShort(h.value)}`,
-                      h.gain === null ? '' : `unrealised ${signedAmountLabel(h.gain)}${gainPct === null ? '' : `, ${signedPercentLabel(gainPct)}`}`,
-                      flag?.stale && h.quote ? `price from ${shortDate(h.quote.date)}, stale` : '',
-                      flag?.expectedDividend ? 'dividend expected' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
-                    accessibilityHint="Opens the company"
-                    onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}
-                    last={i === shown.length - 1}
-                  />
-                );
-              })}
-            </View>
-          )}
+          ) : null}
 
-          <GoldSilver owned={ownedMetals} rates={metal.rates} ratesError={metal.error} />
-          <SavingsPlans owned={ownedPlans} />
-          <MutualFunds owned={ownedFunds} navs={fundNavs.navs} navsError={fundNavs.error} />
-
-          {showSoldOut && soldOut.length ? (
+          {(showSoldOut || open.length === 0) && soldOut.length ? (
             <>
-              <SectionLabel>Sold out</SectionLabel>
+              <SectionHeader title="Sold out" count={soldOut.length} />
               <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
                 {soldOut.map((h, i) => (
                   <ListRow

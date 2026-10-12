@@ -137,6 +137,31 @@ export function SectionLabel({ children, right }: { children: ReactNode; right?:
   );
 }
 
+/** Heading of a holdings section: title and count on the left, the section's value on the right. */
+export function SectionHeader({ title, count, value, right }: { title: string; count?: number; value?: string | null; right?: ReactNode }) {
+  const styles = useKitStyles();
+  return (
+    <View style={[styles.row, { marginTop: 8 }]} accessible accessibilityRole="header" accessibilityLabel={`${title}${count !== undefined ? `, ${count}` : ''}${value ? `, ${value}` : ''}`}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 }}>
+        <Text style={styles.strong}>{title}</Text>
+        {count !== undefined ? <Text style={styles.muted}>{count}</Text> : null}
+      </View>
+      {right ?? (value ? <Text style={styles.number}>{value}</Text> : null)}
+    </View>
+  );
+}
+
+/** Small label-over-value pair for a strip of figures inside a card. */
+export function Fact({ label, value }: { label: string; value: string }) {
+  const styles = useKitStyles();
+  return (
+    <View style={{ flex: 1, gap: 2 }}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.number}>{value}</Text>
+    </View>
+  );
+}
+
 export function Muted({ children }: { children: ReactNode }) {
   const styles = useKitStyles();
   return <Text style={styles.muted}>{children}</Text>;
