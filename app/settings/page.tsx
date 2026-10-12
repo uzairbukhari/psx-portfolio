@@ -1,17 +1,12 @@
-import { getViewer } from '@/lib/auth';
-import Dashboard from '../portfolio';
+import { DashboardRoute } from '../dashboard-route';
 export const metadata = {
   title: 'Settings | Sipwise',
   description: 'Account, tax, AI model and data settings.',
 };
-export default async function SettingsPage() {
-  const user = await getViewer();
-  return (
-    <Dashboard
-      email={user?.email ?? null}
-      name={user?.name ?? null}
-      picture={user?.picture ?? null}
-      role={user?.role ?? 'user'}
-    />
-  );
+export default function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return <DashboardRoute returnTo="/settings" searchParams={searchParams} />;
 }

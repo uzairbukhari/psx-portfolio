@@ -1,4 +1,6 @@
 'use client';
+import './dashboard-styles';
+import { ownedKey } from './asset-keys';
 import { useConfirm } from '@/components/confirm-dialog';
 import {
   useEffect,
@@ -89,63 +91,49 @@ import {
 import { addNotifications, dividendNotifications } from '@/lib/notifications';
 import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
-import PortfolioReports from './portfolio-reports';
-import AssetReports, { AllReports } from './asset-reports';
 import { reportMode } from '@/lib/asset-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
-import GoldSilverSection, { metalKey, type OwnedMetal } from './gold-silver';
-import SavingsPlansSection, { planKey, type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
-import MutualFundsSection, { fundKey, type OwnedFund } from './mutual-funds';
 import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
 import CollapsiblePanel from './collapsible-panel';
 import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
-import CompanyDetail from './company-detail';
-import LedgerTimeline, {
-  buildAssetEntries,
-  buildEntries,
-} from './ledger-timeline';
+import {
+  PortfolioReports,
+  AssetReports,
+  AllReports,
+  LedgerTimeline,
+  MonthlyPicks,
+  CompanyDetail,
+  GoldSilverSection,
+  SavingsPlansSection,
+  MutualFundsSection,
+  SettingsView,
+  NotificationsView,
+  ResearchDesk,
+  AiLab,
+  TargetsEditor,
+  AhlImportDialog,
+  FinqalabImportDialog,
+  BrokerImportDialog,
+  IpoImportDialog,
+  DividendSyncView,
+} from './lazy-panels';
+import type { OwnedMetal } from './gold-silver';
+import type { OwnedPlan } from './savings-plans';
+import type { OwnedFund } from './mutual-funds';
+import { buildAssetEntries, buildEntries } from '@/lib/ledger-entries';
 import { CompanyNavProvider } from './ticker-link';
-import ResearchDesk from './research-desk';
-import AiLab from './ai-lab';
-import { SignIn, LoadError } from './sign-in';
+import { LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import { ThemeMenuItems } from './theme-menu';
-import NotificationsView from './notifications-view';
-import TargetsEditor from './targets-editor';
-import SettingsView from './settings-view';
-import { AhlImportDialog } from './ahl-import-dialog';
-import { DividendSyncView } from './dividend-sync-view';
-import {
-  parseAhlLedgerText,
-  type AhlLedgerStatement,
-} from '@/lib/ahl-ledger-pdf';
+import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import { MAX_WATCH_TICKERS } from '@/lib/market-watch';
-import MonthlyPicks from './monthly-picks';
-import { parseFinqalabReport } from './finqalab-import';
-import { FinqalabImportDialog } from './finqalab-import-dialog';
-import { BrokerImportDialog } from './broker-import-dialog';
-import { detectJsGlobalLedger, parseJsGlobalLedger } from '@/lib/js-global-ledger';
-import { detectPsxConfirmation, detectPsxLedger, parsePsxConfirmation, parsePsxLedger } from '@/lib/psx-confirmation';
+import type { BrokerStatement, BrokerFormat } from '@/lib/broker-import';
+import type { BrokerTable } from '@/lib/broker-file';
+import type { IpoAllotment } from '@/lib/ipo-list-import';
 import {
-  validateBrokerStatement,
-  type BrokerStatement,
-  type BrokerFormat,
-} from '@/lib/broker-import';
-import {
-  readBrokerTable,
-  parseSavedFormat,
-  formatFromReviewed,
-  redactBrokerText,
-  type BrokerTable,
-} from '@/lib/broker-file';
-import { IpoImportDialog } from './ipo-import-dialog';
-import { parseIpoList, type IpoAllotment } from '@/lib/ipo-list-import';
-import {
-  detectJsonImport,
-  detectPdfImport,
   summarizeImports,
   IMPORT_LABEL,
   UNSUPPORTED_FILE,
@@ -153,8 +141,6 @@ import {
 } from '@/lib/import-detect';
 import type { FinqalabTrade } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
-import { importAhlTrades, parseAhlHistory } from './ahl-import';
-import { importCdcDividends } from '@/lib/cdc-import';
 import type { PortfolioResponse } from '@/lib/api-types';
 import {
   ConflictError,
@@ -1528,7 +1514,8 @@ function DashboardContent({
         <p className="muted">Loading your holdings…</p>
       </main>
     );
-  if (!p && !email) return <SignIn returnTo={initialPathname || '/'} />;
+  // Signed-out visitors never reach the dashboard: DashboardRoute (a Server Component) renders the landing.
+  if (!p && !email) return null;
   if (!p) return <LoadError message={message} busy={busy} onRetry={load} />;
   // The market pulse sends only these tickers to the server; names and saved quotes are merged back in locally.
   // The All view shows the index only; a single portfolio follows what it holds.
@@ -1566,6 +1553,7 @@ function DashboardContent({
     });
   }
   const runCdc = async (raw: unknown) => {
+    const { importCdcDividends } = await import('./import-parsers');
     const result = importCdcDividends(raw, p.companies, p.dividends ?? []);
     if (!result.imported) {
       if (result.skippedDuplicate)
@@ -1616,11 +1604,13 @@ function DashboardContent({
       `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
     );
   };
-  const runFinqalab = (text: string, fileName: string) => {
+  const runFinqalab = async (text: string, fileName: string) => {
     // Read locally, then review: nothing is saved until the preview is confirmed.
+    const { parseFinqalabReport } = await import('./import-parsers');
     setFinqalabReview({ rows: parseFinqalabReport(text), fileName });
   };
   const runAhlJson = async (raw: unknown) => {
+    const { parseAhlHistory, importAhlTrades } = await import('./import-parsers');
     const rows = parseAhlHistory(raw);
     const result = importAhlTrades(p, rows);
     if (!result.imported) {
@@ -1662,6 +1652,7 @@ function DashboardContent({
       setReadingImport(true);
       let reviewing = false;
       try {
+        const parsers = await import('./import-parsers');
         const bytes = await f.arrayBuffer();
         const hash = Array.from(
           new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
@@ -1683,10 +1674,10 @@ function DashboardContent({
         if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
           // Read locally, then review: nothing is saved until the preview is confirmed.
           pdf = await extractPdfText(new Uint8Array(bytes));
-          kind = detectPdfImport(pdf.text);
+          kind = parsers.detectPdfImport(pdf.text);
           unknownText = pdf.text;
         } else if (/\.(csv|xlsx)$/i.test(f.name)) {
-          table = await readBrokerTable(f);
+          table = await parsers.readBrokerTable(f);
           kind = null;
           unknownText = table.text;
           const saved = (p.brokerFormats ?? []).find(
@@ -1701,7 +1692,7 @@ function DashboardContent({
             try {
               reviewing = true;
               setBrokerReview({
-                statement: parseSavedFormat(table, saved),
+                statement: parsers.parseSavedFormat(table, saved),
                 fileName: f.name,
                 format: null,
                 hash,
@@ -1715,17 +1706,17 @@ function DashboardContent({
         } else {
           try {
             raw = JSON.parse(await f.text());
-            kind = detectJsonImport(raw);
+            kind = parsers.detectJsonImport(raw);
             unknownText = JSON.stringify(raw);
           } catch {
             throw Error(UNSUPPORTED_FILE);
           }
         }
-        if (!kind && pdf && !expected && detectPsxConfirmation(pdf.text)) {
+        if (!kind && pdf && !expected && parsers.detectPsxConfirmation(pdf.text)) {
           // Youngs Capital, Syed Faraz Equities and other brokers on the same PSX confirmation template.
           reviewing = true;
           setBrokerReview({
-            statement: validateBrokerStatement(parsePsxConfirmation(pdf.text)),
+            statement: parsers.validateBrokerStatement(parsers.parsePsxConfirmation(pdf.text)),
             fileName: f.name,
             format: null,
             hash,
@@ -1733,10 +1724,10 @@ function DashboardContent({
           });
           return;
         }
-        if (!kind && pdf && !expected && detectPsxLedger(pdf.text)) {
+        if (!kind && pdf && !expected && parsers.detectPsxLedger(pdf.text)) {
           reviewing = true;
           setBrokerReview({
-            statement: validateBrokerStatement(parsePsxLedger(pdf.text)),
+            statement: parsers.validateBrokerStatement(parsers.parsePsxLedger(pdf.text)),
             fileName: f.name,
             format: null,
             hash,
@@ -1744,10 +1735,10 @@ function DashboardContent({
           });
           return;
         }
-        if (!kind && pdf && !expected && detectJsGlobalLedger(pdf.text)) {
+        if (!kind && pdf && !expected && parsers.detectJsGlobalLedger(pdf.text)) {
           reviewing = true;
           setBrokerReview({
-            statement: validateBrokerStatement(parseJsGlobalLedger(pdf.text)),
+            statement: parsers.validateBrokerStatement(parsers.parseJsGlobalLedger(pdf.text)),
             fileName: f.name,
             format: null,
             hash,
@@ -1776,7 +1767,7 @@ function DashboardContent({
           const response = await fetch('/api/broker-import/extract', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: redactBrokerText(unknownText) }),
+            body: JSON.stringify({ text: parsers.redactBrokerText(unknownText) }),
             credentials: 'same-origin',
           });
           const data = (await response.json()) as {
@@ -1785,12 +1776,12 @@ function DashboardContent({
           };
           if (!response.ok)
             throw Error(data.error ?? 'Statement extraction failed.');
-          const statement = validateBrokerStatement(data.statement);
+          const statement = parsers.validateBrokerStatement(data.statement);
           reviewing = true;
           setBrokerReview({
             statement,
             fileName: f.name,
-            format: table ? formatFromReviewed(table, statement) : null,
+            format: table ? parsers.formatFromReviewed(table, statement) : null,
             hash,
             method: 'ai',
           });
@@ -1806,18 +1797,18 @@ function DashboardContent({
           );
         if (kind === 'finqalab') {
           reviewing = true;
-          runFinqalab(pdf!.text, f.name);
+          await runFinqalab(pdf!.text, f.name);
         } else if (kind === 'ahl' && pdf) {
           reviewing = true;
           setAhlStatement({
-            statement: await parseAhlLedgerText(pdf.text, pdf.pages),
+            statement: await parsers.parseAhlLedgerText(pdf.text, pdf.pages),
             fileName: f.name,
           });
         } else if (kind === 'ahl') await runAhlJson(raw);
         else if (kind === 'cdc') await runCdc(raw);
         else {
           reviewing = true;
-          setIpoReview({ items: parseIpoList(raw), fileName: f.name });
+          setIpoReview({ items: parsers.parseIpoList(raw), fileName: f.name });
         }
       } finally {
         if (!reviewing) {
@@ -2111,7 +2102,7 @@ function DashboardContent({
   }
   function openFund(key: string) {
     // From the All view a fund opens inside its own portfolio, where it can be edited.
-    const owner = ownedFunds.find((o) => fundKey(o) === key) as
+    const owner = ownedFunds.find((o) => ownedKey(o) === key) as
       | (OwnedFund & { portfolioId?: string })
       | undefined;
     if (isAll && owner?.portfolioId) {
@@ -3362,7 +3353,7 @@ function DashboardContent({
                 openOwnedAsset(
                   'metal',
                   key,
-                  ownedMetals.find((o) => metalKey(o) === key),
+                  ownedMetals.find((o) => ownedKey(o) === key),
                 )
               }
             />
@@ -3389,7 +3380,7 @@ function DashboardContent({
                 openOwnedAsset(
                   'plan',
                   key,
-                  ownedPlans.find((o) => planKey(o) === key),
+                  ownedPlans.find((o) => ownedKey(o) === key),
                 )
               }
             />
@@ -3507,7 +3498,7 @@ function DashboardContent({
             <MutualFundsSection
               focusKey={fundFocus}
               onSwitchPortfolio={(key) => {
-                const owner = ownedFunds.find((o) => fundKey(o) === key) as
+                const owner = ownedFunds.find((o) => ownedKey(o) === key) as
                   | (OwnedFund & { portfolioId?: string })
                   | undefined;
                 if (!owner?.portfolioId) return;
@@ -3549,7 +3540,7 @@ function DashboardContent({
               onSwitchPortfolio={(key) =>
                 switchToOwner(
                   'metal',
-                  ownedMetals.find((o) => metalKey(o) === key),
+                  ownedMetals.find((o) => ownedKey(o) === key),
                 )
               }
               owned={ownedMetals}
@@ -3578,7 +3569,7 @@ function DashboardContent({
               onSwitchPortfolio={(key) =>
                 switchToOwner(
                   'plan',
-                  ownedPlans.find((o) => planKey(o) === key),
+                  ownedPlans.find((o) => ownedKey(o) === key),
                 )
               }
               owned={ownedPlans}

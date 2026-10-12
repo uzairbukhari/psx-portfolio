@@ -1,8 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import './research-dossier.css';
-@import './research-jobs.css';
 
 @custom-variant dark (&:is(.dark *));
 

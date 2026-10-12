@@ -71,8 +71,7 @@ export interface QuoteSnapshot {
 }
 
 export async function readCachedQuotes(db: D1Database, tickers: string[]) {
-  const wanted = new Set(tickers);
-  return new Map((await readQuoteRows(db)).filter((row) => wanted.has(row.ticker)).map((row) => [row.ticker, rowToQuote(row)] as const));
+  return new Map((await readQuoteRows(db, [...new Set(tickers)])).map((row) => [row.ticker, rowToQuote(row)] as const));
 }
 
 /** Cached prices, with a clean note for every one that is out of date or missing. */

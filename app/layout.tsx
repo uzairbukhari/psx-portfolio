@@ -2,12 +2,6 @@ import type { Metadata } from 'next';
 import { env } from 'cloudflare:workers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import './ledger.css';
-import './picks.css';
-import './ai-lab.css';
-import './reports.css';
-import './account-overview.css';
-import './settings.css';
 import { DEFAULT_THEME, THEME_META, themeInitScript } from '@/lib/theme';
 
 const geistSans = Geist({
@@ -21,6 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://sipwise.trade'),
   title: 'Sipwise',
   description:
     'Track PSX stocks, mutual funds, gold, silver and savings plans in one private, encrypted ledger. Plan your monthly SIP.',

@@ -1,5 +1,6 @@
 'use client';
 
+import { ownedKey } from './asset-keys';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, Plus } from 'lucide-react';
 import {
@@ -25,10 +26,8 @@ import {
   type MetalRateRow,
 } from '@/lib/metal-rates';
 import { money, moneyShort, today } from '@/lib/portfolio';
-import LedgerTimeline, {
-  NO_STOCKS,
-  buildAssetEntries,
-} from './ledger-timeline';
+import LedgerTimeline from './ledger-timeline';
+import { NO_STOCKS, buildAssetEntries } from '@/lib/ledger-entries';
 import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedMetal = {
@@ -36,9 +35,6 @@ export type OwnedMetal = {
   portfolioId?: string;
   portfolioName?: string;
 };
-/** Identifies one holding on its own page (the same holding can sit in several portfolios on the All view). */
-export const metalKey = (o: OwnedMetal) =>
-  `${o.asset.id}${o.portfolioName ? `@${o.portfolioName}` : ''}`;
 const ENTRY_HISTORY_LENGTH =
   typeof window === 'undefined' ? 0 : window.history.length;
 const tone = (n: number | null) =>
@@ -180,7 +176,7 @@ export default function GoldSilverSection({
     />
   ) : null;
   if (focusKey !== undefined) {
-    const row = rows.find((r) => metalKey(r) === focusKey);
+    const row = rows.find((r) => ownedKey(r) === focusKey);
     const back = (
       <button
         type="button"
@@ -392,13 +388,13 @@ export default function GoldSilverSection({
                   </tr>
                 </thead>
                 {g.rows.map((row) => (
-                  <tbody key={metalKey(row)}>
+                  <tbody key={ownedKey(row)}>
                     <tr className="fund-row">
                       <td data-label="Holding" className="fund-row__name">
                         <button
                           type="button"
                           className="fund-row__toggle"
-                          onClick={() => onOpenAsset?.(metalKey(row))}
+                          onClick={() => onOpenAsset?.(ownedKey(row))}
                         >
                           <span>
                             <b>{row.asset.name}</b>

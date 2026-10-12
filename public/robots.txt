@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /$
+Allow: /privacy
+Allow: /terms
+Disallow: /api/
+Disallow: /admin
+Disallow: /company/
+Disallow: /funds/
+Disallow: /gold/
+Disallow: /plans/
+Disallow: /reports
+Disallow: /activity
+Disallow: /history
+Disallow: /sip
+Disallow: /settings
+Disallow: /notifications
+Disallow: /ai-lab
+Disallow: /research-desk
+
+Sitemap: https://sipwise.trade/sitemap.xml

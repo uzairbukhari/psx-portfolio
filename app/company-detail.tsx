@@ -42,7 +42,8 @@ import {
   type HistoryRange,
   type PricePoint,
 } from '@/lib/price-history';
-import LedgerTimeline, { buildEntries } from './ledger-timeline';
+import LedgerTimeline from './ledger-timeline';
+import { buildEntries } from '@/lib/ledger-entries';
 import { readJson } from '@/lib/safe-json';
 
 type Holding = {

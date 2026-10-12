@@ -311,7 +311,7 @@ export default function PortfolioValueCard({
       )}
       </div>
       </div>
-      {aside && <aside className="value-card-aside">{aside}</aside>}
+      {aside && <div className="value-card-aside">{aside}</div>}
       </div>
     </section>
   );

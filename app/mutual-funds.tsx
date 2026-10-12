@@ -1,5 +1,6 @@
 'use client';
 
+import { ownedKey } from './asset-keys';
 import { useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, XAxis, YAxis } from 'recharts';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
@@ -38,15 +39,11 @@ import FundMatchDialog from './fund-match-dialog';
 import { useFundHistory } from './use-fund-data';
 import { webPublicData } from './vault-transport';
 import CollapsiblePanel from './collapsible-panel';
-import LedgerTimeline, {
-  NO_STOCKS,
-  buildAssetEntries,
-} from './ledger-timeline';
+import LedgerTimeline from './ledger-timeline';
+import { NO_STOCKS, buildAssetEntries } from '@/lib/ledger-entries';
 
 export type OwnedFund = { asset: FundAsset; portfolioName?: string };
 /** Identifies one fund on its own page (the same fund can sit in several portfolios on the All view). */
-export const fundKey = (o: OwnedFund) =>
-  `${o.asset.id}${o.portfolioName ? `@${o.portfolioName}` : ''}`;
 type Catalog = FundCatalogResponse['funds'];
 type Mode =
   | { kind: 'add' }
@@ -247,7 +244,7 @@ export default function MutualFundsSection({
     />
   ) : null;
   if (focusKey !== undefined) {
-    const row = rows.find((r) => fundKey(r) === focusKey);
+    const row = rows.find((r) => ownedKey(r) === focusKey);
     const back = (
       <button
         type="button"
@@ -585,7 +582,7 @@ export default function MutualFundsSection({
                   </tr>
                 </thead>
                 {g.rows.map(({ asset, v, portfolioName }) => {
-                  const key = fundKey({ asset, portfolioName });
+                  const key = ownedKey({ asset, portfolioName });
                   return (
                     <tbody key={key}>
                       <tr className="fund-row">
