@@ -14,7 +14,7 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission); D1_DATABASE_ID to target staging.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { d1, trackedTickers } from './d1-rest.mjs';
+import { d1, trackedTickers, trackRun } from './d1-rest.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { documentText } from './pdf-text.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
@@ -68,6 +68,7 @@ async function aiLookup(tickers) {
 }
 
 async function main() {
+  trackRun('face-values', { dryRun });
   const { tickers, requested } = await targets();
   const evidenceFile = arg('evidence');
   const curated = evidenceFile ? JSON.parse(readFileSync(evidenceFile, 'utf8')) : [];

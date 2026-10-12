@@ -323,6 +323,22 @@ export const adminActions = sqliteTable(
   (table) => [index('admin_actions_at_idx').on(table.at)],
 );
 
+// One row per scheduled or manual run of a public data job (scrapers on GitHub, the cron Worker). Public data only:
+// the job name, outcome and a short sanitised message. Pruned after 90 days.
+export const jobRuns = sqliteTable(
+  'job_runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    job: text('job').notNull(),
+    source: text('source').notNull(),
+    startedAt: text('started_at').notNull(),
+    finishedAt: text('finished_at').notNull(),
+    ok: integer('ok').notNull(),
+    detail: text('detail'),
+  },
+  (table) => [index('job_runs_job_idx').on(table.job, table.startedAt)],
+);
+
 // Per-user fixed-window rate limits for expensive actions (forced PSX refreshes,
 // on-demand facts scrapes). One row per user and action.
 export const rateLimits = sqliteTable(

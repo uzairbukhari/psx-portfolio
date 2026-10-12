@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AuditReport } from '@/lib/analytics-store';
 import { ERROR_AREAS } from '@/lib/error-codes';
 import { readJson } from '@/lib/safe-json';
+import type { AdminActionRow } from '@/lib/admin-actions';
 
 const label = (name: string) => { const t = name.replaceAll('_', ' '); return t[0].toUpperCase() + t.slice(1); };
 
@@ -17,6 +18,10 @@ export default function AuditLog({ includeInternal }: { includeInternal?: boolea
   const [user, setUser] = useState('');
   const [ownToggle, setOwnToggle] = useState(false);
   const includeAdmin = includeInternal ?? ownToggle;
+  const [actions, setActions] = useState<AdminActionRow[]>([]);
+  useEffect(() => {
+    void fetch('/api/admin/actions', { cache: 'no-store' }).then((r) => readJson(r)).then((b) => setActions((b as { actions?: AdminActionRow[] }).actions ?? [])).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     const q = new URLSearchParams({ days: String(days) });
@@ -34,7 +39,7 @@ export default function AuditLog({ includeInternal }: { includeInternal?: boolea
       setError(e instanceof Error ? e.message : 'Could not load the audit log.');
     }
   }, [area, code, days, user, includeAdmin]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { const t = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(t); }, [load]);
 
   if (error) return <p className="muted" role="alert">{error}</p>;
   if (!report) return <p className="muted">Loading…</p>;
@@ -74,6 +79,16 @@ export default function AuditLog({ includeInternal }: { includeInternal?: boolea
                 </tr>
               ))}
             </tbody>
+          </table>
+        </div>
+      )}
+      <h2>Admin actions</h2>
+      <p className="muted">What super admins changed or started from the console, newest first.</p>
+      {actions.length === 0 ? <p className="muted">No admin actions yet.</p> : (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Target</th><th>Result</th></tr></thead>
+            <tbody>{actions.map((a, i) => <tr key={`${a.at}${i}`}><td>{new Date(a.at).toLocaleString()}</td><td>{a.actor}</td><td>{label(a.action.replaceAll('-', '_'))}</td><td>{a.target ?? '—'}</td><td>{a.result}</td></tr>)}</tbody>
           </table>
         </div>
       )}

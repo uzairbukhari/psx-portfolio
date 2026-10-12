@@ -7,6 +7,7 @@ export type PipelineRow = {
   id: string; label: string; expected: string; status: PipelineStatus;
   lastSuccessAt: string | null; ageMinutes: number | null; lastError: string | null;
   action: PipelineAction | null; workflow: string | null;
+  lastRun: { at: string; ok: boolean; source: string; detail: string | null } | null;
 };
 export type QueueItem = { kind: string; ticker: string; status: string; requestedAt: string; attempts: number; error: string | null };
 export type Queues = { counts: { kind: string; status: string; n: number }[]; stuck: QueueItem[]; stuckCount: number; aiQueued: number };
@@ -16,7 +17,8 @@ export type AiSpend = {
   months: { month: string; usd: number }[];
   recentRuns: { startedAt: string; status: string; models: string; costUsd: number; error: string | null }[];
 };
-export type AdminHealth = DataHealth & { pipelines: PipelineRow[]; queues: Queues; aiSpend: AiSpend };
+export type CronBeat = { lastBeatAt: string | null; status: PipelineStatus };
+export type AdminHealth = DataHealth & { pipelines: PipelineRow[]; queues: Queues; aiSpend: AiSpend; cron: CronBeat };
 
 export type AdminHealthOptions = { now?: Date; aiLabCapUsd?: number | null; faceValueCapUsd?: number };
 
@@ -52,16 +54,31 @@ async function rows<T>(db: D1Database, sql: string, ...args: unknown[]): Promise
 
 export async function pipelineRows(db: D1Database, now: Date, marketOpen: boolean): Promise<PipelineRow[]> {
   return Promise.all(PIPELINES.map(async (def) => {
-    const success = (await first<{ t: string | null }>(db, SUCCESS[def.id]))?.t || null;
-    const failure = FAILURE[def.id] ? await first<{ e: string | null; at: string | null }>(db, FAILURE[def.id]) : null;
+    const data = (await first<{ t: string | null }>(db, SUCCESS[def.id]))?.t || null;
+    // A clean recorded run also proves the job is alive (it may rightly have had nothing new to store).
+    const lastOk = await first<{ t: string | null }>(db, 'SELECT MAX(finished_at) AS t FROM job_runs WHERE job=? AND ok=1', def.id);
+    const success = [data, lastOk?.t ?? null].filter((t): t is string => !!t).sort((a, b) => a.localeCompare(b)).pop() ?? null;
+    const own = FAILURE[def.id] ? await first<{ e: string | null; at: string | null }>(db, FAILURE[def.id]) : null;
+    const run = await first<{ finished_at: string; ok: number; source: string; detail: string | null }>(
+      db, 'SELECT finished_at,ok,source,detail FROM job_runs WHERE job=? ORDER BY started_at DESC, id DESC LIMIT 1', def.id);
+    const ran = run && run.ok === 0 ? { e: run.detail ?? 'The last run failed.', at: run.finished_at } : null;
+    const failure = [own, ran].filter((f): f is { e: string | null; at: string | null } => !!f?.e).sort((a, b) => (a.at ?? '').localeCompare(b.at ?? '')).pop() ?? null;
     // A failure only counts while it is newer than the last success.
     const live = failure?.e && (!success || !failure.at || failure.at > success) ? failure : null;
     const verdict = pipelineStatus(def, success, live ? { at: live.at } : null, now, marketOpen);
     return {
       id: def.id, label: def.label, expected: def.expected, status: verdict.status, lastSuccessAt: success,
       ageMinutes: verdict.ageMinutes, lastError: live ? cut(live.e) : null, action: def.action, workflow: def.workflow,
+      lastRun: run ? { at: run.finished_at, ok: run.ok === 1, source: run.source, detail: cut(run.detail) } : null,
     };
   }));
+}
+
+/** The cron Worker writes a heartbeat row on every firing (every 5 minutes on weekday market hours, plus the fund crons). */
+export async function cronBeat(db: D1Database, now: Date): Promise<CronBeat> {
+  const beat = (await first<{ t: string | null }>(db, "SELECT last_success_at AS t FROM refresh_state WHERE kind='cron' AND key='heartbeat'"))?.t ?? null;
+  const def = { id: 'cron', label: 'Cron Worker', expected: '', cadence: 'daily' as const, lateHours: 30, failHours: 80, required: false, workflow: null, action: null };
+  return { lastBeatAt: beat, status: pipelineStatus(def, beat, null, now, false).status };
 }
 
 export async function queueSummary(db: D1Database, now: Date): Promise<Queues> {
@@ -108,8 +125,8 @@ export async function aiSpend(db: D1Database, now: Date, opts: AdminHealthOption
 export async function adminHealth(db: D1Database, opts: AdminHealthOptions = {}): Promise<AdminHealth> {
   const now = opts.now ?? new Date();
   const base = await dataHealth(db, now);
-  const [pipelines, queues, spend] = await Promise.all([pipelineRows(db, now, base.marketOpen), queueSummary(db, now), aiSpend(db, now, opts)]);
-  return { ...base, pipelines, queues, aiSpend: spend };
+  const [pipelines, queues, spend, cron] = await Promise.all([pipelineRows(db, now, base.marketOpen), queueSummary(db, now), aiSpend(db, now, opts), cronBeat(db, now)]);
+  return { ...base, pipelines, queues, aiSpend: spend, cron };
 }
 
 /** Caps from Worker settings: AI Lab has none unless set; the face-value finder defaults to $1. */

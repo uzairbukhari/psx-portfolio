@@ -3,10 +3,11 @@
 // builds up from the day this first runs; there is no free source for older prices.
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/mufap-nav-scrape.mjs [--dry-run]
-import { d1 } from './d1-rest.mjs';
+import { d1, trackRun } from './d1-rest.mjs';
 import { parseMufapNavs } from '../lib/mufap.ts';
 
 const dryRun = process.argv.includes('--dry-run');
+trackRun('funds', { dryRun });
 const URL_ = 'https://www.mufap.com.pk/Industry/IndustryStatDaily?tab=3';
 const MIN_FUNDS = 50; // far fewer than the real list means the page changed: fail loudly instead of storing a fragment
 

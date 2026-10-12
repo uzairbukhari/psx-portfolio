@@ -65,3 +65,6 @@
 .admin-spark{height:110px;width:100%}
 .admin-error{color:var(--danger-ink);max-width:320px;overflow-wrap:anywhere}
 @media (max-width:900px){.admin-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-spend{grid-template-columns:1fr}.admin-two{grid-template-columns:1fr}}
+.admin-row-actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.admin-cron{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.admin-history{margin:1rem 0}

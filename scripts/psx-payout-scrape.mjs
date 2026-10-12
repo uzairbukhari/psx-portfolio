@@ -6,7 +6,7 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-payout-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
-import { d1, trackedTickers } from './d1-rest.mjs';
+import { d1, trackedTickers, trackRun } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { fetchPsxPayoutsHtml } from '../lib/psx-fetch.ts';
@@ -66,6 +66,7 @@ async function notifyPhones(rows, before) {
 }
 
 async function main() {
+  trackRun('dividends', { dryRun });
   const tickers = await trackedTickers(tickerArg);
   const rows = [];
   const failed = [];
