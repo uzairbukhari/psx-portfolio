@@ -118,10 +118,11 @@ const INTERNAL_EMAILS = "SELECT lower(email) FROM user_roles WHERE role IN ('sup
  * All dashboard numbers for the super admin. Internal accounts (super admins and test accounts) are left out unless
  * `includeAdmin`: new events carry `is_admin`, and `internalKeys` covers events recorded before an account was marked.
  */
-export async function usageReport(db: D1Database, includeAdmin = false, now = new Date(), internalKeys: string[] = []) {
+export async function usageReport(db: D1Database, includeAdmin = false, now = new Date(), internalKeys: string[] = [], rangeDays = 30) {
+  const windowDays = Math.min(Math.max(Math.floor(rangeDays) || 30, 7), 90);
   const today = pktDay(now);
   const since = pktDay(new Date(now.getTime() - 120 * DAY_MS));
-  const since30 = pktDay(new Date(now.getTime() - 29 * DAY_MS));
+  const since30 = pktDay(new Date(now.getTime() - (windowDays - 1) * DAY_MS));
   const adminClause = includeAdmin ? '' : `AND is_admin=0${excludeKeys(internalKeys)}`;
   const userClause = includeAdmin ? '' : ` AND lower(email) NOT IN (${INTERNAL_EMAILS})`;
   const all = async <T,>(sql: string, ...p: unknown[]) => (await db.prepare(sql).bind(...p).all<T>()).results;
@@ -143,7 +144,16 @@ export async function usageReport(db: D1Database, includeAdmin = false, now = ne
   const signupSeries = await all<{ day: string; n: number }>(
     `SELECT substr(first_seen_at,1,10) AS day, COUNT(*) AS n FROM app_users WHERE origin IN ('signup','unknown') AND first_seen_at>=?${userClause} GROUP BY day ORDER BY day`, `${since30}T00:00:00Z`);
 
-  return shapeReport({ today, activity, signups, features, screens, accounts, signupSeries, funnelCounts: {
+  const platforms = await all<{ platform: string; users: number; events: number }>(
+    `SELECT platform, COUNT(DISTINCT user_key) AS users, COUNT(*) AS events FROM analytics_events WHERE day>=? AND user_key IS NOT NULL ${adminClause} GROUP BY platform ORDER BY users DESC`, since30);
+  const versions = await all<{ platform: string; version: string; users: number }>(
+    `SELECT platform, COALESCE(app_version,'unknown') AS version, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE day>=? AND user_key IS NOT NULL ${adminClause} GROUP BY platform, version ORDER BY users DESC LIMIT 12`, since30);
+  const origins = await all<{ origin: string; n: number }>(
+    `SELECT origin, COUNT(*) AS n FROM app_users WHERE 1=1${userClause} GROUP BY origin ORDER BY n DESC`);
+  const importFunnel = await all<{ event: string; users: number }>(
+    `SELECT event, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE event IN ('import_started','import_completed','import_failed') AND day>=? AND user_key IS NOT NULL ${adminClause} GROUP BY event`, since30);
+
+  return shapeReport({ today, activity, signups, features, screens, accounts, signupSeries, windowDays, platforms, versions, origins, importFunnel, funnelCounts: {
     landing: await count('landing_viewed', 'anon_id'), clicked: await count('sign_in_clicked', 'anon_id'),
     signedUp: await count('signed_up', 'user_key'), vault: await count('vault_created', 'user_key'), content,
   }, includeAdmin, now });
@@ -155,6 +165,11 @@ export function shapeReport(i: {
   screens: { screen: string; n: number; users: number }[];
   accounts: { total: number; signups30: number | null; signups7: number | null } | null;
   signupSeries: { day: string; n: number }[];
+  windowDays?: number;
+  platforms?: { platform: string; users: number; events: number }[];
+  versions?: { platform: string; version: string; users: number }[];
+  origins?: { origin: string; n: number }[];
+  importFunnel?: { event: string; users: number }[];
   funnelCounts: { landing: number; clicked: number; signedUp: number; vault: number; content: number };
 }) {
   const byEvent = new Map<string, { event: string; users: number; count: number; web: number; phone: number }>();
@@ -166,17 +181,23 @@ export function shapeReport(i: {
     byEvent.set(f.event, row);
   }
   const f = i.funnelCounts;
-  const from30 = pktDay(new Date(i.now.getTime() - 29 * DAY_MS));
+  const days = i.windowDays ?? 30;
+  const from30 = pktDay(new Date(i.now.getTime() - (days - 1) * DAY_MS));
   const signedUpSet = i.signups.filter((s) => s.day >= from30);
   const returned = returnedWithinWeek(signedUpSet, i.activity);
   return {
     generatedAt: i.now.toISOString(),
     includesAdmin: i.includeAdmin,
+    days,
+    platforms: i.platforms ?? [],
+    versions: i.versions ?? [],
+    origins: i.origins ?? [],
+    imports: ['import_started', 'import_completed', 'import_failed'].map((event) => ({ event, users: i.importFunnel?.find((r) => r.event === event)?.users ?? 0 })),
     totalUsers: i.accounts?.total ?? 0,
     signups7: i.accounts?.signups7 ?? 0,
     signups30: i.accounts?.signups30 ?? 0,
     active: activeCounts(i.activity, i.today),
-    dailyActive: dailyActive(i.activity, i.today, 30),
+    dailyActive: dailyActive(i.activity, i.today, days),
     signupSeries: i.signupSeries,
     features: [...byEvent.values()].filter((r) => !NOISE.includes(r.event)).sort((a, b) => b.users - a.users || b.count - a.count),
     errors: [...byEvent.values()].filter((r) => r.event === 'client_error' || r.event.endsWith('_failed')),
@@ -187,13 +208,14 @@ export function shapeReport(i: {
       { step: 'Signed up', users: f.signedUp },
       { step: 'Created a vault', users: f.vault },
       { step: 'Added first entry or import', users: f.content },
-      { step: 'Came back within 7 days (sign-ups, last 30 days)', users: returned },
+      { step: 'Came back within 7 days (sign-ups in the range)', users: returned },
     ],
     retention: retentionCohorts(i.signups, i.activity, i.today),
   };
 }
 
-export type AuditFilters = { days: number; area?: string; code?: string; userEmail?: string; includeAdmin?: boolean };
+export type AuditFilters = { days: number; area?: string; code?: string; userEmail?: string; userKeyPrefix?: string; offset?: number; includeAdmin?: boolean };
+export const AUDIT_PAGE = 50;
 export type AuditRow = { ts: string; user: string | null; platform: string; version: string | null; area: string; code: string; screen: string | null; internal: boolean };
 
 /** The audit log for the super admin: recent client_error events with counts per category and code. Internal accounts are tagged and hidden unless `includeAdmin`. */
@@ -204,22 +226,36 @@ export async function auditLog(db: D1Database, f: AuditFilters, secret: string, 
   const args: unknown[] = [since];
   if (!f.includeAdmin) where.push(`is_admin=0${excludeKeys(internalKeys)}`);
   if (f.userEmail) { where.push('user_key=?'); args.push(await userKey(f.userEmail, secret)); }
+  else if (f.userKeyPrefix && /^[0-9a-f]{6,32}$/.test(f.userKeyPrefix)) { where.push('user_key LIKE ?'); args.push(`${f.userKeyPrefix}%`); }
   const base = where.join(' AND ');
   const all = async <T,>(sql: string, ...p: unknown[]) => (await db.prepare(sql).bind(...p).all<T>()).results;
   const filter = (f.area ? " AND json_extract(props,'$.area')=?" : '') + (f.code ? " AND json_extract(props,'$.code')=?" : '');
   const filterArgs = [...(f.area ? [f.area] : []), ...(f.code ? [f.code] : [])];
   const rows = await all<{ ts: string; user_key: string | null; anon_id: string | null; platform: string; app_version: string | null; props: string | null; is_admin: number }>(
-    `SELECT ts,user_key,anon_id,platform,app_version,props,is_admin FROM analytics_events WHERE ${base}${filter} ORDER BY id DESC LIMIT 200`, ...args, ...filterArgs);
+    `SELECT ts,user_key,anon_id,platform,app_version,props,is_admin FROM analytics_events WHERE ${base}${filter} ORDER BY id DESC LIMIT ${AUDIT_PAGE + 1} OFFSET ${Math.max(0, Math.min(Math.floor(f.offset ?? 0), 5000))}`, ...args, ...filterArgs);
   const byArea = await all<{ area: string; n: number }>(
     `SELECT json_extract(props,'$.area') AS area, COUNT(*) AS n FROM analytics_events WHERE ${base} GROUP BY area ORDER BY n DESC`, ...args);
   const byCode = await all<{ area: string; code: string; n: number; users: number }>(
     `SELECT json_extract(props,'$.area') AS area, json_extract(props,'$.code') AS code, COUNT(*) AS n, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE ${base}${filter} GROUP BY area, code ORDER BY n DESC LIMIT 40`, ...args, ...filterArgs);
+  const total = (await db.prepare(`SELECT COUNT(*) AS n FROM analytics_events WHERE ${base}${filter}`).bind(...args, ...filterArgs).first<{ n: number }>())?.n ?? 0;
+  const byDayRows = await all<{ day: string; n: number }>(
+    `SELECT day, COUNT(*) AS n FROM analytics_events WHERE ${base}${filter} GROUP BY day ORDER BY day`, ...args, ...filterArgs);
+  const byVersion = await all<{ platform: string; version: string; n: number; users: number }>(
+    `SELECT platform, COALESCE(app_version,'unknown') AS version, COUNT(*) AS n, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE ${base}${filter} GROUP BY platform, version ORDER BY n DESC LIMIT 12`, ...args, ...filterArgs);
+  const hasMore = rows.length > AUDIT_PAGE;
   return {
     generatedAt: now.toISOString(),
     days,
+    total,
+    hasMore,
+    byDay: Array.from({ length: Math.min(days, 90) }, (_, i) => {
+      const day = pktDay(new Date(now.getTime() - (Math.min(days, 90) - 1 - i) * DAY_MS));
+      return { day, n: byDayRows.find((r) => r.day === day)?.n ?? 0 };
+    }),
+    byVersion,
     byArea: byArea.filter((r) => r.area),
     byCode: byCode.filter((r) => r.code),
-    rows: rows.map((r): AuditRow => {
+    rows: rows.slice(0, AUDIT_PAGE).map((r): AuditRow => {
       const p = r.props ? (JSON.parse(r.props) as Record<string, string>) : {};
       return { ts: r.ts, user: r.user_key ? r.user_key.slice(0, 8) : null, platform: r.platform, version: r.app_version, area: p.area ?? 'other', code: p.code ?? 'unknown', screen: p.screen ?? null, internal: r.is_admin === 1 || (!!r.user_key && internalKeys.includes(r.user_key)) };
     }),

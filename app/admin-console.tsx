@@ -17,7 +17,9 @@ const ICONS = { overview: LayoutDashboard, health: Activity, analytics: BarChart
 /** Full-width super admin space, outside Settings and outside the vault gate (none of it needs the portfolio). */
 export default function AdminConsole({ section, email, name, picture }: { section: AdminSection; email: string; name: string | null; picture: string | null }) {
   const [includeInternal, setIncludeInternal] = useState(false);
+  const [days, setDays] = useState(30);
   const current = ADMIN_SECTIONS.find((s) => s.id === section)!;
+  const showsRange = section === 'analytics' || section === 'audit';
   const showsToggle = section === 'overview' || section === 'analytics' || section === 'audit';
 
   return (
@@ -27,6 +29,11 @@ export default function AdminConsole({ section, email, name, picture }: { sectio
         <span className="admin-sep" aria-hidden="true">/</span>
         <span>Admin console</span>
         <span className="admin-grow" />
+        {showsRange && (
+          <select aria-label="Time range" className="admin-range" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+            {[7, 30, 90].map((d) => <option key={d} value={d}>Last {d} days</option>)}
+          </select>
+        )}
         {showsToggle && (
           <label className="admin-switch">
             <input type="checkbox" checked={includeInternal} onChange={(e) => setIncludeInternal(e.target.checked)} /> Include internal accounts
@@ -54,8 +61,8 @@ export default function AdminConsole({ section, email, name, picture }: { sectio
           <div className="admin-card">
             {section === 'overview' && <AdminOverview includeInternal={includeInternal} />}
             {section === 'health' && <SystemHealth />}
-            {section === 'analytics' && <UsageDashboard includeInternal={includeInternal} />}
-            {section === 'audit' && <AuditLog includeInternal={includeInternal} />}
+            {section === 'analytics' && <UsageDashboard includeInternal={includeInternal} days={days} />}
+            {section === 'audit' && <AuditLog includeInternal={includeInternal} days={days} />}
             {section === 'accounts' && <AdminAccounts email={email} />}
           </div>
         </main>

@@ -7,9 +7,11 @@ import { db, failure, requireSuperAdmin } from '@/lib/server';
 export async function GET(req: Request) {
   try {
     await requireSuperAdmin(req);
-    const includeAdmin = new URL(req.url).searchParams.get('admin') === '1';
+    const q = new URL(req.url).searchParams;
+    const includeAdmin = q.get('admin') === '1';
+    const days = Number(q.get('days') ?? 30);
     const database = db();
     const keys = includeAdmin ? [] : await internalUserKeys(database, env.SESSION_SECRET ?? '');
-    return Response.json(await usageReport(database, includeAdmin, new Date(), keys), { headers: { 'Cache-Control': 'no-store' } });
+    return Response.json(await usageReport(database, includeAdmin, new Date(), keys, days), { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return failure(error); }
 }

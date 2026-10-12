@@ -20,6 +20,8 @@ export async function GET(req: Request) {
       area: area && (ERROR_AREAS as readonly string[]).includes(area) ? area : undefined,
       code: code && (ERROR_CODES as readonly string[]).includes(code) ? code : undefined,
       userEmail: email,
+      userKeyPrefix: q.get('key')?.trim().toLowerCase() || undefined,
+      offset: Number(q.get('offset') ?? 0),
       includeAdmin,
     }, env.SESSION_SECRET ?? '', new Date(), keys);
     return Response.json(report, { headers: { 'Cache-Control': 'no-store' } });

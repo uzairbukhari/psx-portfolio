@@ -101,3 +101,32 @@ test('test accounts are left out of usage and audit reports, including events re
   const auditAll = await auditLog(db, { days: 7, includeAdmin: true }, secret, now, keys);
   assert.deepEqual(auditAll.rows.map((r) => r.internal).sort(), [false, true]);
 });
+
+test('audit log pages past 50 rows, filters by key prefix, and reports per-day and per-version counts; usage honours the range', async () => {
+  const db = d1();
+  const now = new Date('2026-10-07T10:00:00Z');
+  const secret = 'sec';
+  const a = await userKey('a@x.com', secret);
+  const b = await userKey('b@x.com', secret);
+  for (let i = 0; i < 60; i += 1)
+    await insertEvents(db, { sessionId: `s-${i}`, userKey: i < 55 ? a : b, platform: i % 2 ? 'android' : 'web', appVersion: i % 2 ? '1.2.0' : null }, [{ event: 'client_error', props: { area: 'import', code: 'pdf_unrecognized' } }], now);
+  const first = await auditLog(db, { days: 7, includeAdmin: true }, secret, now, []);
+  assert.equal(first.rows.length, 50);
+  assert.equal(first.hasMore, true);
+  assert.equal(first.total, 60);
+  const second = await auditLog(db, { days: 7, includeAdmin: true, offset: 50 }, secret, now, []);
+  assert.equal(second.rows.length, 10);
+  assert.equal(second.hasMore, false);
+  const only = await auditLog(db, { days: 7, includeAdmin: true, userKeyPrefix: b.slice(0, 8) }, secret, now, []);
+  assert.equal(only.total, 5);
+  const bad = await auditLog(db, { days: 7, includeAdmin: true, userKeyPrefix: "x' OR 1=1 --" }, secret, now, []);
+  assert.equal(bad.total, 60); // not hex, so ignored
+  assert.equal(first.byDay.at(-1).n, 60);
+  assert.deepEqual(first.byVersion.map((v) => v.platform).sort(), ['android', 'web']);
+
+  const usage = await usageReport(db, true, now, [], 7);
+  assert.equal(usage.days, 7);
+  assert.equal(usage.dailyActive.length, 7);
+  assert.deepEqual(usage.platforms.map((p) => p.platform).sort(), ['android', 'web']);
+  assert.equal((await usageReport(db, true, now, [], 9999)).dailyActive.length, 90);
+});
