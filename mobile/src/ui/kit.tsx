@@ -306,6 +306,41 @@ export function Input({ label, hint, error, style, ...props }: TextInputProps & 
   );
 }
 
+/** Compact search field: icon, one line, clear button. The label is spoken, not drawn. */
+export function SearchField({ label, value, onChangeText, placeholder }: { label: string; value: string; onChangeText: (text: string) => void; placeholder?: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: layout.minTarget, borderRadius: radii.pill, backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, paddingLeft: 14, paddingRight: 6 }}>
+      <Icon name="search" size={18} color={colors.muted} />
+      <TextInput
+        accessibilityLabel={label}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder ?? label}
+        placeholderTextColor={colors.muted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        style={{ flex: 1, color: colors.ink, fontSize: 16, paddingVertical: 8 }}
+      />
+      {value ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => onChangeText('')} hitSlop={8} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="close" size={18} color={colors.muted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** One row of chips that scrolls sideways instead of wrapping onto a second line. */
+export function ChipRow({ children, label }: { children: ReactNode; label?: string }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel={label} contentContainerStyle={{ gap: 8, paddingRight: layout.gutter }} keyboardShouldPersistTaps="handled">
+      {children}
+    </ScrollView>
+  );
+}
+
 /** Filter chip: a toggle with a `selected` state (a tick as well as colour). 40 dp tall plus hit slop = 48 dp. */
 export function Chip({ label, selected, onPress, accessibilityLabel, role = 'button' }: { label: string; selected?: boolean; onPress?: () => void; accessibilityLabel?: string; role?: 'button' | 'tab' | 'radio' }) {
   const styles = useKitStyles();

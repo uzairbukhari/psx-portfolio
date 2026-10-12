@@ -3,9 +3,9 @@ import { Pressable, Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { WEIGHT_CAP, money, moneyShort } from '@shared/portfolio.ts';
 import { targetTotals } from '@shared/targets.ts';
-import { monthTitle } from '@/data/format';
+import { monthTitle, shortDate } from '@/data/format';
 import { parseNumber } from '@/data/mutations';
-import { buildPlan, currentMonth, setBudget, shiftMonth, unifiedPlanSource } from '@/data/sip';
+import { buildPlan, currentMonth, monthBuys, setBudget, shiftMonth, unifiedPlanSource } from '@/data/sip';
 import { usePortfolio } from '@/data/usePortfolio';
 import { PicksView } from '@/screens/PicksView';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -13,7 +13,7 @@ import { type } from '@/theme/tokens';
 import { AppBar } from '@/ui/AppBar';
 import { Icon } from '@/ui/Icon';
 import { ReviewBuysSheet } from '@/ui/ReviewBuysSheet';
-import { Avatar, Button, Card, Collapsible, Input, Loading, Muted, Notice, ProgressBar, Screen, Segmented, SectionLabel, Sheet, StepsBar, useKitStyles } from '@/ui/kit';
+import { Avatar, Button, Card, Collapsible, Input, Loading, Muted, Notice, ProgressBar, Screen, Segmented, SectionLabel, Sheet, Stat, StepsBar, useKitStyles } from '@/ui/kit';
 
 type Mode = 'targets' | 'picks';
 
@@ -81,6 +81,7 @@ export default function Plan() {
   const buys = plan && budgetSet && !plan.errors.length ? plan.rows.filter((r) => r.shares > 0 && r.price !== null) : [];
   const complete = Boolean(plan && budgetSet && !plan.errors.length && plan.remaining === 0);
   const feePct = parseNumber(fee) ?? 0;
+  const boughtList = useMemo(() => monthBuys(portfolio, month), [portfolio, month]);
 
   async function refreshPrices() {
     setPricing(true);
@@ -124,9 +125,15 @@ export default function Plan() {
           {budgetSet ? moneyShort(plan?.budget ?? 0) : 'Not set'}
         </Text>
         <StepsBar fraction={spentFraction} />
-        <View style={styles.row}>
-          <Text style={styles.text}>Bought this month {moneyShort(plan?.already ?? 0)}</Text>
-          {budgetSet ? <Text style={styles.number}>{moneyShort(plan?.remaining ?? 0)} left</Text> : null}
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <Stat label="Bought">
+            <Text style={styles.number} accessibilityLabel={`Bought ${moneyShort(plan?.already ?? 0)}`}>{moneyShort(plan?.already ?? 0)}</Text>
+          </Stat>
+          {budgetSet ? (
+            <Stat label="Left to invest">
+              <Text style={styles.number}>{moneyShort(plan?.remaining ?? 0)}</Text>
+            </Stat>
+          ) : null}
         </View>
         <Button
           label={budgetSet ? `Edit ${monthName} budget` : `Set ${monthName}’s budget`}
@@ -136,6 +143,23 @@ export default function Plan() {
           accessibilityHint={readOnly ? 'Past months cannot be changed here' : undefined}
         />
       </Card>
+
+      {boughtList.length ? (
+        <Collapsible title={`Bought in ${monthName} · ${boughtList.length} ${boughtList.length === 1 ? 'buy' : 'buys'}`} defaultOpen>
+          <View style={{ marginHorizontal: -16, marginBottom: -8 }}>
+            {boughtList.map((b, i) => (
+              <View key={b.id} accessible accessibilityLabel={`${b.ticker}, ${b.shares} shares${b.price === null ? '' : ` at ${money(b.price)}`}, ${shortDate(b.date)}, ${money(b.amount)}`} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }, i > 0 && { borderTopWidth: 1, borderTopColor: colors.line }]}>
+                <Avatar ticker={b.ticker} size={36} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.strong}>{b.ticker}</Text>
+                  <Text style={styles.muted} numberOfLines={2}>{b.shares} shares{b.price === null ? '' : ` @ ${money(b.price)}`} · {shortDate(b.date, new Date().getFullYear())}</Text>
+                </View>
+                <Text style={styles.number}>{money(b.amount)}</Text>
+              </View>
+            ))}
+          </View>
+        </Collapsible>
+      ) : null}
 
       <Segmented label="Plan mode" value={mode} onChange={setMode} options={portfolio.companies.length ? [{ key: 'targets', label: 'Targets' }, { key: 'picks', label: '🧪 Monthly Picks' }] : [{ key: 'targets', label: 'Targets' }]} />
       {message ? <Notice tone={message.error ? 'error' : 'success'}>{message.text}</Notice> : null}

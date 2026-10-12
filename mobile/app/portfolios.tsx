@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,6 +15,7 @@ import {
   setPortfolioLocked,
   LEGACY_PORTFOLIO_ID,
 } from '@shared/portfolio-account.ts';
+import { contentsLabel, portfolioContents } from '@/data/scope';
 import { usePortfolio } from '@/data/usePortfolio';
 import { useVault } from '@/vault/VaultProvider';
 import {
@@ -24,6 +25,7 @@ import {
   Muted,
   Notice,
   Screen,
+  StatusChip,
   useKitStyles,
 } from '@/ui/kit';
 
@@ -60,46 +62,54 @@ export default function Portfolios() {
         Manage broker accounts and investment goals under one login.
       </Muted>
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {p.account?.portfolios.map((entry) => (
-        <Card key={entry.id}>
-          <Text style={styles.strong}>{entry.name}</Text>
-          <Muted>{entry.locked ? 'Locked · read only' : 'Open for edits'}</Muted><Button label={entry.locked?'Unlock':'Lock'} variant="text" disabled={busy || p.offline} onPress={()=>void change(async()=>{await session.saveAccount(setPortfolioLocked(session.account,entry.id,!entry.locked),p.revision)})} />
-          <Button
-            label="Rename"
-            variant="text"
-            onPress={() => {
-              setEditing(entry.id);
-              setName(entry.name);
-            }}
-            disabled={busy || p.offline}
-          />
-          {entry.id !== LEGACY_PORTFOLIO_ID && !entry.locked && !hasFinancialRecords(entry.portfolio) &&
-          p.account!.portfolios.length > 1 ? (
-            <Button
-              label="Delete empty portfolio"
-              variant="text"
-              disabled={busy || p.offline}
-              onPress={() =>
-                Alert.alert('Delete empty portfolio?', entry.name, [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: () =>
-                      void change(async () => {
-                        await session.saveAccount(
-                          removePortfolio(session.account, entry.id),
-                          p.revision,
-                        );
-                        if (p.selectedId === entry.id) p.select(ALL_PORTFOLIOS);
-                      }),
-                  },
-                ])
-              }
-            />
-          ) : null}
-        </Card>
-      ))}
+      {p.account?.portfolios.map((entry) => {
+        const canDelete = entry.id !== LEGACY_PORTFOLIO_ID && !entry.locked && !hasFinancialRecords(entry.portfolio) && p.account!.portfolios.length > 1;
+        return (
+          <Card key={entry.id}>
+            <View style={styles.row}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.strong} numberOfLines={1}>{entry.name}</Text>
+                <Muted>{contentsLabel(portfolioContents(entry.portfolio))}</Muted>
+              </View>
+              <StatusChip text={entry.locked ? 'Locked' : 'Open'} tone={entry.locked ? 'warn' : 'neutral'} icon={entry.locked ? 'lock' : undefined} />
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginLeft: -8 }}>
+              <Button
+                label="Rename"
+                variant="text"
+                icon="edit"
+                onPress={() => {
+                  setEditing(entry.id);
+                  setName(entry.name);
+                }}
+                disabled={busy || p.offline}
+              />
+              <Button label={entry.locked ? 'Unlock' : 'Lock'} variant="text" icon="lock" disabled={busy || p.offline} onPress={() => void change(async () => { await session.saveAccount(setPortfolioLocked(session.account, entry.id, !entry.locked), p.revision); })} />
+              {canDelete ? (
+                <Button
+                  label="Delete"
+                  variant="text"
+                  disabled={busy || p.offline}
+                  onPress={() =>
+                    Alert.alert('Delete empty portfolio?', entry.name, [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () =>
+                          void change(async () => {
+                            await session.saveAccount(removePortfolio(session.account, entry.id), p.revision);
+                            if (p.selectedId === entry.id) p.select(ALL_PORTFOLIOS);
+                          }),
+                      },
+                    ])
+                  }
+                />
+              ) : null}
+            </View>
+          </Card>
+        );
+      })}
       <Input
         label={editing ? 'New portfolio name' : 'Create portfolio'}
         value={name}
