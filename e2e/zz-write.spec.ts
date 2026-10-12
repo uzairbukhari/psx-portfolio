@@ -9,8 +9,8 @@ test('a transaction saved in the app is encrypted, stored and still there after 
 
   await app.getByRole('button', { name: /Add transaction/ }).first().click();
   const dialog = app.getByRole('dialog', { name: 'Add transaction' });
-  await dialog.getByLabel('Transaction portfolio').selectOption({ label: 'AHL Core' });
-  // The company is already filled in when the dialog is opened from its page.
+  // The dialog opens on the chosen portfolio with the company already filled in; picking a portfolio again would clear the company.
+  await expect(dialog.getByLabel('Transaction portfolio')).toHaveValue(/.+/);
   await dialog.getByLabel('Number of shares').fill('25');
   await dialog.getByLabel(/Price per share/).fill('50');
   const failedCalls: string[] = [];
