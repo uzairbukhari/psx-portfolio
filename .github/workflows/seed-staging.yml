@@ -2,8 +2,8 @@ name: Seed staging
 
 # Fills the STAGING D1 database with public PSX market data for a few tickers (using
 # the same scrapers as production, aimed at the staging DB). It seeds no portfolio:
-# portfolios are end-to-end encrypted, so staging holds none until a tester restores
-# the fictional file from `node scripts/seed-staging.mjs`. Never reads or writes the
+# portfolios are end-to-end encrypted, so the fictional test account's portfolios are seeded
+# through its vault by `node scripts/seed-test-account.mjs --target=staging` (see docs/testing.md). Never reads or writes the
 # production database; D1_DATABASE_ID is read from env.staging in wrangler.jsonc.
 on:
   workflow_dispatch:
@@ -11,13 +11,13 @@ on:
       tickers:
         description: 'Comma-separated tickers to scrape'
         required: false
-        default: 'MEBL,LUCK,OGDC,HUBC,ENGRO,SYS'
+        default: 'MEBL,HBL,LUCK,FCCL,OGDC,PPL,PSO,HUBC,EFERT,FFC,SYS,AIRLINK,SEARL,INDU,TRG'
   workflow_call:
     inputs:
       tickers:
         type: string
         required: false
-        default: 'MEBL,LUCK,OGDC,HUBC,ENGRO,SYS'
+        default: 'MEBL,HBL,LUCK,FCCL,OGDC,PPL,PSO,HUBC,EFERT,FFC,SYS,AIRLINK,SEARL,INDU,TRG'
 
 concurrency:
   group: seed-staging
@@ -67,3 +67,5 @@ jobs:
         run: node scripts/psx-directory-scrape.mjs --mode=bootstrap --limit=80
       - name: Scrape gold rates
         run: node scripts/metal-rates-scrape.mjs
+      - name: Add test fixtures the scrapers cannot fill (fund prices, test account role)
+        run: node scripts/seed-staging-public.mjs
