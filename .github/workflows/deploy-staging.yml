@@ -218,8 +218,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-  # Smoke-tests the deployed staging app as the fictional test account (reseeds its vault first). Skipped until the
-  # `TEST_LOGIN_SECRET` staging environment secret exists.
+  # Smoke-tests the deployed staging app as the fictional test account (reseeds its vault first). This is the merge
+  # gate (see the `e2e-gate` job): a missing `TEST_LOGIN_SECRET` fails the run instead of silently passing.
   e2e:
     needs: [merge, deploy]
     runs-on: ubuntu-latest
@@ -232,8 +232,8 @@ jobs:
         id: configured
         run: |
           if [ -z "$TEST_LOGIN_SECRET" ]; then
-            echo "::notice::No TEST_LOGIN_SECRET staging secret: skipping the staging end-to-end tests (see docs/testing.md)."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error::No TEST_LOGIN_SECRET staging secret, so the end-to-end tests cannot run and the merge gate stays red (see docs/testing.md)."
+            exit 1
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
@@ -261,3 +261,22 @@ jobs:
             playwright-report
             test-results
           retention-days: 7
+
+  # The single check to mark as REQUIRED in branch protection / the ruleset for `main`. It runs even when an
+  # earlier job failed or was skipped (a skipped job would otherwise count as passing) and is green only when
+  # the staging end-to-end tests really ran and passed.
+  e2e-gate:
+    needs: [merge, check, deploy, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require a passing end-to-end run
+        env:
+          RESULTS: ${{ needs.merge.result }} ${{ needs.check.result }} ${{ needs.deploy.result }} ${{ needs.e2e.result }}
+        run: |
+          echo "merge check deploy e2e: $RESULTS"
+          if [ "$RESULTS" != "success success success success" ]; then
+            echo "::error::Staging checks did not all pass, so this PR must not be merged."
+            exit 1
+          fi

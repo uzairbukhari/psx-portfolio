@@ -58,8 +58,25 @@ node scripts/seed-test-account.mjs --target=staging   # reset the staging vault 
 npm run e2e:staging                                   # seed + smoke suite against https://staging.sipwise.trade
 ```
 
-CI: `deploy-staging.yml` runs the `e2e` job after every staging deploy (skipped until the secret exists). Override the
+CI: `deploy-staging.yml` runs the `e2e` job after every staging deploy; a missing secret fails it. Override the
 URL with `E2E_BASE_URL`. Staging prices are real and move, so specs assert exact numbers on local only.
+
+## Blocking merges on a failing run
+
+The `e2e-gate` job in `deploy-staging.yml` is green only when merge, check, deploy and e2e all succeeded. Make it
+required once (repo admin):
+
+Settings > Rules > Rulesets (or Branches > Branch protection) for `main` > "Require status checks to pass" > add
+**`e2e-gate`** (workflow "Deploy staging"), and enable "Require branches to be up to date". Or with the CLI:
+
+```bash
+gh api -X PUT repos/<owner>/<repo>/branches/main/protection --input - <<'JSON'
+{"required_status_checks":{"strict":true,"contexts":["e2e-gate"]},"enforce_admins":false,
+ "required_pull_request_reviews":null,"restrictions":null}
+JSON
+```
+
+Fork PRs never get the staging secrets, so the gate fails for them by design.
 
 ## Exploring by hand (Claude in Chrome)
 
