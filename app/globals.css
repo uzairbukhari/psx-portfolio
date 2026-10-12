@@ -532,3 +532,14 @@ html[data-app-env=staging] .app-header .brand::after{content:'STAGING';margin-le
 @media(max-width:480px){.header-brand-group .logo-word{display:none}.header-brand-group .brand{gap:4px}.app-header .hdr-btn{width:32px;height:32px;padding:0}.app-header .account-trigger{gap:4px;padding:3px 6px}}
 
 .pulse-holdings__cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}@media(max-width:620px){.pulse-holdings__cols{grid-template-columns:1fr;gap:18px}}
+
+/* Header navigation: links in a <nav> that keep the look of the old line tabs. */
+.app-nav{display:flex;align-items:stretch;justify-content:center}
+.app-nav-link{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-size:14px;font-weight:500;text-decoration:none;transition:color .15s ease}
+.app-nav-link::after{content:'';position:absolute;opacity:0;transition:opacity .15s ease}
+.app-nav-link[aria-current=page]::after{opacity:1}
+.app-nav-link:focus-visible{outline:2px solid var(--ring);outline-offset:-3px;border-radius:6px}
+@media(prefers-reduced-motion:reduce){.app-nav-link,.app-nav-link::after{transition:none}}
+/* Cross-fade between pages (see withViewTransition in app-nav.tsx). */
+::view-transition-old(root),::view-transition-new(root){animation-duration:160ms;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+@media(prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}}

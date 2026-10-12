@@ -17,12 +17,16 @@ import {
   type VaultSession,
   type VaultStatus,
 } from '@/lib/vault-client';
-import { MIN_PASSWORD_CHARS, VaultError, decodeRecoverySecret } from '@/lib/vault-crypto';
+import { MIN_PASSWORD_CHARS, VaultError, decodeRecoverySecret, setKdfRunner } from '@/lib/vault-crypto';
 import { forgetTabKey, keepTabKey, recallTabKey } from '@/lib/vault-tab-keep';
 import { browserTabKeepStore } from './vault-tab-store';
 import { webVaultTransport } from './vault-transport';
+import { deriveKey } from './kdf-client';
 import { reportAccountState, track } from './analytics';
 import './vault.css';
+
+// Argon2id runs in a Worker thread in the browser, so unlocking never freezes the page.
+setKdfRunner(deriveKey);
 
 export const INACTIVITY_LOCK_MS = 15 * 60_000;
 
@@ -309,7 +313,7 @@ function Unlock({
   const [recovery, setRecovery] = useState('');
   const [again, setAgain] = useState('');
   const [typed, setTyped] = useState('');
-  const [keep, setKeep] = useState(true);
+  const [keep, setKeep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function run(work: () => Promise<VaultSession | void>) {

@@ -37,6 +37,7 @@ import { useConfirm } from '@/components/confirm-dialog';
 import { ThemeSetting } from './theme-menu';
 import { analyticsEnabled, setAnalyticsEnabled, track, flushAnalytics } from './analytics';
 import { Switch } from '@/components/ui/switch';
+import { webMcpEnabled, setWebMcpEnabled } from './webmcp-pref';
 import { UserAvatar } from './user-avatar';
 import { ImportPanel, UploadButton } from './settings-imports';
 import type { ImportKind, ImportSummary } from '@/lib/import-detect';
@@ -242,7 +243,11 @@ export default function SettingsView({
   }
   const [active, setActive] = useState(initialSection ?? 'account');
   const [shareStats, setShareStats] = useState(true);
-  useEffect(() => setShareStats(analyticsEnabled()), []);
+  const [browserAssistant, setBrowserAssistant] = useState(false);
+  useEffect(() => {
+    setShareStats(analyticsEnabled());
+    setBrowserAssistant(webMcpEnabled());
+  }, []);
   const sections = [
     { id: 'account', label: 'Account', icon: UserRound },
     ...(portfolios ? [{id:'portfolios',label:'Portfolios',icon:Database}] : []),
@@ -361,6 +366,27 @@ export default function SettingsView({
                     onCheckedChange={(on) => {
                       setShareStats(on);
                       setAnalyticsEnabled(on);
+                    }}
+                  />
+                </Row>
+              </Section>
+
+              <Section
+                id="browser-assistant"
+                icon={<ShieldCheck size={18} />}
+                title="Browser assistants"
+                description="Some browsers let an AI assistant call tools offered by the page."
+              >
+                <Row
+                  label="Let a browser assistant read my portfolio"
+                  hint="Read-only: holdings, quote dates and the monthly plan. Off by default and kept on this device. Applies from the next page load."
+                >
+                  <Switch
+                    checked={browserAssistant}
+                    aria-label="Let a browser assistant read my portfolio"
+                    onCheckedChange={(on) => {
+                      setBrowserAssistant(on);
+                      setWebMcpEnabled(on);
                     }}
                   />
                 </Row>

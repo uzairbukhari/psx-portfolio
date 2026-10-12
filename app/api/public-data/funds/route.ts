@@ -1,4 +1,6 @@
+import { waitUntil } from 'cloudflare:workers';
 import { db, failure, identity } from '@/lib/server';
+import { edgeCached } from '@/lib/edge-cache';
 import {
   readFundCatalog,
   readFundHistory,
@@ -23,10 +25,11 @@ export async function GET(req: Request) {
     const fund = params.get('fund');
     if (fund !== null && !/^\d{1,8}$/.test(fund))
       throw new UserError('Invalid fund id.');
+    // Public and identical for everyone; MUFAP prices change once a day, so five minutes at the edge is safe.
     const body =
       fund === null
-        ? await readFundCatalog(db())
-        : await readFundHistory(db(), fund);
+        ? await edgeCached('fund-catalog', 300, () => readFundCatalog(db()), waitUntil)
+        : await edgeCached(`fund-history:${fund}`, 300, () => readFundHistory(db(), fund), waitUntil);
     return Response.json(body, {
       headers: { 'Cache-Control': 'private, max-age=900' },
     });

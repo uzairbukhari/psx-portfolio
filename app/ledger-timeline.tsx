@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { ChevronDown, Pencil, Search } from 'lucide-react';
-import { money, realizedSales, type Portfolio } from '@/lib/portfolio';
+import { money, moneyShort, realizedSales, type Portfolio } from '@/lib/portfolio';
+import { KpiStrip } from './kpi-strip';
 import {
   FILTERS,
-  MONTHS,
   monthLabel,
   sipChip,
   cents,
@@ -78,7 +78,7 @@ export default function LedgerTimeline({
   const pnl = cents(pnlKnown.reduce((a, e) => a + (gainOf(e) ?? 0), 0));
   const pnlUnknown = sales.length - pnlKnown.length;
   const signed = (n: number) =>
-    (n > 0 ? '+' : n < 0 ? '−' : '') + money(Math.abs(n));
+    (n > 0 ? '+' : n < 0 ? '−' : '') + moneyShort(Math.abs(n));
 
   const groups: [string, LedgerEntry[]][] = [];
   for (const e of visible) {
@@ -102,41 +102,20 @@ export default function LedgerTimeline({
   return (
     <div className="ledger">
       {!hideKpis && (
-        <div className="ledger-kpis">
-          <div>
-            <span>Invested</span>
-            <b>{money(cents(sum(['buy', 'opening'])))}</b>
-          </div>
-          <div>
-            <span>Sold</span>
-            <b>{money(cents(sum(['sell'])))}</b>
-          </div>
-          <div>
-            <span>Realised profit / loss</span>
-            {sales.length === 0 ? (
-              <b>—</b>
-            ) : (
-              <b
-                className={
-                  pnl > 0 ? 'pos-text' : pnl < 0 ? 'neg-text' : undefined
-                }
-              >
-                {signed(pnl)}
-              </b>
-            )}
-            {pnlUnknown > 0 && (
-              <small>{pnlUnknown} sale(s) without a cost basis</small>
-            )}
-          </div>
-          <div>
-            <span>Dividends received</span>
-            <b className="pos-text">{money(cents(sum(['dividend'])))}</b>
-          </div>
-          <div>
-            <span>Fees paid</span>
-            <b>{money(cents(fees))}</b>
-          </div>
-        </div>
+        <KpiStrip
+          items={[
+            { label: 'Invested', value: moneyShort(cents(sum(['buy', 'opening']))), primary: true },
+            { label: 'Sold', value: moneyShort(cents(sum(['sell']))) },
+            {
+              label: 'Realised profit / loss',
+              value: sales.length === 0 ? '—' : signed(pnl),
+              tone: sales.length === 0 ? undefined : pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : undefined,
+              note: pnlUnknown > 0 ? `${pnlUnknown} sale(s) without a cost basis` : undefined,
+            },
+            { label: 'Dividends received', value: moneyShort(cents(sum(['dividend']))), tone: 'pos' },
+            { label: 'Fees paid', value: moneyShort(cents(fees)) },
+          ]}
+        />
       )}
       <div className="ledger-bar">
         <div className="seg" aria-label="Entry type">

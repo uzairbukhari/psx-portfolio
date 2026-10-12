@@ -1,6 +1,8 @@
 'use client';
 import './dashboard-styles';
 import { ownedKey } from './asset-keys';
+import { webMcpEnabled } from './webmcp-pref';
+import { cachedHoldings, cachedTaxSummary } from './portfolio-memo';
 import { useConfirm } from '@/components/confirm-dialog';
 import {
   useEffect,
@@ -11,7 +13,8 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { usePathname } from 'next/navigation';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { DashboardSkeleton } from './dashboard-skeleton';
+import { AppNav, NavPanel, useRouteMeta, type NavItem } from './app-nav';
 import {
   Dialog,
   DialogContent,
@@ -778,6 +781,7 @@ function DashboardContent({
   const [planFocus, setPlanFocus] = useState(() =>
     planFromPathname(initialPathname),
   );
+  useRouteMeta(tab, tab === 'company' ? companyTicker : undefined);
   function setTab(requested: string) {
     const next = allowTab(requested, isAdmin);
     setTabState(next);
@@ -1363,7 +1367,7 @@ function DashboardContent({
         };
       }
     ).modelContext;
-    if (!context?.registerTool || !p) return;
+    if (!context?.registerTool || !p || !webMcpEnabled()) return;
     const abort = new AbortController();
     try {
       Promise.resolve(
@@ -1386,7 +1390,7 @@ function DashboardContent({
               if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m))
                 throw Error('Invalid month');
               return {
-                holdings: holdings(p),
+                holdings: cachedHoldings(p),
                 plan: plan(p, m, fees, allowOld),
               };
             },
@@ -1504,16 +1508,7 @@ function DashboardContent({
     };
   }, [workspace, picksHome, p]);
   if (!p && email && !(failed && message))
-    return (
-      <main className="app-loading">
-        <div className="brand">
-          <LogoMark size={28} />
-          <Wordmark />
-        </div>
-        <Spinner className="size-6" />
-        <p className="muted">Loading your holdings…</p>
-      </main>
-    );
+    return <DashboardSkeleton />;
   // Signed-out visitors never reach the dashboard: DashboardRoute (a Server Component) renders the landing.
   if (!p && !email) return null;
   if (!p) return <LoadError message={message} busy={busy} onRetry={load} />;
@@ -1523,7 +1518,7 @@ function DashboardContent({
     mode: (isAll ? 'index' : 'holdings') as 'index' | 'holdings',
     tickers: isAll
       ? []
-      : holdings(p)
+      : cachedHoldings(p)
           .filter((h) => h.shares > 0)
           .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
           .map((h) => h.ticker)
@@ -1884,7 +1879,7 @@ function DashboardContent({
       await load();
       notify('Tax status saved for all portfolios.');
     });
-  const hs = holdings(p)
+  const hs = cachedHoldings(p)
       .slice()
       .sort((a, b) => (b.value ?? -1) - (a.value ?? -1)),
     held = hs.filter((h) => h.shares > 0),
@@ -2050,7 +2045,7 @@ function DashboardContent({
     tab === 'notifications';
   // A portfolio with nothing in it shows only its start screen: no tabs to open.
   const hideTabs = chromeless || (p.companies.length === 0 && !hasAssets);
-  const taxedDividends = taxSummary(p).dividends;
+  const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
       ...buildAssetEntries(ticker ? [] : allAssets, () => setTab('holdings')),
@@ -2611,6 +2606,20 @@ function DashboardContent({
     setCompany(null);
     setCreatingCompany(false);
   }
+  const navItems: NavItem[] = [
+    { tab: 'holdings', href: '/', label: 'Holdings', short: 'Holdings', icon: <Wallet className="tab-icon" aria-hidden="true" /> },
+    { tab: 'reports', href: '/reports', label: 'Reports', short: 'Reports', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
+    { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
+    ...(hasStocks
+      ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
+      : []),
+    ...(isAdmin
+      ? [
+          { tab: 'research-desk', href: '/research-desk', label: 'Research desk', short: 'Research', icon: <FlaskConical className="tab-icon" aria-hidden="true" /> },
+          { tab: 'ai-lab', href: '/ai-lab', label: 'AI Lab', short: 'AI Lab', icon: <Microscope className="tab-icon" aria-hidden="true" /> },
+        ]
+      : []),
+  ];
   return (
     <CompanyNavProvider value={openCompany}>
       <main className="desk">
@@ -2624,7 +2633,7 @@ function DashboardContent({
             } else processImportFile(request.file, request.expected);
           }}
         />
-        <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+        <div className="flex flex-col gap-2">
           <header className={'app-header' + (hideTabs ? ' no-tabs' : '')}>
             <div className="header-brand-group">
               <button
@@ -2816,47 +2825,14 @@ function DashboardContent({
               )}
             </div>
             {!hideTabs && (
-              <TabsList variant="line">
-                <TabsTrigger value="holdings">
-                  <Wallet className="tab-icon" aria-hidden="true" />
-                  <span className="tab-long">Holdings</span>
-                  <span className="tab-short">Holdings</span>
-                </TabsTrigger>
-                <TabsTrigger value="reports">
-                  <BarChart3 className="tab-icon" aria-hidden="true" />
-                  <span className="tab-long">Reports</span>
-                  <span className="tab-short">Reports</span>
-                </TabsTrigger>
-                <TabsTrigger value="history">
-                  <ScrollText className="tab-icon" aria-hidden="true" />
-                  <span className="tab-long">Activity</span>
-                  <span className="tab-short">Activity</span>
-                </TabsTrigger>
-                {hasStocks && (
-                  <TabsTrigger value="sip" title="Experimental feature">
-                    <FlaskConical className="tab-icon tab-flask" aria-hidden="true" />
-                    <span className="tab-long">Monthly Picks</span>
-                    <span className="tab-short">Picks</span>
-                  </TabsTrigger>
-                )}
-                {isAdmin && (
-                  <TabsTrigger value="research-desk">
-                    <FlaskConical className="tab-icon" aria-hidden="true" />
-                    <span className="tab-long">Research desk</span>
-                    <span className="tab-short">Research</span>
-                  </TabsTrigger>
-                )}
-                {isAdmin && (
-                  <TabsTrigger value="ai-lab">
-                    <Microscope className="tab-icon" aria-hidden="true" />
-                    <span className="tab-long">AI Lab</span>
-                    <span className="tab-short">AI Lab</span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
+              <AppNav
+                items={navItems}
+                active={tab}
+                onNavigate={setTab}
+              />
             )}
           </header>
-          <TabsContent value="holdings">
+          <NavPanel id="holdings" tab={tab}>
             {p.companies.length === 0 && !hasAssets ? (
               <div className="panel empty-holdings">
                 <span className="empty-holdings-icon" aria-hidden="true">
@@ -3408,8 +3384,8 @@ function DashboardContent({
               }
               onOpenFund={openFund}
             />
-          </TabsContent>
-          <TabsContent value="reports">
+          </NavPanel>
+          <NavPanel id="reports" tab={tab}>
             {isAll ? (
               <AllReports
                 portfolio={p}
@@ -3429,8 +3405,8 @@ function DashboardContent({
             ) : (
               <PortfolioReports portfolio={p} />
             )}
-          </TabsContent>
-          <TabsContent value="sip">
+          </NavPanel>
+          <NavPanel id="sip" tab={tab}>
             {!hasStocks ? (
               <div className="panel empty-holdings">
                 <h2>Monthly Picks needs a stock</h2>
@@ -3472,8 +3448,8 @@ function DashboardContent({
                 }}
               />
             )}
-          </TabsContent>
-          <TabsContent value="history">
+          </NavPanel>
+          <NavPanel id="history" tab={tab}>
             <div className="activity-head">
               <h2>Activity</h2>
               <button
@@ -3493,8 +3469,8 @@ function DashboardContent({
               entries={ledgerEntries(undefined)}
               onOpenCompany={openCompany}
             />
-          </TabsContent>
-          <TabsContent value="fund">
+          </NavPanel>
+          <NavPanel id="fund" tab={tab}>
             <MutualFundsSection
               focusKey={fundFocus}
               onSwitchPortfolio={(key) => {
@@ -3532,8 +3508,8 @@ function DashboardContent({
                 )
               }
             />
-          </TabsContent>
-          <TabsContent value="metal">
+          </NavPanel>
+          <NavPanel id="metal" tab={tab}>
             <GoldSilverSection
               focusKey={metalFocus}
               onBack={() => setTab('holdings')}
@@ -3561,8 +3537,8 @@ function DashboardContent({
                 )
               }
             />
-          </TabsContent>
-          <TabsContent value="plan">
+          </NavPanel>
+          <NavPanel id="plan" tab={tab}>
             <SavingsPlansSection
               focusKey={planFocus}
               onBack={() => setTab('holdings')}
@@ -3590,8 +3566,8 @@ function DashboardContent({
                 )
               }
             />
-          </TabsContent>
-          <TabsContent value="company">
+          </NavPanel>
+          <NavPanel id="company" tab={tab}>
             {companyTicker && (
               <CompanyDetail
                 portfolio={p}
@@ -3627,27 +3603,27 @@ function DashboardContent({
                 onConfirmDividend={openReceipt}
               />
             )}
-          </TabsContent>
+          </NavPanel>
           {isAdmin && (
-            <TabsContent value="research-desk">
+            <NavPanel id="research-desk" tab={tab}>
               <ResearchDesk
                 portfolio={p}
                 onSave={save}
                 onOpenSettings={() => setTab('settings')}
               />
-            </TabsContent>
+            </NavPanel>
           )}
           {isAdmin && (
-            <TabsContent value="ai-lab">
+            <NavPanel id="ai-lab" tab={tab}>
               <AiLab
                 portfolio={p}
                 busy={busy}
                 onSave={save}
                 onOpenCompany={openCompany}
               />
-            </TabsContent>
+            </NavPanel>
           )}
-          <TabsContent value="settings">
+          <NavPanel id="settings" tab={tab}>
             <SettingsView
               key={settingsEntry.n}
               initialSection={settingsEntry.section}
@@ -3697,16 +3673,16 @@ function DashboardContent({
                 />
               }
             />
-          </TabsContent>
-          <TabsContent value="notifications">
+          </NavPanel>
+          <NavPanel id="notifications" tab={tab}>
             <NotificationsView
               notifications={allNotifications}
               busy={busy}
               onChange={updateNotifications}
               onBack={() => setTab('holdings')}
             />
-          </TabsContent>
-        </Tabs>
+          </NavPanel>
+        </div>
         {locked ? (
           <p className="notice">
             This portfolio is locked. Unlock it in Settings → Portfolios to make

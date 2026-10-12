@@ -17,14 +17,14 @@ export async function unlock(page: Page) {
   }
   await page.goto('/');
   const password = page.getByLabel('Vault password');
-  await expect(password.or(page.getByRole('tablist').first())).toBeVisible({ timeout: 60_000 });
+  await expect(password.or(page.getByRole('navigation', { name: 'Main' }).first())).toBeVisible({ timeout: 60_000 });
   if (await password.isVisible()) {
     await password.fill(TEST_VAULT_PASSWORD);
     // Reloads inside this tab then stay unlocked (sessionStorage), so specs can navigate by URL.
     await page.getByLabel(/Keep me unlocked in this tab/).check();
     await page.getByRole('button', { name: 'Unlock' }).click();
   }
-  await expect(page.getByRole('tablist').first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('navigation', { name: 'Main' }).first()).toBeVisible({ timeout: 60_000 });
 }
 
 type Worker = { shared: Page };
@@ -43,7 +43,7 @@ export const test = base.extend<{ app: Page }, Worker>({
   ],
   app: async ({ shared }, provide, testInfo) => {
     await shared.goto('/');
-    await expect(shared.getByRole('tablist').first()).toBeVisible({ timeout: 60_000 });
+    await expect(shared.getByRole('navigation', { name: 'Main' }).first()).toBeVisible({ timeout: 60_000 });
     await provide(shared);
     if (testInfo.status !== testInfo.expectedStatus)
       await testInfo.attach('screenshot', { body: await shared.screenshot({ fullPage: true }), contentType: 'image/png' });
@@ -57,7 +57,7 @@ export const isLocal = !isStaging;
 export async function choosePortfolio(page: Page, name: string) {
   await page.locator('select').first().selectOption({ label: name });
   // A portfolio with no records shows the "Start your portfolio" screen instead of the tabs.
-  await expect(page.getByRole('tablist').first().or(page.getByText('Start your portfolio'))).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('navigation', { name: 'Main' }).first().or(page.getByText('Start your portfolio'))).toBeVisible({ timeout: 30_000 });
 }
 
 /** The visible page text on one line, for loose "this content is on the page" assertions. */
