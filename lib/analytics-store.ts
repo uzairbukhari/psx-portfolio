@@ -226,3 +226,51 @@ export async function auditLog(db: D1Database, f: AuditFilters, secret: string, 
   };
 }
 export type AuditReport = Awaited<ReturnType<typeof auditLog>>;
+
+export type OverviewMetrics = Awaited<ReturnType<typeof overviewMetrics>>;
+
+/** The few numbers on the admin Overview. Internal accounts are left out unless `includeAdmin`, as in usageReport. */
+export async function overviewMetrics(db: D1Database, includeAdmin = false, now = new Date(), internalKeys: string[] = []) {
+  const today = pktDay(now);
+  const adminClause = includeAdmin ? '' : `AND is_admin=0${excludeKeys(internalKeys)}`;
+  const userClause = includeAdmin ? '' : ` AND lower(email) NOT IN (${INTERNAL_EMAILS})`;
+  const all = async <T,>(sql: string, ...p: unknown[]) => (await db.prepare(sql).bind(...p).all<T>()).results;
+  const one = async <T,>(sql: string, ...p: unknown[]) => db.prepare(sql).bind(...p).first<T>();
+  const dayAgo = (n: number) => pktDay(new Date(now.getTime() - n * DAY_MS));
+  const since = dayAgo(29);
+
+  const activity = await all<DayUser>(`SELECT DISTINCT user_key AS userKey, day FROM analytics_events WHERE user_key IS NOT NULL AND day>=? ${adminClause}`, since);
+  const activeOn = (day: string) => activity.filter((r) => r.day === day).length;
+  const signups = async (fromDay: string, toDay: string) => (await one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM app_users WHERE origin IN ('signup','unknown') AND first_seen_at>=? AND first_seen_at<?${userClause}`,
+    `${fromDay}T00:00:00Z`, `${toDay}T00:00:00Z`))?.n ?? 0;
+  const tomorrow = pktDay(new Date(now.getTime() + DAY_MS));
+
+  const errorSince = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+  const errorPrev = new Date(now.getTime() - 48 * 3_600_000).toISOString();
+  const errCount = async (from: string, to: string) => (await one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM analytics_events WHERE event='client_error' AND ts>=? AND ts<? ${adminClause}`, from, to))?.n ?? 0;
+  const top = await one<{ area: string | null; code: string | null; n: number }>(
+    `SELECT json_extract(props,'$.area') AS area, json_extract(props,'$.code') AS code, COUNT(*) AS n FROM analytics_events
+     WHERE event='client_error' AND ts>=? ${adminClause} GROUP BY area, code ORDER BY n DESC LIMIT 1`, errorSince);
+  const prevForTop = top?.code ? (await one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM analytics_events WHERE event='client_error' AND ts>=? AND ts<? AND json_extract(props,'$.code')=? ${adminClause}`, errorPrev, errorSince, top.code))?.n ?? 0 : 0;
+  const errorSeries = await all<{ day: string; n: number }>(
+    `SELECT day, COUNT(*) AS n FROM analytics_events WHERE event='client_error' AND day>=? ${adminClause} GROUP BY day ORDER BY day`, since);
+
+  return {
+    generatedAt: now.toISOString(),
+    activeToday: activeOn(today),
+    activeLastWeek: activeOn(dayAgo(7)),
+    signups7: await signups(dayAgo(6), tomorrow),
+    signupsPrev7: await signups(dayAgo(13), dayAgo(6)),
+    errors24h: await errCount(errorSince, '9999'),
+    errorsPrev24h: await errCount(errorPrev, errorSince),
+    topError: top?.code ? { area: top.area ?? 'other', code: top.code, n: top.n, before: prevForTop } : null,
+    dailyActive: dailyActive(activity, today, 30),
+    errorSeries: Array.from({ length: 30 }, (_, i) => {
+      const day = dayAgo(29 - i);
+      return { day, n: errorSeries.find((r) => r.day === day)?.n ?? 0 };
+    }),
+  };
+}
