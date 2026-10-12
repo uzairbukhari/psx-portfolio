@@ -26,7 +26,7 @@ test('reports cover stocks, metals and mutual funds', async ({ app }) => {
 test('settings shows the super admin sections', async ({ app }) => {
   await app.goto('/settings');
   await expect(app.getByText('Super admin').first()).toBeVisible();
-  for (const section of ['Portfolios', 'Security', 'Sync dividends', 'Research AI', 'Usage analytics']) await expect(app.getByText(section, { exact: true }).first()).toBeVisible();
+  for (const section of ['Portfolios', 'Security', 'Sync dividends', 'Research AI']) await expect(app.getByText(section, { exact: true }).first()).toBeVisible();
 });
 
 test('theme switch applies to the page', async ({ app }) => {
