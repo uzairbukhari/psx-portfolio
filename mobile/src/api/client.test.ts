@@ -83,3 +83,13 @@ test('delete can carry a JSON body (account deletion confirmation)', async () =>
   await api.delete('/api/mobile-sessions?id=1');
   assert.equal(seen.body, undefined);
 });
+
+test('a Cloudflare limit page becomes a calm message with a platform code', async () => {
+  const api = createApiClient({
+    baseUrl: 'https://x.test',
+    getToken: async () => 'tok',
+    fetcher: (async () => new Response('<html><title>Error 1102</title>Worker exceeded resource limits</html>', { status: 503 })) as unknown as typeof fetch,
+  });
+  await assert.rejects(() => api.get('/api/v3/portfolio'), (e: unknown) =>
+    e instanceof ApiRequestError && e.status === 503 && e.code === 'cf_worker_limit' && /busy/.test(e.message));
+});

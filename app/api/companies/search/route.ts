@@ -11,6 +11,6 @@ export async function GET(req: Request) {
     const hits = await searchDirectory(db(), params.get('q'));
     return Response.json({ companies: hits }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

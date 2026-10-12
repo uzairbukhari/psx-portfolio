@@ -75,6 +75,6 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }

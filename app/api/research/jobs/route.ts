@@ -55,7 +55,7 @@ export async function GET(req: Request) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }
 
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       { status: 201 },
     );
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }
 
@@ -174,7 +174,7 @@ export async function PATCH(req: Request) {
       .first<ResearchJobRow>();
     return Response.json({ job: publicJob(updated!) });
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }
 
@@ -206,6 +206,6 @@ export async function DELETE(req: Request) {
     ]);
     return Response.json({ ok: true });
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }

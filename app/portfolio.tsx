@@ -54,6 +54,7 @@ import {
   FlaskConical,
   Microscope,
   LockKeyhole,
+  ShieldCheck,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
 import {
@@ -663,7 +664,7 @@ type DashboardProps = {
   email: string | null;
   name: string | null;
   picture: string | null;
-  role: 'super_admin' | 'user';
+  role: 'super_admin' | 'tester' | 'user';
 };
 /**
  * Signed in is not enough: the dashboard only mounts once the vault is unlocked. Locking (or signing out) unmounts
@@ -2736,6 +2737,11 @@ function DashboardContent({
                     <DropdownMenuItem onClick={() => setTab('settings')}>
                       <Settings size={15} /> Settings
                     </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
+                        <ShieldCheck size={15} /> Admin console
+                      </DropdownMenuItem>
+                    )}
                     <ThemeMenuItems />
                     {vault && (
                       <DropdownMenuItem onClick={vault.lock}>

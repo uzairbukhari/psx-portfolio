@@ -8,7 +8,7 @@ import { deleteVault } from '@/lib/vault-store';
 import { serializeExpiredCookie } from '@/lib/session';
 import { UserError } from '@/lib/user-error';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const viewer = await getViewer();
     if (!viewer) throw new UserError('Sign in to continue.', 401);
@@ -22,7 +22,7 @@ export async function GET() {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -46,6 +46,6 @@ export async function DELETE(req: Request) {
     headers.append('Set-Cookie', serializeExpiredCookie('session'));
     return Response.json({ deleted: true } satisfies DeleteAccountResponse, { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

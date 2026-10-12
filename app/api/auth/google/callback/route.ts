@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { safeRelativeReturnPath } from '@/lib/auth';
 import { emailAllowed, safeGooglePicture } from '@/lib/google-id-token';
 import { noteSignIn } from '@/lib/analytics-store';
-import { getUserRole } from '@/lib/roles';
+import { getUserRole, isInternal } from '@/lib/roles';
 import {
   readCookieValue,
   serializeCookie,
@@ -78,7 +78,7 @@ async function handleCallback(req: Request): Promise<Response> {
     picture,
   );
 
-  await noteSignIn(env.DB, email, 'web', env.SESSION_SECRET, (await getUserRole(email)) === 'super_admin');
+  await noteSignIn(env.DB, email, 'web', env.SESSION_SECRET, isInternal(await getUserRole(email)));
 
   const headers = new Headers({
     Location: new URL(returnTo, url.origin).toString(),

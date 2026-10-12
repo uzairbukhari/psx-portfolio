@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     await identity(req);
     return Response.json(await faceValueStatus(db(), new URL(req.url).searchParams.get('tickers'), dispatchConfig()), { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -28,6 +28,6 @@ export async function POST(req: Request) {
     if (body && typeof body !== 'object') throw new UserError('Invalid request.');
     return Response.json(await requestFaceValues(db(), user, body.tickers, dispatchConfig()), { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

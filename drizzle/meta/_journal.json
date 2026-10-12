@@ -239,6 +239,27 @@
       "when": 1791725247348,
       "tag": "0033_amusing_luke_cage",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1791791906507,
+      "tag": "0034_striped_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1791795556493,
+      "tag": "0035_striped_the_fallen",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1791796148154,
+      "tag": "0036_neat_virginia_dare",
+      "breakpoints": true
     }
   ]
 }

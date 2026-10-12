@@ -11,7 +11,7 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission); D1_DATABASE_ID to target staging.
 import { pathToFileURL } from 'node:url';
 import { appendFileSync } from 'node:fs';
-import { d1 } from './d1-rest.mjs';
+import { d1, trackRun } from './d1-rest.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents } from '../lib/psx-market.ts';
@@ -31,6 +31,7 @@ async function openRequests() {
 }
 
 async function main() {
+  trackRun('directory', { dryRun });
   const explicit = (arg('tickers') ?? '').split(',').map(normalizeTicker).filter(Boolean);
   const asked = explicit.length ? explicit : await openRequests();
   const onDemand = asked.length > 0;

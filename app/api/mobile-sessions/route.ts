@@ -12,7 +12,7 @@ export async function GET(req: Request) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -26,6 +26,6 @@ export async function DELETE(req: Request) {
     if (!(await revokeMobileSession(email, id))) throw new UserError('Session not found.', 404);
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

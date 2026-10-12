@@ -216,6 +216,6 @@ export async function POST(req: Request) {
     await addEvent(row.id, String(body.stage), message);
     return Response.json({ ok: true });
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }

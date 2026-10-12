@@ -52,3 +52,23 @@ export async function trackedTickers(tickerArg) {
   }
   return [...found].sort();
 }
+
+/**
+ * Records this run in `job_runs` for the admin console when the script ends: success when the exit code is 0, failure
+ * with the error message otherwise. Call it first thing in main(); it does nothing on a dry run or without credentials.
+ * Never throws and never changes the exit code.
+ */
+export function trackRun(job, { dryRun = false } = {}) {
+  if (dryRun || !process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.CLOUDFLARE_API_TOKEN) return;
+  const startedAt = new Date().toISOString();
+  let done = false;
+  const finish = async (ok, detail) => {
+    if (done) return;
+    done = true;
+    const text = detail == null ? null : String(detail instanceof Error ? detail.message : detail).replace(/\s+/g, ' ').slice(0, 300);
+    await d1('INSERT INTO job_runs (job,source,started_at,finished_at,ok,detail) VALUES (?,?,?,?,?,?)',
+      [job, 'github', startedAt, new Date().toISOString(), ok ? 1 : 0, text]).catch(() => {});
+  };
+  process.once('beforeExit', (code) => { void finish((process.exitCode ?? code ?? 0) === 0, process.exitCode ? `Finished with exit code ${process.exitCode}` : null); });
+  process.once('uncaughtException', (error) => { void finish(false, error).finally(() => { console.error(error); process.exit(1); }); });
+}

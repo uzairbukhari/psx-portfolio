@@ -9,6 +9,6 @@ export async function GET(req: Request) {
     const rates = await readMetalRates(db(), today());
     return Response.json({ rates }, { headers: { 'Cache-Control': 'private, max-age=900' } });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

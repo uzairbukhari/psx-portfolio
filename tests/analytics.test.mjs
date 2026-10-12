@@ -114,7 +114,8 @@ import { noteSignIn, resolveOrigin, insertEvents, usageReport, deleteUserEvents 
 function d1() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('CREATE TABLE mobile_sessions (id text, email text, platform text, created_at text, last_seen_at text)');
-  for (const f of ['0032_powerful_mindworm.sql'])
+  sqlite.exec('CREATE TABLE user_roles (email text PRIMARY KEY, role text NOT NULL, created_at text NOT NULL)');
+  for (const f of ['0032_powerful_mindworm.sql', '0034_striped_zarda.sql'])
     sqlite.exec(readFileSync(new URL(`../drizzle/${f}`, import.meta.url), 'utf8').replaceAll('--> statement-breakpoint', ''));
   const stmt = (sql, args = []) => ({
     bind: (...a) => stmt(sql, a),

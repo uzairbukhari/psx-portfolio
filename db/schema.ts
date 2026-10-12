@@ -299,12 +299,77 @@ export const priceHistory = sqliteTable('price_history', {
   intradayFetchedAt: text('intraday_fetched_at'),
 });
 
-// Role assignments by email. No row means the default 'user' role.
+// Role assignments by email. No row means the default 'user' role. 'super_admin' and 'tester' are the internal
+// accounts: both are left out of usage analytics (see lib/internal-accounts.ts).
 export const userRoles = sqliteTable('user_roles', {
   email: text('email').primaryKey(),
   role: text('role').notNull(),
   createdAt: text('created_at').notNull(),
+  note: text('note'),
+  addedBy: text('added_by'),
 });
+
+// What a super admin changed from the admin console (role changes first). `actor` is always a super admin's email.
+export const adminActions = sqliteTable(
+  'admin_actions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    at: text('at').notNull(),
+    actor: text('actor').notNull(),
+    action: text('action').notNull(),
+    target: text('target'),
+    result: text('result').notNull(),
+  },
+  (table) => [index('admin_actions_at_idx').on(table.at)],
+);
+
+// One row per scheduled or manual run of a public data job (scrapers on GitHub, the cron Worker). Public data only:
+// the job name, outcome and a short sanitised message. Pruned after 90 days.
+export const jobRuns = sqliteTable(
+  'job_runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    job: text('job').notNull(),
+    source: text('source').notNull(),
+    startedAt: text('started_at').notNull(),
+    finishedAt: text('finished_at').notNull(),
+    ok: integer('ok').notNull(),
+    detail: text('detail'),
+  },
+  (table) => [index('job_runs_job_idx').on(table.job, table.startedAt)],
+);
+
+// Server-side failures (HTTP 5xx the Worker itself answered), one row per route, code and minute with a count, so a
+// burst cannot flood the table. Route and code only: no message, no user. Pruned after 30 days.
+export const serverErrors = sqliteTable(
+  'server_errors',
+  {
+    route: text('route').notNull(),
+    code: text('code').notNull(),
+    minute: text('minute').notNull(),
+    status: integer('status').notNull(),
+    n: integer('n').notNull().default(1),
+  },
+  (table) => [primaryKey({ columns: [table.route, table.code, table.minute] }), index('server_errors_minute_idx').on(table.minute)],
+);
+
+// Cloudflare's own numbers for each Worker and UTC day, copied in by the cron Worker from the GraphQL Analytics API
+// (only when CF_ANALYTICS_TOKEN is set). `statuses` is a JSON object of invocation status -> count.
+export const platformMetrics = sqliteTable(
+  'platform_metrics',
+  {
+    day: text('day').notNull(),
+    script: text('script').notNull(),
+    requests: integer('requests').notNull().default(0),
+    errors: integer('errors').notNull().default(0),
+    limitHits: integer('limit_hits').notNull().default(0),
+    cpuP50: real('cpu_p50'),
+    cpuP99: real('cpu_p99'),
+    statuses: text('statuses').notNull().default('{}'),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.script] })],
+);
 
 // Per-user fixed-window rate limits for expensive actions (forced PSX refreshes,
 // on-demand facts scrapes). One row per user and action.

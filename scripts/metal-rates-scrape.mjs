@@ -5,10 +5,11 @@
 //   international  world spot price in USD per ounce (gold-api.com) times the dollar rate (open.er-api.com), per tola.
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/metal-rates-scrape.mjs [--dry-run]
-import { d1 } from './d1-rest.mjs';
+import { d1, trackRun } from './d1-rest.mjs';
 import { parseGoldPage, tolaFromSpot } from '../lib/metal-rates.ts';
 
 const dryRun = process.argv.includes('--dry-run');
+trackRun('metals', { dryRun });
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.9' };
 const pktToday = () => new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
 const getJson = async (url) => {

@@ -6,7 +6,7 @@ import { createMobileSession } from '@/lib/mobile-sessions';
 import { failure } from '@/lib/server';
 import { UserError } from '@/lib/user-error';
 import { readLimited } from '@/lib/read-limited';
-import { getUserRole } from '@/lib/roles';
+import { getUserRole, isInternal } from '@/lib/roles';
 import { noteSignIn } from '@/lib/analytics-store';
 import { cleanPlatform } from '@/lib/mobile-sessions';
 
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const sid = await createMobileSession(identity.email, body.deviceName, body.platform);
     const token = await signMobileToken({ ...identity, sid }, env.SESSION_SECRET);
     const role = await getUserRole(identity.email);
-    await noteSignIn(env.DB, identity.email, cleanPlatform(body.platform), env.SESSION_SECRET, role === 'super_admin');
+    await noteSignIn(env.DB, identity.email, cleanPlatform(body.platform), env.SESSION_SECRET, isInternal(role));
     return Response.json(
       {
         token,
@@ -36,6 +36,6 @@ export async function POST(req: Request) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

@@ -1,6 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { getViewer } from '@/lib/auth';
+import { isInternal } from '@/lib/roles';
 import { parseBatch } from '@/lib/analytics-events';
+import { pruneJobRuns } from '@/lib/job-runs';
+import { pruneServerErrors } from '@/lib/server-errors';
 import { purgeOldEvents, recordBatch, resolveOrigin, userKey } from '@/lib/analytics-store';
 import { takeRateLimit } from '@/lib/rate-limit';
 import { readLimited } from '@/lib/read-limited';
@@ -26,13 +29,17 @@ export async function POST(req: Request) {
     // Signed-out visitors can only send a few public-page events.
     const events = viewer ? batch.events : batch.events.filter((e) =>
       e.event === 'landing_viewed' || e.event === 'sign_in_clicked' || (e.event === 'screen_viewed' && ['landing', 'privacy', 'terms', 'sign_in'].includes(e.props.screen)));
-    const admin = viewer?.role === 'super_admin';
+    const admin = !!viewer && isInternal(viewer.role);
     await recordBatch(database, { ...batch, events }, viewer ? who : null, admin);
     const state = events.find((e) => e.event === 'account_state');
     if (viewer && state) await resolveOrigin(database, viewer.email, state.props.vault === 'exists', env.SESSION_SECRET ?? '', admin);
-    if (Math.random() < 0.01) await purgeOldEvents(database);
+    if (Math.random() < 0.01) {
+      await purgeOldEvents(database);
+      await pruneJobRuns(database).catch(() => {});
+      await pruneServerErrors(database).catch(() => {});
+    }
     return new Response(null, { status: 204 });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

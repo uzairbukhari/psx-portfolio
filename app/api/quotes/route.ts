@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     const { snapshot, job } = await requestQuoteJob(db(), dispatchConfig(), tickers, { force });
     return respond(snapshot, job);
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }
 
@@ -88,6 +88,6 @@ export async function GET(req: Request) {
     const { snapshot, job } = await quoteJobStatus(db(), tickers, since);
     return respond(snapshot, job);
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }

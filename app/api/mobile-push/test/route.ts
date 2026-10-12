@@ -54,6 +54,6 @@ export async function POST(req: Request) {
     }
     return Response.json({ sent: results.length }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

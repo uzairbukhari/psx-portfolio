@@ -107,6 +107,6 @@ export async function GET(req: Request) {
       },
     });
   } catch (error) {
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }
