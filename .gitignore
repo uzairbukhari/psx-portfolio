@@ -49,3 +49,4 @@ mobile/sipwise-37903-firebase-adminsdk-fbsvc-9f5b18a76e.json
 /test-results/
 /playwright-report/
 .env.test.local
+financial-data/
