@@ -94,8 +94,8 @@ import AssetReports, { AllReports } from './asset-reports';
 import { reportMode } from '@/lib/asset-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
-import GoldSilverSection, { type OwnedMetal } from './gold-silver';
-import SavingsPlansSection, { type OwnedPlan } from './savings-plans';
+import GoldSilverSection, { metalKey, type OwnedMetal } from './gold-silver';
+import SavingsPlansSection, { planKey, type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
 import MutualFundsSection, { fundKey, type OwnedFund } from './mutual-funds';
 import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
@@ -217,9 +217,8 @@ const PATH_TABS: Record<string, string> = Object.fromEntries([
   ['/history', 'history'],
 ]);
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
-const FUND_PATH = new RegExp('^/funds/([^/]+)/?$');
-function fundFromPathname(pathname: string): string {
-  const match = FUND_PATH.exec(pathname);
+function assetFromPathname(prefix: string, pathname: string): string {
+  const match = new RegExp(`^/${prefix}/([^/]+)/?$`).exec(pathname);
   if (!match) return '';
   try {
     return decodeURIComponent(match[1]);
@@ -227,6 +226,12 @@ function fundFromPathname(pathname: string): string {
     return '';
   }
 }
+const fundFromPathname = (pathname: string) =>
+  assetFromPathname('funds', pathname);
+const metalFromPathname = (pathname: string) =>
+  assetFromPathname('gold', pathname);
+const planFromPathname = (pathname: string) =>
+  assetFromPathname('plans', pathname);
 function subscribeWide(onChange: () => void) {
   const query = window.matchMedia('(min-width: 1100px)');
   query.addEventListener('change', onChange);
@@ -247,7 +252,11 @@ function tabFromPathname(pathname: string): string {
     ? 'company'
     : fundFromPathname(pathname)
       ? 'fund'
-      : (PATH_TABS[pathname] ?? 'holdings');
+      : metalFromPathname(pathname)
+        ? 'metal'
+        : planFromPathname(pathname)
+          ? 'plan'
+          : (PATH_TABS[pathname] ?? 'holdings');
 }
 type ApiResponse = {
   error?: string;
@@ -776,6 +785,12 @@ function DashboardContent({
   const [fundFocus, setFundFocus] = useState(() =>
     fundFromPathname(initialPathname),
   );
+  const [metalFocus, setMetalFocus] = useState(() =>
+    metalFromPathname(initialPathname),
+  );
+  const [planFocus, setPlanFocus] = useState(() =>
+    planFromPathname(initialPathname),
+  );
   function setTab(requested: string) {
     const next = allowTab(requested, isAdmin);
     setTabState(next);
@@ -789,6 +804,8 @@ function DashboardContent({
       setTabState(allowTab(tabFromPathname(window.location.pathname), isAdmin));
       setCompanyTicker(companyFromPathname(window.location.pathname));
       setFundFocus(fundFromPathname(window.location.pathname));
+      setMetalFocus(metalFromPathname(window.location.pathname));
+      setPlanFocus(planFromPathname(window.location.pathname));
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -2029,6 +2046,8 @@ function DashboardContent({
     tab === 'settings' ||
     tab === 'company' ||
     tab === 'fund' ||
+    tab === 'metal' ||
+    tab === 'plan' ||
     tab === 'notifications';
   // A portfolio with nothing in it shows only its start screen: no tabs to open.
   const hideTabs = chromeless || (p.companies.length === 0 && !hasAssets);
@@ -2097,6 +2116,39 @@ function DashboardContent({
     if (window.location.pathname !== path)
       window.history.pushState(null, '', path);
     window.scrollTo({ top: 0 });
+  }
+  /** Opens a gold holding or savings plan's own page; from the All view, inside the portfolio that owns it. */
+  function openOwnedAsset(
+    kind: 'metal' | 'plan',
+    key: string,
+    owner: { portfolioId?: string; asset: { id: string } } | undefined,
+  ) {
+    if (isAll && owner?.portfolioId) {
+      workspace?.choose(owner.portfolioId);
+      key = owner.asset.id;
+    }
+    if (kind === 'metal') setMetalFocus(key);
+    else setPlanFocus(key);
+    const path = `/${kind === 'metal' ? 'gold' : 'plans'}/${encodeURIComponent(key)}`;
+    setTabState(kind);
+    if (window.location.pathname !== path)
+      window.history.pushState(null, '', path);
+    window.scrollTo({ top: 0 });
+  }
+  /** Moves a gold or plan page that was opened on the All view into its own portfolio so it can be edited. */
+  function switchToOwner(
+    kind: 'metal' | 'plan',
+    owner: { portfolioId?: string; asset: { id: string } } | undefined,
+  ) {
+    if (!owner?.portfolioId) return;
+    workspace?.choose(owner.portfolioId);
+    if (kind === 'metal') setMetalFocus(owner.asset.id);
+    else setPlanFocus(owner.asset.id);
+    window.history.replaceState(
+      null,
+      '',
+      `/${kind === 'metal' ? 'gold' : 'plans'}/${encodeURIComponent(owner.asset.id)}`,
+    );
   }
   function pickAsset(kind: AssetPick) {
     if (kind === 'stock') openTx('buy');
@@ -3298,6 +3350,13 @@ function DashboardContent({
                   message,
                 )
               }
+              onOpenAsset={(key) =>
+                openOwnedAsset(
+                  'metal',
+                  key,
+                  ownedMetals.find((o) => metalKey(o) === key),
+                )
+              }
             />
             <SavingsPlansSection
               addRequest={assetAdd.kind === 'plan' ? assetAdd.n : 0}
@@ -3316,6 +3375,13 @@ function DashboardContent({
                     ],
                   },
                   message,
+                )
+              }
+              onOpenAsset={(key) =>
+                openOwnedAsset(
+                  'plan',
+                  key,
+                  ownedPlans.find((o) => planKey(o) === key),
                 )
               }
             />
@@ -3461,6 +3527,64 @@ function DashboardContent({
                     assets: [
                       ...(p.assets ?? []).filter((a) => a.kind !== 'fund'),
                       ...funds,
+                    ],
+                  },
+                  message,
+                )
+              }
+            />
+          </TabsContent>
+          <TabsContent value="metal">
+            <GoldSilverSection
+              focusKey={metalFocus}
+              onBack={() => setTab('holdings')}
+              onSwitchPortfolio={(key) =>
+                switchToOwner(
+                  'metal',
+                  ownedMetals.find((o) => metalKey(o) === key),
+                )
+              }
+              owned={ownedMetals}
+              rates={metalRates.rates}
+              ratesError={metalRates.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(assets, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'metal'),
+                      ...assets,
+                    ],
+                  },
+                  message,
+                )
+              }
+            />
+          </TabsContent>
+          <TabsContent value="plan">
+            <SavingsPlansSection
+              focusKey={planFocus}
+              onBack={() => setTab('holdings')}
+              onSwitchPortfolio={(key) =>
+                switchToOwner(
+                  'plan',
+                  ownedPlans.find((o) => planKey(o) === key),
+                )
+              }
+              owned={ownedPlans}
+              planNavs={planNavs}
+              planNavsError={planNavData.loaded ? planNavData.error : ''}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(plans, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'plan'),
+                      ...plans,
                     ],
                   },
                   message,

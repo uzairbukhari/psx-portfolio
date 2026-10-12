@@ -38,6 +38,10 @@ import FundMatchDialog from './fund-match-dialog';
 import { useFundHistory } from './use-fund-data';
 import { webPublicData } from './vault-transport';
 import CollapsiblePanel from './collapsible-panel';
+import LedgerTimeline, {
+  NO_STOCKS,
+  buildAssetEntries,
+} from './ledger-timeline';
 
 export type OwnedFund = { asset: FundAsset; portfolioName?: string };
 /** Identifies one fund on its own page (the same fund can sit in several portfolios on the All view). */
@@ -88,13 +92,6 @@ const monthText = (month: string) =>
   });
 const rid = () =>
   `r-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
-const TYPE_LABEL: Record<FundEntry['type'], string> = {
-  opening: 'Opening balance',
-  buy: 'Bought',
-  redeem: 'Redeemed',
-  dividend: 'Cash dividend',
-  reinvest: 'Dividend reinvested',
-};
 
 /**
  * Mutual funds from any AMC reporting to MUFAP. Value is units times the price you would get on redemption, from MUFAP's
@@ -218,7 +215,9 @@ export default function MutualFundsSection({
   }
 
   const matchTarget =
-    mode?.kind === 'match' ? funds.find((f) => f.id === mode.fundId) : undefined;
+    mode?.kind === 'match'
+      ? funds.find((f) => f.id === mode.fundId)
+      : undefined;
   const dialog = matchTarget ? (
     <FundMatchDialog
       fund={matchTarget}
@@ -475,25 +474,37 @@ export default function MutualFundsSection({
               )}
             </p>
           ))}
-        <FundHistory
-          asset={asset}
-          v={v}
-          canEdit={canEdit}
-          busy={busy}
-          onEdit={(kind, editId) => setMode({ kind, fundId: asset.id, editId })}
-          onToggle={(entryId) =>
-            void update(
-              asset.id,
-              (f) => ({
-                ...f,
-                entries: f.entries.map((e) =>
-                  e.id === entryId ? { ...e, voided: !e.voided } : e,
+        <FundHistory asset={asset} v={v} />
+        <section className="company-section">
+          <h2>Activity</h2>
+          <LedgerTimeline
+            portfolio={NO_STOCKS}
+            ticker={asset.fundName || asset.name}
+            hideKpis
+            entries={buildAssetEntries([{ asset }], () => undefined, {
+              correct: (_a, entryId) => {
+                const entry = asset.entries.find((e) => e.id === entryId);
+                if (entry)
+                  setMode({
+                    kind: entry.type,
+                    fundId: asset.id,
+                    editId: entryId,
+                  });
+              },
+              toggleVoid: (_a, entryId) =>
+                void update(
+                  asset.id,
+                  (f) => ({
+                    ...f,
+                    entries: f.entries.map((e) =>
+                      e.id === entryId ? { ...e, voided: !e.voided } : e,
+                    ),
+                  }),
+                  'Entry updated.',
                 ),
-              }),
-              'Entry updated.',
-            )
-          }
-        />
+            })}
+          />
+        </section>
 
         {dialog}
       </div>
@@ -645,32 +656,14 @@ export default function MutualFundsSection({
   );
 }
 
-const monthHeading = (date: string) =>
-  new Date(`${date.slice(0, 7)}-15T12:00:00Z`)
-    .toLocaleDateString('en-GB', {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    })
-    .toUpperCase();
-
-/** The fund page's price chart and activity, laid out like the company page: a chart panel, then entries by month. */
+/** The fund page's price chart: MUFAP prices plus what you paid per unit, so it has a line while daily history is short. */
 function FundHistory({
   asset,
   v,
-  canEdit,
-  busy,
-  onToggle,
-  onEdit,
 }: {
   asset: FundAsset;
   v: ReturnType<typeof valueFund>;
-  canEdit: boolean;
-  busy: boolean;
-  onToggle: (entryId: string) => void;
-  onEdit: (kind: FundEntry['type'], entryId: string) => void;
 }) {
-  const [all, setAll] = useState(false);
   const history = useFundHistory(asset.mufapId, true);
   // MUFAP's stored prices, plus what you paid per unit and the latest price, so the chart has a line
   // even while the daily history is still short.
@@ -687,17 +680,6 @@ function FundHistory({
     .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
     .map(([date, nav]) => ({ date, nav }));
   const sparse = history.navs.length < 2;
-  const entries = [...asset.entries].sort((x, y) =>
-    x.date < y.date ? 1 : x.date > y.date ? -1 : 0,
-  );
-  const shown = all ? entries : entries.slice(0, 5);
-  const months: { month: string; items: FundEntry[] }[] = [];
-  for (const e of shown) {
-    const month = e.date.slice(0, 7);
-    const last = months.at(-1);
-    if (last?.month === month) last.items.push(e);
-    else months.push({ month, items: [e] });
-  }
   const lo = data.length ? Math.min(...data.map((d) => d.nav)) : 0;
   const hi = data.length ? Math.max(...data.map((d) => d.nav)) : 0;
   const pad = (hi - lo) * 0.08 || hi * 0.02;
@@ -764,98 +746,6 @@ function FundHistory({
             {history.error ||
               'There is no price history for this fund yet. It builds up day by day.'}
           </p>
-        )}
-      </section>
-      <section className="company-section fund-activity">
-        <h2>Activity</h2>
-        {entries.length === 0 ? (
-          <p className="muted">No transactions recorded for this fund yet.</p>
-        ) : (
-          months.map(({ month, items }) => (
-            <div className="ledger-month" key={month}>
-              <h4>
-                <div>{monthHeading(month)}</div>
-              </h4>
-              {items.map((e) => {
-                const h = v.history.find((x) => x.id === e.id);
-                const inflow = e.type === 'redeem' || e.type === 'dividend';
-                const tag =
-                  e.type === 'redeem'
-                    ? 'sell'
-                    : e.type === 'dividend' || e.type === 'reinvest'
-                      ? 'dividend'
-                      : e.type === 'buy'
-                        ? 'buy'
-                        : 'opening';
-                const detail = [
-                  e.units === undefined
-                    ? 'Cash payout'
-                    : e.amount && e.units
-                      ? `${units(e.units)} units @ ${money(e.amount / e.units)}`
-                      : `${units(e.units)} units`,
-                  e.load ? `load ${money(e.load)}` : '',
-                  e.taxWithheld ? `tax ${money(e.taxWithheld)}` : '',
-                  h ? `holding ${units(h.heldAfter)}` : '',
-                  h?.realizedGain != null
-                    ? `gain ${signed(h.realizedGain)}`
-                    : '',
-                  e.note,
-                  e.voided ? 'voided' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · ');
-                return (
-                  <div
-                    className="ledger-row"
-                    key={e.id}
-                    style={e.voided ? { opacity: 0.55 } : undefined}
-                  >
-                    <span className="ledger-date">{e.date.slice(8)}</span>
-                    <span className={`ledger-type type-${tag}`}>
-                      {TYPE_LABEL[e.type]}
-                    </span>
-                    <div className="ledger-main">
-                      <small>{detail}</small>
-                    </div>
-                    <span className="ledger-amount">
-                      {e.amount === null
-                        ? 'Cost unknown'
-                        : `${inflow ? '+' : ''}${money(e.amount)}`}
-                    </span>
-                    {canEdit && (
-                      <span className="fund-activity__actions">
-                        <button
-                          type="button"
-                          className="secondary compact"
-                          disabled={busy}
-                          onClick={() => onEdit(e.type, e.id)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary compact"
-                          disabled={busy}
-                          onClick={() => onToggle(e.id)}
-                        >
-                          {e.voided ? 'Restore' : 'Void'}
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))
-        )}
-        {entries.length > 5 && (
-          <button
-            type="button"
-            className="link-button ledger-older"
-            onClick={() => setAll(!all)}
-          >
-            {all ? 'Show fewer' : `Show ${entries.length - 5} older`}
-          </button>
         )}
       </section>
     </>

@@ -46,6 +46,8 @@ export type LedgerEntry = {
   /** True for money taken out of a savings plan: it is cash back, not a sale with a profit. */
   noGain?: boolean;
   correct: () => void;
+  /** Set on gold, plan and fund pages: adds a Void / Restore button beside the edit button. */
+  toggleVoid?: () => void;
   /** Present on expected dividends: opens the confirm-receipt form. */
   confirm?: () => void;
 };
@@ -200,6 +202,11 @@ export function buildEntries({
 export function buildAssetEntries(
   assets: { asset: Asset; portfolioName?: string }[],
   onOpenAssets: () => void,
+  /** On an asset's own page: edit and void entries in place instead of sending you to Holdings, and list plan statement values. */
+  page?: {
+    correct: (asset: Asset, entryId: string) => void;
+    toggleVoid: (asset: Asset, entryId: string) => void;
+  },
 ): LedgerEntry[] {
   const out: LedgerEntry[] = [];
   for (const { asset, portfolioName } of assets) {
@@ -230,7 +237,9 @@ export function buildAssetEntries(
             assetKind: asset.metal === 'gold' ? 'Gold' : 'Silver',
             realizedGain:
               e.type === 'sell' ? (gains.get(e.id) ?? null) : undefined,
-            correct: onOpenAssets,
+            correct: () =>
+              page ? page.correct(asset, e.id) : onOpenAssets(),
+            toggleVoid: page ? () => page.toggleVoid(asset, e.id) : undefined,
           });
         }
       } else if (asset.kind === 'plan') {
@@ -249,9 +258,30 @@ export function buildAssetEntries(
             voided: !!e.voided,
             assetKind: 'Plan',
             noGain: !paidIn,
-            correct: onOpenAssets,
+            correct: () =>
+              page ? page.correct(asset, e.id) : onOpenAssets(),
+            toggleVoid: page ? () => page.toggleVoid(asset, e.id) : undefined,
           });
         }
+        if (page)
+          for (const x of asset.valuations) {
+            out.push({
+              key: key(x.id),
+              date: x.date,
+              ticker: asset.name,
+              type: 'opening',
+              label: 'Statement',
+              detail: `Value from your statement${x.note ? ` · ${x.note}` : ''}${where}`,
+              fees: null,
+              amount: x.value,
+              inflow: false,
+              voided: !!x.voided,
+              assetKind: 'Plan',
+              noGain: true,
+              correct: () => page.correct(asset, x.id),
+              toggleVoid: () => page.toggleVoid(asset, x.id),
+            });
+          }
       } else {
         const gains = new Map(
           fundPosition(asset).history.map((h) => [h.id, h.realizedGain]),
@@ -291,7 +321,9 @@ export function buildAssetEntries(
             assetKind: 'Fund',
             realizedGain:
               e.type === 'redeem' ? (gains.get(e.id) ?? null) : undefined,
-            correct: onOpenAssets,
+            correct: () =>
+              page ? page.correct(asset, e.id) : onOpenAssets(),
+            toggleVoid: page ? () => page.toggleVoid(asset, e.id) : undefined,
           });
         }
       }
@@ -301,6 +333,14 @@ export function buildAssetEntries(
   }
   return out;
 }
+
+/** Gold, plan and fund pages show only that asset's records, so there are no stock companies or sales to look up. */
+export const NO_STOCKS = {
+  companies: [],
+  trades: [],
+  quotes: {},
+  budgets: {},
+} as Portfolio;
 
 export default function LedgerTimeline({
   portfolio,
@@ -577,7 +617,27 @@ export default function LedgerTimeline({
                           : 'Unknown'
                         : (e.inflow ? '+' : '') + money(cents(e.amount))}
                     </span>
-                    {!e.voided ? (
+                    {e.toggleVoid ? (
+                      <span className="ledger-actions">
+                        {!e.voided && (
+                          <button
+                            type="button"
+                            className="secondary compact ledger-edit"
+                            aria-label={`Correct ${e.label.toLowerCase()} for ${e.ticker}`}
+                            onClick={e.correct}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="secondary compact ledger-edit"
+                          onClick={e.toggleVoid}
+                        >
+                          {e.voided ? 'Restore' : 'Void'}
+                        </button>
+                      </span>
+                    ) : !e.voided ? (
                       <button
                         type="button"
                         className="secondary compact ledger-edit"

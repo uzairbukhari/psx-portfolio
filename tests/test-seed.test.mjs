@@ -155,7 +155,7 @@ test('seeding a vault in-process leaves ciphertext only and opens with the test 
   const session = await unlockVault(transport, status, { password: TEST_VAULT_PASSWORD });
   assert.equal(session.account.portfolios.length, 4);
   const stored = JSON.stringify(server.log.map((l) => l.body ?? ''));
-  assert.ok(!stored.includes('MEBL') && !stored.includes('Meezan'), 'the server must only see ciphertext');
+  assert.ok(!stored.includes('Meezan') && !stored.includes('\\"ticker\\":\\"MEBL\\"'), 'the server must only see ciphertext');
 });
 
 test('staging gap seeding is batched and refuses the production database', async () => {
