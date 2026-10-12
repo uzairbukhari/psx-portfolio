@@ -22,7 +22,12 @@
     "db:migrate:vault:staging": "wrangler d1 migrations apply VAULT_DB --remote --env staging",
     "build:staging": "CLOUDFLARE_ENV=staging vinext build",
     "deploy:staging": "npm run build:staging && wrangler deploy --config dist/server/wrangler.json",
-    "db:migrate:staging": "wrangler d1 migrations apply DB --remote --env staging"
+    "db:migrate:staging": "wrangler d1 migrations apply DB --remote --env staging",
+    "sandbox:setup": "node scripts/sandbox.mjs setup",
+    "sandbox:reset": "node scripts/sandbox.mjs reset",
+    "sandbox:dev": "vite dev --config vite.sandbox.config.ts",
+    "e2e:local": "E2E_TARGET=local playwright test",
+    "e2e:staging": "E2E_TARGET=staging playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.131.0",
@@ -55,6 +60,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",

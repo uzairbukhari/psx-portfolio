@@ -17,6 +17,7 @@ export type Viewer = AuthUser & { role: Role };
 const LOGIN_PATH = '/api/auth/google/login';
 const LOGOUT_PATH = '/api/auth/logout';
 const CALLBACK_PATH = '/api/auth/google/callback';
+const TEST_LOGIN_PATH = '/api/auth/test-login';
 const SESSION_COOKIE = 'session';
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -93,6 +94,7 @@ function isReservedAuthPath(pathname: string): boolean {
   return (
     pathname === LOGIN_PATH ||
     pathname === LOGOUT_PATH ||
-    pathname === CALLBACK_PATH
+    pathname === CALLBACK_PATH ||
+    pathname === TEST_LOGIN_PATH
   );
 }

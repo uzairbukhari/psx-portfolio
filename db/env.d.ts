@@ -52,3 +52,9 @@ declare namespace Cloudflare {
     AI_RESEARCH_MONTHLY_CAP_USD?: string;
   }
 }
+declare namespace Cloudflare {
+  interface Env {
+    /** Staging only: secret for /api/auth/test-login, which signs in the fictional test account. Unset elsewhere. */
+    TEST_LOGIN_SECRET?: string;
+  }
+}
