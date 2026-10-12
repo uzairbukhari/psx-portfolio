@@ -1,5 +1,6 @@
 // Monthly SIP planner glue over the shared plan() calculation.
-import { plan, today, type Portfolio } from '../../../lib/portfolio.ts';
+import { DISPLAY_PARTS, plan, today, type Portfolio } from '../../../lib/portfolio.ts';
+import { ALL_PORTFOLIOS, dashboardPortfolio, type NamedPortfolio, type PortfolioAccount } from '../../../lib/portfolio-account.ts';
 import { clonePortfolio } from './mutations.ts';
 
 export type SipPlan = ReturnType<typeof plan>;
@@ -34,4 +35,20 @@ export function setBudget(p: Portfolio, month: string, amount: number): Portfoli
   const next = clonePortfolio(p);
   next.budgets[month] = amount;
   return next;
+}
+
+/**
+ * One SIP plan for the whole account: weights are measured against every portfolio's holdings together, while the
+ * budget and the target weights live in the first ("home") portfolio, the same place Monthly Picks keeps its list.
+ */
+export function unifiedPlanSource(account: PortfolioAccount): { home: NamedPortfolio; portfolio: Portfolio } {
+  const home = account.portfolios[0];
+  const combined = dashboardPortfolio(account, ALL_PORTFOLIOS);
+  // plan() refuses a display-only combined portfolio, so hand it a plain copy.
+  const portfolio: Portfolio = { ...combined };
+  delete portfolio[DISPLAY_PARTS];
+  portfolio.budgets = { ...home.portfolio.budgets };
+  const homeCompanies = new Map(home.portfolio.companies.map((c) => [c.ticker, c]));
+  portfolio.companies = combined.companies.map((c) => homeCompanies.get(c.ticker) ?? c);
+  return { home, portfolio };
 }
