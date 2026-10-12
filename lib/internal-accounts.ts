@@ -20,6 +20,7 @@ export async function listInternalAccounts(db: D1Database): Promise<InternalAcco
 
 /** The analytics user keys of every internal account, used to leave their past events out of reports. */
 export async function internalUserKeys(db: D1Database, secret: string): Promise<string[]> {
+  if (!secret) return []; // no signing secret (local dev): keys cannot be computed, events still carry is_admin
   const { results } = await db.prepare("SELECT email FROM user_roles WHERE role IN ('super_admin','tester') LIMIT 200").all<{ email: string }>();
   return Promise.all(results.map((r) => userKey(r.email, secret)));
 }

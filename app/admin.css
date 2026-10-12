@@ -3,7 +3,7 @@
 .admin-top{display:flex;align-items:center;gap:12px;height:56px;padding:0 20px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:5}
 .admin-sep{color:var(--muted-foreground)}
 .admin-grow{flex:1}
-.admin-switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-foreground);cursor:pointer}
+.admin-switch{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:8px;white-space:nowrap;margin:0!important;font-size:13px;color:var(--muted-foreground);cursor:pointer}
 .admin-body{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh - 56px)}
 .admin-nav{display:flex;flex-direction:column;gap:2px;padding:16px 10px;border-right:1px solid var(--border);background:var(--card)}
 .admin-nav a{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;color:var(--muted-foreground);font-size:14px;font-weight:500;text-decoration:none;border:1px solid transparent}
@@ -14,15 +14,20 @@
 .admin-main{padding:24px 28px 48px;max-width:1600px;min-width:0}
 .admin-main h1{margin:0 0 4px;font-size:24px}
 .admin-main>.muted{margin:0 0 20px;max-width:75ch}
+.admin-card .table-wrap{overflow-x:auto}
 .admin-card{border:1px solid var(--card-border);border-radius:var(--radius);background:var(--card);padding:20px 24px;min-width:0}
 .admin-form{display:grid;grid-template-columns:minmax(0,2fr) 180px minmax(0,1.5fr) auto;gap:12px;align-items:end;margin-bottom:20px}
 .admin-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted-foreground)}
 .admin-form input,.admin-form select{padding:8px 10px;font-size:14px}
 .admin-table{width:100%;border-collapse:collapse;font-size:14px}
-.admin-table th{text-align:left;color:var(--muted-foreground);font-weight:500;padding:8px;border-bottom:1px solid var(--border)}
+.admin-table th{position:relative;text-align:left;color:var(--muted-foreground);font-weight:500;padding:8px;border-bottom:1px solid var(--border)}
 .admin-table td{padding:10px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+/* Settings styled these filters inside a card that sets the text colour; here they sit in the admin card. */
+.admin-card .audit-filters button{color:var(--foreground)}
+.admin-card .audit-filters button[aria-pressed="true"]{color:var(--primary-foreground)}
+.admin-card .audit-filters select,.admin-card .audit-filters input[type="text"],.admin-card .audit-filters input:not([type]){width:auto;min-width:150px;color:var(--foreground)}
 @media (max-width:900px){
-  .admin-body{grid-template-columns:1fr}
+  .admin-body{grid-template-columns:minmax(0,1fr)}
   .admin-nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--border);padding:8px 16px}
   .admin-nav a{white-space:nowrap}.admin-nav hr{display:none}
   .admin-main{padding:16px}
