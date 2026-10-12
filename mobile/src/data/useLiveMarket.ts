@@ -5,16 +5,21 @@ import { watchQuery } from '@shared/market-watch.ts';
 import { tokenStore } from '@/auth/token-store';
 import { config } from '@/config';
 import { emptyLive, MAX_STREAM_RETRIES, readLiveStream, reduceLive, retryDelayMs, StreamRejected, type LiveState } from './live-market';
+import { useBatchedReducer } from './useBatchedReducer';
 
 export type LiveStatus = 'off' | 'connecting' | 'live' | 'fallback';
 
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener('abort', () => {
+    const onAbort = () => {
       clearTimeout(timer);
       resolve();
-    });
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
   });
 
 /**
@@ -23,7 +28,8 @@ const sleep = (ms: number, signal: AbortSignal) =>
  * account) or exhausted retries leave status `fallback`, and the caller's polling carries on as before.
  */
 export function useLiveMarket(enabled: boolean, tickers: string[]): { live: LiveState; status: LiveStatus } {
-  const [live, setLive] = useState<LiveState>(emptyLive);
+  // A burst of ticks at the open is applied at most four times a second instead of once per tick.
+  const [live, pushLive, resetLive] = useBatchedReducer(reduceLive, emptyLive, 250);
   const [status, setStatus] = useState<LiveStatus>('off');
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
 
@@ -35,7 +41,7 @@ export function useLiveMarket(enabled: boolean, tickers: string[]): { live: Live
   const tickerKey = tickers.join(',');
   useEffect(() => {
     if (!enabled || !appActive) {
-      setLive(emptyLive);
+      resetLive(emptyLive);
       setStatus('off');
       return;
     }
@@ -53,7 +59,7 @@ export function useLiveMarket(enabled: boolean, tickers: string[]): { live: Live
             signal,
             onEvent: (event) => {
               attempt = 0;
-              setLive((state) => reduceLive(state, event));
+              pushLive(event);
               setStatus('live');
             },
           });
@@ -66,7 +72,7 @@ export function useLiveMarket(enabled: boolean, tickers: string[]): { live: Live
           }
         }
         if (signal.aborted) return;
-        setLive((state) => ({ ...state, connected: false }));
+        pushLive({ kind: 'status', connected: false });
         if (attempt >= MAX_STREAM_RETRIES) {
           setStatus('fallback');
           return;
@@ -75,7 +81,7 @@ export function useLiveMarket(enabled: boolean, tickers: string[]): { live: Live
       }
     })();
     return () => controller.abort();
-  }, [enabled, appActive, tickerKey]);
+  }, [enabled, appActive, tickerKey, pushLive, resetLive]);
 
   return { live, status };
 }

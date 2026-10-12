@@ -33,12 +33,16 @@ export function useTrackRecord(): { status: 'loading' | 'error' | 'ready' | 'emp
       return merged;
     },
   });
+  // Keyed on plain values (not the `totals` object, which is new after every refetch), so the daily series and the
+  // money-weighted return are rebuilt only when the portfolio, the price history or the headline value changes.
   const totals = p.view?.totals;
+  const missing = totals?.missingPrice.join(',') ?? null;
+  const currentValue = totals && totals.missingPrice.length === 0 ? totals.value : null;
+  const histories = q.data;
   const record = useMemo(() => {
-    if (!portfolio || !totals || !q.data) return null;
-    const complete = totals.missingPrice.length === 0;
-    return buildTrackRecord({ portfolio, histories: q.data, asOf: today(), currentValue: complete ? totals.value : null, missingPrice: totals.missingPrice });
-  }, [portfolio, totals, q.data]);
+    if (!portfolio || missing === null || !histories) return null;
+    return buildTrackRecord({ portfolio, histories, asOf: today(), currentValue, missingPrice: missing ? missing.split(',') : [] });
+  }, [portfolio, histories, currentValue, missing]);
   if (portfolio && tickers.length === 0) return { status: 'empty', record: null, retry: () => {} };
   if (record) return { status: 'ready', record, retry: () => void q.refetch() };
   if (q.isError) return { status: 'error', record: null, retry: () => void q.refetch() };

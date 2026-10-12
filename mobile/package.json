@@ -8,6 +8,7 @@
     "android": "APP_VARIANT=development expo start --android",
     "ios": "APP_VARIANT=development expo start --ios",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint -c .oxlintrc.json app src",
     "test": "node --test --experimental-strip-types 'src/**/*.test.ts'",
     "update:staging": "APP_VARIANT=staging npx eas-cli update --platform android --channel staging --environment preview",
     "update:production": "APP_VARIANT=production npx eas-cli update --platform android --channel production --environment production"
@@ -43,6 +44,7 @@
   "devDependencies": {
     "@types/node": "^22.20.4",
     "@types/react": "~19.2.0",
+    "oxlint": "1.76.0",
     "typescript": "~6.0.3"
   }
 }

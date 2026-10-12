@@ -42,6 +42,8 @@ export default function Plan() {
   const source = unified ? unified.portfolio : p.portfolio;
   const [destination, setDestination] = useState('');
   const result = useMemo(() => (source ? buildPlan(source, month, parseNumber(fee) ?? 0, allowOld) : null), [source, month, fee, allowOld]);
+  // Declared before the early returns below: hooks must run in the same order on every render.
+  const boughtList = useMemo(() => (source ? monthBuys(source, month) : []), [source, month]);
   useEffect(()=>{setEditingBudget(false);setReviewing(false)},[p.selectedId]);
   const bar = <AppBar title="Plan" subtitle="Decide this month’s buys" />;
 
@@ -81,7 +83,6 @@ export default function Plan() {
   const buys = plan && budgetSet && !plan.errors.length ? plan.rows.filter((r) => r.shares > 0 && r.price !== null) : [];
   const complete = Boolean(plan && budgetSet && !plan.errors.length && plan.remaining === 0);
   const feePct = parseNumber(fee) ?? 0;
-  const boughtList = useMemo(() => monthBuys(portfolio, month), [portfolio, month]);
 
   async function refreshPrices() {
     setPricing(true);
@@ -161,7 +162,7 @@ export default function Plan() {
         </Collapsible>
       ) : null}
 
-      <Segmented label="Plan mode" value={mode} onChange={setMode} options={portfolio.companies.length ? [{ key: 'targets', label: 'Targets' }, { key: 'picks', label: '🧪 Monthly Picks' }] : [{ key: 'targets', label: 'Targets' }]} />
+      <Segmented label="Plan mode" value={mode} onChange={setMode} options={portfolio.companies.length ? [{ key: 'targets', label: 'Targets' }, { key: 'picks', label: 'Monthly Picks' }] : [{ key: 'targets', label: 'Targets' }]} />
       {message ? <Notice tone={message.error ? 'error' : 'success'}>{message.text}</Notice> : null}
       {p.offline ? <Notice tone="offline">Offline · this plan is read only until you reconnect.</Notice> : null}
 

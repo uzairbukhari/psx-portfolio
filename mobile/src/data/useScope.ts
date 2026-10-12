@@ -31,3 +31,21 @@ export function useScope() {
   }, [parts, metal.rates, fundNavs.navs]);
   return { parts, assets, metals, plans, funds, metal, fundNavs, hasAssets, overview };
 }
+
+/** Value and share of net worth for every portfolio, whatever is selected. Computed only while `enabled` (the chooser is open). */
+export function usePortfolioTotals(enabled: boolean) {
+  const p = usePortfolio();
+  const parts = useMemo(() => (enabled && p.account ? p.account.portfolios : []), [enabled, p.account]);
+  const hasMetals = parts.some((e) => (e.portfolio.assets ?? []).some((a) => a.kind === 'metal'));
+  const hasFunds = parts.some((e) => (e.portfolio.assets ?? []).some((a) => a.kind === 'fund'));
+  const metal = useMetalRates(enabled && hasMetals);
+  const fundNavs = useFundNavs(enabled && hasFunds);
+  return useMemo(() => {
+    if (!parts.length) return null;
+    try {
+      return accountOverview(parts, today(), { metalRates: metal.rates, fundNavs: fundNavs.navs });
+    } catch {
+      return null;
+    }
+  }, [parts, metal.rates, fundNavs.navs]);
+}

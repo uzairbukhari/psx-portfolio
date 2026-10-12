@@ -173,7 +173,7 @@ export default function More() {
           )}
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.strong} numberOfLines={1}>{user?.name ?? user?.email}</Text>
-            <Muted>{user?.email}</Muted>
+            <Text style={styles.muted} numberOfLines={1} ellipsizeMode="middle">{user?.email}</Text>
           </View>
           {isAdmin ? <StatusChip text="Admin" tone="primary" /> : null}
         </View>

@@ -57,7 +57,6 @@ export default function Portfolios() {
   }
   return (
     <Screen edges={['bottom']}>
-      <Text style={styles.title}>Portfolios</Text>
       <Muted>
         Manage broker accounts and investment goals under one login.
       </Muted>

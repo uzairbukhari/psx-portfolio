@@ -66,7 +66,16 @@ function Root() {
 export default function RootLayout() {
   // The separate app lock was removed (the vault's own fingerprint unlock covers sign-in); forget an old switch setting.
   useEffect(() => { void SecureStore.deleteItemAsync('sipwise.lock').catch(() => {}); }, []);
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1 } } }));
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 1,
+        // Opening a screen is not a reason to reload and decrypt the whole vault; focus, pull-to-refresh and saves are.
+        staleTime: 60_000,
+        refetchOnMount: false,
+      },
+    },
+  }));
   // Refetch stale data (prices, portfolio revision) whenever the app comes back to the foreground.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (status) => {

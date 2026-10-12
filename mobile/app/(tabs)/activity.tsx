@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { RefreshControl, SectionList, Text, View } from 'react-native';
+import { Animated, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ACTIVITY_FILTERS, filterActivity, groupByMonth, type ActivityFilter } from '@/data/activity-view';
@@ -8,6 +8,7 @@ import { usePortfolio } from '@/data/usePortfolio';
 import { useTheme } from '@/theme/ThemeProvider';
 import { ActivityRow } from '@/ui/ActivityRow';
 import { AppBar } from '@/ui/AppBar';
+import { useFabScroll } from '@/ui/ScrollAwareFab';
 import { Button, Chip, ChipRow, EmptyState, Loading, Notice, SearchField, useKitStyles } from '@/ui/kit';
 
 export default function Activity() {
@@ -16,6 +17,7 @@ export default function Activity() {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<ActivityFilter>('all');
   const [query, setQuery] = useState('');
+  const onScroll = useFabScroll();
   const entries = useMemo(() => (p.portfolio ? activityEntries(p.portfolio) : []), [p.portfolio]);
   const sections = useMemo(() => groupByMonth(filterActivity(entries, filter, query)), [entries, filter, query]);
   const shown = sections.reduce((n, s) => n + s.data.length, 0);
@@ -33,7 +35,9 @@ export default function Activity() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       {/* A virtualised SectionList renders only the rows on screen, so a ledger of thousands of entries scrolls smoothly. */}
-      <SectionList
+      <Animated.SectionList
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         sections={sections}
         keyExtractor={(e) => e.id}
         stickySectionHeadersEnabled

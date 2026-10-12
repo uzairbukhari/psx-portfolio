@@ -28,6 +28,7 @@ jobs:
         working-directory: .
         run: ln -s "$PWD/mobile/node_modules" node_modules
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
       - name: Bundle for Android and iOS
         env:

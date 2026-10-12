@@ -244,7 +244,7 @@ export function UnlockScreen({
   const [error, setError] = useState('');
   // Ticked by default where the phone supports it: the slow password derivation then happens once per phone.
   const [remember, setRemember] = useState(true);
-  async function useBiometric() {
+  async function unlockWithBiometric() {
     setBusy(true);
     setError('');
     const problem = await biometric.unlock();
@@ -255,7 +255,7 @@ export function UnlockScreen({
   useEffect(() => {
     if (mode === 'password' && biometric.has && !autoTried.current) {
       autoTried.current = true;
-      void useBiometric();
+      void unlockWithBiometric();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [biometric.has, mode]);
@@ -312,7 +312,7 @@ export function UnlockScreen({
   return (
     <VaultFrame title="Welcome back" subtitle={email ? `Unlock the vault for ${email}. This is separate from your Google sign-in.` : 'Your portfolio is encrypted. Unlock it to continue.'}>
       {status.offline ? <Notice tone="offline">You are offline. Your last saved copy can be opened, but changes cannot be saved until you reconnect.</Notice> : null}
-      {biometric.has ? <Button label="Unlock with fingerprint or face" icon="lock" disabled={busy} onPress={() => void useBiometric()} /> : null}
+      {biometric.has ? <Button label="Unlock with fingerprint or face" icon="lock" disabled={busy} onPress={() => void unlockWithBiometric()} /> : null}
       <Card>
         <PasswordField label="Vault password" kind="current" value={password} onChangeText={setPassword} editable={!busy} />
         {biometric.canOffer && !biometric.has ? (
