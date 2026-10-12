@@ -14,7 +14,13 @@ test('a transaction saved in the app is encrypted, stored and still there after 
   await dialog.getByLabel('Number of shares').fill('25');
   await dialog.getByLabel(/Price per share/).fill('50');
   await dialog.getByRole('button', { name: 'Save entry' }).click();
-  await expect(dialog).toBeHidden({ timeout: 30_000 });
+  try {
+    await expect(dialog).toBeHidden({ timeout: 30_000 });
+  } catch (error) {
+    // Say why the save did not go through (validation or server message) instead of just "still visible".
+    const shown = (await dialog.locator('.notice, [role="alert"]').allInnerTexts()).join(' | ') || (await dialog.innerText()).replace(/\s+/g, ' ').slice(0, 800);
+    throw new Error(`Saving the transaction did not close the dialog. The dialog says: ${shown}`, { cause: error });
+  }
 
   await app.reload();
   await expect(app.getByText('Fauji Cement').first()).toBeVisible({ timeout: 60_000 });
