@@ -8,6 +8,8 @@ export type HistoryRow = {
   id: string;
   /** Already formatted, e.g. "5 Mar 2026". */
   date: string;
+  /** The same day as YYYY-MM-DD; lets a list group by month. */
+  iso?: string;
   tag: HistoryTag;
   tagLabel: string;
   /** What happened, e.g. "3 × 1 tola (35 g)". */

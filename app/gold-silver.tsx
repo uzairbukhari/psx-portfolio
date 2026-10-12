@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,8 @@ import {
   type MetalRateRow,
 } from '@/lib/metal-rates';
 import { money, moneyShort, today } from '@/lib/portfolio';
-import AssetHistory, { type HistoryRow } from './asset-history';
+import ActivityList from './asset-activity';
+import type { HistoryRow } from './asset-history';
 import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedMetal = {
@@ -34,6 +35,11 @@ export type OwnedMetal = {
   portfolioId?: string;
   portfolioName?: string;
 };
+/** Identifies one holding on its own page (the same holding can sit in several portfolios on the All view). */
+export const metalKey = (o: OwnedMetal) =>
+  `${o.asset.id}${o.portfolioName ? `@${o.portfolioName}` : ''}`;
+const ENTRY_HISTORY_LENGTH =
+  typeof window === 'undefined' ? 0 : window.history.length;
 const tone = (n: number | null) =>
   n === null ? '' : n >= 0 ? 'pos-text' : 'neg-text';
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
@@ -63,6 +69,7 @@ function historyRows(
       return {
         id: e.id,
         date: dateText(e.date),
+        iso: e.date,
         tag: e.type === 'sell' ? 'sell' : e.type === 'buy' ? 'buy' : 'neutral',
         tagLabel:
           e.type === 'opening'
@@ -107,6 +114,10 @@ export default function GoldSilverSection({
   canEdit,
   busy,
   addRequest = 0,
+  focusKey,
+  onOpenAsset,
+  onBack,
+  onSwitchPortfolio,
   onChange,
 }: {
   owned: OwnedMetal[];
@@ -116,6 +127,12 @@ export default function GoldSilverSection({
   busy: boolean;
   /** Bumped by the page's + menu to open the add dialog. */
   addRequest?: number;
+  /** Shows that one holding's page instead of the tables. */
+  focusKey?: string;
+  onOpenAsset?: (key: string) => void;
+  onBack?: () => void;
+  /** On the All view a holding can only be edited inside its own portfolio; this switches to it. */
+  onSwitchPortfolio?: (key: string) => void;
   /** Receives this portfolio's complete asset list after an add, sale or void. */
   onChange: (assets: MetalAsset[], message: string) => Promise<void>;
 }) {
@@ -137,6 +154,27 @@ export default function GoldSilverSection({
     setSeenRequest(addRequest);
     if (addRequest > 0 && canEdit) setOpen({ type: 'buy' });
   }
+  const groups = useMemo(
+    () =>
+      (['gold', 'silver'] as const).flatMap((metal) => {
+        const list = rows.filter((r) => r.asset.metal === metal);
+        return list.length === 0
+          ? []
+          : [
+              {
+                metal,
+                rows: list,
+                value: list.every((r) => r.v.value !== null)
+                  ? list.reduce((a, r) => a + (r.v.value ?? 0), 0)
+                  : null,
+                gain: list.every((r) => r.v.gain !== null)
+                  ? list.reduce((a, r) => a + (r.v.gain ?? 0), 0)
+                  : null,
+              },
+            ];
+      }),
+    [rows],
+  );
   const totals = useMemo(() => {
     const known = rows.every((r) => r.v.value !== null);
     const gainKnown = rows.every((r) => r.v.gain !== null);
@@ -169,6 +207,7 @@ export default function GoldSilverSection({
   const dialog = open ? (
     <MetalEntryDialog
       initialType={open.type}
+      presetAssetId={open.assetId && !open.entryId ? open.assetId : undefined}
       editing={
         open.assetId && open.entryId
           ? {
@@ -189,6 +228,134 @@ export default function GoldSilverSection({
       }}
     />
   ) : null;
+  if (focusKey !== undefined) {
+    const row = rows.find((r) => metalKey(r) === focusKey);
+    const back = (
+      <button
+        type="button"
+        data-slot="link"
+        className="back-link company-back"
+        onClick={() => {
+          if (window.history.length > ENTRY_HISTORY_LENGTH)
+            window.history.back();
+          else onBack?.();
+        }}
+      >
+        <ArrowLeft size={15} /> Back
+      </button>
+    );
+    if (!row)
+      return (
+        <div className="company-page">
+          {back}
+          <p className="muted">This holding is not in your portfolio.</p>
+          {dialog}
+        </div>
+      );
+    const { asset, v } = row;
+    return (
+      <div className="company-page">
+        {back}
+        <div className="company-head">
+          <div>
+            <p className="eyebrow">
+              {asset.metal === 'gold' ? `${asset.karat}K GOLD` : 'SILVER'}
+            </p>
+            <h1>{asset.name}</h1>
+            <p>{row.portfolioName ?? ''}</p>
+          </div>
+          <div className="company-price">
+            <strong>{v.rate ? money(v.rate.pkrPerTola) : '—'}</strong>
+            <small>
+              {v.rate
+                ? `per tola of 24K ${asset.metal} · ${dateText(v.rate.date)}`
+                : 'No rate yet'}
+            </small>
+          </div>
+          {canEdit && (
+            <div className="company-actions">
+              <button disabled={busy} onClick={() => setOpen({ type: 'buy' })}>
+                <Plus size={16} /> Add purchase
+              </button>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => setOpen({ type: 'sell', assetId: asset.id })}
+              >
+                Record a sale
+              </button>
+            </div>
+          )}
+          {!canEdit && row.portfolioName && onSwitchPortfolio && (
+            <div className="company-actions">
+              <button onClick={() => onSwitchPortfolio(focusKey)}>
+                Open in {row.portfolioName} to record transactions
+              </button>
+            </div>
+          )}
+        </div>
+        {ratesError && (
+          <p className="notice">
+            Could not load today&apos;s rates: {ratesError}
+          </p>
+        )}
+        {error && <p className="notice error">{error}</p>}
+        <div className="company-cards">
+          <article>
+            <span>Held</span>
+            <strong>{grams(v.grams)}</strong>
+            <small>{tolaFromGrams(v.grams).toFixed(2)} tola</small>
+          </article>
+          <article>
+            <span>Market value</span>
+            <strong>{v.value === null ? '—' : money(v.value)}</strong>
+            <small>Cost {v.cost === null ? '—' : money(v.cost)}</small>
+          </article>
+          <article>
+            <span>Gain / loss</span>
+            <strong className={tone(v.gain)}>
+              {v.gain === null ? '—' : signed(v.gain)}
+            </strong>
+            <small className={tone(v.gainPercent)}>
+              {v.gainPercent === null
+                ? 'Needs cost and rate'
+                : `${v.gainPercent >= 0 ? '+' : '−'}${Math.abs(v.gainPercent).toFixed(1)}%`}
+            </small>
+          </article>
+          <article>
+            <span>Realised gain</span>
+            <strong className={tone(v.realized)}>
+              {v.realized === null ? '—' : signed(v.realized)}
+            </strong>
+            <small>
+              Bought {moneyShort(v.bought.amount)} · sold{' '}
+              {moneyShort(v.sold.amount)}
+            </small>
+          </article>
+        </div>
+        <p className="report-source">
+          {v.rate
+            ? `Priced at ${money(v.rate.pkrPerTola)} per tola of 24K ${asset.metal} · ${v.rate.kind === 'local' ? 'dealer rate' : 'international estimate converted to rupees'}${v.rate.fellBack ? ' (the dealer rate is more than 2 days old)' : ''}${v.rate.stale ? ' · STALE' : ''}`
+            : 'No rate available yet, so the value is not shown.'}
+        </p>
+        <section className="company-section">
+          <h2>Activity</h2>
+          <ActivityList
+            empty="No purchases or sales recorded yet."
+            rows={historyRows(
+              asset,
+              v,
+              canEdit,
+              busy,
+              toggleVoid,
+              (assetId, entryId) => setOpen({ type: 'buy', assetId, entryId }),
+            )}
+          />
+        </section>
+        {dialog}
+      </div>
+    );
+  }
   // A class you never used is not shown; one you have sold out stays, for its history.
   if (rows.length === 0) return dialog;
 
@@ -245,81 +412,104 @@ export default function GoldSilverSection({
           </p>
         )}
         {error && <p className="notice error">{error}</p>}
-        {rows.map(({ asset, v, portfolioName }) => (
-          <article
-            className="metal-asset"
-            key={`${asset.id}-${portfolioName ?? ''}`}
-          >
-            <header className="metal-asset__head">
+        {groups.map((g) => (
+          <section className="fund-group" key={g.metal}>
+            <header className="fund-group__head">
               <div>
-                <b>{asset.name}</b>
+                <b>{g.metal === 'gold' ? 'Gold' : 'Silver'}</b>
                 <small>
-                  {asset.metal === 'gold' ? `${asset.karat}K gold` : 'Silver'}
-                  {portfolioName ? ` · ${portfolioName}` : ''}
+                  {g.rows.length} {g.rows.length === 1 ? 'holding' : 'holdings'}
                 </small>
               </div>
-              <div className="metal-asset__value amount">
-                {v.value === null ? 'Rate needed' : moneyShort(v.value)}
-                <small className={tone(v.gain)}>
-                  {v.gain === null
-                    ? v.cost === null
-                      ? 'cost not known'
-                      : 'no value yet'
-                    : `${signed(v.gain)}${v.gainPercent === null ? '' : ` · ${v.gainPercent >= 0 ? '+' : '−'}${Math.abs(v.gainPercent).toFixed(1)}%`}`}
+              <div className="fund-group__totals amount">
+                {g.value === null ? 'Rate needed' : moneyShort(g.value)}
+                <small className={tone(g.gain)}>
+                  {g.gain === null ? 'gain not known' : signed(g.gain)}
                 </small>
               </div>
             </header>
-            <dl className="metal-asset__stats">
-              <div>
-                <dt>Held</dt>
-                <dd>
-                  {grams(v.grams)}
-                  <small>{tolaFromGrams(v.grams).toFixed(2)} tola</small>
-                </dd>
-              </div>
-              <div>
-                <dt>Average cost</dt>
-                <dd>
-                  {v.averagePerGram === null
-                    ? '—'
-                    : `${money(v.averagePerGram * 11.6638)} / tola`}
-                </dd>
-              </div>
-              <div>
-                <dt>Bought / sold</dt>
-                <dd>
-                  {grams(v.bought.grams)} / {grams(v.sold.grams)}
-                  <small>
-                    {moneyShort(v.bought.amount)} in ·{' '}
-                    {moneyShort(v.sold.amount)} out
-                  </small>
-                </dd>
-              </div>
-              <div>
-                <dt>Realised gain</dt>
-                <dd className={tone(v.realized)}>
-                  {v.realized === null ? 'cost not known' : signed(v.realized)}
-                </dd>
-              </div>
-            </dl>
-            <p className="report-source">
-              {v.rate
-                ? `Priced at ${money(v.rate.pkrPerTola)} per tola of 24K ${asset.metal} · ${v.rate.kind === 'local' ? 'dealer rate' : 'international estimate converted to rupees'} · ${dateText(v.rate.date)}${v.rate.fellBack ? ' (the dealer rate is more than 2 days old)' : ''}${v.rate.stale ? ' · STALE' : ''}`
-                : 'No rate available yet, so the value is not shown.'}
-            </p>
-            <AssetHistory
-              summary={`${v.history.length} ${v.history.length === 1 ? 'entry' : 'entries'}${asset.entries.some((e) => e.voided) ? `, ${asset.entries.filter((e) => e.voided).length} voided` : ''}`}
-              rows={historyRows(
-                asset,
-                v,
-                canEdit,
-                busy,
-                toggleVoid,
-                (assetId, entryId) =>
-                  setOpen({ type: 'buy', assetId, entryId }),
-              )}
-            />
-          </article>
+            <div className="fund-table-wrap">
+              <table className="fund-table">
+                <thead>
+                  <tr>
+                    <th>Holding</th>
+                    <th>Held</th>
+                    <th>Avg cost / tola</th>
+                    <th>Rate / tola</th>
+                    <th>Value</th>
+                    <th>Gain / loss</th>
+                    <th>Realised</th>
+                  </tr>
+                </thead>
+                {g.rows.map((row) => (
+                  <tbody key={metalKey(row)}>
+                    <tr className="fund-row">
+                      <td data-label="Holding" className="fund-row__name">
+                        <button
+                          type="button"
+                          className="fund-row__toggle"
+                          onClick={() => onOpenAsset?.(metalKey(row))}
+                        >
+                          <span>
+                            <b>{row.asset.name}</b>
+                            <small>
+                              {row.asset.metal === 'gold'
+                                ? `${row.asset.karat}K gold`
+                                : 'Silver'}
+                              {row.portfolioName
+                                ? ` · ${row.portfolioName}`
+                                : ''}
+                            </small>
+                          </span>
+                        </button>
+                      </td>
+                      <td data-label="Held">
+                        {grams(row.v.grams)}
+                        <small>
+                          {tolaFromGrams(row.v.grams).toFixed(2)} tola
+                        </small>
+                      </td>
+                      <td data-label="Avg cost / tola">
+                        {row.v.averagePerGram === null
+                          ? '—'
+                          : money(row.v.averagePerGram * 11.6638)}
+                      </td>
+                      <td data-label="Rate / tola">
+                        {row.v.rate ? (
+                          <>
+                            {money(row.v.rate.pkrPerTola)}
+                            <small>{dateText(row.v.rate.date)}</small>
+                          </>
+                        ) : (
+                          <small>No rate yet</small>
+                        )}
+                      </td>
+                      <td data-label="Value" className="amount">
+                        {row.v.value === null
+                          ? 'Rate needed'
+                          : moneyShort(row.v.value)}
+                      </td>
+                      <td data-label="Gain / loss" className={tone(row.v.gain)}>
+                        {row.v.gain === null
+                          ? row.v.cost === null
+                            ? 'cost not known'
+                            : 'no value yet'
+                          : signed(row.v.gain)}
+                      </td>
+                      <td
+                        data-label="Realised"
+                        className={tone(row.v.realized)}
+                      >
+                        {row.v.realized === null
+                          ? 'cost not known'
+                          : signed(row.v.realized)}
+                      </td>
+                    </tr>
+                  </tbody>
+                ))}
+              </table>
+            </div>
+          </section>
         ))}
       </CollapsiblePanel>
       {dialog}
@@ -329,6 +519,7 @@ export default function GoldSilverSection({
 
 function MetalEntryDialog({
   initialType,
+  presetAssetId,
   editing,
   assets,
   rates,
@@ -337,6 +528,8 @@ function MetalEntryDialog({
   onSave,
 }: {
   initialType: MetalEntry['type'];
+  /** Pre-selects the holding when opened from its own page. */
+  presetAssetId?: string;
   /** Correct an existing entry in place instead of adding a new one. */
   editing?: { assetId: string; entry?: MetalEntry };
   assets: MetalAsset[];
@@ -353,7 +546,9 @@ function MetalEntryDialog({
     existing?.type ?? initialType,
   );
   const [assetId, setAssetId] = useState(
-    editing?.assetId ?? (initialType === 'sell' ? (assets[0]?.id ?? '') : ''),
+    editing?.assetId ??
+      presetAssetId ??
+      (initialType === 'sell' ? (assets[0]?.id ?? '') : ''),
   );
   const [metal, setMetal] = useState<Metal>('gold');
   const [karat, setKarat] = useState<Karat>(24);
@@ -441,7 +636,9 @@ function MetalEntryDialog({
           a.id === target.id
             ? {
                 ...a,
-                entries: a.entries.map((e) => (e.id === existing.id ? entry : e)),
+                entries: a.entries.map((e) =>
+                  e.id === existing.id ? entry : e,
+                ),
               }
             : a,
         );
@@ -482,10 +679,10 @@ function MetalEntryDialog({
           {existing
             ? 'Edit entry'
             : type === 'sell'
-            ? 'Record a sale'
-            : type === 'opening'
-              ? 'Opening balance'
-              : 'Add gold or silver'}
+              ? 'Record a sale'
+              : type === 'opening'
+                ? 'Opening balance'
+                : 'Add gold or silver'}
         </DialogTitle>
         <DialogDescription>
           Coins and bars only. Every purchase and sale stays in the history.
