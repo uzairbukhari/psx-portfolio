@@ -72,3 +72,7 @@
 @media(max-width:900px){.company-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.dividend-charts{grid-template-columns:1fr}}
 @media(max-width:760px){.company-price strong{font-size:28px}.company-cards article{padding:14px}.company-cards strong{font-size:clamp(15px,5vw,20px);letter-spacing:-.4px}.company-actions{position:fixed;left:0;right:0;bottom:0;z-index:35;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--background);border-top:1px solid var(--border)}.company-actions>button:first-child{flex:1}.company-page{padding-bottom:calc(72px + env(safe-area-inset-bottom))}}
 .ledger-bar>.seg+.ledger-search{margin-left:auto}
+
+.ledger-actions{display:flex;gap:6px;justify-content:flex-end}
+.ledger-row:has(.ledger-actions){grid-template-columns:34px 92px minmax(0,1fr) auto auto}
+@media(max-width:760px){.ledger-row:has(.ledger-actions){grid-template-columns:24px auto minmax(0,1fr) auto auto}.ledger-actions{grid-area:edit}}

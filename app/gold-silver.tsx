@@ -9,7 +9,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  describePieces,
   newAssetId,
   valueMetal,
   type MetalAsset,
@@ -26,8 +25,10 @@ import {
   type MetalRateRow,
 } from '@/lib/metal-rates';
 import { money, moneyShort, today } from '@/lib/portfolio';
-import ActivityList from './asset-activity';
-import type { HistoryRow } from './asset-history';
+import LedgerTimeline, {
+  NO_STOCKS,
+  buildAssetEntries,
+} from './ledger-timeline';
 import CollapsiblePanel from './collapsible-panel';
 
 export type OwnedMetal = {
@@ -52,56 +53,6 @@ const dateText = (date: string) =>
     timeZone: 'UTC',
   });
 const OTHER = 'other';
-
-function historyRows(
-  asset: MetalAsset,
-  v: ReturnType<typeof valueMetal>,
-  canEdit: boolean,
-  busy: boolean,
-  toggleVoid: (assetId: string, entryId: string) => Promise<void>,
-  edit: (assetId: string, entryId: string) => void,
-): HistoryRow[] {
-  return [...asset.entries]
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-    .map((e) => {
-      const h = v.history.find((x) => x.id === e.id);
-      const sale = e.type === 'sell';
-      return {
-        id: e.id,
-        date: dateText(e.date),
-        iso: e.date,
-        tag: e.type === 'sell' ? 'sell' : e.type === 'buy' ? 'buy' : 'neutral',
-        tagLabel:
-          e.type === 'opening'
-            ? 'Opening'
-            : e.type === 'buy'
-              ? 'Bought'
-              : 'Sold',
-        title: `${describePieces(e)}${e.form ? ` · ${e.form}` : ''}`,
-        note: e.note || undefined,
-        amount:
-          e.amount === null
-            ? 'Cost unknown'
-            : `${sale ? '+' : '−'}${money(e.amount)}`,
-        amountTone: sale ? 'pos-text' : '',
-        meta: [
-          h ? `Holding ${grams(h.heldAfter)}` : '',
-          h?.realizedGain != null ? `Gain ${signed(h.realizedGain)}` : '',
-        ].filter(Boolean),
-        voided: !!e.voided,
-        action: canEdit
-          ? {
-              label: e.voided ? 'Restore' : 'Void',
-              disabled: busy,
-              onClick: () => void toggleVoid(asset.id, e.id),
-            }
-          : undefined,
-        edit: canEdit
-          ? { disabled: busy, onClick: () => edit(asset.id, e.id) }
-          : undefined,
-      } satisfies HistoryRow;
-    });
-}
 
 /**
  * Gold and silver coins and bars: current value, and the full history of every purchase and sale. Values come from
@@ -340,16 +291,15 @@ export default function GoldSilverSection({
         </p>
         <section className="company-section">
           <h2>Activity</h2>
-          <ActivityList
-            empty="No purchases or sales recorded yet."
-            rows={historyRows(
-              asset,
-              v,
-              canEdit,
-              busy,
-              toggleVoid,
-              (assetId, entryId) => setOpen({ type: 'buy', assetId, entryId }),
-            )}
+          <LedgerTimeline
+            portfolio={NO_STOCKS}
+            ticker={asset.name}
+            hideKpis
+            entries={buildAssetEntries([{ asset }], () => undefined, {
+              correct: (_a, entryId) =>
+                setOpen({ type: 'buy', assetId: asset.id, entryId }),
+              toggleVoid: (_a, entryId) => void toggleVoid(asset.id, entryId),
+            })}
           />
         </section>
         {dialog}

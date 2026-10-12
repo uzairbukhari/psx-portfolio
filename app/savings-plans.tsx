@@ -32,8 +32,10 @@ import {
   type PlanAsset,
 } from '@/lib/plans';
 import { money, moneyShort, today } from '@/lib/portfolio';
-import ActivityList from './asset-activity';
-import type { HistoryRow } from './asset-history';
+import LedgerTimeline, {
+  NO_STOCKS,
+  buildAssetEntries,
+} from './ledger-timeline';
 import CollapsiblePanel from './collapsible-panel';
 import { track } from './analytics';
 
@@ -63,91 +65,6 @@ const monthText = (month: string) =>
     year: 'numeric',
     timeZone: 'UTC',
   });
-function planHistoryRows(
-  asset: PlanAsset,
-  canEdit: boolean,
-  busy: boolean,
-  update: (
-    planId: string,
-    change: (plan: PlanAsset) => PlanAsset,
-    message: string,
-  ) => Promise<void>,
-  edit: (kind: 'contribution' | 'redeem' | 'value', id: string) => void,
-): HistoryRow[] {
-  const toggle = (kind: 'entry' | 'value', key: string) =>
-    void update(
-      asset.id,
-      (p) =>
-        kind === 'entry'
-          ? {
-              ...p,
-              entries: p.entries.map((e) =>
-                e.id === key ? { ...e, voided: !e.voided } : e,
-              ),
-            }
-          : {
-              ...p,
-              valuations: p.valuations.map((x) =>
-                x.id === key ? { ...x, voided: !x.voided } : x,
-              ),
-            },
-      'Record updated.',
-    );
-  const rows: (HistoryRow & { sort: string })[] = [
-    ...asset.entries.map((e) => ({
-      id: e.id,
-      sort: e.date,
-      date: dateText(e.date),
-      iso: e.date,
-      tag: e.type === 'contribution' ? ('buy' as const) : ('sell' as const),
-      tagLabel: e.type === 'contribution' ? 'Paid in' : 'Redeemed',
-      title:
-        e.type === 'contribution'
-          ? 'Contribution to the plan'
-          : 'Cash taken out',
-      note: e.load
-        ? `Load ${money(e.load)} · ${money(e.amount - e.load)} invested`
-        : e.note || undefined,
-      amount: `${e.type === 'contribution' ? '−' : '+'}${money(e.amount)}`,
-      amountTone: e.type === 'contribution' ? '' : 'pos-text',
-      voided: !!e.voided,
-      action: canEdit
-        ? {
-            label: e.voided ? 'Restore' : 'Void',
-            disabled: busy,
-            onClick: () => toggle('entry', e.id),
-          }
-        : undefined,
-      edit: canEdit
-        ? { disabled: busy, onClick: () => edit(e.type, e.id) }
-        : undefined,
-    })),
-    ...asset.valuations.map((x) => ({
-      id: x.id,
-      sort: x.date,
-      date: dateText(x.date),
-      iso: x.date,
-      tag: 'value' as const,
-      tagLabel: 'Statement',
-      title: 'Value from your statement',
-      note: x.note || undefined,
-      amount: money(x.value),
-      voided: !!x.voided,
-      action: canEdit
-        ? {
-            label: x.voided ? 'Restore' : 'Void',
-            disabled: busy,
-            onClick: () => toggle('value', x.id),
-          }
-        : undefined,
-      edit: canEdit
-        ? { disabled: busy, onClick: () => edit('value', x.id) }
-        : undefined,
-    })),
-  ];
-  return rows.sort((a, b) => (a.sort < b.sort ? 1 : a.sort > b.sort ? -1 : 0));
-}
-
 const providerLabel = (asset: PlanAsset) =>
   asset.provider === 'pak-qatar-mbp'
     ? 'Pak-Qatar Family Takaful'
@@ -606,15 +523,35 @@ export default function SavingsPlansSection({
           ))}
         <section className="company-section">
           <h2>Activity</h2>
-          <ActivityList
-            empty="No records yet."
-            rows={planHistoryRows(
-              asset,
-              canEdit,
-              busy,
-              update,
-              (kind, editId) => setMode({ kind, planId: asset.id, editId }),
-            )}
+          <LedgerTimeline
+            portfolio={NO_STOCKS}
+            ticker={asset.name}
+            hideKpis
+            entries={buildAssetEntries([{ asset }], () => undefined, {
+              correct: (_a, entryId) =>
+                setMode({
+                  kind: asset.valuations.some((x) => x.id === entryId)
+                    ? 'value'
+                    : (asset.entries.find((e) => e.id === entryId)?.type ??
+                      'contribution'),
+                  planId: asset.id,
+                  editId: entryId,
+                }),
+              toggleVoid: (_a, entryId) =>
+                void update(
+                  asset.id,
+                  (pl) => ({
+                    ...pl,
+                    entries: pl.entries.map((e) =>
+                      e.id === entryId ? { ...e, voided: !e.voided } : e,
+                    ),
+                    valuations: pl.valuations.map((x) =>
+                      x.id === entryId ? { ...x, voided: !x.voided } : x,
+                    ),
+                  }),
+                  'Record updated.',
+                ),
+            })}
           />
         </section>
         {dialog}
