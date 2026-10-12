@@ -1,4 +1,3 @@
-import { ChoosePortfolio } from '@/ui/AllPortfolios';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +35,10 @@ function Step({ label, glyph, onPress }: { label: string; glyph: string; onPress
 export default function Targets() {
   const styles = useKitStyles();
   const { colors } = useTheme();
-  const p = usePortfolio();
+  // With several portfolios there is one set of targets, kept in the first (home) portfolio.
+  const selection = usePortfolio();
+  const homeId = selection.account && selection.account.portfolios.length > 1 ? selection.account.portfolios[0].id : undefined;
+  const p = usePortfolio(homeId);
   const [rows, setRows] = useState<Draft[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');
@@ -50,7 +52,6 @@ export default function Targets() {
   const edit = (next: Draft[]) => setRows(next);
   const patch = (ticker: string, change: Partial<Draft>) => edit(draft.map((r) => (r.ticker === ticker ? { ...r, ...change } : r)));
 
-  if (p.isAll) return <ChoosePortfolio purpose="Choose the portfolio whose targets you want to edit." />;
   if (p.isLoading || !portfolio)
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom']}>

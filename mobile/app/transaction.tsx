@@ -72,9 +72,9 @@ function closeScreen() {
 export default function Transaction() {
   const kit = useKitStyles();
   const { colors } = useTheme();
-  const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string; shares?: string; price?: string; month?: string }>();
+  const params = useLocalSearchParams<{ ticker?: string; kind?: string; id?: string; shares?: string; price?: string; month?: string; portfolio?: string }>();
   const selection = usePortfolio();
-  const [destination, setDestination] = useState('');
+  const [destination, setDestination] = useState(params.portfolio ?? '');
   const ownerId = params.id?.includes('::') ? params.id.split('::')[0] : undefined;
   const p = usePortfolio(destination || ownerId);
   const { api } = useAuth();

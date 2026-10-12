@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankPortfolio, validate } from '../../../lib/portfolio.ts';
-import { buildPlan, setBudget, shiftMonth } from './sip.ts';
+import { buildPlan, setBudget, shiftMonth, unifiedPlanSource } from './sip.ts';
 
 test('shiftMonth crosses year boundaries both ways', () => {
   assert.equal(shiftMonth('2026-12', 1), '2027-01');
@@ -39,4 +39,21 @@ test('buildPlan spends within the budget for an eligible company with a price', 
   assert.equal(r.plan.errors.length, 0);
   assert.ok(r.plan.invested <= 1000);
   assert.ok(r.plan.rows[0].shares > 0);
+});
+
+test('unifiedPlanSource plans once across portfolios with the home budget and targets', () => {
+  const co = (ticker: string, target: number) => ({ ticker, name: ticker, sector: 'Bank', target, approved: true, screenDate: '2026-01-01', note: '' });
+  const home = blankPortfolio();
+  home.companies = [co('AAA', 100)];
+  home.budgets['2026-10'] = 50000;
+  const other = blankPortfolio();
+  other.companies = [co('BBB', 50)];
+  other.budgets['2026-10'] = 99999;
+  const account = { version: 1, portfolios: [{ id: 'a', name: 'Home', portfolio: home }, { id: 'b', name: 'Other', portfolio: other }] } as never;
+  const { home: h, portfolio } = unifiedPlanSource(account);
+  assert.equal(h.id, 'a');
+  assert.equal(portfolio.budgets['2026-10'], 50000);
+  assert.deepEqual(portfolio.companies.map((c) => [c.ticker, c.target]), [['AAA', 100], ['BBB', 0]]);
+  const r = buildPlan(portfolio, '2026-10', 0, true);
+  assert.equal(r.error, null);
 });

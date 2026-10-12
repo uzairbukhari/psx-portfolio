@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { money, today } from '@shared/portfolio.ts';
+import { money, today, type Portfolio } from '@shared/portfolio.ts';
 import { recordBuys } from '@/data/mutations';
 import { parseReview, reviewRows, type ReviewRow, type SuggestedBuy } from '@/data/record-buys';
 import { plural } from '@/data/format';
@@ -19,6 +19,8 @@ export function ReviewBuysSheet({
   month,
   feePct,
   title = 'Review and record',
+  portfolioId,
+  companies,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -26,17 +28,21 @@ export function ReviewBuysSheet({
   month: string;
   feePct: number;
   title?: string;
+  /** Portfolio that receives the buys; defaults to the selected one. */
+  portfolioId?: string;
+  /** Companies the buys may belong to; any the receiving portfolio lacks are added to it with no target. */
+  companies?: Portfolio['companies'];
 }) {
   return (
     <Sheet visible={visible} title={title} onClose={onClose}>
       {/* Mounted only while open, so every opening starts from the current suggestions. */}
-      {visible ? <ReviewBody suggestions={suggestions} month={month} feePct={feePct} onClose={onClose} /> : null}
+      {visible ? <ReviewBody suggestions={suggestions} month={month} feePct={feePct} onClose={onClose} portfolioId={portfolioId} companies={companies} /> : null}
     </Sheet>
   );
 }
 
-function ReviewBody({ suggestions, month, feePct, onClose }: { suggestions: SuggestedBuy[]; month: string; feePct: number; onClose: () => void }) {
-  const p = usePortfolio();
+function ReviewBody({ suggestions, month, feePct, onClose, portfolioId, companies }: { suggestions: SuggestedBuy[]; month: string; feePct: number; onClose: () => void; portfolioId?: string; companies?: Portfolio['companies'] }) {
+  const p = usePortfolio(portfolioId);
   const toast = useToast();
   const styles = useKitStyles();
   const [rows, setRows] = useState<ReviewRow[]>(() => reviewRows(suggestions));
@@ -62,7 +68,9 @@ function ReviewBody({ suggestions, month, feePct, onClose }: { suggestions: Sugg
     setBusy(true);
     try {
       const previous = p.portfolio;
-      const savedRevision = await p.save(recordBuys(previous, parsed.buys, month, today(), 'SIP'));
+      const missing = (companies ?? []).filter((c) => parsed.buys.some((b) => b.ticker === c.ticker) && !previous.companies.some((x) => x.ticker === c.ticker));
+      const base = missing.length ? { ...previous, companies: [...previous.companies, ...missing.map((c) => ({ ...c, target: 0 }))] } : previous;
+      const savedRevision = await p.save(recordBuys(base, parsed.buys, month, today(), 'SIP'));
       toast.show({
         message: `${plural(parsed.buys.length, 'buy')} recorded for ${month}`,
         actionLabel: 'Undo',

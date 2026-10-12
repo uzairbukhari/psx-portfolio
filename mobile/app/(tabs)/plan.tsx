@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { WEIGHT_CAP, money, moneyShort } from '@shared/portfolio.ts';
 import { targetTotals } from '@shared/targets.ts';
 import { monthTitle } from '@/data/format';
 import { parseNumber } from '@/data/mutations';
-import { buildPlan, currentMonth, setBudget, shiftMonth } from '@/data/sip';
+import { buildPlan, currentMonth, setBudget, shiftMonth, unifiedPlanSource } from '@/data/sip';
 import { usePortfolio } from '@/data/usePortfolio';
 import { PicksView } from '@/screens/PicksView';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -17,10 +17,9 @@ import { Avatar, Button, Card, Collapsible, Input, Loading, Muted, Notice, Progr
 
 type Mode = 'targets' | 'picks';
 
-function EmbeddedPlan({children}: {children:ReactNode;onRefresh?:()=>void;refreshing?:boolean}) {return <View style={{gap:14}}>{children}</View>}
-export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;embedded?:boolean} = {}) {
+export default function Plan() {
   const params = useLocalSearchParams<{ mode?: string }>();
-  const p = usePortfolio(portfolioId);
+  const p = usePortfolio();
   const styles = useKitStyles();
   const { colors } = useTheme();
   const now = currentMonth();
@@ -38,11 +37,14 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
   const [reviewing, setReviewing] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
-  const result = useMemo(() => (!p.isAll && p.portfolio ? buildPlan(p.portfolio, month, parseNumber(fee) ?? 0, allowOld) : null), [p.portfolio, month, fee, allowOld]);
+  // With several portfolios there is one plan for all of them, whichever portfolio is selected.
+  const unified = useMemo(() => (p.account && p.account.portfolios.length > 1 ? unifiedPlanSource(p.account) : null), [p.account]);
+  const source = unified ? unified.portfolio : p.portfolio;
+  const [destination, setDestination] = useState('');
+  const result = useMemo(() => (source ? buildPlan(source, month, parseNumber(fee) ?? 0, allowOld) : null), [source, month, fee, allowOld]);
   useEffect(()=>{setEditingBudget(false);setReviewing(false)},[p.selectedId]);
   const bar = <AppBar title="Plan" subtitle="Decide this month’s buys" />;
 
-  if (p.isAll) return <Screen>{bar}{p.account?.portfolios.map((part)=><Card key={part.id}><Text style={styles.strong}>{part.name}</Text><Button label="Open portfolio to plan" variant="text" onPress={()=>p.select(part.id)} /><Plan portfolioId={part.id} embedded /></Card>)}</Screen>;
   if (p.isLoading)
     return (
       <Screen>
@@ -50,7 +52,7 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
         <Loading />
       </Screen>
     );
-  if (!p.portfolio || !result)
+  if (!source || !result)
     return (
       <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
         {bar}
@@ -60,9 +62,12 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
       </Screen>
     );
 
-  const portfolio = p.portfolio;
+  const portfolio = source;
   const plan = result.plan;
-  const readOnly = embedded || p.locked || month < now;
+  const homeId = unified?.home.id;
+  const receivers = unified ? (p.account?.portfolios ?? []).filter((entry) => !entry.locked) : [];
+  const receiverId = receivers.some((entry) => entry.id === destination) ? destination : (receivers.find((entry) => entry.id === homeId) ?? receivers[0])?.id;
+  const readOnly = (unified ? Boolean(unified.home.locked) : p.locked) || month < now;
   const targeted = portfolio.companies.filter((c) => c.target > 0);
   // The targets total gets its own notice with a way to fix it, so it is not repeated among the plan's errors.
   const planErrors = (plan?.errors ?? []).filter((e) => e !== 'Target weights must total 100%.');
@@ -100,10 +105,9 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
     </Pressable>
   );
 
-  const Container = embedded ? EmbeddedPlan : Screen;
   return (
-    <Container onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
-      {embedded ? null : bar}
+    <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching}>
+      {bar}
       <Card tone="hero">
         <View style={styles.row}>
           {arrow(-1)}
@@ -138,7 +142,7 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
       {p.offline ? <Notice tone="offline">Offline · this plan is read only until you reconnect.</Notice> : null}
 
       {mode === 'picks' && portfolio.companies.length ? (
-        <PicksView key={p.targetId ?? 'all'} portfolioId={portfolioId} month={month} fee={fee} onFee={setFee} readOnly={readOnly} />
+        <PicksView key={homeId ?? p.targetId ?? 'all'} portfolioId={homeId} month={month} fee={fee} onFee={setFee} readOnly={readOnly} />
       ) : targeted.length === 0 ? (
         <Card tone="hero">
           <Text style={styles.strong}>Choose your companies and targets</Text>
@@ -197,12 +201,18 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
                         label={`Record only ${r.ticker}`}
                         variant="text"
                         style={{ alignSelf: 'flex-start' }}
-                        onPress={() => router.push({ pathname: '/transaction', params: { ticker: r.ticker, kind: 'buy', shares: String(r.shares), price: String(r.price), month } })}
+                        onPress={() => router.push({ pathname: '/transaction', params: { ticker: r.ticker, kind: 'buy', shares: String(r.shares), price: String(r.price), month, ...(receiverId ? { portfolio: receiverId } : {}) } })}
                       />
                     ) : null}
                   </View>
                 ))}
               </View>
+              {unified && buys.length && !readOnly && receivers.length > 1 ? (
+                <>
+                  <Segmented label="Record buys in" value={receiverId ?? ''} onChange={setDestination} options={receivers.map((entry) => ({ key: entry.id, label: entry.name }))} />
+                  <Muted>One plan covers all your portfolios. Choose which portfolio receives these buys.</Muted>
+                </>
+              ) : null}
               {buys.length && !readOnly ? (
                 <Button
                   label={`Record all ${buys.length} ${buys.length === 1 ? 'buy' : 'buys'}…`}
@@ -231,18 +241,18 @@ export default function Plan({portfolioId,embedded=false}: {portfolioId?:string;
             </View>
             <Button label={pricing ? 'Refreshing prices…' : 'Refresh PSX prices'} variant="outline" icon="refresh" loading={pricing} onPress={() => void refreshPrices()} />
           </Collapsible>
-          <ReviewBuysSheet visible={reviewing} onClose={() => setReviewing(false)} suggestions={buys} month={month} feePct={feePct} />
+          <ReviewBuysSheet visible={reviewing} onClose={() => setReviewing(false)} suggestions={buys} month={month} feePct={feePct} portfolioId={receiverId} companies={portfolio.companies} />
         </>
       )}
 
-      <BudgetSheet key={month} visible={editingBudget} month={month} current={budgetSet ? portfolio.budgets[month] : null} onClose={() => setEditingBudget(false)} onSaved={(text) => setMessage({ text, error: false })} />
-    </Container>
+      <BudgetSheet key={month} scopeId={homeId} visible={editingBudget} month={month} current={budgetSet ? portfolio.budgets[month] : null} onClose={() => setEditingBudget(false)} onSaved={(text) => setMessage({ text, error: false })} />
+    </Screen>
   );
 }
 
 /** Budget for one month. Keyed by month, so what is typed here can only ever be saved to the month it was opened for. */
-function BudgetSheet({ visible, month, current, onClose, onSaved }: { visible: boolean; month: string; current: number | null; onClose: () => void; onSaved: (message: string) => void }) {
-  const p = usePortfolio();
+function BudgetSheet({ scopeId, visible, month, current, onClose, onSaved }: { scopeId?: string; visible: boolean; month: string; current: number | null; onClose: () => void; onSaved: (message: string) => void }) {
+  const p = usePortfolio(scopeId);
   const [text, setText] = useState(current === null ? '' : String(current));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
