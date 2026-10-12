@@ -13,11 +13,12 @@ const pct = (n: number) => `${Math.round(n * 100)}%`;
 const shortDay = (d: string) => d.slice(5);
 
 /** Super-admin usage analytics (GET /api/admin/usage): sign-ups, active users, feature use, funnel, retention. */
-export default function UsageDashboard() {
+export default function UsageDashboard({ includeInternal }: { includeInternal?: boolean } = {}) {
   const [report, setReport] = useState<UsageReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [includeAdmin, setIncludeAdmin] = useState(false);
+  const [ownToggle, setOwnToggle] = useState(false);
+  const includeAdmin = includeInternal ?? ownToggle;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,7 +57,7 @@ export default function UsageDashboard() {
         ))}
       </div>
       <p className="muted">
-        Stickiness (today ÷ 30 days): {active.stickiness === null ? 'n/a' : pct(active.stickiness)}. Sign-ups count accounts first seen
+        Stickiness (today ÷ 30 days): {active.stickiness === null ? 'n/a' : pct(active.stickiness)}. Super admins and test accounts are left out unless you include them. Sign-ups count accounts first seen
         since usage tracking began; accounts that already existed are in Total users only.
       </p>
 
@@ -145,9 +146,11 @@ export default function UsageDashboard() {
         </>
       )}
 
-      <label className="usage-toggle">
-        <input type="checkbox" checked={includeAdmin} onChange={(e) => setIncludeAdmin(e.target.checked)} /> Include my own activity
-      </label>
+      {includeInternal === undefined && (
+        <label className="usage-toggle">
+          <input type="checkbox" checked={ownToggle} onChange={(e) => setOwnToggle(e.target.checked)} /> Include internal accounts
+        </label>
+      )}
       <button type="button" className="secondary compact" disabled={loading} onClick={() => void load()}>
         {loading ? 'Refreshing…' : 'Refresh'}
       </button>

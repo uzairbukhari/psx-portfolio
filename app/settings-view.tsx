@@ -1,11 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  Activity,
   ArrowLeft,
   BarChart3,
-  ScrollText,
   Cpu,
   Database,
   Download,
@@ -36,10 +35,7 @@ import {
   type ResearchSettings,
 } from '@/lib/portfolio';
 import { useConfirm } from '@/components/confirm-dialog';
-import SystemHealth from './system-health';
-import UsageDashboard from './usage-dashboard';
 import { ThemeSetting } from './theme-menu';
-import AuditLog from './audit-log';
 import { analyticsEnabled, setAnalyticsEnabled, track, flushAnalytics } from './analytics';
 import { Switch } from '@/components/ui/switch';
 import { UserAvatar } from './user-avatar';
@@ -164,7 +160,7 @@ export default function SettingsView({
   name: string | null;
   email: string;
   picture: string | null;
-  role: 'super_admin' | 'user';
+  role: 'super_admin' | 'tester' | 'user';
   busy: boolean;
   usage: Usage | null;
   filerStatus: '' | 'filer' | 'non-filer';
@@ -254,7 +250,7 @@ export default function SettingsView({
     ...(security ? [{ id: 'security', label: 'Security', icon: KeyRound }] : []),
     { id: 'data', label: 'Data & imports', icon: Database },
     ...(dividendSync ? [{ id: 'sync-dividends', label: 'Sync dividends', icon: RefreshCw }] : []),
-    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }, { id: 'health', label: 'System health', icon: Activity }, { id: 'analytics', label: 'Usage analytics', icon: BarChart3 }, { id: 'audit', label: 'Audit log', icon: ScrollText }] : []),
+    ...(isAdmin ? [{ id: 'research', label: 'Research AI', icon: Cpu }] : []),
   ];
   const current = sections.some((x) => x.id === active) ? active : 'account';
 
@@ -331,6 +327,13 @@ export default function SettingsView({
                     <LogOut size={14} /> Sign out
                   </button>
                 </div>
+                {isAdmin && (
+                  <Row label="Admin console" hint="System health, usage analytics, audit log and internal accounts.">
+                    <Link href="/admin/health" className="secondary compact signout-link">
+                      <ShieldCheck size={14} aria-hidden="true" /> Open
+                    </Link>
+                  </Row>
+                )}
               </Section>
 
               <Section
@@ -544,42 +547,6 @@ export default function SettingsView({
               description="Backfill cash dividends from your whole holding history and approve them as received."
             >
               {dividendSync}
-            </Section>
-          )}
-
-          {isAdmin && current === 'health' && (
-            <Section
-              id="health"
-              icon={<Activity size={18} />}
-              title="System health"
-              badge="Super admin"
-              description="Monthly Picks run processor, data freshness and recent scrape failures."
-            >
-              <SystemHealth />
-            </Section>
-          )}
-
-          {isAdmin && current === 'analytics' && (
-            <Section
-              id="analytics"
-              icon={<BarChart3 size={18} />}
-              title="Usage analytics"
-              badge="Super admin"
-              description="Sign-ups, active users and feature use on web and phone. Counts only: no holdings, tickers or amounts are ever recorded."
-            >
-              <UsageDashboard />
-            </Section>
-          )}
-
-          {isAdmin && current === 'audit' && (
-            <Section
-              id="audit"
-              icon={<ScrollText size={18} />}
-              title="Audit log"
-              badge="Super admin"
-              description="Errors users run into, by category and code, so you can trace a problem to a screen, platform, version or person. No error text or data is recorded."
-            >
-              <AuditLog />
             </Section>
           )}
 

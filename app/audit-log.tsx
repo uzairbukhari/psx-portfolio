@@ -8,14 +8,15 @@ import { readJson } from '@/lib/safe-json';
 const label = (name: string) => { const t = name.replaceAll('_', ' '); return t[0].toUpperCase() + t.slice(1); };
 
 /** Super-admin audit log (GET /api/admin/audit): errors users hit, by category and code. Never shows message text. */
-export default function AuditLog() {
+export default function AuditLog({ includeInternal }: { includeInternal?: boolean } = {}) {
   const [report, setReport] = useState<AuditReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [area, setArea] = useState('');
   const [code, setCode] = useState('');
   const [days, setDays] = useState(7);
   const [user, setUser] = useState('');
-  const [includeAdmin, setIncludeAdmin] = useState(false);
+  const [ownToggle, setOwnToggle] = useState(false);
+  const includeAdmin = includeInternal ?? ownToggle;
 
   const load = useCallback(async () => {
     const q = new URLSearchParams({ days: String(days) });
@@ -56,7 +57,9 @@ export default function AuditLog() {
           {report.byCode.map((c) => <option key={`${c.area}${c.code}`} value={c.code}>{label(c.code)} ({c.n})</option>)}
         </select>
         <input aria-label="Filter by user email" placeholder="User email" value={user} onChange={(e) => setUser(e.target.value)} />
-        <label><input type="checkbox" checked={includeAdmin} onChange={(e) => setIncludeAdmin(e.target.checked)} /> Include my own</label>
+        {includeInternal === undefined && (
+          <label><input type="checkbox" checked={ownToggle} onChange={(e) => setOwnToggle(e.target.checked)} /> Include internal accounts</label>
+        )}
       </fieldset>
       <p className="muted">Showing the latest {report.rows.length} of {total}. Only the category, code and screen are recorded, never the error text or any data. Each user appears as a short key; type an email above to see one person&apos;s errors.</p>
       {report.rows.length === 0 ? <p className="muted">No errors recorded for these filters.</p> : (
@@ -67,7 +70,7 @@ export default function AuditLog() {
               {report.rows.map((r, i) => (
                 <tr key={`${r.ts}${i}`}>
                   <td>{new Date(r.ts).toLocaleString()}</td><td>{label(r.area)}</td><td>{label(r.code)}</td>
-                  <td>{r.screen ? label(r.screen) : '—'}</td><td>{r.platform}</td><td>{r.version ?? '—'}</td><td>{r.user ?? 'signed out'}</td>
+                  <td>{r.screen ? label(r.screen) : '—'}</td><td>{r.platform}</td><td>{r.version ?? '—'}</td><td>{r.user ?? 'signed out'}{r.internal && <span className="set-badge"> Internal</span>}</td>
                 </tr>
               ))}
             </tbody>

@@ -17,6 +17,9 @@ export const USER_TABLES: readonly { table: string; column: string }[] = [
   { table: 'mobile_sessions', column: 'email' },
   { table: 'user_roles', column: 'email' },
   { table: 'app_users', column: 'email' },
+  // The admin console's change log names super admins (actor) and the accounts they changed (target).
+  { table: 'admin_actions', column: 'actor' },
+  { table: 'admin_actions', column: 'target' },
 ];
 
 /** Child tables keyed through a per-user parent row; deleted before the parent so the link still exists. */

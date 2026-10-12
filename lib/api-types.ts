@@ -13,7 +13,7 @@ import type { PublicAnalysis } from './public-analysis-types.ts';
 export type { DataMeta, Freshness } from './market-meta.ts';
 
 // Mirrors lib/roles.ts (which imports the Workers runtime, so it can't be shared).
-export type Role = 'super_admin' | 'user';
+export type Role = 'super_admin' | 'tester' | 'user';
 
 export type ApiError = { error: string };
 

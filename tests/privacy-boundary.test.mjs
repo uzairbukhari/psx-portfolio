@@ -95,3 +95,9 @@ test('the gold and silver rate route takes no input and no asset field is ever s
   const client = read(join(root, 'lib/public-data-client.ts'));
   assert.ok(/call<\{ rates: MetalRateRow\[\] \}>\('\/api\/public-data\/metals'\)/.test(client), 'the rates call carries no parameters');
 });
+
+test('the admin console never touches the vault or the decrypted portfolio', () => {
+  const files = [...walk(join(root, 'app/api/admin')), ...walk(join(root, 'app/admin')), ...['app/admin-console.tsx', 'app/admin-accounts.tsx', 'lib/internal-accounts.ts'].map((f) => join(root, f))];
+  assert.ok(files.length >= 6);
+  for (const file of files) assert.ok(!/vaultDb|VAULT_DB|vault-client|vault-store|portfolio-view|vault-gate/.test(read(file)), `${relative(root, file)} reaches the vault`);
+});

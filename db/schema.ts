@@ -299,12 +299,29 @@ export const priceHistory = sqliteTable('price_history', {
   intradayFetchedAt: text('intraday_fetched_at'),
 });
 
-// Role assignments by email. No row means the default 'user' role.
+// Role assignments by email. No row means the default 'user' role. 'super_admin' and 'tester' are the internal
+// accounts: both are left out of usage analytics (see lib/internal-accounts.ts).
 export const userRoles = sqliteTable('user_roles', {
   email: text('email').primaryKey(),
   role: text('role').notNull(),
   createdAt: text('created_at').notNull(),
+  note: text('note'),
+  addedBy: text('added_by'),
 });
+
+// What a super admin changed from the admin console (role changes first). `actor` is always a super admin's email.
+export const adminActions = sqliteTable(
+  'admin_actions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    at: text('at').notNull(),
+    actor: text('actor').notNull(),
+    action: text('action').notNull(),
+    target: text('target'),
+    result: text('result').notNull(),
+  },
+  (table) => [index('admin_actions_at_idx').on(table.at)],
+);
 
 // Per-user fixed-window rate limits for expensive actions (forced PSX refreshes,
 // on-demand facts scrapes). One row per user and action.
