@@ -67,16 +67,22 @@ test('Cloudflare analytics groups fold into one day, counting limit statuses wha
 
 test('syncing stores nothing without a token and converts microseconds with one', async () => {
   const db = d1();
-  assert.equal(await syncPlatformMetrics(db, {}, ['w'], now, async () => { throw Error('no call'); }), 0);
+  const none = await syncPlatformMetrics(db, {}, ['w'], now, async () => { throw Error('no call'); });
+  assert.equal(none.stored, 0);
+  assert.match(none.error, /not set/);
   const fetcher = async (_u, init) => {
     assert.match(JSON.parse(init.body).variables.script, /^w/);
     return Response.json(gql([{ sum: { requests: 10 }, quantiles: { cpuTimeP50: 3000, cpuTimeP99: 8000 }, dimensions: { status: 'success' } }]));
   };
-  assert.equal(await syncPlatformMetrics(db, { token: 't', accountId: 'a' }, ['w1', 'w2'], now, fetcher), 2);
+  assert.deepEqual(await syncPlatformMetrics(db, { token: 't', accountId: 'a' }, ['w1', 'w2'], now, fetcher), { stored: 2, error: null });
   const row = db.sqlite.prepare("SELECT * FROM platform_metrics WHERE script='w1'").get();
   assert.equal(row.day, '2026-10-14');
   assert.equal(row.cpu_p99, 8);
-  assert.equal(await syncPlatformMetrics(db, { token: 't', accountId: 'a' }, ['w'], now, async () => new Response('x', { status: 403 })), 0);
+  const denied = await syncPlatformMetrics(db, { token: 't', accountId: 'a' }, ['w'], now, async () => new Response('x', { status: 403 }));
+  assert.equal(denied.stored, 0);
+  assert.match(denied.error, /403.*Account Analytics/);
+  const bad = await syncPlatformMetrics(db, { token: 't', accountId: 'a' }, ['w'], now, async () => Response.json({ data: null, errors: [{ message: 'not authorized' }] }));
+  assert.match(bad.error, /not authorized/);
 });
 
 test('the platform report judges limits, server errors and counts what browsers saw', async () => {

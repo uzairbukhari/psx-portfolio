@@ -16,6 +16,9 @@ export type PlatformReport = {
   headline: string;
   connected: boolean;
   lastSyncAt: string | null;
+  /** Why the last sync failed (wrong token, account id ...), from the cron Worker's run record; null when it worked or never ran. */
+  syncError: string | null;
+  syncRanAt: string | null;
   dailyRequestLimit: number;
   cpuLimitMs: number;
   today: { requests: number; errors: number; limitHits: number; cpuP99: number | null; usedShare: number; scripts: ScriptDay[] };
@@ -49,6 +52,7 @@ export async function platformReport(db: D1Database, opts: PlatformOptions = {})
   const since = new Date(now.getTime() - 6 * 86_400_000).toISOString().slice(0, 10);
   const rows = await all<Row>(db, 'SELECT day,script,requests,errors,limit_hits,cpu_p50,cpu_p99,statuses,fetched_at FROM platform_metrics WHERE day>=? ORDER BY day,script', since);
   const lastSyncAt = rows.map((r) => r.fetched_at).sort((a, b) => a.localeCompare(b)).pop() ?? null;
+  const lastRun = await db.prepare("SELECT finished_at,ok,detail FROM job_runs WHERE job='platform' ORDER BY started_at DESC, id DESC LIMIT 1").first<{ finished_at: string; ok: number; detail: string | null }>().catch(() => null);
   const connected = !!lastSyncAt && now.getTime() - Date.parse(lastSyncAt) < 3 * 3_600_000;
   const scripts = rows.filter((r) => r.day === today).map((r): ScriptDay => ({
     day: r.day, script: r.script, requests: r.requests, errors: r.errors, limitHits: r.limit_hits, cpuP50: r.cpu_p50, cpuP99: r.cpu_p99,
@@ -70,7 +74,7 @@ export async function platformReport(db: D1Database, opts: PlatformOptions = {})
     connected, dailyRequestLimit, cpuLimitMs, server,
     today: { requests, errors: sum('errors'), limitHits: sum('limitHits'), cpuP99: cpus.length ? Math.max(...cpus) : null, usedShare: requests / dailyRequestLimit, scripts },
   };
-  return { now: now.toISOString(), ...judgePlatform(partial), lastSyncAt, days, client, ...partial };
+  return { now: now.toISOString(), ...judgePlatform(partial), lastSyncAt, syncError: lastRun && lastRun.ok === 0 ? lastRun.detail : null, syncRanAt: lastRun?.finished_at ?? null, days, client, ...partial };
 }
 
 /** Limits from Worker settings (CF_DAILY_REQUEST_LIMIT, CF_CPU_LIMIT_MS); the Workers Free plan's numbers by default. */
