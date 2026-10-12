@@ -44,7 +44,7 @@ export function SavingsPlans({ owned }: { owned: OwnedPlan[] }) {
               </View>
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <Fact label="Paid in" value={moneyShort(v.contributed)} />
-                <Fact label="Redeemed" value={moneyShort(v.redeemed)} />
+                {v.redeemed > 0 ? <Fact label="Redeemed" value={moneyShort(v.redeemed)} /> : null}
                 <Fact label="Still in" value={moneyShort(v.cost)} />
               </View>
               <Muted>

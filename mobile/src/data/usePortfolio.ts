@@ -33,6 +33,7 @@ export function usePortfolio(scopeId?: string) {
     queryKey: key,
     enabled: Boolean(email),
     queryFn: () => loadAccountView(session, publicData, true),
+    staleTime: 5 * 60_000, // saves check the revision, so edits made on the web are still caught
   });
   const data = query.data ?? null;
   const single = data?.account.portfolios.length === 1;

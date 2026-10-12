@@ -289,19 +289,16 @@ export const today = () =>
     month: '2-digit',
     day: '2-digit',
   }).format(new Date());
-export const money = (n: number | null) =>
-  n === null
-    ? 'Unknown'
-    : new Intl.NumberFormat('en-PK', {
-        style: 'currency',
-        currency: 'PKR',
-        maximumFractionDigits: 2,
-      }).format(n);
+// Built once: constructing an Intl.NumberFormat per call is slow on Hermes, and a Holdings render calls these hundreds of times.
+const PKR_PAISE = new Intl.NumberFormat('en-PK', {
+  style: 'currency',
+  currency: 'PKR',
+  maximumFractionDigits: 2,
+});
+const PKR_WHOLE = new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 });
+export const money = (n: number | null) => (n === null ? 'Unknown' : PKR_PAISE.format(n));
 /** money() without paise for big summary figures (|amount| >= 10,000). */
-export const moneyShort = (n: number | null) =>
-  n === null || Math.abs(n) < 10000
-    ? money(n)
-    : new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(n);
+export const moneyShort = (n: number | null) => (n === null || Math.abs(n) < 10000 ? money(n) : PKR_WHOLE.format(n));
 /** Rounds to paisa, half away from zero for negative values as well as positive. */
 export const round = (n: number) => {
   const r = (Math.sign(n) * Math.round((Math.abs(n) + Number.EPSILON) * 100)) / 100;

@@ -1,11 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import {
-  AccessibilityInfo,
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  type RefreshControlProps,
   type StyleProp,
   type TextInputProps,
   type ViewStyle,
@@ -23,22 +20,12 @@ import { signedMoney, signedPercent } from '@/data/format';
 import { stepStates } from '@/data/progress';
 import { layout, radii, type } from '@/theme/tokens';
 import { makeStyles, useTheme } from '@/theme/ThemeProvider';
+import { AnimatedSheet } from './AnimatedSheet';
+import { useFabScroll } from './ScrollAwareFab';
 import { Icon, type IconName } from './Icon';
+import { useReduceMotion } from './motion';
 
-/** True when the phone asks for reduced motion ("Remove animations" on Android). */
-export function useReduceMotion(): boolean {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    let live = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((v) => live && setReduce(v));
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
-    return () => {
-      live = false;
-      sub.remove();
-    };
-  }, []);
-  return reduce;
-}
+export { useReduceMotion };
 
 export function Screen({
   children,
@@ -51,23 +38,36 @@ export function Screen({
   onRefresh?: () => void;
   refreshing?: boolean;
   edges?: ('top' | 'bottom')[];
-  /** Leaves room under the content for the floating Add button. */
+  /** Leaves room under the content for the floating Add button (tab screens only). */
   fab?: boolean;
 }) {
   const styles = useKitStyles();
   const { colors } = useTheme();
+  const body = { children, styles, fab, refreshControl: onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined };
+  return <SafeAreaView style={styles.screen} edges={edges}>{fab ? <FabScrollBody {...body} /> : <ScrollBody {...body} />}</SafeAreaView>;
+}
+
+type BodyProps = { children: ReactNode; styles: ReturnType<typeof useKitStyles>; fab: boolean; refreshControl?: ReactElement<RefreshControlProps> };
+
+function ScrollBody({ children, styles, fab, refreshControl, onScroll }: BodyProps & { onScroll?: ComponentProps<typeof Animated.ScrollView>['onScroll'] }) {
   return (
-    <SafeAreaView style={styles.screen} edges={edges}>
-      <ScrollView
-        contentContainerStyle={[styles.content, fab && { paddingBottom: 112 }]}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined}
-      >
-        {children}
-      </ScrollView>
-    </SafeAreaView>
+    <Animated.ScrollView
+      onScroll={onScroll}
+      scrollEventThrottle={onScroll ? 16 : undefined}
+      contentContainerStyle={[styles.content, fab && { paddingBottom: 112 }]}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+      refreshControl={refreshControl}
+    >
+      {children}
+    </Animated.ScrollView>
   );
+}
+
+/** Only rendered inside the tab navigator: its scroll offset drives the Add button (useFabScroll needs a navigation context). */
+function FabScrollBody(props: BodyProps) {
+  const onScroll = useFabScroll();
+  return <ScrollBody {...props} onScroll={onScroll} />;
 }
 
 /** Screen heading with an optional subtitle and a right-hand action. */
@@ -128,7 +128,7 @@ export function Title({ children }: { children: ReactNode }) {
 export function SectionLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   const styles = useKitStyles();
   return (
-    <View style={[styles.row, { marginTop: 4 }]}>
+    <View style={[styles.row, { marginTop: 12 }]}>
       <Text style={styles.sectionLabel} accessibilityRole="header">
         {children}
       </Text>
@@ -141,7 +141,7 @@ export function SectionLabel({ children, right }: { children: ReactNode; right?:
 export function SectionHeader({ title, count, value, right }: { title: string; count?: number; value?: string | null; right?: ReactNode }) {
   const styles = useKitStyles();
   return (
-    <View style={[styles.row, { marginTop: 8 }]} accessible accessibilityRole="header" accessibilityLabel={`${title}${count !== undefined ? `, ${count}` : ''}${value ? `, ${value}` : ''}`}>
+    <View style={[styles.row, { marginTop: 16 }]} accessible accessibilityRole="header" accessibilityLabel={`${title}${count !== undefined ? `, ${count}` : ''}${value ? `, ${value}` : ''}`}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 }}>
         <Text style={styles.strong}>{title}</Text>
         {count !== undefined ? <Text style={styles.muted}>{count}</Text> : null}
@@ -432,27 +432,12 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
   );
 }
 
-/** Bottom sheet over the current screen: grab handle, title, scrollable body, closes on the scrim or back. */
+/** Bottom sheet over the current screen: grab handle, title, scrollable body, drag down, tap the scrim or press back to close. */
 export function Sheet({ visible, title, onClose, children }: { visible: boolean; title?: string; onClose: () => void; children: ReactNode }) {
-  const styles = useKitStyles();
-  const reduce = useReduceMotion();
   return (
-    <Modal visible={visible} transparent animationType={reduce ? 'none' : 'slide'} onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView style={styles.scrim} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} />
-        <SafeAreaView edges={['bottom']} style={styles.sheet} accessibilityViewIsModal>
-          <View style={styles.grab} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
-          {title ? (
-            <Text style={styles.title} accessibilityRole="header">
-              {title}
-            </Text>
-          ) : null}
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
-            {children}
-          </ScrollView>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+    <AnimatedSheet visible={visible} title={title} onClose={onClose}>
+      {children}
+    </AnimatedSheet>
   );
 }
 

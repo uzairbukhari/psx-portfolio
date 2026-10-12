@@ -43,7 +43,7 @@ export function ActivityRow({
   const expected = entry.kind === 'dividend' && entry.title.includes('expected');
   const qty = !showTicker || entry.kind === 'dividend' || entry.kind === 'split' ? '' : quantity(entry);
   const chip = (
-    <StatusChip text={expected ? 'Dividend · expected' : KIND_LABEL[entry.kind]} tone={entry.kind === 'sell' || entry.kind === 'dividend' ? (expected ? 'warn' : 'success') : entry.kind === 'buy' || entry.kind === 'opening' ? 'primary' : 'neutral'} icon={entry.kind === 'sell' || entry.kind === 'dividend' ? 'arrowDown' : entry.kind === 'buy' || entry.kind === 'opening' ? 'arrowUp' : undefined} />
+    <StatusChip text={expected ? 'Dividend · expected' : KIND_LABEL[entry.kind]} tone={entry.kind === 'sell' || entry.kind === 'dividend' ? (expected ? 'warn' : 'success') : entry.kind === 'buy' || entry.kind === 'opening' ? 'primary' : 'neutral'} />
   );
   return (
     <Pressable

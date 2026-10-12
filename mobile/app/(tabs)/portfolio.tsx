@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { moneyShort, today } from '@shared/portfolio.ts';
@@ -11,7 +11,8 @@ import { MutualFunds } from '@/ui/MutualFunds';
 import { usePortfolio } from '@/data/usePortfolio';
 import { Insights } from '@/screens/Insights';
 import { useTheme } from '@/theme/ThemeProvider';
-import { AssetMix, OverviewHero, PortfolioBreakdown } from '@/ui/AccountOverview';
+import { PortfolioBreakdown } from '@/ui/AccountOverview';
+import { NetWorthCard } from '@/ui/NetWorthCard';
 import { HoldingRow } from '@/ui/HoldingRow';
 import { AppBar } from '@/ui/AppBar';
 import { GoldSilver } from '@/ui/GoldSilver';
@@ -40,12 +41,14 @@ export default function Portfolio() {
   const [priceError, setPriceError] = useState<string | null>(null);
   const now = today();
 
-  const open = p.view?.open ?? [];
+  const open = useMemo(() => p.view?.open ?? [], [p.view]);
   const soldOut = useMemo(() => (p.portfolio && p.view ? soldOutPositions(p.portfolio, p.view.held) : []), [p.portfolio, p.view]);
   const sectors = useMemo(() => sectorsOf(open), [open]);
   const shown = useMemo(() => sortHoldings(filterBySector(open, sector), sort), [open, sector, sort]);
   const flags = useMemo(() => (p.portfolio ? holdingFlags(p.portfolio, open, now) : new Map()), [p.portfolio, open, now]);
-  const total = open.reduce((a, h) => a + (h.value ?? 0), 0);
+  const total = useMemo(() => open.reduce((a, h) => a + (h.value ?? 0), 0), [open]);
+  // One stable callback for every row, so memoised rows are not re-rendered by this screen's own state changes.
+  const openCompany = useCallback((ticker: string) => router.push({ pathname: '/company/[ticker]', params: { ticker } }), []);
 
   const scope = useScope();
   const { metals: ownedMetals, plans: ownedPlans, funds: ownedFunds, metal, fundNavs, overview, hasAssets } = scope;
@@ -95,8 +98,20 @@ export default function Portfolio() {
         <Insights />
       ) : (
         <>
-          {overview ? <OverviewHero o={overview} label={p.isAll ? 'Net worth · all portfolios' : `Net worth · ${p.portfolioName}`} /> : null}
-          {overview ? <AssetMix o={overview} /> : null}
+          {overview ? (
+            <NetWorthCard
+              label={p.isAll ? 'Net worth · all portfolios' : `Net worth · ${p.portfolioName}`}
+              value={overview.total.value}
+              gain={overview.total.gain}
+              gainPercent={overview.total.gainPercent}
+              invested={overview.total.cost}
+              yearlyReturn={overview.returns.rate}
+              dividends={{ label: `Dividends ${overview.income.taxYear}`, value: overview.income.received }}
+              slices={overview.classes.map((c) => ({ key: c.key, label: c.label, value: c.value, share: c.share, gain: c.gain }))}
+              footnote={overview.returns.rate !== null ? 'Return counts dividends received.' : (overview.returns.blockedBy ?? 'Return shows after 90 days of history.')}
+            />
+          ) : null}
+          {overview?.total.incomplete.length ? <Notice tone="warn">{overview.total.incomplete.join(' ')}</Notice> : null}
           {overview && p.isAll ? <PortfolioBreakdown o={overview} onOpenPortfolio={(id) => p.select(id)} /> : null}
 
           {open.length > 0 ? (
@@ -139,8 +154,8 @@ export default function Portfolio() {
                       key={h.ticker}
                       h={h}
                       flags={flags.get(h.ticker)}
-                      weight={sort === 'weight' ? weightOf(h, total) : undefined}
-                      onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: h.ticker } })}
+                      weight={weightOf(h, total)}
+                      onPress={openCompany}
                       last={i === shown.length - 1}
                     />
                   ))}

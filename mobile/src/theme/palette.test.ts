@@ -23,6 +23,11 @@ for (const scheme of ['light', 'dark'] as const) {
     for (const tint of p.tints) assert.ok(contrast(p.ink, tint) >= 4.5, `${scheme} ink on ${tint}`);
   });
 
+  test(`${scheme}: asset-class colours reach 3:1 on the card surface`, () => {
+    const p = palettes[scheme];
+    for (const [key, colour] of Object.entries(p.assets)) assert.ok(contrast(colour, p.surface) >= 3, `${scheme} ${key}: ${contrast(colour, p.surface).toFixed(2)}:1`);
+  });
+
   test(`${scheme}: control borders reach 3:1 against their surfaces`, () => {
     const p = palettes[scheme];
     for (const [fg, bg] of NON_TEXT_PAIRS) {
@@ -42,7 +47,7 @@ test('the design-spec headline ratios hold', () => {
 test('both palettes define the same tokens as hex or rgba strings', () => {
   assert.deepEqual(Object.keys(lightPalette).sort(), Object.keys(darkPalette).sort());
   for (const [key, value] of Object.entries(lightPalette)) {
-    if (key === 'tints') continue;
+    if (key === 'tints' || key === 'assets') continue;
     assert.match(String(value), /^(#[0-9a-f]{6}|rgba\()/i, key);
   }
 });

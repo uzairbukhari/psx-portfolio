@@ -37,6 +37,8 @@ export type Palette = {
   scrim: string;
   /** Ticker monogram backgrounds; `ink` text sits on each. */
   tints: readonly string[];
+  /** Asset-class series colours (charts and legend swatches only, never text). Mirrors the web's --asset-* tokens. */
+  assets: { stocks: string; funds: string; gold: string; silver: string; plans: string };
 };
 
 export const lightPalette: Palette = {
@@ -59,6 +61,7 @@ export const lightPalette: Palette = {
   brandMint: '#22e0a0',
   scrim: 'rgba(19,32,27,0.45)',
   tints: ['#e3eafc', '#dcf3ea', '#f3e8ff', '#fdecd8', '#e0f2fe', '#fde8e6', '#eef0ea'],
+  assets: { stocks: '#2563eb', funds: '#7c3aed', gold: '#b7791f', silver: '#64748b', plans: '#0d9488' },
 };
 
 export const darkPalette: Palette = {
@@ -81,6 +84,7 @@ export const darkPalette: Palette = {
   brandMint: '#22e0a0',
   scrim: 'rgba(0,0,0,0.6)',
   tints: ['#1b2a4d', '#123328', '#2c2147', '#3a2a14', '#12304a', '#3a1a18', '#1a2622'],
+  assets: { stocks: '#3b82f6', funds: '#a78bfa', gold: '#f5b942', silver: '#cbd5e1', plans: '#2dd4bf' },
 };
 
 export type Scheme = 'light' | 'dark';
