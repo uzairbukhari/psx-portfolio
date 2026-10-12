@@ -44,6 +44,8 @@ async function startDueScrapers(env: Env, scheduledTime: number) {
 }
 
 // MUFAP publishes at no fixed hour, so besides the nightly run (22:30 PKT) it is read again mid-morning and mid-afternoon.
+/** Platform numbers and admin alerts: minute 15 and 45 of every hour, any day. Must match `triggers.crons` in wrangler.jsonc. */
+const PLATFORM_CRON = '15,45 * * * *';
 const MUFAP_CRONS = new Set(['30 17 * * 1-5', '0 5 * * 1-5', '0 9 * * 1-5']);
 
 export default {
@@ -63,12 +65,16 @@ export default {
          ON CONFLICT(kind,key) DO UPDATE SET last_attempt_at=excluded.last_attempt_at, last_success_at=excluded.last_success_at`,
       ).bind(beat, beat).run().catch(() => {}),
     );
-    // Twice an hour, after copying Cloudflare's own request, error and limit numbers for the two Workers (needs the optional token), tell super admins' phones (generic message, once a day per issue) if anything is wrong.
-    if (env.APP_ENV !== 'staging' && new Date(controller.scheduledTime).getUTCMinutes() % 30 === 0) {
-      ctx.waitUntil(
+    // Twice an hour, every day, after copying Cloudflare's own request, error and limit numbers for the two Workers (needs the
+    // optional token), tell super admins' phones (generic message, once a day per issue) if anything is wrong. This has its own
+    // Cron Trigger so it also runs outside market hours and at weekends, and never starts scrapers.
+    if (controller.cron === PLATFORM_CRON) {
+      if (env.APP_ENV !== 'staging') ctx.waitUntil(
         (async () => {
-          if (env.CF_ANALYTICS_TOKEN && env.CF_ACCOUNT_ID)
-            await syncPlatformMetrics(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, ['psx-portfolio-sip', 'psx-portfolio-sip-quote-refresh'], new Date(controller.scheduledTime)).catch(() => 0);
+          // The outcome is a job run, so the Platform page can say why the numbers are missing (wrong token, account id, ...).
+          const startedAt = new Date().toISOString();
+          const sync = await syncPlatformMetrics(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, ['psx-portfolio-sip', 'psx-portfolio-sip-quote-refresh'], new Date(controller.scheduledTime)).catch((e: unknown) => ({ stored: 0, error: e instanceof Error ? e.message : 'sync failed' }));
+          await recordJobRun(env.DB, { job: 'platform', source: 'cron', startedAt, ok: !sync.error, detail: sync.error ?? `${sync.stored} Workers` }).catch(() => {});
           const lab = Number(env.AI_RESEARCH_MONTHLY_CAP_USD);
           const face = Number(env.FACE_VALUE_AI_MONTHLY_CAP_USD);
           const result = await sendAdminAlerts(env.DB, {
@@ -79,6 +85,7 @@ export default {
           if (result.sent) console.log('Admin alert sent', result);
         })().catch((e) => console.error('Admin alerts failed', e)),
       );
+      return;
     }
     // MUFAP blocks GitHub's runners but answers Cloudflare, so the fund prices are fetched here (public data, no user data).
     if (MUFAP_CRONS.has(controller.cron)) {

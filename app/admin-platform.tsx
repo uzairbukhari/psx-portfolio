@@ -34,6 +34,7 @@ export default function AdminPlatform() {
           quote-refresh Worker as the secret <code>CF_ANALYTICS_TOKEN</code> and set <code>CF_ACCOUNT_ID</code> there. The server errors and
           browser-side counts below work without it.
           {report.lastSyncAt && <> Last sync {ago(report.lastSyncAt, nowMs)}.</>}
+          {report.syncRanAt ? (report.syncError ? <> <strong>The last attempt ({ago(report.syncRanAt, nowMs)}) failed: {report.syncError}.</strong></> : <> The last attempt ({ago(report.syncRanAt, nowMs)}) succeeded; refresh in a moment.</>) : <> The cron Worker has not tried yet; it runs at 15 and 45 minutes past every hour.</>}
         </p>
       )}
       <div className="admin-spend">

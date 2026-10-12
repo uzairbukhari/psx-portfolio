@@ -46,9 +46,9 @@ export function parseWorkerDay(response: unknown): DayMetrics | null {
 
 export type CfSettings = { token?: string; accountId?: string };
 
-/** Fetches today's (UTC) numbers for one Worker. Never throws; null when unavailable. CPU times are microseconds in the API. */
-export async function fetchWorkerDay(settings: CfSettings, script: string, now = new Date(), fetcher: typeof fetch = fetch): Promise<DayMetrics | null> {
-  if (!settings.token || !settings.accountId) return null;
+/** Fetches today's (UTC) numbers for one Worker. Never throws; `error` says why nothing came back. CPU times are microseconds in the API. */
+export async function fetchWorkerDay(settings: CfSettings, script: string, now = new Date(), fetcher: typeof fetch = fetch): Promise<{ metrics: DayMetrics } | { error: string }> {
+  if (!settings.token || !settings.accountId) return { error: 'CF_ANALYTICS_TOKEN or CF_ACCOUNT_ID is not set' };
   const day = now.toISOString().slice(0, 10);
   try {
     const res = await fetcher(GRAPHQL_URL, {
@@ -57,11 +57,15 @@ export async function fetchWorkerDay(settings: CfSettings, script: string, now =
       body: JSON.stringify({ query: QUERY, variables: { account: settings.accountId, script, from: `${day}T00:00:00Z`, to: now.toISOString() } }),
       signal: AbortSignal.timeout(10_000),
     });
-    if (!res.ok) return null;
-    const parsed = parseWorkerDay(await res.json());
-    if (!parsed) return null;
-    return { ...parsed, cpuP50: parsed.cpuP50 === null ? null : parsed.cpuP50 / 1000, cpuP99: parsed.cpuP99 === null ? null : parsed.cpuP99 / 1000 };
-  } catch { return null; }
+    if (!res.ok) return { error: `Cloudflare answered ${res.status} for ${script}${res.status === 401 || res.status === 403 ? ' (check the token permission: Account Analytics Read)' : ''}` };
+    const body: unknown = await res.json();
+    const parsed = parseWorkerDay(body);
+    if (!parsed) {
+      const first = (body as { errors?: { message?: string }[] })?.errors?.[0]?.message;
+      return { error: `No data for ${script}${first ? `: ${first}` : ' (wrong account id or script name?)'}` };
+    }
+    return { metrics: { ...parsed, cpuP50: parsed.cpuP50 === null ? null : parsed.cpuP50 / 1000, cpuP99: parsed.cpuP99 === null ? null : parsed.cpuP99 / 1000 } };
+  } catch (e) { return { error: e instanceof Error ? e.message : 'Could not reach Cloudflare' }; }
 }
 
 export async function storeWorkerDay(db: Pick<D1Database, 'prepare'>, script: string, m: DayMetrics, now = new Date()): Promise<void> {
@@ -72,12 +76,14 @@ export async function storeWorkerDay(db: Pick<D1Database, 'prepare'>, script: st
   ).bind(now.toISOString().slice(0, 10), script, m.requests, m.errors, m.limitHits, m.cpuP50, m.cpuP99, JSON.stringify(m.statuses), now.toISOString()).run();
 }
 
-/** Copies today's numbers for each Worker into the database; returns how many were stored. */
-export async function syncPlatformMetrics(db: Pick<D1Database, 'prepare'>, settings: CfSettings, scripts: string[], now = new Date(), fetcher: typeof fetch = fetch): Promise<number> {
+/** Copies today's numbers for each Worker into the database; returns how many were stored and the first problem, if any. */
+export async function syncPlatformMetrics(db: Pick<D1Database, 'prepare'>, settings: CfSettings, scripts: string[], now = new Date(), fetcher: typeof fetch = fetch): Promise<{ stored: number; error: string | null }> {
   let stored = 0;
+  let error: string | null = null;
   for (const script of scripts) {
-    const metrics = await fetchWorkerDay(settings, script, now, fetcher);
-    if (metrics) { await storeWorkerDay(db, script, metrics, now); stored += 1; }
+    const result = await fetchWorkerDay(settings, script, now, fetcher);
+    if ('metrics' in result) { await storeWorkerDay(db, script, result.metrics, now); stored += 1; }
+    else error ??= result.error;
   }
-  return stored;
+  return { stored, error };
 }
