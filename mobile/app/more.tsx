@@ -6,10 +6,9 @@ import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MobileSessionsResponse, UsageResponse } from '@shared/api-types.ts';
 import { useAuth, useEmail } from '@/auth/AuthProvider';
-import { useBiometricLock } from '@/auth/BiometricLock';
 import { accountBackupShare, encryptedBackupShare } from '@/data/backup';
 import { useVault } from '@/vault/VaultProvider';
-import { setFilerStatus, type FilerStatus } from '@/data/mutations';
+import { accountTaxProfile, setAccountFilerStatus, type FilerStatus } from '@shared/portfolio-account.ts';
 import { usePortfolio } from '@/data/usePortfolio';
 import { pushAvailable, pushPreference, registerForPush, unregisterPush } from '@/push/push';
 import { config } from '@/config';
@@ -31,7 +30,6 @@ export default function More() {
   const [deleting, setDeleting] = useState(false);
   const queryClient = useQueryClient();
   const email = useEmail();
-  const lock = useBiometricLock();
   const [shareStats, setShareStats] = useState(true);
   useEffect(() => { void readAnalyticsEnabled().then(setShareStats); }, []);
   const [pushOn, setPushOn] = useState(false);
@@ -71,14 +69,16 @@ export default function More() {
     }
   }
   const user = state.status === 'signedIn' ? state.user : null;
-  const filerStatus = p.portfolio?.taxProfile?.filerStatus ?? '';
+  // One tax status for the whole account: it is written into every portfolio and read from the first one.
+  const filerStatus = p.account ? (accountTaxProfile(p.account)?.filerStatus ?? '') : '';
 
   async function chooseFilerStatus(status: FilerStatus) {
-    if (!p.portfolio || status === filerStatus) return;
+    if (!p.account || status === filerStatus) return;
     setTaxBusy(true);
     setError(null);
     try {
-      await p.save(setFilerStatus(p.portfolio, status));
+      await vault.session.saveAccount(setAccountFilerStatus(vault.session.account, status), p.revision, { replaceAll: true });
+      await queryClient.invalidateQueries({ queryKey: ['portfolio-account', email] });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save your tax status.');
     } finally {
@@ -161,8 +161,6 @@ export default function More() {
   return (
     <Screen edges={['bottom']}>
       <Button label="Manage portfolios" variant="outline" onPress={() => router.push('/portfolios')} />
-      <Button label="Restore account backup" variant="outline" onPress={() => router.push('/restore')} />
-      {p.isAll ? <Notice>Choose a portfolio to change its tax status.</Notice> : null}
 
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -189,24 +187,6 @@ export default function More() {
       </Card>
 
       <SectionLabel>Security</SectionLabel>
-      <Card>
-        <View style={styles.row}>
-          {iconBox('lock')}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.strong}>App lock</Text>
-            <Muted>Ask for fingerprint, face or screen lock when opening the app.</Muted>
-          </View>
-          <Switch
-            accessibilityLabel="App lock"
-            value={lock.enabled}
-            trackColor={{ true: colors.primary, false: colors.line }}
-            thumbColor={colors.surface}
-            onValueChange={(on) => {
-              void lock.setEnabled(on).then((problem) => problem && setError(problem));
-            }}
-          />
-        </View>
-      </Card>
       {vault.biometric.supported ? (
         <Card>
           <View style={styles.row}>
@@ -296,12 +276,12 @@ export default function More() {
 
       <SectionLabel>Tax status</SectionLabel>
       <Card>
-        <Muted>Sets the rate Insights use to estimate tax on gains and dividends. Estimates are indicative, not your tax liability.</Muted>
+        <Muted>One setting for every portfolio. It sets the rate Insights use to estimate tax on gains and dividends. Estimates are indicative, not your tax liability.</Muted>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
           <Chip role="radio" label="Filer · 15%" accessibilityLabel="Filer, 15 percent tax" selected={filerStatus === 'filer'} onPress={() => void chooseFilerStatus('filer')} />
           <Chip role="radio" label="Non-filer · 30%" accessibilityLabel="Non-filer, 30 percent tax" selected={filerStatus === 'non-filer'} onPress={() => void chooseFilerStatus('non-filer')} />
         </View>
-        {!p.portfolio ? <Muted>Loading your portfolio…</Muted> : taxBusy ? <Muted>Saving…</Muted> : null}
+        {!p.account ? <Muted>Loading your portfolio…</Muted> : taxBusy ? <Muted>Saving…</Muted> : null}
       </Card>
 
       {usage.data ? (
@@ -322,8 +302,7 @@ export default function More() {
 
       <SectionLabel>Data</SectionLabel>
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-        <ListRow left={iconBox('upload')} title="Import" subtitle="AHL trades and CDC dividends, with a preview first" onPress={() => router.push('/import')} />
-        <ListRow left={iconBox('file')} title="Encrypted backup" subtitle="Share your whole ledger as an encrypted file. Restore it on the website with your vault password or recovery key." onPress={() => void exportBackup()} />
+        <ListRow left={iconBox('file')} title="Encrypted backup" subtitle="Share your whole ledger as an encrypted file." onPress={() => void exportBackup()} />
         <ListRow left={iconBox('file')} title="Readable export (not encrypted)" subtitle="Plain JSON anyone can read. Asks you to confirm first." onPress={exportReadable} />
         <ListRow left={iconBox('lock')} title="Lock Sipwise now" subtitle="Forget the vault key on this phone until you unlock it again." onPress={vault.lock} last />
       </View>

@@ -72,7 +72,6 @@ export default function Activity() {
                     <Chip key={f.key} role="radio" label={f.label} accessibilityLabel={`Show ${f.label.toLowerCase()}`} selected={filter === f.key} onPress={() => setFilter(f.key)} />
                   ))}
                 </View>
-                <Button label="Import history" variant="text" icon="upload" onPress={() => router.push('/import')} style={{ alignSelf: 'flex-start' }} />
               </>
             ) : null}
           </View>
@@ -99,7 +98,7 @@ export default function Activity() {
               icon="activity"
               title="Nothing recorded yet"
               body="Buys, sales, dividends and splits appear here, newest first."
-              action={<Button label="Import history" icon="upload" onPress={() => router.push('/import')} />}
+              action={<Button label="Add a trade" icon="plus" onPress={() => router.push('/transaction')} />}
             />
           ) : (
             <EmptyState icon="activity" title="No entries match" body="Try a different search or filter." />

@@ -5,6 +5,7 @@ import * as Crypto from 'expo-crypto';
 import { useQueryClient } from '@tanstack/react-query';
 import { blankPortfolio } from '@shared/portfolio.ts';
 import {
+  accountTaxProfile,
   ALL_PORTFOLIOS,
   hasFinancialRecords,
   normalizeAccount,
@@ -123,7 +124,7 @@ export default function Portfolios() {
                       {
                         id: Crypto.randomUUID(),
                         name: portfolioName(name),
-                        portfolio: blankPortfolio(),
+                        portfolio: { ...blankPortfolio(), taxProfile: accountTaxProfile(session.account) },
                       },
                     ],
                   },

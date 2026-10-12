@@ -89,10 +89,8 @@ export default function Today() {
         {p.offline ? <Notice tone="offline" action={{ label: 'Retry', onPress: () => void p.refetch() }}>{`Offline${savedTime ? ` · showing your saved copy from ${savedTime}` : ''}`}</Notice> : null}
         <SectionLabel>Start with</SectionLabel>
         <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-          <ListRow left={<StartIcon name="upload" />} title="Import AHL trade history" subtitle="JSON export from AHL" onPress={() => router.push({ pathname: '/import', params: { kind: 'ahl' } })} />
-          <ListRow left={<StartIcon name="upload" />} title="Import CDC dividends" subtitle="JSON from CDC" onPress={() => router.push({ pathname: '/import', params: { kind: 'cdc' } })} />
           <ListRow left={<StartIcon name="plus" />} title="Add my first holding" subtitle="Enter a buy by hand" onPress={() => router.push('/transaction')} />
-          <ListRow left={<StartIcon name="chevronRight" />} title="Skip for now" subtitle="You can import later from Activity" onPress={() => setSkipped(true)} last />
+          <ListRow left={<StartIcon name="chevronRight" />} title="Skip for now" subtitle="You can add holdings later" onPress={() => setSkipped(true)} last />
         </View>
         <Text style={styles.muted}>Prices are delayed PSX quotes, and every figure says which date it used. Your data syncs with the Sipwise website.</Text>
       </Screen>
