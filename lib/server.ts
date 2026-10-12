@@ -1,6 +1,7 @@
-import { env } from 'cloudflare:workers';
+import { env, waitUntil } from 'cloudflare:workers';
 import { getCurrentUser } from '@/lib/auth';
 import { getUserRole, isSuperAdmin } from '@/lib/roles';
+import { classifyServerError, recordServerError, routeLabel } from '@/lib/server-errors';
 import { UserError, publicError } from '@/lib/user-error';
 export async function identity(req: Request, write = false) {
   const user = await getCurrentUser();
@@ -31,11 +32,21 @@ export function db() {
  * Error response for an API route. Only `UserError` messages reach the
  * browser; anything else is logged and answered with a generic message.
  */
-export function failure(e: unknown, status?: number) {
+export function failure(e: unknown, status?: number, req?: Request) {
   const out = publicError(e, status);
   if (out.status >= 500 && !(e instanceof UserError)) console.error(e);
+  if (out.status >= 500) noteServerError(e, out.status, req);
   return Response.json(
     out.code ? { error: out.message, code: out.code } : { error: out.message },
     { status: out.status, headers: { 'Cache-Control': 'no-store' } },
   );
+}
+
+/** Counts a 5xx per route and code for the admin console. Best effort: a failure here must never change the response. */
+function noteServerError(e: unknown, status: number, req?: Request) {
+  try {
+    if (!env.DB) return;
+    const write = recordServerError(env.DB, req ? routeLabel(req.url) : 'unknown', classifyServerError(e, status), status).catch(() => {});
+    waitUntil(write);
+  } catch { /* never block the answer */ }
 }

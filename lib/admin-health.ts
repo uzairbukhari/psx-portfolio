@@ -1,5 +1,6 @@
 // Operational health for the admin console: freshness of every public data pipeline, queued requests, AI spend. Counts,
 // timestamps and sanitised error text only; the server holds no private portfolio data.
+import { platformReport, type PlatformOptions } from './admin-platform.ts';
 import { dataHealth, type DataHealth } from './data-health.ts';
 import { PIPELINES, pipelineStatus, type PipelineAction, type PipelineStatus } from './pipelines.ts';
 
@@ -18,9 +19,10 @@ export type AiSpend = {
   recentRuns: { startedAt: string; status: string; models: string; costUsd: number; error: string | null }[];
 };
 export type CronBeat = { lastBeatAt: string | null; status: PipelineStatus };
-export type AdminHealth = DataHealth & { pipelines: PipelineRow[]; queues: Queues; aiSpend: AiSpend; cron: CronBeat };
+export type PlatformPill = { status: PipelineStatus; headline: string };
+export type AdminHealth = DataHealth & { pipelines: PipelineRow[]; queues: Queues; aiSpend: AiSpend; cron: CronBeat; platform: PlatformPill };
 
-export type AdminHealthOptions = { now?: Date; aiLabCapUsd?: number | null; faceValueCapUsd?: number };
+export type AdminHealthOptions = { now?: Date; aiLabCapUsd?: number | null; faceValueCapUsd?: number; platform?: PlatformOptions };
 
 const STUCK_MINUTES = 15;
 const cut = (text: string | null) => (text ? text.slice(0, 300) : null);
@@ -125,8 +127,8 @@ export async function aiSpend(db: D1Database, now: Date, opts: AdminHealthOption
 export async function adminHealth(db: D1Database, opts: AdminHealthOptions = {}): Promise<AdminHealth> {
   const now = opts.now ?? new Date();
   const base = await dataHealth(db, now);
-  const [pipelines, queues, spend, cron] = await Promise.all([pipelineRows(db, now, base.marketOpen), queueSummary(db, now), aiSpend(db, now, opts), cronBeat(db, now)]);
-  return { ...base, pipelines, queues, aiSpend: spend, cron };
+  const [pipelines, queues, spend, cron, plat] = await Promise.all([pipelineRows(db, now, base.marketOpen), queueSummary(db, now), aiSpend(db, now, opts), cronBeat(db, now), platformReport(db, { ...opts.platform, now })]);
+  return { ...base, pipelines, queues, aiSpend: spend, cron, platform: { status: plat.status, headline: plat.headline } };
 }
 
 /** Caps from Worker settings: AI Lab has none unless set; the face-value finder defaults to $1. */

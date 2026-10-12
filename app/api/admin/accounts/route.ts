@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   try {
     await requireSuperAdmin(req);
     return Response.json({ accounts: await listInternalAccounts(db()) }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }
 
 export async function POST(req: Request) {
@@ -27,5 +27,5 @@ export async function DELETE(req: Request) {
     const actor = await requireSuperAdmin(req, true);
     await removeInternalAccount(db(), actor, new URL(req.url).searchParams.get('email'));
     return Response.json({ accounts: await listInternalAccounts(db()) }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

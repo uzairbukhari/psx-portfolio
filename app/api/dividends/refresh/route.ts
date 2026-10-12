@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     await identity(req);
     return json(await dividendRefreshStatus(db(), new URL(req.url).searchParams.get('tickers'), dispatchConfig()));
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -22,6 +22,6 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as { tickers?: unknown };
     return json(await requestDividendRefresh(db(), user, body.tickers, dispatchConfig()));
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

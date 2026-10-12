@@ -25,5 +25,5 @@ export async function GET(req: Request) {
       includeAdmin,
     }, env.SESSION_SECRET ?? '', new Date(), keys);
     return Response.json(report, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

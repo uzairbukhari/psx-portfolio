@@ -3,6 +3,7 @@ import { getViewer } from '@/lib/auth';
 import { isInternal } from '@/lib/roles';
 import { parseBatch } from '@/lib/analytics-events';
 import { pruneJobRuns } from '@/lib/job-runs';
+import { pruneServerErrors } from '@/lib/server-errors';
 import { purgeOldEvents, recordBatch, resolveOrigin, userKey } from '@/lib/analytics-store';
 import { takeRateLimit } from '@/lib/rate-limit';
 import { readLimited } from '@/lib/read-limited';
@@ -35,9 +36,10 @@ export async function POST(req: Request) {
     if (Math.random() < 0.01) {
       await purgeOldEvents(database);
       await pruneJobRuns(database).catch(() => {});
+      await pruneServerErrors(database).catch(() => {});
     }
     return new Response(null, { status: 204 });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

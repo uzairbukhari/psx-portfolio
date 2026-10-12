@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     await identity(req);
     return Response.json(await companyStatus(db(), new URL(req.url).searchParams.get('tickers'), dispatchConfig()), { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -29,6 +29,6 @@ export async function POST(req: Request) {
     }
     return Response.json(await requestCompanyLookup(db(), user, body.tickers, dispatchConfig()), { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

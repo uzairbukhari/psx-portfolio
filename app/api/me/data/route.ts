@@ -9,5 +9,5 @@ export async function DELETE(req: Request) {
     assertClearConfirmed(body.confirm);
     await clearUserData(db(), email);
     return Response.json({ cleared: true }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

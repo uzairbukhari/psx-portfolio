@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     await requireSuperAdmin(req);
     const tickers = cleanAiLabTickers(new URL(req.url).searchParams.get('tickers'));
     return json(await readPublicResearch(db(), tickers, env));
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }
 
 export async function POST(req: Request) {
@@ -27,5 +27,5 @@ export async function POST(req: Request) {
     const outcome = await requestResearch(db(), dispatchConfig(), tickers, env);
     if (!outcome.queued.length && outcome.reason) throw new UserError(outcome.reason, 409);
     return json(outcome);
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

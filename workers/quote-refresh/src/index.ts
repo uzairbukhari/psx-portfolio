@@ -1,5 +1,6 @@
 import { refreshFundPayouts, refreshFunds } from '../../../lib/mufap-refresh';
 import { refreshPlanNavs } from '../../../lib/plan-navs';
+import { syncPlatformMetrics } from '../../../lib/cf-analytics';
 import { recordJobRun } from '../../../lib/job-runs';
 import { PIPELINES } from '../../../lib/pipelines';
 import { dispatchWorkflow, dueWorkflows } from '../../../lib/scrape-schedule';
@@ -10,6 +11,9 @@ interface Env {
   GITHUB_DISPATCH_TOKEN?: string;
   GITHUB_REPO?: string;
   APP_ENV?: string;
+  /** Optional: a read-only Account Analytics token, and the account id, switch on Cloudflare limit tracking in the admin console. */
+  CF_ANALYTICS_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
 }
 
 /**
@@ -56,6 +60,13 @@ export default {
          ON CONFLICT(kind,key) DO UPDATE SET last_attempt_at=excluded.last_attempt_at, last_success_at=excluded.last_success_at`,
       ).bind(beat, beat).run().catch(() => {}),
     );
+    // Cloudflare's own request, error and limit numbers for the two Workers, twice an hour (needs the optional token).
+    if (env.CF_ANALYTICS_TOKEN && env.CF_ACCOUNT_ID && env.APP_ENV !== 'staging' && new Date(controller.scheduledTime).getUTCMinutes() % 30 === 0) {
+      ctx.waitUntil(
+        syncPlatformMetrics(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, ['psx-portfolio-sip', 'psx-portfolio-sip-quote-refresh'], new Date(controller.scheduledTime))
+          .catch((e) => console.error('Platform metrics failed', e)),
+      );
+    }
     // MUFAP blocks GitHub's runners but answers Cloudflare, so the fund prices are fetched here (public data, no user data).
     if (MUFAP_CRONS.has(controller.cron)) {
       ctx.waitUntil(

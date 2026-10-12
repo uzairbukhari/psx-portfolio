@@ -14,5 +14,5 @@ export async function GET(req: Request) {
     const keys = includeAdmin ? [] : await internalUserKeys(database, env.SESSION_SECRET ?? '');
     const [health, metrics] = await Promise.all([adminHealth(database, spendCaps(env)), overviewMetrics(database, includeAdmin, new Date(), keys)]);
     return Response.json({ health, metrics, attention: buildAttention(health, metrics) }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

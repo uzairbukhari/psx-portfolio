@@ -27,6 +27,6 @@ export async function POST(req: Request) {
       await db().prepare('INSERT INTO admin_actions (at,actor,action,target,result) VALUES (?,?,?,?,?)')
         .bind(new Date().toISOString(), actor, 'refresh-funds', 'mufap', 'failed').run().catch(() => {});
     }
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

@@ -1,4 +1,5 @@
 import type { ApiError } from '../../../lib/api-types.ts';
+import { classifyPlatformResponse, PLATFORM_MESSAGES, type PlatformCode } from '../../../lib/platform-errors.ts';
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -37,9 +38,12 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized, fetcher = f
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let response: Response;
     let body: (T & Partial<ApiError> & { code?: string }) | null;
+    let platform: PlatformCode | null = null;
     try {
       response = await fetcher(`${baseUrl}${path}`, { ...init, headers, signal: init.signal ?? controller.signal });
-      body = (await response.json().catch(() => null)) as (T & Partial<ApiError> & { code?: string }) | null;
+      const raw = await response.text().catch(() => '');
+      try { body = JSON.parse(raw) as (T & Partial<ApiError> & { code?: string }) | null; } catch { body = null; }
+      platform = body ? null : classifyPlatformResponse(response.status, raw);
     } catch {
       throw new ApiRequestError('Could not reach Sipwise. Check your connection.', 0);
     } finally {
@@ -47,6 +51,7 @@ export function createApiClient({ baseUrl, getToken, onUnauthorized, fetcher = f
     }
     if (!response.ok) {
       if (response.status === 401 && authed) onUnauthorized?.();
+      if (platform) throw new ApiRequestError(PLATFORM_MESSAGES[platform], response.status, platform);
       throw new ApiRequestError(body?.error ?? `Request failed (${response.status}).`, response.status, body?.code);
     }
     return body as T;

@@ -6,13 +6,13 @@ export async function GET(req: Request) {
   try {
     return await getCiphertext(vaultDb(), await identity(req));
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 export async function PUT(req: Request) {
   try {
     return await putCiphertext(vaultDb(), await identity(req, true), req);
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

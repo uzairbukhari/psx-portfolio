@@ -2,17 +2,22 @@
 // leaves the device: only the matched `area` and `code` are sent (see EVENT_CATALOG.client_error). Anything not
 // recognised becomes other/unknown. Pure module (no Workers imports) so the phone app can import it.
 
-export const ERROR_AREAS = ['import', 'sync', 'vault', 'prices', 'auth', 'picks', 'app', 'other'] as const;
+export const ERROR_AREAS = ['import', 'sync', 'vault', 'prices', 'auth', 'picks', 'app', 'platform', 'other'] as const;
 export type ErrorArea = (typeof ERROR_AREAS)[number];
 
 export const ERROR_CODES = [
   'pdf_unrecognized', 'pdf_no_text', 'pdf_line_unreadable', 'unsupported_file', 'wrong_import_card', 'import_invalid',
   'chunk_load', 'network', 'save_conflict', 'vault_locked', 'vault_wrong_password', 'rate_limited', 'forbidden',
   'server_error', 'price_refresh_failed', 'uncaught', 'unknown',
+  'cf_worker_limit', 'cf_daily_limit', 'cf_rate_limited', 'cf_timeout', 'cf_unavailable',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
 const RULES: [RegExp, ErrorArea, ErrorCode][] = [
+  [/busy right now/i, 'platform', 'cf_worker_limit'],
+  [/daily capacity/i, 'platform', 'cf_daily_limit'],
+  [/took too long to answer/i, 'platform', 'cf_timeout'],
+  [/temporarily unavailable/i, 'platform', 'cf_unavailable'],
   [/dynamically imported module|importing a module script|loading chunk|ChunkLoadError|PDF reader could not load/i, 'app', 'chunk_load'],
   [/don.t recognize this broker|could not be read from this statement|Choose a PSX broker/i, 'import', 'pdf_unrecognized'],
   [/No readable text|Scanned statements/i, 'import', 'pdf_no_text'],

@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   try {
     await requireSuperAdmin(req);
     return Response.json({ actions: await recentAdminActions(db(), 100) }, { headers: noStore });
-  } catch (e) { return failure(e); }
+  } catch (e) { return failure(e, undefined, req); }
 }
 
 /** Super admin: run one allowlisted operation (start a scraper workflow, retry or cancel stuck requests). */
@@ -23,5 +23,5 @@ export async function POST(req: Request) {
       token: env.GITHUB_DISPATCH_TOKEN, repo: env.GITHUB_REPO, appEnv: env.APP_ENV,
     });
     return Response.json(result, { status: result.ok ? 200 : 502, headers: noStore });
-  } catch (e) { return failure(e); }
+  } catch (e) { return failure(e, undefined, req); }
 }

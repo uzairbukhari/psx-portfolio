@@ -13,5 +13,5 @@ export async function GET(req: Request) {
     const database = db();
     const keys = includeAdmin ? [] : await internalUserKeys(database, env.SESSION_SECRET ?? '');
     return Response.json(await usageReport(database, includeAdmin, new Date(), keys, days), { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

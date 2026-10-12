@@ -31,7 +31,7 @@ export async function GET(req: Request) {
       headers: { 'Cache-Control': 'private, max-age=900' },
     });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -50,6 +50,6 @@ export async function POST(req: Request) {
       },
     );
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

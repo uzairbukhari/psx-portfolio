@@ -101,9 +101,10 @@ test('only https googleusercontent pictures are kept', () => {
 async function loadServer(via) {
   const base = new URL('../', import.meta.url);
   const source = readFileSync(new URL('lib/server.ts', base), 'utf8')
-    .replace("import { env } from 'cloudflare:workers';", 'const env = {};')
+    .replace("import { env, waitUntil } from 'cloudflare:workers';", 'const env = {}; const waitUntil = () => {};')
     .replace("import { getCurrentUser } from '@/lib/auth';", `const getCurrentUser = async () => (globalThis.__via ? { email: 'a@example.com', via: globalThis.__via } : null);`)
     .replace("import { getUserRole, isSuperAdmin } from '@/lib/roles';", 'const getUserRole = async () => "user"; const isSuperAdmin = () => false;')
+    .replace("import { classifyServerError, recordServerError, routeLabel } from '@/lib/server-errors';", 'const classifyServerError = () => "server_error"; const recordServerError = async () => {}; const routeLabel = () => "/";')
     .replace("import { UserError, publicError } from '@/lib/user-error';", `import { UserError, publicError } from '${new URL('lib/user-error.ts', base).href}';`);
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
   globalThis.__via = via;

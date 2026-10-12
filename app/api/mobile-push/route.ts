@@ -17,7 +17,7 @@ export async function PUT(req: Request) {
     if (!(await setPushToken(sid, email, body.token))) throw new UserError('Session not found.', 404);
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -28,6 +28,6 @@ export async function DELETE(req: Request) {
     await setPushToken(sid, email, null);
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

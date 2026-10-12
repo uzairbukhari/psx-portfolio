@@ -6,27 +6,27 @@ export async function GET(req: Request) {
   try {
     return await getVault(vaultDb(), await identity(req));
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 export async function POST(req: Request) {
   try {
     return await postVault(vaultDb(), await identity(req, true), req);
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 export async function PUT(req: Request) {
   try {
     return await putVaultWrappers(vaultDb(), await identity(req, true), req);
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 export async function DELETE(req: Request) {
   try {
     return await deleteOwnVault(vaultDb(), await identity(req, true), req);
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

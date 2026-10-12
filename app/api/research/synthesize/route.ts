@@ -491,6 +491,6 @@ Explain findings simply. The narrative must cover the business, industry and mac
         .catch(() => {});
       await addEvent(jobId, 'needs_attention', message).catch(() => {});
     }
-    return failure(error);
+    return failure(error, undefined, req);
   }
 }

@@ -39,6 +39,7 @@ export default function AdminOverview({ includeInternal }: { includeInternal: bo
         {health.pipelines.map((p) => (
           <a key={p.id} href="/admin/health#pipelines" title={p.expected}><StatusPill status={p.status} label={`${p.label}${p.status === 'ok' || p.status === 'idle' ? '' : p.ageMinutes === null ? ' · never' : ''}`} /></a>
         ))}
+        <a href="/admin/platform" title={health.platform.headline}><StatusPill status={health.platform.status} label="Cloudflare" /></a>
       </div>
       <div className="admin-kpis">
         <div className="admin-kpi"><small>Active today</small><strong>{metrics.activeToday}</strong><Change now={metrics.activeToday} before={metrics.activeLastWeek} goodWhen="up" suffix="vs same day last week" /></div>

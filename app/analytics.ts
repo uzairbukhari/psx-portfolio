@@ -4,6 +4,7 @@
 // Settings (on by default, stored on this device).
 import { validateEvent, type EventName, type EventProps } from '@/lib/analytics-events';
 import type { IncomingEvent } from '@/lib/analytics-events';
+import { onPlatformError } from '@/lib/safe-json';
 import { classifyError, type ErrorArea, type ErrorCode } from '@/lib/error-codes';
 
 const OPT_OUT_KEY = 'sipwise.analytics.optout';
@@ -72,14 +73,32 @@ export async function flushAnalytics() {
   session ??= id('sessionStorage', 'sipwise.analytics.session');
   const events = queue.splice(0, 50);
   try {
-    await fetch('/api/events', {
+    const res = await fetch('/api/events', {
       method: 'POST',
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: session, anonId: id('localStorage', ANON_KEY), platform: 'web', events }),
     });
-  } catch { /* analytics must never get in the way */ }
+    if (res.status >= 500 || res.status === 429) requeue(events);
+  } catch {
+    // Offline or the platform is down: keep the events and try again later (analytics must never get in the way).
+    requeue(events);
+  }
 }
+
+const MAX_QUEUED = 200;
+const RETRY_MS = 60_000;
+/** Puts unsent events back in front of the queue (bounded) and tries again after a pause or when the browser is back online. */
+function requeue(events: IncomingEvent[]) {
+  queue.unshift(...events);
+  if (queue.length > MAX_QUEUED) queue.length = MAX_QUEUED;
+  timer ??= setTimeout(() => void flushAnalytics(), RETRY_MS);
+  if (!onlineHooked && typeof window !== 'undefined') {
+    onlineHooked = true;
+    window.addEventListener('online', () => void flushAnalytics());
+  }
+}
+let onlineHooked = false;
 
 const SCREEN_BY_PATH: [RegExp, string][] = [
   [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/reports/, 'reports'], [/^\/sip/, 'sip'],
@@ -107,4 +126,6 @@ export function hookGlobalErrors() {
   hookedErrors = true;
   window.addEventListener('error', (e) => reportError(e.message || '', 'app', 'uncaught'));
   window.addEventListener('unhandledrejection', (e) => reportError(e.reason, 'app', 'uncaught'));
+  // Cloudflare's own error pages (Worker over its limits, platform trouble): recorded as a category and code only.
+  onPlatformError((code) => reportError('', 'platform', code));
 }

@@ -9,6 +9,6 @@ export async function GET(req: Request) {
     await identity(req);
     return Response.json(await readPublicData(db(), new URL(req.url).searchParams.get('tickers')), { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

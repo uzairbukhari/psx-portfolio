@@ -38,5 +38,5 @@ export async function POST(req: Request) {
       input: body.text, webSearch: undefined,
     });
     return Response.json({ statement: validateBrokerStatement(response.json), model: response.model }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

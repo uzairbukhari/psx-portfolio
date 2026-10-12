@@ -339,6 +339,38 @@ export const jobRuns = sqliteTable(
   (table) => [index('job_runs_job_idx').on(table.job, table.startedAt)],
 );
 
+// Server-side failures (HTTP 5xx the Worker itself answered), one row per route, code and minute with a count, so a
+// burst cannot flood the table. Route and code only: no message, no user. Pruned after 30 days.
+export const serverErrors = sqliteTable(
+  'server_errors',
+  {
+    route: text('route').notNull(),
+    code: text('code').notNull(),
+    minute: text('minute').notNull(),
+    status: integer('status').notNull(),
+    n: integer('n').notNull().default(1),
+  },
+  (table) => [primaryKey({ columns: [table.route, table.code, table.minute] }), index('server_errors_minute_idx').on(table.minute)],
+);
+
+// Cloudflare's own numbers for each Worker and UTC day, copied in by the cron Worker from the GraphQL Analytics API
+// (only when CF_ANALYTICS_TOKEN is set). `statuses` is a JSON object of invocation status -> count.
+export const platformMetrics = sqliteTable(
+  'platform_metrics',
+  {
+    day: text('day').notNull(),
+    script: text('script').notNull(),
+    requests: integer('requests').notNull().default(0),
+    errors: integer('errors').notNull().default(0),
+    limitHits: integer('limit_hits').notNull().default(0),
+    cpuP50: real('cpu_p50'),
+    cpuP99: real('cpu_p99'),
+    statuses: text('statuses').notNull().default('{}'),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.script] })],
+);
+
 // Per-user fixed-window rate limits for expensive actions (forced PSX refreshes,
 // on-demand facts scrapes). One row per user and action.
 export const rateLimits = sqliteTable(

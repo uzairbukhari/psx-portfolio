@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     const tickers = cleanWatchTickers(new URL(req.url).searchParams.get('tickers'));
     if (!tickers.length) throw new UserError('Choose at least one company.');
     return publicJson({ ...(await buildPublicAnalysis(db(), tickers)), dispatchEnabled: dispatchEnabled(dispatchConfig()) });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }
 
 export async function POST(req: Request) {
@@ -36,5 +36,5 @@ export async function POST(req: Request) {
       throw new UserError(`Company data refreshes are limited to ${FACTS_DISPATCH_LIMIT.max} a day. Try again in ${waitText(limit.retryAfterMs)}.`, 429);
     const result = await requestFacts(db(), dispatchConfig(), tickers);
     return publicJson({ dispatched: result.dispatched, waiting: result.waiting, reason: result.reason ?? null });
-  } catch (error) { return failure(error); }
+  } catch (error) { return failure(error, undefined, req); }
 }

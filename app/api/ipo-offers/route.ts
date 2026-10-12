@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     const tickers = new URL(req.url).searchParams.get('tickers');
     return Response.json(await ipoStatus(db(), tickers, dispatchConfig()), { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }
 
@@ -22,6 +22,6 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as { tickers?: unknown };
     return Response.json(await requestIpoLookup(db(), user, body.tickers, dispatchConfig()), { headers });
   } catch (e) {
-    return failure(e);
+    return failure(e, undefined, req);
   }
 }

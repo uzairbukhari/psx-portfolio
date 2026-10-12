@@ -38,6 +38,8 @@ export const SHARED_TABLES: readonly string[] = [
   'price_history',
   'refresh_state',
   'job_runs',
+  'server_errors',
+  'platform_metrics',
   'security_catalog',
   'security_face_values',
   'corporate_actions',

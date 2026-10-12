@@ -2,17 +2,18 @@
 'use client';
 
 import { useState } from 'react';
-import { Activity, ArrowLeft, BarChart3, LayoutDashboard, ScrollText, Users } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, Cloud, LayoutDashboard, ScrollText, Users } from 'lucide-react';
 import { ADMIN_SECTIONS, type AdminSection } from './admin-sections';
 import AdminAccounts from './admin-accounts';
 import AdminOverview from './admin-overview';
+import AdminPlatform from './admin-platform';
 import AuditLog from './audit-log';
 import SystemHealth from './system-health';
 import UsageDashboard from './usage-dashboard';
 import { UserAvatar } from './user-avatar';
 import './admin.css';
 
-const ICONS = { overview: LayoutDashboard, health: Activity, analytics: BarChart3, audit: ScrollText, accounts: Users } as const;
+const ICONS = { overview: LayoutDashboard, health: Activity, platform: Cloud, analytics: BarChart3, audit: ScrollText, accounts: Users } as const;
 
 /** Full-width super admin space, outside Settings and outside the vault gate (none of it needs the portfolio). */
 export default function AdminConsole({ section, email, name, picture }: { section: AdminSection; email: string; name: string | null; picture: string | null }) {
@@ -61,6 +62,7 @@ export default function AdminConsole({ section, email, name, picture }: { sectio
           <div className="admin-card">
             {section === 'overview' && <AdminOverview includeInternal={includeInternal} />}
             {section === 'health' && <SystemHealth />}
+            {section === 'platform' && <AdminPlatform />}
             {section === 'analytics' && <UsageDashboard includeInternal={includeInternal} days={days} />}
             {section === 'audit' && <AuditLog includeInternal={includeInternal} days={days} />}
             {section === 'accounts' && <AdminAccounts email={email} />}

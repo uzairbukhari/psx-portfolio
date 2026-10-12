@@ -9,5 +9,5 @@ export async function GET(req: Request) {
     const job = new URL(req.url).searchParams.get('job') ?? undefined;
     const known = job && PIPELINES.some((p) => p.id === job) ? job : undefined;
     return Response.json({ runs: await recentJobRuns(db(), known, 40) }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (e) { return failure(e); }
+  } catch (e) { return failure(e, undefined, req); }
 }
