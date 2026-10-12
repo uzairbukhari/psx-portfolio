@@ -170,15 +170,6 @@ export function changeNotifications(p: Portfolio, change: (list: AppNotification
   return next;
 }
 
-export type FilerStatus = 'filer' | 'non-filer';
-
-/** Sets the tax status Reports use to estimate tax (the same `taxProfile.filerStatus` the web writes). */
-export function setFilerStatus(p: Portfolio, filerStatus: FilerStatus): Portfolio {
-  const next = clonePortfolio(p);
-  next.taxProfile = { filerStatus };
-  return next;
-}
-
 export type BuyDraft = { ticker: string; shares: number; price: number; fees?: number };
 
 /**

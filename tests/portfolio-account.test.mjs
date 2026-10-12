@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { blankPortfolio, holdings } from '../lib/portfolio.ts';
-import { assertCanAddPortfolio, MAX_PORTFOLIOS, dashboardPortfolio, accountFromPortfolio, accountActivity, consolidatedAccount, importMatches, normalizeAccount, portfolioAt, removePortfolio, renamePortfolio, replacePortfolio } from '../lib/portfolio-account.ts';
+import { assertCanAddPortfolio, MAX_PORTFOLIOS, dashboardPortfolio, accountFromPortfolio, accountActivity, consolidatedAccount, importMatches, normalizeAccount, portfolioAt, removePortfolio, renamePortfolio, replacePortfolio, setAccountFilerStatus, accountTaxProfile } from '../lib/portfolio-account.ts';
 import { loadAccountView, savePortfolioView } from '../lib/portfolio-view.ts';
 import { openAccountBackup, parseBackup } from '../lib/vault-backup.ts';
 import * as c from '../lib/vault-client.ts';
@@ -162,4 +162,19 @@ test('the All view follows the Monthly Picks shortlist kept in the first portfol
   const a = ledger(); a.monthlyPicksShortlist = ['MEBL'];
   const all = account(a, ledger(200));
   assert.deepEqual(dashboardPortfolio(all).monthlyPicksShortlist, ['MEBL']);
+});
+
+test('one tax status covers every portfolio and every view, locked ones included', () => {
+  const acct = account();
+  acct.portfolios[1].locked = true;
+  const next = setAccountFilerStatus(acct, 'non-filer');
+  assert.ok(next.portfolios.every((p) => p.portfolio.taxProfile.filerStatus === 'non-filer'));
+  assert.equal(accountTaxProfile(next).filerStatus, 'non-filer');
+  assert.equal(acct.portfolios[0].portfolio.taxProfile.filerStatus, 'filer', 'original untouched');
+  // the All view and a single-portfolio view follow the account, not the blank-portfolio default
+  assert.equal(dashboardPortfolio(next).taxProfile.filerStatus, 'non-filer');
+  assert.equal(dashboardPortfolio(next, 'finqalab').taxProfile.filerStatus, 'non-filer');
+  // a portfolio that disagrees with the first one is overridden in the views
+  const mixed = { ...next, portfolios: [next.portfolios[0], { ...next.portfolios[1], portfolio: { ...next.portfolios[1].portfolio, taxProfile: { filerStatus: 'filer' } } }] };
+  assert.equal(dashboardPortfolio(mixed, 'finqalab').taxProfile.filerStatus, 'non-filer');
 });

@@ -178,6 +178,7 @@ import {
   dashboardPortfolio,
   ALL_PORTFOLIOS,
   importMatches,
+  setAccountFilerStatus,
 } from '@/lib/portfolio-account';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
@@ -1881,10 +1882,17 @@ function DashboardContent({
         'AI model settings saved.',
       ),
     );
+  /** One tax status for the whole account: written into every portfolio, whichever view is open. */
   const saveFilerStatus = (filerStatus: 'filer' | 'non-filer') =>
-    attempt(() =>
-      save({ ...p, taxProfile: { filerStatus } }, 'Tax status saved.'),
-    );
+    attempt(async () => {
+      await vault!.session.saveAccount(
+        setAccountFilerStatus(vault!.session.account, filerStatus),
+        revision,
+        { replaceAll: true },
+      );
+      await load();
+      notify('Tax status saved for all portfolios.');
+    });
   const hs = holdings(p)
       .slice()
       .sort((a, b) => (b.value ?? -1) - (a.value ?? -1)),

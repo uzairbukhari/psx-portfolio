@@ -386,6 +386,29 @@ export function setPortfolioLocked(
     ),
   };
 }
+/**
+ * Tax status (filer or non-filer) belongs to the person, not to one portfolio. It is stored in every portfolio's
+ * `taxProfile` so older apps keep working, and the first portfolio is the one the account follows.
+ */
+export type FilerStatus = NonNullable<Portfolio['taxProfile']>['filerStatus'];
+export function accountTaxProfile(
+  account: PortfolioAccount,
+): Portfolio['taxProfile'] {
+  return account.portfolios[0]?.portfolio.taxProfile;
+}
+/** Writes the status into every portfolio, locked ones too: it is a setting, not a ledger record. */
+export function setAccountFilerStatus(
+  account: PortfolioAccount,
+  filerStatus: FilerStatus,
+): PortfolioAccount {
+  return {
+    ...account,
+    portfolios: account.portfolios.map((p) => ({
+      ...p,
+      portfolio: { ...p.portfolio, taxProfile: { filerStatus } },
+    })),
+  };
+}
 export function assertAccountWritable(
   previous: PortfolioAccount,
   next: PortfolioAccount,
@@ -404,10 +427,13 @@ export function dashboardPortfolio(
   account: PortfolioAccount,
   selected = ALL_PORTFOLIOS,
 ): Portfolio {
+  const taxProfile = accountTaxProfile(account);
+  const withTax = (p: Portfolio): Portfolio => ({ ...p, taxProfile });
   if (account.portfolios.length === 1) return account.portfolios[0].portfolio;
   if (selected !== ALL_PORTFOLIOS)
-    return portfolioAt(account, { id: selected });
+    return withTax(portfolioAt(account, { id: selected }));
   const result = blankPortfolio();
+  result.taxProfile = taxProfile;
   result[DISPLAY_PARTS] = account.portfolios;
   result.dividends = [];
   const companies = new Map<string, Portfolio['companies'][number]>();

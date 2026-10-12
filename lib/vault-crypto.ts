@@ -264,6 +264,15 @@ export function assertPasswordAcceptable(password: string) {
   if (length > MAX_PASSWORD_CHARS) throw new VaultError('weak-password', `Use at most ${MAX_PASSWORD_CHARS} characters.`);
 }
 
+let kdfAsyncTick = 25;
+/**
+ * How long the Argon2 loop works between yields to the event loop. The web keeps it short so the page stays smooth;
+ * the phone has nothing else to draw while it derives, so it uses longer windows and loses less time to scheduling.
+ */
+export function setKdfAsyncTick(ms: number) {
+  kdfAsyncTick = Math.max(10, Math.min(250, Math.round(ms)));
+}
+
 let kdfProgressListener: ((fraction: number) => void) | null = null;
 
 /**
@@ -286,7 +295,7 @@ async function passwordKey(password: string, kdf: PasswordKdf, salt: Uint8Array)
     dkLen: KEY_BYTES,
     // Validated above; the library caps memory at its own default unless told.
     maxmem: kdf.m * 1024 + 1024 * 1024,
-    asyncTick: 25,
+    asyncTick: kdfAsyncTick,
     // Looked up per call, so a screen that subscribes just after starting the derivation still hears it.
     onProgress: (fraction) => kdfProgressListener?.(fraction),
   });

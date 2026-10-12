@@ -8,7 +8,7 @@ import { usePortfolio } from '@/data/usePortfolio';
 import { useTheme } from '@/theme/ThemeProvider';
 import { ActivityRow } from '@/ui/ActivityRow';
 import { AppBar } from '@/ui/AppBar';
-import { Button, Chip, EmptyState, Input, Loading, Notice, useKitStyles } from '@/ui/kit';
+import { Button, Chip, ChipRow, EmptyState, Loading, Notice, SearchField, useKitStyles } from '@/ui/kit';
 
 export default function Activity() {
   const p = usePortfolio();
@@ -58,21 +58,12 @@ export default function Activity() {
             {p.error && !p.portfolio ? <Notice tone="error">{p.error.message}</Notice> : null}
             {entries.length ? (
               <>
-                <Input
-                  label="Search activity"
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Ticker, date or text"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                />
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
+                <SearchField label="Search activity" placeholder="Search ticker, date or text" value={query} onChangeText={setQuery} />
+                <ChipRow label="Filter activity">
                   {ACTIVITY_FILTERS.map((f) => (
                     <Chip key={f.key} role="radio" label={f.label} accessibilityLabel={`Show ${f.label.toLowerCase()}`} selected={filter === f.key} onPress={() => setFilter(f.key)} />
                   ))}
-                </View>
-                <Button label="Import history" variant="text" icon="upload" onPress={() => router.push('/import')} style={{ alignSelf: 'flex-start' }} />
+                </ChipRow>
               </>
             ) : null}
           </View>
@@ -99,7 +90,7 @@ export default function Activity() {
               icon="activity"
               title="Nothing recorded yet"
               body="Buys, sales, dividends and splits appear here, newest first."
-              action={<Button label="Import history" icon="upload" onPress={() => router.push('/import')} />}
+              action={<Button label="Add a trade" icon="plus" onPress={() => router.push('/transaction')} />}
             />
           ) : (
             <EmptyState icon="activity" title="No entries match" body="Try a different search or filter." />

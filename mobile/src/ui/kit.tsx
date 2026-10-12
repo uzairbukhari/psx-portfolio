@@ -137,6 +137,31 @@ export function SectionLabel({ children, right }: { children: ReactNode; right?:
   );
 }
 
+/** Heading of a holdings section: title and count on the left, the section's value on the right. */
+export function SectionHeader({ title, count, value, right }: { title: string; count?: number; value?: string | null; right?: ReactNode }) {
+  const styles = useKitStyles();
+  return (
+    <View style={[styles.row, { marginTop: 8 }]} accessible accessibilityRole="header" accessibilityLabel={`${title}${count !== undefined ? `, ${count}` : ''}${value ? `, ${value}` : ''}`}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, flexShrink: 1 }}>
+        <Text style={styles.strong}>{title}</Text>
+        {count !== undefined ? <Text style={styles.muted}>{count}</Text> : null}
+      </View>
+      {right ?? (value ? <Text style={styles.number}>{value}</Text> : null)}
+    </View>
+  );
+}
+
+/** Small label-over-value pair for a strip of figures inside a card. */
+export function Fact({ label, value }: { label: string; value: string }) {
+  const styles = useKitStyles();
+  return (
+    <View style={{ flex: 1, gap: 2 }}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.number}>{value}</Text>
+    </View>
+  );
+}
+
 export function Muted({ children }: { children: ReactNode }) {
   const styles = useKitStyles();
   return <Text style={styles.muted}>{children}</Text>;
@@ -303,6 +328,41 @@ export function Input({ label, hint, error, style, ...props }: TextInputProps & 
       />
       {error ? <Text style={[styles.muted, { color: colors.loss }]}>{error}</Text> : hint ? <Text style={styles.muted}>{hint}</Text> : null}
     </View>
+  );
+}
+
+/** Compact search field: icon, one line, clear button. The label is spoken, not drawn. */
+export function SearchField({ label, value, onChangeText, placeholder }: { label: string; value: string; onChangeText: (text: string) => void; placeholder?: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: layout.minTarget, borderRadius: radii.pill, backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, paddingLeft: 14, paddingRight: 6 }}>
+      <Icon name="search" size={18} color={colors.muted} />
+      <TextInput
+        accessibilityLabel={label}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder ?? label}
+        placeholderTextColor={colors.muted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        style={{ flex: 1, color: colors.ink, fontSize: 16, paddingVertical: 8 }}
+      />
+      {value ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => onChangeText('')} hitSlop={8} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="close" size={18} color={colors.muted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** One row of chips that scrolls sideways instead of wrapping onto a second line. */
+export function ChipRow({ children, label }: { children: ReactNode; label?: string }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel={label} contentContainerStyle={{ gap: 8, paddingRight: layout.gutter }} keyboardShouldPersistTaps="handled">
+      {children}
+    </ScrollView>
   );
 }
 

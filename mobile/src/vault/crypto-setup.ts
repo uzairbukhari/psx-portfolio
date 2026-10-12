@@ -3,7 +3,7 @@
 // expo-crypto. A build made before expo-crypto was added does not contain that native module: the app then says
 // plainly that this build cannot create or open an encrypted vault, instead of falling back to a weak random
 // source. (Math.random is never used for key material.)
-import { nobleAes, setCryptoAdapter, type CryptoAdapter } from '../../../lib/vault-crypto.ts';
+import { nobleAes, setCryptoAdapter, setKdfAsyncTick, type CryptoAdapter } from '../../../lib/vault-crypto.ts';
 
 export type RandomSource = (length: number) => Uint8Array;
 
@@ -31,6 +31,7 @@ export function installMobileCrypto(load: () => RandomSource = defaultRandom): C
   if (result?.ok) return result;
   try {
     setCryptoAdapter(createMobileAdapter(load()));
+    setKdfAsyncTick(100);
     result = { ok: true };
   } catch {
     result = { ok: false, reason: NEEDS_NEW_BUILD };

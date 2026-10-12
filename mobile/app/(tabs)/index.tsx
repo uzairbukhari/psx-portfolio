@@ -6,7 +6,9 @@ import { lastTradingDay } from '@shared/psx-calendar.ts';
 import { monthTitle, pktTime, plural, shortDate, signedMoney, signedPercent } from '@/data/format';
 import { currentMonth } from '@/data/sip';
 import { monthProgress, nextActions, returnBreakdown, type NextAction } from '@/data/today';
+import { contentsLabel } from '@/data/scope';
 import { usePortfolio } from '@/data/usePortfolio';
+import { useScope } from '@/data/useScope';
 import { useTheme } from '@/theme/ThemeProvider';
 import { type } from '@/theme/tokens';
 import { AppBar } from '@/ui/AppBar';
@@ -29,6 +31,7 @@ export default function Today() {
   const [pricing, setPricing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [skipped, setSkipped] = useState(false);
+  const scope = useScope();
   const now = today();
   const month = currentMonth();
 
@@ -57,7 +60,8 @@ export default function Today() {
     );
 
   const { totals, open, error } = p.view;
-  const firstUse = p.portfolio.companies.length === 0 && p.portfolio.trades.length === 0;
+  // Funds, savings plans and gold count as something to show: a portfolio holding only those is not new.
+  const firstUse = p.portfolio.companies.length === 0 && p.portfolio.trades.length === 0 && !scope.hasAssets && !(p.portfolio.dividends ?? []).length;
   const lastDay = lastTradingDay(now);
   const oldPrices = totals.oldestQuoteDate !== null && totals.oldestQuoteDate < lastDay;
   const priceNeeded = totals.heldCount > 0 && totals.missingPrice.length === totals.heldCount;
@@ -89,18 +93,22 @@ export default function Today() {
         {p.offline ? <Notice tone="offline" action={{ label: 'Retry', onPress: () => void p.refetch() }}>{`Offline${savedTime ? ` · showing your saved copy from ${savedTime}` : ''}`}</Notice> : null}
         <SectionLabel>Start with</SectionLabel>
         <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-          <ListRow left={<StartIcon name="upload" />} title="Import AHL trade history" subtitle="JSON export from AHL" onPress={() => router.push({ pathname: '/import', params: { kind: 'ahl' } })} />
-          <ListRow left={<StartIcon name="upload" />} title="Import CDC dividends" subtitle="JSON from CDC" onPress={() => router.push({ pathname: '/import', params: { kind: 'cdc' } })} />
           <ListRow left={<StartIcon name="plus" />} title="Add my first holding" subtitle="Enter a buy by hand" onPress={() => router.push('/transaction')} />
-          <ListRow left={<StartIcon name="chevronRight" />} title="Skip for now" subtitle="You can import later from Activity" onPress={() => setSkipped(true)} last />
+          <ListRow left={<StartIcon name="chevronRight" />} title="Skip for now" subtitle="You can add holdings later" onPress={() => setSkipped(true)} last />
         </View>
         <Text style={styles.muted}>Prices are delayed PSX quotes, and every figure says which date it used. Your data syncs with the Sipwise website.</Text>
       </Screen>
     );
 
-  const headline = priceNeeded ? 'Prices needed' : moneyShort(totals.value);
+  // With funds, plans or gold in scope the headline is the net worth of everything, not just the stocks.
+  const net = scope.hasAssets ? scope.overview : null;
+  const headline = net ? moneyShort(net.total.value) : priceNeeded ? 'Prices needed' : moneyShort(totals.value);
   const incomplete = totals.incomplete.length > 0;
-  const label = totals.missingPrice.length ? 'Market value of priced holdings' : 'Market value of holdings';
+  const label = net ? (p.isAll ? 'Net worth · all portfolios' : 'Net worth') : totals.missingPrice.length ? 'Market value of priced holdings' : 'Market value of holdings';
+  const gain = net ? net.total.gain : totals.gain;
+  const gainPercent = net ? net.total.gainPercent : totals.gainPercent;
+  const cost = net ? net.total.cost : totals.cost;
+  const holdingsLabel = contentsLabel({ stocks: open.length, plans: scope.plans.length, funds: scope.funds.length, metals: scope.metals.length });
 
   return (
     <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching} fab>
@@ -113,24 +121,24 @@ export default function Today() {
         <Text style={styles.sectionLabel}>{label}{incomplete && !totals.missingPrice.length ? ' · incomplete' : ''}</Text>
         {oldPrices ? <StatusChip tone="warn" text={`Prices as of ${shortDate(totals.oldestQuoteDate)}`} /> : null}
         {totals.missingPrice.length ? <StatusChip tone="warn" text={`${plural(totals.missingPrice.length, 'holding')} ${totals.missingPrice.length === 1 ? 'needs' : 'need'} a price`} /> : null}
-        <Text style={{ color: colors.ink, ...type.display }} accessibilityLabel={priceNeeded ? 'Prices needed' : `${label}, ${moneyShort(totals.value)}`}>
+        <Text style={{ color: colors.ink, ...type.display }} accessibilityLabel={`${label}, ${headline}`}>
           {headline}
         </Text>
-        {totals.gain === null ? (
+        {gain === null ? (
           <Text style={styles.muted}>Unrealised gain on current holdings: not yet known{totals.missingPrice.length ? ` (add a price for ${totals.missingPrice.join(', ')})` : ''}</Text>
         ) : (
           <View style={{ gap: 2 }}>
-            <Amount value={totals.gain} text={`${signedMoney(totals.gain)} (${signedPercent(totals.gainPercent)})`} size={17} label="Unrealised gain on current holdings" weight="700" />
+            <Amount value={gain} text={`${signedMoney(gain)} (${signedPercent(gainPercent)})`} size={17} label="Unrealised gain on current holdings" weight="700" />
             <Text style={styles.muted}>unrealised gain on current holdings</Text>
           </View>
         )}
         <View style={styles.divider} />
         <View style={styles.row}>
           <Stat label="Cost of current holdings">
-            <Text style={styles.number}>{totals.cost === null ? 'Not yet known' : moneyShort(totals.cost)}</Text>
+            <Text style={styles.number}>{cost === null ? 'Not yet known' : moneyShort(cost)}</Text>
           </Stat>
           <Stat label="Holdings">
-            <Text style={styles.number}>{plural(open.length, 'company', 'companies')}</Text>
+            <Text style={styles.number}>{net ? holdingsLabel : plural(open.length, 'company', 'companies')}</Text>
           </Stat>
         </View>
         {totals.unknownCost.length ? <Text style={styles.muted}>Cost is not known for {totals.unknownCost.join(', ')}, so cost and gain are not shown. Edit the opening entry to add its cost.</Text> : null}
@@ -194,11 +202,15 @@ export default function Today() {
             ))}
           </View>
         </>
-      ) : open.length === 0 ? (
-        <EmptyState icon="holdings" title="No open positions yet" body="Record your first buy or import your broker history." action={<Button label="Add a trade" icon="plus" onPress={() => router.push('/transaction')} />} />
+      ) : open.length === 0 && !scope.hasAssets ? (
+        <EmptyState icon="holdings" title="No open positions yet" body="Record your first buy to start." action={<Button label="Add a trade" icon="plus" onPress={() => router.push('/transaction')} />} />
       ) : null}
 
       {open.length > 0 || totals.heldCount > 0 ? <ValueVsMoneyInCard collapsible /> : null}
+
+      {scope.hasAssets && open.length === 0 ? (
+        <Button label="See your holdings" variant="outline" onPress={() => router.push('/portfolio')} />
+      ) : null}
 
       <MarketPulse tickers={watchTickers(p.portfolio)} />
     </Screen>

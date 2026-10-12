@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
-import { BiometricLockProvider } from '@/auth/BiometricLock';
+import * as SecureStore from 'expo-secure-store';
 import { PushBridge } from '@/push/PushBridge';
 import { AnalyticsBridge } from '@/analytics/AnalyticsBridge';
 import { SignIn } from '@/screens/SignIn';
@@ -46,8 +46,6 @@ function Root() {
           <Stack.Screen name="inbox" options={{ title: 'Inbox' }} />
           <Stack.Screen name="more" options={{ title: 'More' }} />
           <Stack.Screen name="portfolios" options={{ title: 'Portfolios' }} />
-          <Stack.Screen name="restore" options={{ title: 'Restore backup' }} />
-          <Stack.Screen name="import" options={{ title: 'Import' }} />
           {/* Old paths that now live inside Portfolio and Plan; they redirect, so they have no header. */}
           <Stack.Screen name="reports" options={{ headerShown: false }} />
           <Stack.Screen name="picks" options={{ headerShown: false }} />
@@ -66,6 +64,8 @@ function Root() {
 }
 
 export default function RootLayout() {
+  // The separate app lock was removed (the vault's own fingerprint unlock covers sign-in); forget an old switch setting.
+  useEffect(() => { void SecureStore.deleteItemAsync('sipwise.lock').catch(() => {}); }, []);
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1 } } }));
   // Refetch stale data (prices, portfolio revision) whenever the app comes back to the foreground.
   useEffect(() => {
@@ -78,9 +78,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <BiometricLockProvider>
-            <Root />
-          </BiometricLockProvider>
+          <Root />
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

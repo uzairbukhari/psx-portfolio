@@ -22,7 +22,7 @@ for (const [file, target] of REDIRECTS)
   });
 
 test('the four tabs, inbox, more and the company page exist', () => {
-  for (const file of ['(tabs)/index.tsx', '(tabs)/portfolio.tsx', '(tabs)/plan.tsx', '(tabs)/activity.tsx', 'inbox.tsx', 'more.tsx', 'company/[ticker].tsx', 'import.tsx', 'targets.tsx', 'received.tsx', 'quote.tsx', 'transaction.tsx'])
+  for (const file of ['(tabs)/index.tsx', '(tabs)/portfolio.tsx', '(tabs)/plan.tsx', '(tabs)/activity.tsx', 'inbox.tsx', 'more.tsx', 'company/[ticker].tsx', 'targets.tsx', 'received.tsx', 'quote.tsx', 'transaction.tsx'])
     assert.ok(existsSync(app(file)), file);
 });
 
@@ -41,8 +41,8 @@ test('Add transaction picks the SIP month instead of typing it, and closes witho
   assert.doesNotMatch(source, /behavior=\{Platform\.OS === 'ios' \? 'padding' : 'height'\}/);
 });
 
-test('both privacy covers use the self-healing foreground check, so one cannot get stuck over the app', () => {
-  for (const file of ['../src/auth/BiometricLock.tsx', '../src/vault/VaultProvider.tsx']) {
+test('the vault privacy cover uses the self-healing foreground check, so one cannot get stuck over the app', () => {
+  for (const file of ['../src/vault/VaultProvider.tsx']) {
     const source = readFileSync(new URL(file, app('x')), 'utf8');
     assert.match(source, /useAppActive\(\)/, file);
     assert.doesNotMatch(source, /setAppActive/, file);

@@ -29,6 +29,19 @@ export function buildPlan(
   }
 }
 
+export type MonthBuy = { id: string; date: string; ticker: string; shares: number; price: number | null; fees: number; amount: number; note: string };
+
+/**
+ * The buys that count toward a month's budget, the same rule the plan uses for "bought this month": tagged to the SIP
+ * month, or untagged and dated in it. Amount includes fees, so the list adds up to the figure on the budget card.
+ */
+export function monthBuys(p: Portfolio, month: string): MonthBuy[] {
+  return p.trades
+    .filter((t) => !t.voided && t.kind === 'buy' && (t.month === month || (!t.month && t.date.slice(0, 7) === month)))
+    .map((t) => ({ id: t.id, date: t.date, ticker: t.ticker, shares: t.shares, price: t.price, fees: t.fees, amount: Math.round(((t.price === null ? 0 : t.shares * t.price) + t.fees) * 100) / 100, note: t.note }))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1));
+}
+
 export function setBudget(p: Portfolio, month: string, amount: number): Portfolio {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Invalid month.');
   if (!Number.isFinite(amount) || amount < 0) throw new Error('Enter a budget of zero or more.');
