@@ -1,7 +1,7 @@
+/* oxlint-disable next/no-html-link-for-pages -- full page loads are intended: next/link throws in the vinext production build */
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Activity, ArrowLeft, BarChart3, ScrollText, Users } from 'lucide-react';
 import { ADMIN_SECTIONS, type AdminSection } from './admin-sections';
 import AdminAccounts from './admin-accounts';
@@ -35,16 +35,17 @@ export default function AdminConsole({ section, email, name, picture }: { sectio
       </header>
       <div className="admin-body">
         <nav className="admin-nav" aria-label="Admin sections">
+          {/* Plain anchors: next/link throws in the vinext production build, so navigation is a full page load. */}
           {ADMIN_SECTIONS.map(({ id, label }) => {
             const Icon = ICONS[id];
             return (
-              <Link key={id} href={`/admin/${id}`} className={id === section ? 'active' : ''} aria-current={id === section ? 'page' : undefined}>
+              <a key={id} href={`/admin/${id}`} className={id === section ? 'active' : ''} aria-current={id === section ? 'page' : undefined}>
                 <Icon size={16} aria-hidden="true" /> {label}
-              </Link>
+              </a>
             );
           })}
           <hr />
-          <Link href="/"><ArrowLeft size={16} aria-hidden="true" /> Back to app</Link>
+          <a href="/"><ArrowLeft size={16} aria-hidden="true" /> Back to app</a>
         </nav>
         <main className="admin-main">
           <h1>{current.label}</h1>

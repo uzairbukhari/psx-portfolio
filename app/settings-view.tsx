@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
@@ -329,9 +328,10 @@ export default function SettingsView({
                 </div>
                 {isAdmin && (
                   <Row label="Admin console" hint="System health, usage analytics, audit log and internal accounts.">
-                    <Link href="/admin/health" className="secondary compact signout-link">
+                    {/* oxlint-disable-next-line next/no-html-link-for-pages -- full page load; next/link throws in the vinext production build */}
+                    <a href="/admin/health" className="secondary compact signout-link">
                       <ShieldCheck size={14} aria-hidden="true" /> Open
-                    </Link>
+                    </a>
                   </Row>
                 )}
               </Section>
