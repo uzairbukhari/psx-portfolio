@@ -2,22 +2,23 @@
 'use client';
 
 import { useState } from 'react';
-import { Activity, ArrowLeft, BarChart3, ScrollText, Users } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, LayoutDashboard, ScrollText, Users } from 'lucide-react';
 import { ADMIN_SECTIONS, type AdminSection } from './admin-sections';
 import AdminAccounts from './admin-accounts';
+import AdminOverview from './admin-overview';
 import AuditLog from './audit-log';
 import SystemHealth from './system-health';
 import UsageDashboard from './usage-dashboard';
 import { UserAvatar } from './user-avatar';
 import './admin.css';
 
-const ICONS = { health: Activity, analytics: BarChart3, audit: ScrollText, accounts: Users } as const;
+const ICONS = { overview: LayoutDashboard, health: Activity, analytics: BarChart3, audit: ScrollText, accounts: Users } as const;
 
 /** Full-width super admin space, outside Settings and outside the vault gate (none of it needs the portfolio). */
 export default function AdminConsole({ section, email, name, picture }: { section: AdminSection; email: string; name: string | null; picture: string | null }) {
   const [includeInternal, setIncludeInternal] = useState(false);
   const current = ADMIN_SECTIONS.find((s) => s.id === section)!;
-  const showsToggle = section === 'analytics' || section === 'audit';
+  const showsToggle = section === 'overview' || section === 'analytics' || section === 'audit';
 
   return (
     <div className="admin-shell">
@@ -51,6 +52,7 @@ export default function AdminConsole({ section, email, name, picture }: { sectio
           <h1>{current.label}</h1>
           <p className="muted">{current.description}</p>
           <div className="admin-card">
+            {section === 'overview' && <AdminOverview includeInternal={includeInternal} />}
             {section === 'health' && <SystemHealth />}
             {section === 'analytics' && <UsageDashboard includeInternal={includeInternal} />}
             {section === 'audit' && <AuditLog includeInternal={includeInternal} />}

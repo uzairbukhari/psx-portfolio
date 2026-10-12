@@ -2738,7 +2738,7 @@ function DashboardContent({
                       <Settings size={15} /> Settings
                     </DropdownMenuItem>
                     {isAdmin && (
-                      <DropdownMenuItem onClick={() => window.location.assign('/admin/health')}>
+                      <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
                         <ShieldCheck size={15} /> Admin console
                       </DropdownMenuItem>
                     )}

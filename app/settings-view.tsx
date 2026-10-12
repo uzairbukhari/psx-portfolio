@@ -329,7 +329,7 @@ export default function SettingsView({
                 {isAdmin && (
                   <Row label="Admin console" hint="System health, usage analytics, audit log and internal accounts.">
                     {/* oxlint-disable-next-line next/no-html-link-for-pages -- full page load; next/link throws in the vinext production build */}
-                    <a href="/admin/health" className="secondary compact signout-link">
+                    <a href="/admin" className="secondary compact signout-link">
                       <ShieldCheck size={14} aria-hidden="true" /> Open
                     </a>
                   </Row>

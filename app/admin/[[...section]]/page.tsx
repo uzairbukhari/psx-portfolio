@@ -14,7 +14,7 @@ export default async function AdminPage({ params }: { params: Promise<{ section?
   if (!viewer) redirect('/');
   if (viewer.role !== 'super_admin') notFound();
   const parts = (await params).section ?? [];
-  if (parts.length === 0) redirect('/admin/health');
+  if (parts.length === 0) redirect('/admin/overview');
   const section = ADMIN_SECTIONS.find((s) => s.id === parts[0]);
   if (!section || parts.length > 1) notFound();
   return <AdminConsole section={section.id} email={viewer.email} name={viewer.name} picture={viewer.picture} />;
