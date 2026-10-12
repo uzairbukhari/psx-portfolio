@@ -1,5 +1,6 @@
 import { refreshFundPayouts, refreshFunds } from '../../../lib/mufap-refresh';
 import { refreshPlanNavs } from '../../../lib/plan-navs';
+import { sendAdminAlerts } from '../../../lib/admin-alerts';
 import { syncPlatformMetrics } from '../../../lib/cf-analytics';
 import { recordJobRun } from '../../../lib/job-runs';
 import { PIPELINES } from '../../../lib/pipelines';
@@ -12,6 +13,8 @@ interface Env {
   GITHUB_REPO?: string;
   APP_ENV?: string;
   /** Optional: a read-only Account Analytics token, and the account id, switch on Cloudflare limit tracking in the admin console. */
+  AI_RESEARCH_MONTHLY_CAP_USD?: string;
+  FACE_VALUE_AI_MONTHLY_CAP_USD?: string;
   CF_ANALYTICS_TOKEN?: string;
   CF_ACCOUNT_ID?: string;
 }
@@ -60,11 +63,21 @@ export default {
          ON CONFLICT(kind,key) DO UPDATE SET last_attempt_at=excluded.last_attempt_at, last_success_at=excluded.last_success_at`,
       ).bind(beat, beat).run().catch(() => {}),
     );
-    // Cloudflare's own request, error and limit numbers for the two Workers, twice an hour (needs the optional token).
-    if (env.CF_ANALYTICS_TOKEN && env.CF_ACCOUNT_ID && env.APP_ENV !== 'staging' && new Date(controller.scheduledTime).getUTCMinutes() % 30 === 0) {
+    // Twice an hour, after copying Cloudflare's own request, error and limit numbers for the two Workers (needs the optional token), tell super admins' phones (generic message, once a day per issue) if anything is wrong.
+    if (env.APP_ENV !== 'staging' && new Date(controller.scheduledTime).getUTCMinutes() % 30 === 0) {
       ctx.waitUntil(
-        syncPlatformMetrics(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, ['psx-portfolio-sip', 'psx-portfolio-sip-quote-refresh'], new Date(controller.scheduledTime))
-          .catch((e) => console.error('Platform metrics failed', e)),
+        (async () => {
+          if (env.CF_ANALYTICS_TOKEN && env.CF_ACCOUNT_ID)
+            await syncPlatformMetrics(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, ['psx-portfolio-sip', 'psx-portfolio-sip-quote-refresh'], new Date(controller.scheduledTime)).catch(() => 0);
+          const lab = Number(env.AI_RESEARCH_MONTHLY_CAP_USD);
+          const face = Number(env.FACE_VALUE_AI_MONTHLY_CAP_USD);
+          const result = await sendAdminAlerts(env.DB, {
+            now: new Date(controller.scheduledTime),
+            aiLabCapUsd: Number.isFinite(lab) && lab > 0 ? lab : null,
+            faceValueCapUsd: Number.isFinite(face) && face > 0 ? face : 1,
+          });
+          if (result.sent) console.log('Admin alert sent', result);
+        })().catch((e) => console.error('Admin alerts failed', e)),
       );
     }
     // MUFAP blocks GitHub's runners but answers Cloudflare, so the fund prices are fetched here (public data, no user data).
