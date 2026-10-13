@@ -157,8 +157,8 @@ export function Fact({ label, value }: { label: string; value: string }) {
   const styles = useKitStyles();
   return (
     <View style={{ flex: 1, gap: 2 }}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.number}>{value}</Text>
+      <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
+      <Text style={styles.number} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
     </View>
   );
 }
@@ -238,7 +238,7 @@ export function Amount({
   return (
     <View accessible accessibilityLabel={label ? `${label}, ${spoken}` : spoken} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1 }}>
       {arrow && value !== null && value !== 0 ? <Icon name={value > 0 ? 'arrowUp' : 'arrowDown'} size={Math.round(size * 0.95)} color={color} strokeWidth={2.4} /> : null}
-      <Text style={{ color, fontSize: size, lineHeight: Math.round(size * 1.35), fontWeight: weight, fontVariant: ['tabular-nums'], flexShrink: 1 }}>{shown}</Text>
+      <Text style={{ color, fontSize: size, lineHeight: Math.round(size * 1.35), fontWeight: weight, fontVariant: ['tabular-nums'], flexShrink: 1 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{shown}</Text>
     </View>
   );
 }
@@ -247,7 +247,7 @@ export function Stat({ label, children }: { label: string; children: ReactNode }
   const styles = useKitStyles();
   return (
     <View style={styles.stat}>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
       {children}
     </View>
   );
