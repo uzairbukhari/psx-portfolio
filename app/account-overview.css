@@ -315,8 +315,13 @@
   gap: 10px;
 }
 .overview-portfolios {
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 12px;
+}
+/* An odd last portfolio spans the row so there is never an empty cell. */
+.overview-portfolios > li:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 button.overview-portfolio:not([data-slot]) {
   justify-content: normal;
@@ -327,8 +332,8 @@ button.overview-portfolio:not([data-slot]) {
   display: grid;
   align-content: start;
   justify-items: stretch;
-  gap: 6px;
-  padding: 16px 18px;
+  gap: 4px;
+  padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgb(var(--ch-tint) / 0.03);
@@ -364,17 +369,17 @@ button.overview-portfolio:not([data-slot]):focus-visible {
   white-space: nowrap;
 }
 .overview-portfolio__value {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: -0.6px;
-  margin-top: 4px;
+  letter-spacing: -0.5px;
+  margin-top: 0;
 }
 .overview-portfolio__gain {
   font-size: 13px;
 }
 .overview-portfolio .bar {
   display: block;
-  margin: 6px 0 2px;
+  margin: 4px 0 0;
 }
 .overview-portfolio small {
   font-size: 12px;
@@ -382,7 +387,7 @@ button.overview-portfolio:not([data-slot]):focus-visible {
 
 /* Folding panels (All companies, gold, plans, funds) */
 .collapsible {
-  margin-top: 22px;
+  margin-top: 12px;
   padding: 0;
 }
 .collapsible__head {
@@ -390,21 +395,22 @@ button.overview-portfolio:not([data-slot]):focus-visible {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 24px;
-  padding: 16px 22px;
+  gap: 6px 24px;
+  padding: 9px 18px;
 }
 button.collapsible__toggle:not([data-slot]) {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 0;
+  padding: 2px 0;
+  min-height: 0;
   background: none;
   border: 0;
   border-radius: 6px;
   box-shadow: none;
   transform: none;
   color: var(--foreground);
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.3px;
 }
@@ -427,21 +433,21 @@ button.collapsible__toggle:not([data-slot]):focus-visible {
 .collapsible__figures {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 28px;
+  gap: 4px 24px;
   margin: 0;
 }
 .collapsible__figures > div {
   display: grid;
-  gap: 2px;
+  gap: 0;
   text-align: right;
 }
 .collapsible__figures dt {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 .collapsible__figures dd {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 .collapsible__actions {
@@ -686,7 +692,29 @@ button.start-tile:not([data-slot]):hover {
 .holdings-head--inline {
   margin: 0;
   padding: 14px 0;
-  justify-content: flex-end;
+}
+.holdings-search {
+  order: 0;
+  flex: 1 1 240px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  max-width: 420px;
+}
+.holdings-search svg {
+  position: absolute;
+  left: 11px;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+.holdings-search input {
+  width: 100%;
+  padding: 7px 10px 7px 34px;
+  font-size: 13px;
+}
+.holdings-head--inline .holdings-soldout {
+  margin-left: auto;
 }
 .add-asset__trigger {
   display: inline-flex;
@@ -938,5 +966,19 @@ tbody[data-open] .fund-row__chevron {
   }
   .fund-activity__actions {
     grid-area: act;
+  }
+}
+
+/* The Portfolios card grows with its neighbour, so its cards share the height instead of leaving a gap. */
+.overview-panel[aria-label='Portfolios'] {
+  display: flex;
+  flex-direction: column;
+}
+.overview-panel[aria-label='Portfolios'] .overview-portfolios {
+  flex: 1;
+}
+@container (max-width: 420px) {
+  .overview-portfolios {
+    grid-template-columns: 1fr;
   }
 }

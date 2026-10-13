@@ -34,7 +34,7 @@ import {
   type ResearchSettings,
 } from '@/lib/portfolio';
 import { useConfirm } from '@/components/confirm-dialog';
-import { ThemeSetting } from './theme-menu';
+import { ChartPaletteSetting, ThemeSetting } from './theme-menu';
 import { analyticsEnabled, setAnalyticsEnabled, track, flushAnalytics } from './analytics';
 import { Switch } from '@/components/ui/switch';
 import { webMcpEnabled, setWebMcpEnabled } from './webmcp-pref';
@@ -345,9 +345,11 @@ export default function SettingsView({
                 id="appearance"
                 icon={<Palette size={18} />}
                 title="Appearance"
-                description="Choose how Sipwise looks. Light is the default."
+                description="Choose how Sipwise looks and the colours charts use. Light is the default."
               >
                 <ThemeSetting />
+                <h4 className="set-subhead">Chart colours</h4>
+                <ChartPaletteSetting />
               </Section>
 
               <Section

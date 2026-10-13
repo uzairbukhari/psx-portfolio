@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/popover';
 import {
   Plus,
+  Search,
   Briefcase,
   Upload,
   Wallet,
@@ -906,6 +907,7 @@ function DashboardContent({
       dir: 'asc' | 'desc';
     } | null>(null),
     [sectorFilter, setSectorFilter] = useState<string>(''),
+    [holdingsQuery, setHoldingsQuery] = useState(''),
     [showSoldOut, setShowSoldOut] = useState(false),
     [targetsOpen, setTargetsOpen] = useState(false);
   // Status messages surface as toasts instead of an inline banner: errors
@@ -1934,11 +1936,18 @@ function DashboardContent({
       new Set(hs.map((h) => h.sector).filter((s): s is string => !!s)),
     ),
     rowsBase = showSoldOut ? held.concat(soldOut) : held,
-    rowsFiltered = !sectorFilter
+    rowsBySector = !sectorFilter
       ? rowsBase
       : sectorFilter === SHORTLISTED
         ? rowsBase.filter((h) => h.target > 0)
         : rowsBase.filter((h) => h.sector === sectorFilter),
+    rowsFiltered = holdingsQuery.trim()
+      ? rowsBySector.filter((h) =>
+          `${h.ticker} ${h.name} ${h.sector ?? ''}`
+            .toLowerCase()
+            .includes(holdingsQuery.trim().toLowerCase()),
+        )
+      : rowsBySector,
     holdingsSortAccessor: Record<
       HoldingsSortKey,
       (h: (typeof hs)[number]) => number | string
@@ -3003,6 +3012,16 @@ function DashboardContent({
                     ]}
                   >
                     <div className="holdings-head holdings-head--inline">
+                      <label className="holdings-search">
+                        <Search size={15} aria-hidden="true" />
+                        <input
+                          type="search"
+                          value={holdingsQuery}
+                          placeholder="Search company, ticker or sector"
+                          aria-label="Search companies"
+                          onChange={(e) => setHoldingsQuery(e.target.value)}
+                        />
+                      </label>
                       <button
                         className="secondary compact holdings-add holdings-targets"
                         disabled={busy || locked}

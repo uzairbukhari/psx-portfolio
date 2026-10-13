@@ -65,7 +65,7 @@ export function EChart({
     const mo = new MutationObserver(bump);
     mo.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme', 'class'],
+      attributeFilter: ['data-theme', 'data-chart-palette', 'class'],
     });
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
     mq?.addEventListener?.('change', bump);

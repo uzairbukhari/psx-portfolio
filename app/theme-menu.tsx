@@ -9,12 +9,18 @@ import {
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { CHART_PALETTES, parseChartPalette } from '@/lib/chart-palette';
 import { parseThemePreference, THEMES, type Theme } from '@/lib/theme';
+import { useChartPalette } from './use-chart-palette';
 import { useTheme } from './use-theme';
 
 function Swatch({ colors }: { colors: (typeof THEMES)[number]['swatch'] }) {
   return (
-    <span className="theme-swatch" aria-hidden="true" style={{ background: colors[0], borderColor: colors[2] }}>
+    <span
+      className="theme-swatch"
+      aria-hidden="true"
+      style={{ background: colors[0], borderColor: colors[2] }}
+    >
       <i style={{ background: colors[1] }} />
       <i style={{ background: colors[2] }} />
     </span>
@@ -29,7 +35,10 @@ export function ThemeMenuItems() {
         <Palette size={15} /> Theme
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent>
-        <DropdownMenuRadioGroup value={preference} onValueChange={(v) => setPreference(parseThemePreference(v))}>
+        <DropdownMenuRadioGroup
+          value={preference}
+          onValueChange={(v) => setPreference(parseThemePreference(v))}
+        >
           {THEMES.map((t) => (
             <DropdownMenuRadioItem key={t.id} value={t.id}>
               <Swatch colors={t.swatch} /> {t.label}
@@ -46,9 +55,18 @@ export function ThemeMenuItems() {
 
 export function ThemeSetting() {
   const { preference, setPreference, ready } = useTheme();
-  const options: { id: Theme | 'system'; label: string; hint: string; swatch?: (typeof THEMES)[number]['swatch'] }[] = [
+  const options: {
+    id: Theme | 'system';
+    label: string;
+    hint: string;
+    swatch?: (typeof THEMES)[number]['swatch'];
+  }[] = [
     ...THEMES,
-    { id: 'system', label: 'System', hint: 'Light or dark, following your device' },
+    {
+      id: 'system',
+      label: 'System',
+      hint: 'Light or dark, following your device',
+    },
   ];
   return (
     <>
@@ -61,10 +79,16 @@ export function ThemeSetting() {
           <label
             key={o.id}
             htmlFor={`theme-${o.id}`}
-            className={preference === o.id ? 'option-card selected' : 'option-card'}
+            className={
+              preference === o.id ? 'option-card selected' : 'option-card'
+            }
           >
             <RadioGroupItem id={`theme-${o.id}`} value={o.id} />
-            {o.swatch ? <Swatch colors={o.swatch} /> : <Monitor size={18} aria-hidden="true" />}
+            {o.swatch ? (
+              <Swatch colors={o.swatch} />
+            ) : (
+              <Monitor size={18} aria-hidden="true" />
+            )}
             <span>
               <strong>{o.label}</strong>
               <small>{o.hint}</small>
@@ -73,6 +97,52 @@ export function ThemeSetting() {
         ))}
       </RadioGroup>
       <p className="set-hint">Saved on this device only.</p>
+    </>
+  );
+}
+
+/** Colours used by every chart; separate from the theme so any palette works in any theme. */
+export function ChartPaletteSetting() {
+  const { palette, setPalette } = useChartPalette();
+  const ready = useTheme().ready;
+  return (
+    <>
+      <RadioGroup
+        className="option-cards palette-cards"
+        value={ready ? palette : ''}
+        onValueChange={(v) => setPalette(parseChartPalette(v))}
+      >
+        {CHART_PALETTES.map((o) => (
+          <label
+            key={o.id}
+            htmlFor={`palette-${o.id}`}
+            className={
+              palette === o.id ? 'option-card selected' : 'option-card'
+            }
+          >
+            <RadioGroupItem id={`palette-${o.id}`} value={o.id} />
+            <span
+              className="palette-chips"
+              data-chart-palette={o.id}
+              aria-hidden="true"
+            >
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>
+              <strong>{o.label}</strong>
+              <small>{o.hint}</small>
+            </span>
+          </label>
+        ))}
+      </RadioGroup>
+      <p className="set-hint">
+        Applies to every chart. Saved on this device only.
+      </p>
     </>
   );
 }

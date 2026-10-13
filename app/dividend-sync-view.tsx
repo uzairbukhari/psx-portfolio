@@ -217,15 +217,18 @@ export function DividendSyncView({
   return (
     <div className="ds">
       {dialog}
-      <p className="muted">
-        Review cash dividends your holdings were entitled to, including sold positions. Eligibility comes from the book-closure range and the shares you held on each
-        payout’s cutoff date (the last trade that settles before book closure: T+2 before 9 Feb 2026, T+1 after, skipping weekends and market holidays).
-        Announcement dates alone do not decide it. Nothing is added until you approve it.
+      <p className="ds-lead">
+        Review cash dividends your holdings were entitled to, including sold positions. New and past payouts are added automatically when you open the app; only the ones that need a decision (for
+        example an unknown face value) wait below. Nothing else is added until you approve it.
       </p>
-      <p className="muted">
-        New and past payouts are now added automatically when you open the app: clean ones are recorded as received with an estimated payment date, and only
-        the ones that need a decision (for example an unknown face value) wait below. Edit a record in Activity if its date or amount differs, or void it if you did not receive it.
-      </p>
+      <details className="ir-warnings ds-how">
+        <summary>How entitlement is worked out</summary>
+        <p className="muted">
+          Eligibility comes from the book-closure range and the shares you held on each payout’s cutoff date (the last trade that settles before book closure: T+2 before 9 Feb 2026, T+1 after, skipping
+          weekends and market holidays). Announcement dates alone do not decide it. Clean payouts are recorded as received with an estimated payment date. Edit a record in Activity if its date or amount
+          differs, or void it if you did not receive it.
+        </p>
+      </details>
       {batches.length > 0 && (
         <div className="ir-banner" aria-live="polite">
           Added automatically:{' '}
@@ -240,10 +243,12 @@ export function DividendSyncView({
       <div className="ir-controls">
         <label>Book closure from <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label>
         <label>to <input type="date" value={to} min={from} max={today()} onChange={(e) => setTo(e.target.value)} /></label>
+        <span className="ds-bar__actions">
         <button type="button" className="secondary compact" onClick={() => { setFrom(earliestHoldingDate(portfolio) ?? today()); setTo(today()); }}>Reset to full history</button>
         <button type="button" className="compact" disabled={busy || loading || data?.dispatchEnabled === false || data?.overall === 'queued' || data?.overall === 'running'} onClick={() => void refresh()}>
           Refresh PSX announcements
         </button>
+        </span>
       </div>
       <div className="ir-status" aria-live="polite">
         {status && <span>Announcement fetch: <span className={`ir-pill ${status.tone}`}>{status.label}</span></span>}
