@@ -16,5 +16,7 @@ android {
 
 dependencies {
   // Reference Argon2 (RFC 9106) from Bouncy Castle. The platform's own copy is hidden from apps, so this one is bundled.
-  implementation 'org.bouncycastle:bcprov-jdk18on:1.80'
+  // Must be the jdk15to18 artifact at the version expo-updates already brings (bcutil-jdk15to18:1.81 depends on it):
+  // the jdk18on artifact contains the same classes, and the release build fails on duplicate classes.
+  implementation 'org.bouncycastle:bcprov-jdk15to18:1.81'
 }
