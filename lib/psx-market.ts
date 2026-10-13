@@ -135,7 +135,9 @@ export function parseIndexSummary(html: string, indexName = 'KSE100'): IndexSumm
   const nextPanel = html.indexOf('<div class="tabs__panel marketIndices__details"', blockStart + 1);
   const block = html.slice(blockStart, nextPanel === -1 ? undefined : nextPanel);
 
-  const meta = block.match(/data-date="([^"]+)"[^>]*data-close="([^"]+)"/);
+  // Attribute order is not guaranteed, and the price/change/range parts disappear when the market is closed or pre-open.
+  const asOfAttr = block.match(/data-date="([^"]+)"/)?.[1];
+  const closeAttr = block.match(/data-close="([^"]+)"/)?.[1];
   const changeMatch = block.match(
     // A falling index is printed with its own minus sign ("-42.80 (-0.03%)").
     /marketIndices__change change__text--(pos|neg)">(?:<i[^>]*><\/i>)?\s*-?([\d,.]+)\s*\((-?[\d.]+)%\)/,
@@ -146,19 +148,29 @@ export function parseIndexSummary(html: string, indexName = 'KSE100'): IndexSumm
     )?.[1];
   const ranges = [...block.matchAll(/class="numRange" data-low="([^"]+)" data-high="([^"]+)"/g)];
 
-  if (!meta || !changeMatch || ranges.length < 2)
-    throw Error(`Unexpected PSX index markup for "${indexName}" (${block.length} bytes)`);
+  if (!asOfAttr || !closeAttr) throw Error(`Unexpected PSX index markup for "${indexName}" (${block.length} bytes)`);
 
-  const close = num(meta[2]);
-  const change = num(changeMatch[2]) * (changeMatch[1] === 'neg' ? -1 : 1);
-  const asOf = meta[1];
+  const close = num(closeAttr);
+  const previousClose = num(stat('Previous Close'));
+  // Without the printed change (closed/pre-open markup) derive it from the previous close.
+  const change = changeMatch
+    ? num(changeMatch[2]) * (changeMatch[1] === 'neg' ? -1 : 1)
+    : previousClose > 0
+      ? close - previousClose
+      : NaN;
+  const changePercent = changeMatch
+    ? num(changeMatch[3])
+    : previousClose > 0
+      ? ((close - previousClose) / previousClose) * 100
+      : NaN;
+  const asOf = asOfAttr;
   if (!Number.isFinite(close) || close <= 0) throw Error(`Unexpected PSX index price for "${indexName}"`);
 
   return {
     name: indexName,
     close,
     change,
-    changePercent: num(changeMatch[3]),
+    changePercent,
     asOf,
     date: asOf.slice(0, 10),
     high: num(stat('High')),
@@ -166,11 +178,11 @@ export function parseIndexSummary(html: string, indexName = 'KSE100'): IndexSumm
     volume: num(stat('Volume')),
     oneYearChangePercent: num(stat('1-Year Change')),
     ytdChangePercent: num(stat('YTD Change')),
-    previousClose: num(stat('Previous Close')),
-    dayRangeLow: num(ranges[0][1]),
-    dayRangeHigh: num(ranges[0][2]),
-    weekRangeLow: num(ranges[1][1]),
-    weekRangeHigh: num(ranges[1][2]),
+    previousClose,
+    dayRangeLow: num(ranges[0]?.[1]),
+    dayRangeHigh: num(ranges[0]?.[2]),
+    weekRangeLow: num(ranges[1]?.[1]),
+    weekRangeHigh: num(ranges[1]?.[2]),
     fetchedAt: new Date().toISOString(),
   };
 }

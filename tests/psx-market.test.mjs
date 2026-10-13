@@ -173,6 +173,16 @@ test('parseIndexSummary reads a falling index printed with a minus sign', () => 
   assert.equal(summary.previousClose, 170425.62);
 });
 
+test('parseIndexSummary accepts reduced closed-market markup without change or ranges', () => {
+  const html =
+    '<div class="tabs__panel marketIndices__details" data-name="KSE100" data-type="1" data-close="168346.16" data-date="2026-10-12 15:11:00"><h1 class="marketIndices__price">168,346.16</h1><div class="stats"><div class="stats_item"><div class="stats_label">Previous Close</div><div class="stats_value">168,636.85</div></div></div></div>';
+  const summary = parseIndexSummary(html, 'KSE100');
+  assert.equal(summary.close, 168346.16);
+  assert.equal(summary.asOf, '2026-10-12 15:11:00');
+  assert.ok(Math.abs(summary.change - -290.69) < 0.01);
+  assert.equal(summary.dayRangeLow, 0);
+});
+
 test('buildMarketSummary grows today\'s KSE100 series and carries every ALLSHR quote', async () => {
   const { buildMarketSummary } = await import('../scripts/psx-quote-scrape.mjs');
   const index = { date: '2026-09-29', asOf: '2026-09-29 12:18:30', close: 170382.82 };
