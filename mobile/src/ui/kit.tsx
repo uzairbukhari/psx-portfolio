@@ -24,6 +24,7 @@ import { AnimatedSheet } from './AnimatedSheet';
 import { useFabScroll } from './ScrollAwareFab';
 import { Icon, type IconName } from './Icon';
 import { useReduceMotion } from './motion';
+import { refreshHaptic, tickHaptic } from './haptics';
 
 export { useReduceMotion };
 
@@ -43,7 +44,7 @@ export function Screen({
 }) {
   const styles = useKitStyles();
   const { colors } = useTheme();
-  const body = { children, styles, fab, refreshControl: onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined };
+  const body = { children, styles, fab, refreshControl: onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={() => { refreshHaptic(); onRefresh(); }} tintColor={colors.primary} colors={[colors.primary]} /> : undefined };
   return <SafeAreaView style={styles.screen} edges={edges}>{fab ? <FabScrollBody {...body} /> : <ScrollBody {...body} />}</SafeAreaView>;
 }
 
@@ -375,7 +376,7 @@ export function Chip({ label, selected, onPress, accessibilityLabel, role = 'but
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole={role}
       accessibilityState={{ selected: Boolean(selected) }}
-      onPress={onPress}
+      onPress={onPress && (() => { if (!selected) tickHaptic(); onPress(); })}
       hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
       style={({ pressed }) => [styles.chip, selected && styles.chipOn, pressed && { opacity: 0.7 }]}
     >
@@ -421,7 +422,7 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
             accessibilityRole="tab"
             accessibilityLabel={o.spoken ?? o.label}
             accessibilityState={{ selected: on }}
-            onPress={() => onChange(o.key)}
+            onPress={() => { if (!on) tickHaptic(); onChange(o.key); }}
             style={[styles.segment, on && styles.segmentOn]}
           >
             <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{o.label}</Text>

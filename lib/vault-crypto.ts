@@ -105,6 +105,11 @@ export type CryptoAdapter = {
   randomBytes(length: number): Uint8Array;
   aesGcmEncrypt(key: Uint8Array, nonce: Uint8Array, aad: Uint8Array, plaintext: Uint8Array): Promise<Uint8Array>;
   aesGcmDecrypt(key: Uint8Array, nonce: Uint8Array, aad: Uint8Array, ciphertext: Uint8Array): Promise<Uint8Array>;
+  /**
+   * Optional native Argon2id (the phone). It must return exactly what @noble's argon2id returns for the same input
+   * (plain Argon2id v0x13, no secret or associated data). When it is missing or throws, derivePasswordKey uses @noble.
+   */
+  argon2id?(password: Uint8Array, salt: Uint8Array, cost: { m: number; t: number; p: number; dkLen: number }): Promise<Uint8Array>;
 };
 
 /** AES-GCM in pure JS (@noble/ciphers). Used where WebCrypto is missing (Hermes) and by interoperability tests. */
@@ -303,6 +308,24 @@ async function passwordKey(password: string, kdf: PasswordKdf, salt: Uint8Array)
   return hkdf(sha256, raw, undefined, utf8('sipwise-vault/v1/password-wrap-key'), KEY_BYTES);
 }
 
+/**
+ * Password key via the adapter's native Argon2id when it has one (the phone), else (or if it fails) the JS path above.
+ * Kept separate from passwordKey so the two derivations stay independent.
+ */
+async function derivePasswordKey(password: string, kdf: PasswordKdf, salt: Uint8Array): Promise<Uint8Array> {
+  const native = rt().argon2id;
+  if (native) {
+    assertKdfAllowed(kdf);
+    try {
+      const raw = await native(utf8(normalizePassword(password)), salt, { m: kdf.m, t: kdf.t, p: kdf.p, dkLen: KEY_BYTES });
+      if (raw instanceof Uint8Array && raw.length === KEY_BYTES) return hkdf(sha256, raw, undefined, utf8('sipwise-vault/v1/password-wrap-key'), KEY_BYTES);
+    } catch {
+      // Native code unavailable or out of memory: derive the same key in JS.
+    }
+  }
+  return passwordKey(password, kdf, salt);
+}
+
 const recoveryKey = (secret: Uint8Array) => hkdf(sha256, secret, undefined, utf8('sipwise-vault/v1/recovery-wrap-key'), KEY_BYTES);
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -385,7 +408,7 @@ export async function wrapWithPassword(dataKey: Uint8Array, vaultId: string, key
   assertPasswordAcceptable(password);
   const kdf: PasswordKdf = { alg: KDF_ALG, v: KDF_VERSION, ...KDF_DEFAULT };
   const salt = toB64u(randomBytes(SALT_BYTES));
-  const key = await passwordKey(password, kdf, fromB64u(salt));
+  const key = await derivePasswordKey(password, kdf, fromB64u(salt));
   const sealed = await sealKey(key, aadFor('wrap-password', { vaultId, keyVersion, kdf, salt }), dataKey);
   key.fill(0);
   return { kdf, salt, ...sealed };
@@ -404,7 +427,7 @@ export async function wrapWithRecovery(dataKey: Uint8Array, vaultId: string, key
 export async function unwrapWithPassword(material: VaultKeyMaterial, password: string): Promise<Uint8Array> {
   validateVaultKeyMaterial(material);
   const { vaultId, keyVersion, password: w } = material;
-  const key = await passwordKey(password, w.kdf, fromB64u(w.salt));
+  const key = await derivePasswordKey(password, w.kdf, fromB64u(w.salt));
   try {
     return await openKey(key, aadFor('wrap-password', { vaultId, keyVersion, kdf: w.kdf, salt: w.salt }), w, 'wrong-password');
   } finally {

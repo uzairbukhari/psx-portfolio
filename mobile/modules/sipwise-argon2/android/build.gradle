@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.sipwiseargon2'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.sipwiseargon2"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // Reference Argon2 (RFC 9106) from Bouncy Castle. The platform's own copy is hidden from apps, so this one is bundled.
+  implementation 'org.bouncycastle:bcprov-jdk18on:1.80'
+}

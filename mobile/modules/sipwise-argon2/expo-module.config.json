@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["expo.modules.sipwiseargon2.SipwiseArgon2Module"]
+  }
+}

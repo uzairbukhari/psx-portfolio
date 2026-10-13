@@ -3,12 +3,12 @@
 //  - The donut draws each asset class in sequence on mount; tapping a legend row (or the donut) focuses that class:
 //    its arc thickens, the others dim and the centre shows the class's value and share.
 //  - Reduce Motion: everything appears in its final state.
-// OTA-safe: react-native Animated + react-native-svg (already installed). The arc sweep animates strokeDashoffset,
-// an SVG prop, so it runs on the JS driver; it is one 520 ms tween at mount and on data change only, never per frame
-// of scrolling. With Skia or Reanimated in a later native build, move the sweep to the UI thread.
+// The arc sweep is a Reanimated shared value driving strokeDashoffset through useAnimatedProps, so it runs on the UI
+// thread (react-native's own Animated cannot drive an SVG prop natively). Needs the native build with Reanimated.
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
+import Reanimated, { Easing as ReanimatedEasing, Extrapolation, interpolate, useAnimatedProps, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { moneyShort } from '@shared/portfolio.ts';
 import { signedAmountLabel, signedPercentLabel } from '@/data/a11y';
 import { signedMoney, signedPercent } from '@/data/format';
@@ -20,7 +20,8 @@ import { motion, useChangePulse, useReduceMotion } from './motion';
 
 export type AllocationSlice = { key: keyof Palette['assets']; label: string; value: number; /** 0 to 100 */ share: number; gain: number | null };
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedCircle = Reanimated.createAnimatedComponent(Circle);
+const SWEEP_EASE = ReanimatedEasing.bezier(0.2, 0, 0, 1);
 
 const SIZE = 128;
 const STROKE = 14;
@@ -158,19 +159,17 @@ const Donut = memo(function Donut({
   total: string;
 }) {
   const { colors } = useTheme();
-  const [progress] = useState(() => new Animated.Value(reduce ? 1 : 0));
+  const progress = useSharedValue(reduce ? 1 : 0);
   const [pop] = useState(() => new Animated.Value(1));
   // Re-sweep when the mix itself changes (another portfolio), not when a price moves a share by a fraction.
   const shape = slices.map((s) => `${s.key}:${Math.round(s.share)}`).join('|');
   useEffect(() => {
     if (reduce) {
-      progress.setValue(1);
+      progress.value = 1;
       return;
     }
-    progress.setValue(0);
-    const a = Animated.timing(progress, { toValue: 1, duration: motion.slow, easing: motion.easeOut, useNativeDriver: false });
-    a.start();
-    return () => a.stop();
+    progress.value = 0;
+    progress.value = withTiming(1, { duration: motion.slow, easing: SWEEP_EASE });
   }, [shape, reduce, progress]);
   useEffect(() => {
     if (reduce) return;
@@ -199,20 +198,13 @@ const Donut = memo(function Donut({
           {arcs.map((a) => {
             const on = focus === a.key;
             return (
-              <AnimatedCircle
+              <DonutArc
                 key={a.key}
-                cx={CENTER}
-                cy={CENTER}
-                r={R}
-                fill="none"
-                stroke={colors.assets[a.key]}
+                arc={a}
+                progress={progress}
+                color={colors.assets[a.key]}
                 strokeWidth={on ? STROKE_FOCUS : STROKE}
-                strokeOpacity={focus === null || on ? 1 : 0.3}
-                strokeLinecap="butt"
-                strokeDasharray={[a.len, C]}
-                strokeDashoffset={progress.interpolate({ inputRange: [a.from, Math.max(a.to, a.from + 0.0001)], outputRange: [a.len, 0], extrapolate: 'clamp' })}
-                rotation={-90 + a.from * 360}
-                origin={`${CENTER}, ${CENTER}`}
+                opacity={focus === null || on ? 1 : 0.3}
                 onPress={() => onToggle(a.key)}
               />
             );
@@ -234,6 +226,32 @@ const Donut = memo(function Donut({
     </Animated.View>
   );
 });
+
+type Arc = { key: string; len: number; from: number; to: number };
+
+/** One asset-class arc. Its own component because useAnimatedProps is a hook. */
+function DonutArc({ arc, progress, color, strokeWidth, opacity, onPress }: { arc: Arc; progress: SharedValue<number>; color: string; strokeWidth: number; opacity: number; onPress: () => void }) {
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: interpolate(progress.value, [arc.from, Math.max(arc.to, arc.from + 0.0001)], [arc.len, 0], Extrapolation.CLAMP),
+  }));
+  return (
+    <AnimatedCircle
+      cx={CENTER}
+      cy={CENTER}
+      r={R}
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeOpacity={opacity}
+      strokeLinecap="butt"
+      strokeDasharray={[arc.len, C]}
+      animatedProps={animatedProps}
+      rotation={-90 + arc.from * 360}
+      origin={`${CENTER}, ${CENTER}`}
+      onPress={onPress}
+    />
+  );
+}
 
 const LegendRow = memo(function LegendRow({ slice: s, focused, dimmed, onPress }: { slice: AllocationSlice; focused: boolean; dimmed: boolean; onPress: (key: AllocationSlice['key']) => void }) {
   const { colors } = useTheme();

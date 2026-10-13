@@ -32,7 +32,7 @@ const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID ?? '0e6be082-0810-45d2-9036-d8
 const config: ExpoConfig = {
   name: v.label,
   slug: 'sipwise',
-  version: '0.1.0',
+  version: '0.2.0',
   scheme: `sipwise${v.suffix.replace('.', '-')}`,
   orientation: 'portrait',
   icon: './assets/icon.png',

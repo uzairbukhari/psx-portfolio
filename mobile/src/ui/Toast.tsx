@@ -3,6 +3,7 @@ import { AccessibilityInfo, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { makeStyles } from '@/theme/ThemeProvider';
 import { radii } from '@/theme/tokens';
+import { successHaptic } from './haptics';
 
 type ToastInput = { message: string; actionLabel?: string; onAction?: () => void | Promise<void>; durationMs?: number };
 type ToastState = ToastInput & { id: number };
@@ -20,6 +21,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const show = useCallback((t: ToastInput) => {
     setActing(false);
+    // Every save toast carries an Undo action, so an action is the signal for "your change went through".
+    if (t.onAction) successHaptic();
     setToast({ ...t, id: ++idRef.current });
     AccessibilityInfo.announceForAccessibility(t.actionLabel ? `${t.message}. ${t.actionLabel} available.` : t.message);
   }, []);

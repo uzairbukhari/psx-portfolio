@@ -8,6 +8,7 @@ import { usePortfolio } from '@/data/usePortfolio';
 import { useTheme } from '@/theme/ThemeProvider';
 import { ActivityRow } from '@/ui/ActivityRow';
 import { AppBar } from '@/ui/AppBar';
+import { refreshHaptic } from '@/ui/haptics';
 import { useFabScroll } from '@/ui/ScrollAwareFab';
 import { Button, Chip, ChipRow, EmptyState, Loading, Notice, SearchField, useKitStyles } from '@/ui/kit';
 
@@ -45,7 +46,7 @@ export default function Activity() {
         initialNumToRender={16}
         windowSize={7}
         contentContainerStyle={{ paddingBottom: 112 }}
-        refreshControl={<RefreshControl refreshing={p.isRefetching} onRefresh={() => void p.refetch()} tintColor={colors.primary} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={p.isRefetching} onRefresh={() => { refreshHaptic(); void p.refetch(); }} tintColor={colors.primary} colors={[colors.primary]} />}
         ListHeaderComponent={
           <View style={{ padding: 16, gap: 12 }}>
             <AppBar
