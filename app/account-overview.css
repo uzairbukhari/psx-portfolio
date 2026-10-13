@@ -315,13 +315,8 @@
   gap: 10px;
 }
 .overview-portfolios {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
-  gap: 12px;
-}
-/* An odd last portfolio spans the row so there is never an empty cell. */
-.overview-portfolios > li:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 button.overview-portfolio:not([data-slot]) {
   justify-content: normal;
@@ -969,16 +964,40 @@ tbody[data-open] .fund-row__chevron {
   }
 }
 
-/* The Portfolios card grows with its neighbour, so its cards share the height instead of leaving a gap. */
+/* One to four portfolios as compact rows: name and holdings on the left, value and gain on the right, the share bar underneath.
+   The card is only as tall as its rows, so a single portfolio never leaves stretched, empty cards. */
 .overview-panel[aria-label='Portfolios'] {
-  display: flex;
-  flex-direction: column;
+  align-self: start;
 }
-.overview-panel[aria-label='Portfolios'] .overview-portfolios {
-  flex: 1;
+button.overview-portfolio:not([data-slot]) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'top value'
+    'small gain'
+    'bar bar';
+  align-items: baseline;
+  column-gap: 16px;
+  row-gap: 2px;
+  padding: 12px 16px;
 }
-@container (max-width: 420px) {
-  .overview-portfolios {
-    grid-template-columns: 1fr;
-  }
+.overview-portfolio__top {
+  grid-area: top;
+  justify-content: flex-start;
+}
+.overview-portfolio__value {
+  grid-area: value;
+  justify-self: end;
+  font-size: 20px;
+}
+.overview-portfolio small {
+  grid-area: small;
+}
+.overview-portfolio__gain {
+  grid-area: gain;
+  justify-self: end;
+  font-size: 12.5px;
+}
+.overview-portfolio .bar {
+  grid-area: bar;
+  margin: 8px 0 0;
 }
