@@ -93,22 +93,27 @@ export default function Company() {
             {holding.shares === 0 ? <StatusChip tone="neutral" text="Sold out · history only" /> : null}
             <View style={styles.row}>
               <Stat label="Shares">
-                <Text style={styles.number}>{new Intl.NumberFormat('en-PK').format(holding.shares)}</Text>
+                <Text style={styles.number} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{new Intl.NumberFormat('en-PK').format(holding.shares)}</Text>
               </Stat>
               <Stat label="Average cost">
-                <Text style={styles.number}>{holding.average === null ? '—' : money(holding.average)}</Text>
+                <Text style={styles.number} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{holding.average === null ? '—' : money(holding.average)}</Text>
               </Stat>
               <Stat label="Cost">
-                <Text style={styles.number}>{holding.cost === null ? 'Not yet known' : moneyShort(holding.cost)}</Text>
+                <Text style={styles.number} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{holding.cost === null ? 'Not yet known' : moneyShort(holding.cost)}</Text>
               </Stat>
             </View>
             <View style={styles.divider} />
             <View style={styles.row}>
               <Stat label="Value">
-                <Text style={styles.number}>{holding.value === null ? '—' : moneyShort(holding.value)}</Text>
+                <Text style={styles.number} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{holding.value === null ? '—' : moneyShort(holding.value)}</Text>
               </Stat>
               <Stat label="Unrealised gain">
-                {holding.gain === null ? <Text style={styles.muted}>—</Text> : <Amount value={holding.gain} text={`${signedMoney(holding.gain)}${holding.cost ? ` (${signedPercent((holding.gain / holding.cost) * 100)})` : ''}`} label="Unrealised" />}
+                {holding.gain === null ? <Text style={styles.muted}>—</Text> : (
+                  <>
+                    <Amount value={holding.gain} label="Unrealised" />
+                    {holding.cost ? <Amount value={holding.gain} text={signedPercent((holding.gain / holding.cost) * 100)} label="Unrealised percent" arrow={false} size={13} weight="400" /> : null}
+                  </>
+                )}
               </Stat>
               <Stat label="Realised gain">
                 {holding.realized === null ? <Text style={styles.muted}>—</Text> : <Amount value={holding.realized} label="Realised" />}

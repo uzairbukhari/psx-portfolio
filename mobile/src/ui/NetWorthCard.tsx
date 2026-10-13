@@ -135,10 +135,10 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: s
   const { colors } = useTheme();
   return (
     <View style={{ flex: 1, gap: 2 }}>
-      <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 16, fontWeight: '600' }} numberOfLines={1}>
+      <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 16, fontWeight: '600' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
         {label}
       </Text>
-      <Text style={{ color: tone ?? colors.ink, ...type.number }} numberOfLines={1}>
+      <Text style={{ color: tone ?? colors.ink, ...type.number }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
         {value}
       </Text>
     </View>
@@ -274,12 +274,12 @@ const LegendRow = memo(function LegendRow({ slice: s, focused, dimmed, onPress }
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: colors.assets[s.key] }} />
-        <Text numberOfLines={1} style={{ color: colors.ink, ...type.caption, fontWeight: '600', flex: 1 }}>
+        <Text numberOfLines={2} style={{ color: colors.ink, ...type.caption, fontWeight: '600', flex: 1 }}>
           {s.label}
         </Text>
         <Text style={{ color: colors.muted, ...type.caption, fontVariant: ['tabular-nums'] }}>{s.share.toFixed(0)}%</Text>
       </View>
-      <Text numberOfLines={1} style={{ color: colors.ink, ...type.number, fontSize: 13, lineHeight: 18, marginLeft: 18 }}>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ color: colors.ink, ...type.number, fontSize: 13, lineHeight: 18, marginLeft: 18 }}>
         {moneyShort(s.value)}
       </Text>
     </Pressable>
