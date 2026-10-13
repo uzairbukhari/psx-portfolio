@@ -9,25 +9,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TabLoader } from './tab-loader';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceDot,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
+import { EChart } from './charts/echart';
+import { barOption, timeSeriesOption } from '@/lib/chart-kit';
 import {
   money,
   type Dividend,
@@ -78,14 +61,6 @@ const RANGES: [HistoryRange, string][] = [
   ['5y', '5Y'],
 ];
 
-const priceConfig = { price: { label: 'Price', color: 'var(--primary)' } } satisfies ChartConfig;
-const divConfig = {
-  net: { label: 'Received', color: 'var(--success)' },
-} satisfies ChartConfig;
-const cumConfig = {
-  total: { label: 'Cumulative', color: 'var(--primary)' },
-} satisfies ChartConfig;
-
 const tradeSeconds = (date: string) =>
   Math.round(Date.parse(`${date}T12:00:00+05:00`) / 1000);
 const tone = (n: number | null) =>
@@ -103,7 +78,10 @@ function tickLabel(seconds: number, range: HistoryRange) {
     : d.toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'short',
-        year: range === '1y' || range === '3y' || range === '5y' ? '2-digit' : undefined,
+        year:
+          range === '1y' || range === '3y' || range === '5y'
+            ? '2-digit'
+            : undefined,
         timeZone: 'Asia/Karachi',
       });
 }
@@ -122,7 +100,11 @@ function PriceChart({
   // Keyed by request, so switching company (or retrying) never shows the previous
   // company's history or error while the next load runs.
   const requestKey = `${ticker}#${attempt}`;
-  const [loaded, setLoaded] = useState<{ key: string; history?: History; error?: string } | null>(null);
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    history?: History;
+    error?: string;
+  } | null>(null);
   const current = loaded?.key === requestKey ? loaded : null;
   const history = current?.history ?? null;
   const error = current?.error ?? '';
@@ -132,11 +114,19 @@ function PriceChart({
       .then(async (r) => {
         const d = (await readJson(r)) as History & { error?: string };
         if (!r.ok) throw Error(d.error ?? 'Could not load price history.');
-        if (live) setLoaded({ key: requestKey, history: { eod: d.eod, intraday: d.intraday } });
+        if (live)
+          setLoaded({
+            key: requestKey,
+            history: { eod: d.eod, intraday: d.intraday },
+          });
       })
       .catch((e: unknown) => {
         if (live)
-          setLoaded({ key: requestKey, error: e instanceof Error ? e.message : 'Could not load price history.' });
+          setLoaded({
+            key: requestKey,
+            error:
+              e instanceof Error ? e.message : 'Could not load price history.',
+          });
       });
     return () => {
       live = false;
@@ -149,8 +139,6 @@ function PriceChart({
   );
   const change = rangeChange(points);
   const up = (change?.change ?? 0) >= 0;
-  const color = up ? 'var(--success)' : 'var(--danger)';
-  const data = points.map(([t, price]) => ({ t, price }));
   const lo = points.length ? Math.min(...points.map((p) => p[1])) : 0;
   const hi = points.length ? Math.max(...points.map((p) => p[1])) : 0;
   const pad = (hi - lo) * 0.08 || hi * 0.02;
@@ -172,7 +160,8 @@ function PriceChart({
           {change && (
             <small className={up ? 'pos-text' : 'neg-text'}>
               {up ? '+' : ''}
-              {money(Math.round(change.change * 100) / 100)} ({pct(change.percent)}) over{' '}
+              {money(Math.round(change.change * 100) / 100)} (
+              {pct(change.percent)}) over{' '}
               {RANGES.find(([v]) => v === range)![1]}
             </small>
           )}
@@ -193,7 +182,11 @@ function PriceChart({
       {error ? (
         <p className="muted">
           Price history unavailable: {error}{' '}
-          <button type="button" className="link-button" onClick={() => setAttempt((n) => n + 1)}>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => setAttempt((n) => n + 1)}
+          >
             Retry
           </button>
         </p>
@@ -206,76 +199,38 @@ function PriceChart({
             : 'Price history has not been collected for this company yet. The scheduled PSX history job fills it in.'}
         </p>
       ) : (
-        <ChartContainer config={priceConfig} className="company-chart">
-          <AreaChart data={data} margin={{ top: 10, right: 12, bottom: 4, left: 8 }}>
-            <defs>
-              <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                <stop offset="100%" stopColor={color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="t"
-              type="number"
-              scale="time"
-              domain={['dataMin', 'dataMax']}
-              tickLine={false}
-              axisLine={false}
-              minTickGap={40}
-              tickFormatter={(v: number) => tickLabel(v, range)}
-            />
-            <YAxis
-              domain={[lo - pad, hi + pad]}
-              width={56}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v: number) => v.toFixed(0)}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  labelFormatter={(_, payload) =>
-                    tickLabel(Number(payload?.[0]?.payload?.t ?? 0), range)
-                  }
-                  formatter={(value) => money(Number(value))}
-                />
-              }
-            />
-            {holding?.average != null && holding.average >= lo - pad && holding.average <= hi + pad && (
-              <ReferenceLine
-                y={holding.average}
-                stroke="var(--muted-foreground)"
-                strokeDasharray="4 4"
-                label={{ value: 'Avg. cost', position: 'insideTopLeft', fontSize: 11, fill: 'var(--muted-foreground)' }}
-              />
-            )}
-            <Area
-              dataKey="price"
-              type="monotone"
-              stroke={color}
-              strokeWidth={2}
-              fill="url(#priceFill)"
-              dot={false}
-              isAnimationActive={false}
-            />
-            {markers.map(({ t, x }) => (
-              <ReferenceDot
-                key={t.id}
-                x={x}
-                y={t.price!}
-                r={5}
-                fill={t.kind === 'sell' ? 'var(--danger)' : 'var(--success)'}
-                stroke="var(--background)"
-                ifOverflow="hidden"
-              />
-            ))}
-          </AreaChart>
-        </ChartContainer>
+        <EChart
+          className="company-chart"
+          label={`${ticker} price, ${RANGES.find(([v]) => v === range)![1]}. ${points.length} points, latest ${money(points[points.length - 1][1])}.`}
+          build={(t) =>
+            timeSeriesOption(t, {
+              name: 'Price',
+              data: points.map(([sec, price]) => ({ x: sec * 1000, y: price })),
+              area: true,
+              color: up ? t.success : t.danger,
+              valueFormat: (n) => money(n),
+              axisFormat: (v) => v.toFixed(0),
+              dateLabel: (x) => tickLabel(Number(x) / 1000, range),
+              refLines:
+                holding?.average != null &&
+                holding.average >= lo - pad &&
+                holding.average <= hi + pad
+                  ? [{ y: holding.average, label: 'Avg. cost' }]
+                  : undefined,
+              markers: markers.map(({ t: tr, x }) => ({
+                x: x * 1000,
+                y: tr.price!,
+                color: tr.kind === 'sell' ? t.danger : t.success,
+                label: `${tr.kind === 'sell' ? 'Sold' : 'Bought'} ${tr.shares} at ${money(tr.price!)} · ${tr.date}`,
+              })),
+            })
+          }
+        />
       )}
       {markers.length > 0 && (
         <p className="report-source">
-          Green dots: your purchases · red dots: your sales · dashed line: average cost
+          Green dots: your purchases · red dots: your sales · dashed line:
+          average cost
         </p>
       )}
     </section>
@@ -283,7 +238,8 @@ function PriceChart({
 }
 
 /** History depth when the app loaded; anything above it was pushed by in-app navigation. */
-const ENTRY_HISTORY_LENGTH = typeof window === 'undefined' ? 0 : window.history.length;
+const ENTRY_HISTORY_LENGTH =
+  typeof window === 'undefined' ? 0 : window.history.length;
 
 export default function CompanyDetail({
   portfolio,
@@ -323,8 +279,12 @@ export default function CompanyDetail({
   onConfirmDividend: (d: Dividend) => void;
 }) {
   const trades = portfolio.trades.filter((t) => t.ticker === ticker);
-  const dividends = (portfolio.dividends ?? []).filter((d) => d.ticker === ticker);
-  const splits = (portfolio.stockSplits ?? []).filter((s) => s.ticker === ticker);
+  const dividends = (portfolio.dividends ?? []).filter(
+    (d) => d.ticker === ticker,
+  );
+  const splits = (portfolio.stockSplits ?? []).filter(
+    (s) => s.ticker === ticker,
+  );
   const entries = buildEntries({
     trades,
     dividends,
@@ -344,13 +304,19 @@ export default function CompanyDetail({
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((d) => {
       const t = byId.get(d.id);
-      return { d, gross: t?.grossAmount ?? 0, net: t?.netAmount ?? t?.grossAmount ?? 0 };
+      return {
+        d,
+        gross: t?.grossAmount ?? 0,
+        net: t?.netAmount ?? t?.grossAmount ?? 0,
+      };
     });
   const cumulative = received.map((r, i) => ({
     date: r.d.date,
     net: Math.round(r.net * 100) / 100,
     total:
-      Math.round(received.slice(0, i + 1).reduce((a, x) => a + x.net, 0) * 100) / 100,
+      Math.round(
+        received.slice(0, i + 1).reduce((a, x) => a + x.net, 0) * 100,
+      ) / 100,
   }));
   const known = holding !== undefined;
   // Only step back through history the app itself added; a direct link falls back to Holdings.
@@ -362,7 +328,12 @@ export default function CompanyDetail({
 
   return (
     <div className="company-page">
-      <button type="button" data-slot="link" className="back-link company-back" onClick={goBack}>
+      <button
+        type="button"
+        data-slot="link"
+        className="back-link company-back"
+        onClick={goBack}
+      >
         <ArrowLeft size={15} /> Back
       </button>
       <div className="company-head">
@@ -386,7 +357,10 @@ export default function CompanyDetail({
             <Plus size={16} /> Add transaction
           </button>
           <DropdownMenu>
-            <DropdownMenuTrigger className="secondary company-more" aria-label="More actions">
+            <DropdownMenuTrigger
+              className="secondary company-more"
+              aria-label="More actions"
+            >
               <MoreHorizontal size={18} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -406,7 +380,10 @@ export default function CompanyDetail({
               <DropdownMenuItem disabled={busy || !known} onClick={onEdit}>
                 Edit company
               </DropdownMenuItem>
-              <DropdownMenuItem disabled={busy || !known} onClick={onChangeTicker}>
+              <DropdownMenuItem
+                disabled={busy || !known}
+                onClick={onChangeTicker}
+              >
                 Change symbol
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -425,7 +402,9 @@ export default function CompanyDetail({
         <article>
           <span>Market value</span>
           <strong>{summary.value === null ? '—' : money(summary.value)}</strong>
-          <small>Cost {summary.cost === null ? '—' : money(summary.cost)}</small>
+          <small>
+            Cost {summary.cost === null ? '—' : money(summary.cost)}
+          </small>
         </article>
         <article>
           <span>Profit / loss</span>
@@ -433,28 +412,46 @@ export default function CompanyDetail({
             {summary.gain === null ? '—' : money(summary.gain)}
           </strong>
           <small className={tone(summary.gainPercent)}>
-            {summary.gainPercent === null ? 'Needs cost and price' : pct(summary.gainPercent)}
+            {summary.gainPercent === null
+              ? 'Needs cost and price'
+              : pct(summary.gainPercent)}
           </small>
         </article>
         <article>
           <span>Dividends earned</span>
           <strong>
-            {money(summary.dividendNet === null ? summary.dividendGross : summary.dividendNet)}
+            {money(
+              summary.dividendNet === null
+                ? summary.dividendGross
+                : summary.dividendNet,
+            )}
           </strong>
           <small>
-            {summary.dividendNet === null ? 'Gross · set filer status for net' : 'Net of tax'}
+            {summary.dividendNet === null
+              ? 'Gross · set filer status for net'
+              : 'Net of tax'}
           </small>
         </article>
       </div>
 
-      <PriceChart key={ticker} ticker={ticker} holding={holding} trades={trades} />
+      <PriceChart
+        key={ticker}
+        ticker={ticker}
+        holding={holding}
+        trades={trades}
+      />
 
       <section className="company-section">
         <h2>Activity</h2>
         {entries.length === 0 ? (
           <p className="muted">No transactions recorded for {ticker} yet.</p>
         ) : (
-          <LedgerTimeline portfolio={portfolio} entries={entries} ticker={ticker} hideKpis />
+          <LedgerTimeline
+            portfolio={portfolio}
+            entries={entries}
+            ticker={ticker}
+            hideKpis
+          />
         )}
       </section>
 
@@ -462,7 +459,8 @@ export default function CompanyDetail({
         <section className="company-section">
           <h2>Expected dividends</h2>
           <p className="muted">
-            Announced by PSX but not confirmed as paid. They are not counted as income until you mark them received.
+            Announced by PSX but not confirmed as paid. They are not counted as
+            income until you mark them received.
           </p>
           <div className="dividend-grid">
             {expectedDividends.map((d) => {
@@ -473,14 +471,26 @@ export default function CompanyDetail({
                     Book closure {d.date}
                     {d.financialYear ? ` · FY ${d.financialYear}` : ''}
                   </span>
-                  <strong>{money(Math.round((t?.netAmount ?? t?.grossAmount ?? 0) * 100) / 100)}</strong>
+                  <strong>
+                    {money(
+                      Math.round((t?.netAmount ?? t?.grossAmount ?? 0) * 100) /
+                        100,
+                    )}
+                  </strong>
                   <small>
-                    {d.perShare === undefined ? '' : `${money(d.perShare)}/sh · `}
-                    {money(Math.round((t?.grossAmount ?? 0) * 100) / 100)} gross · estimated tax · entitled on{' '}
+                    {d.perShare === undefined
+                      ? ''
+                      : `${money(d.perShare)}/sh · `}
+                    {money(Math.round((t?.grossAmount ?? 0) * 100) / 100)} gross
+                    · estimated tax · entitled on{' '}
                     {d.entitlementDate ?? 'unknown date'}
                     {d.entitlementCertain === false ? ' (unconfirmed)' : ''}
                   </small>
-                  <button type="button" className="secondary compact card-action" onClick={() => onConfirmDividend(d)}>
+                  <button
+                    type="button"
+                    className="secondary compact card-action"
+                    onClick={() => onConfirmDividend(d)}
+                  >
                     Mark received
                   </button>
                 </div>
@@ -504,9 +514,15 @@ export default function CompanyDetail({
                   </span>
                   <strong>{money(Math.round(net * 100) / 100)}</strong>
                   <small>
-                    {d.perShare === undefined ? '' : `${money(d.perShare)}/sh · `}
+                    {d.perShare === undefined
+                      ? ''
+                      : `${money(d.perShare)}/sh · `}
                     {money(Math.round(gross * 100) / 100)} gross ·{' '}
-                    {d.source === 'import' ? 'CDC import' : d.source === 'auto' ? 'PSX auto' : 'Manual'}
+                    {d.source === 'import'
+                      ? 'CDC import'
+                      : d.source === 'auto'
+                        ? 'PSX auto'
+                        : 'Manual'}
                   </small>
                 </div>
               ))}
@@ -514,27 +530,42 @@ export default function CompanyDetail({
             <div className="dividend-charts">
               <div className="panel">
                 <h3>Per payment</h3>
-                <ChartContainer config={divConfig} className="company-chart">
-                  <BarChart data={cumulative} margin={{ top: 10, right: 8, bottom: 4, left: 8 }}>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={24} />
-                    <YAxis width={56} tickLine={false} axisLine={false} />
-                    <ChartTooltip content={<ChartTooltipContent formatter={(v) => money(Number(v))} />} />
-                    <Bar dataKey="net" fill="var(--color-net)" radius={4} />
-                  </BarChart>
-                </ChartContainer>
+                <EChart
+                  className="company-chart"
+                  label={`Dividends received per payment, ${cumulative.length} payments.`}
+                  build={(t) =>
+                    barOption(t, {
+                      cats: cumulative.map((d) => d.date),
+                      series: [
+                        {
+                          name: 'Received',
+                          data: cumulative.map((d) => d.net),
+                          color: t.success,
+                        },
+                      ],
+                      valueFormat: (n) => money(n),
+                    })
+                  }
+                />
               </div>
               <div className="panel">
                 <h3>Cumulative</h3>
-                <ChartContainer config={cumConfig} className="company-chart">
-                  <LineChart data={cumulative} margin={{ top: 10, right: 8, bottom: 4, left: 8 }}>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={24} />
-                    <YAxis width={56} tickLine={false} axisLine={false} />
-                    <ChartTooltip content={<ChartTooltipContent formatter={(v) => money(Number(v))} />} />
-                    <Line dataKey="total" type="stepAfter" stroke="var(--color-total)" strokeWidth={2} dot />
-                  </LineChart>
-                </ChartContainer>
+                <EChart
+                  className="company-chart"
+                  label={`Cumulative dividends received, ${cumulative.length} payments.`}
+                  build={(t) =>
+                    timeSeriesOption(t, {
+                      name: 'Cumulative',
+                      data: cumulative.map((d) => ({ x: d.date, y: d.total })),
+                      categorical: true,
+                      step: true,
+                      zoom: false,
+                      includeZero: true,
+                      valueFormat: (n) => money(n),
+                      dateLabel: (x) => String(x),
+                    })
+                  }
+                />
               </div>
             </div>
           </>

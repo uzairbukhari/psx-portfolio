@@ -1,8 +1,15 @@
 'use client';
 
-import { createContext, useContext, type MouseEvent, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 
-const CompanyNavContext = createContext<((ticker: string) => void) | null>(null);
+const CompanyNavContext = createContext<((ticker: string) => void) | null>(
+  null,
+);
 
 export const CompanyNavProvider = CompanyNavContext.Provider;
 
@@ -19,7 +26,14 @@ export function TickerLink({
   const open = useContext(CompanyNavContext);
   function onClick(event: MouseEvent<HTMLAnchorElement>) {
     event.stopPropagation();
-    if (!open || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    if (
+      !open ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.button !== 0
+    )
+      return;
     event.preventDefault();
     open(ticker);
   }
@@ -32,4 +46,13 @@ export function TickerLink({
       {children ?? ticker}
     </a>
   );
+}
+
+/** Opens a company page from code (a chart click), the same way a TickerLink does. */
+export function useOpenCompany() {
+  const open = useContext(CompanyNavContext);
+  return (ticker: string) => {
+    if (open) open(ticker);
+    else window.location.assign(`/company/${encodeURIComponent(ticker)}`);
+  };
 }

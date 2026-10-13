@@ -543,3 +543,6 @@ html[data-app-env=staging] .app-header .brand::after{content:'STAGING';margin-le
 /* Cross-fade between pages (see withViewTransition in app-nav.tsx). */
 ::view-transition-old(root),::view-transition-new(root){animation-duration:160ms;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
 @media(prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}}
+
+/* ECharts container: a floor so a chart is never collapsed; classes and inline heights win (zero specificity). */
+:where(.echart){min-height:200px;position:relative}

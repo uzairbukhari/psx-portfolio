@@ -3,12 +3,8 @@
 import { ownedKey } from './asset-keys';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
-import { Line, LineChart, XAxis, YAxis } from 'recharts';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
+import { EChart } from './charts/echart';
+import { timeSeriesOption } from '@/lib/chart-kit';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -336,48 +332,21 @@ export default function SavingsPlansSection({
                 </small>
               </div>
             </div>
-            <ChartContainer
-              config={{ value: { label: 'Value', color: 'var(--primary)' } }}
+            <EChart
               className="company-chart"
-            >
-              <LineChart
-                data={points}
-                margin={{ top: 10, right: 12, bottom: 4, left: 8 }}
-              >
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  minTickGap={40}
-                  fontSize={11}
-                  tickFormatter={(d: string) => dateText(d)}
-                />
-                <YAxis
-                  domain={['auto', 'auto']}
-                  width={64}
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={11}
-                  tickFormatter={(n: number) => moneyShort(n)}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      labelFormatter={(d) => dateText(String(d))}
-                      formatter={(value) => <b>{money(Number(value))}</b>}
-                    />
-                  }
-                />
-                <Line
-                  dataKey="value"
-                  type="monotone"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  dot
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ChartContainer>
+              label={`Plan value over time, ${points.length} statements. Latest ${money(points[points.length - 1].value)}.`}
+              build={(t) =>
+                timeSeriesOption(t, {
+                  name: 'Value',
+                  data: points.map((d) => ({ x: d.date, y: d.value })),
+                  area: true,
+                  categorical: points.length < 12,
+                  valueFormat: money,
+                  axisFormat: (n) => moneyShort(n),
+                  dateLabel: (x) => dateText(String(x)),
+                })
+              }
+            />
           </section>
         )}
         {asset.subFund && !planNavs.some((n) => n.fundId === asset.subFund) && (

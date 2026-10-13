@@ -2,7 +2,8 @@
 
 import { ownedKey } from './asset-keys';
 import { useEffect, useMemo, useState } from 'react';
-import { Line, LineChart, XAxis, YAxis } from 'recharts';
+import { EChart } from './charts/echart';
+import { timeSeriesOption } from '@/lib/chart-kit';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
 import {
   DropdownMenu,
@@ -10,11 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
 import {
   Dialog,
   DialogContent,
@@ -677,9 +673,6 @@ function FundHistory({
     .sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))
     .map(([date, nav]) => ({ date, nav }));
   const sparse = history.navs.length < 2;
-  const lo = data.length ? Math.min(...data.map((d) => d.nav)) : 0;
-  const hi = data.length ? Math.max(...data.map((d) => d.nav)) : 0;
-  const pad = (hi - lo) * 0.08 || hi * 0.02;
   return (
     <>
       <section className="panel">
@@ -694,50 +687,21 @@ function FundHistory({
           </div>
         </div>
         {data.length > 1 ? (
-          <ChartContainer
-            config={{
-              nav: { label: 'Price per unit', color: 'var(--primary)' },
-            }}
+          <EChart
             className="company-chart"
-          >
-            <LineChart
-              data={data}
-              margin={{ top: 10, right: 12, bottom: 4, left: 8 }}
-            >
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-                minTickGap={40}
-                fontSize={11}
-                tickFormatter={(d: string) => dateText(d)}
-              />
-              <YAxis
-                domain={[lo - pad, hi + pad]}
-                width={56}
-                tickLine={false}
-                axisLine={false}
-                fontSize={11}
-                tickFormatter={(n: number) => n.toFixed(2)}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(d) => dateText(String(d))}
-                    formatter={(value) => <b>{Number(value).toFixed(4)}</b>}
-                  />
-                }
-              />
-              <Line
-                dataKey="nav"
-                type="monotone"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                dot={data.length < 12}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ChartContainer>
+            label={`Fund price per unit, ${data.length} prices. Latest ${data[data.length - 1].nav.toFixed(2)}.`}
+            build={(t) =>
+              timeSeriesOption(t, {
+                name: 'Price per unit',
+                data: data.map((d) => ({ x: d.date, y: d.nav })),
+                area: true,
+                categorical: data.length < 12,
+                valueFormat: (n) => n.toFixed(4),
+                axisFormat: (n) => n.toFixed(2),
+                dateLabel: (x) => dateText(String(x)),
+              })
+            }
+          />
         ) : (
           <p className="muted">
             {history.error ||
