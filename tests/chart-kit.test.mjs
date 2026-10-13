@@ -190,3 +190,100 @@ test('donut keeps one slice per entry and shows the total in the middle', () => 
     /60\.0%/,
   );
 });
+
+test('time series drops reference lines and markers without a finite value', async () => {
+  const { timeSeriesOption } = await import('../lib/chart-kit.ts');
+  const t = (await import('../lib/chart-kit.ts')).FALLBACK_TOKENS;
+  const o = timeSeriesOption(t, {
+    name: 'x',
+    data: [
+      { x: '2026-01-01', y: 1 },
+      { x: '2026-01-02', y: 2 },
+    ],
+    valueFormat: String,
+    axisFormat: String,
+    dateLabel: String,
+    refLines: [{ y: undefined }, { y: NaN }, { y: 3 }],
+    markers: [
+      { x: 1, y: NaN, color: 'x', label: 'a' },
+      { x: 2, y: 2, color: 'x', label: 'b' },
+    ],
+  });
+  const s = o.series[0];
+  assert.equal(s.markLine.data.length, 1);
+  assert.equal(s.markPoint.data.length, 1);
+});
+
+// Draws every builder with ECharts itself (server-side SVG): a bad option throws here instead of in a user's browser.
+test('every builder draws without throwing, including a series that crosses zero', async () => {
+  const echarts = await import('echarts');
+  const k = await import('../lib/chart-kit.ts');
+  const t = k.FALLBACK_TOKENS;
+  const days = (ys) =>
+    ys.map((y, i) => ({ x: `2026-01-${String(i + 1).padStart(2, '0')}`, y }));
+  const common = { valueFormat: String, axisFormat: String, dateLabel: String };
+  const options = {
+    split: k.timeSeriesOption(t, {
+      name: 'g',
+      data: days([-5, -2, 1, 3, 6, 2, -1, 4]),
+      area: true,
+      split: true,
+      includeZero: true,
+      refLines: [{ y: 0 }],
+      ...common,
+    }),
+    allPositiveSplit: k.timeSeriesOption(t, {
+      name: 'g',
+      data: days([1, 2, 3]),
+      area: true,
+      split: true,
+      ...common,
+    }),
+    markers: k.timeSeriesOption(t, {
+      name: 'p',
+      data: days([1, 2, 3, 4]),
+      area: true,
+      markers: [{ x: '2026-01-02', y: 2, color: 'x', label: 'b' }],
+      refLines: [{ y: 2 }],
+      ...common,
+    }),
+    categorical: k.timeSeriesOption(t, {
+      name: 'c',
+      data: days([1]),
+      categorical: true,
+      step: true,
+      ...common,
+    }),
+    bars: k.barOption(t, {
+      cats: ['a', 'b'],
+      series: [{ name: 's', data: [1, null], color: t.primary }],
+    }),
+    hbar: k.hBarOption(t, {
+      cats: ['a', 'b'],
+      values: [-3, 4],
+      diverging: true,
+      valueFormat: String,
+      name: 'h',
+    }),
+    donut: k.donutOption(t, {
+      slices: [
+        { name: 'a', value: 1, color: t.primary },
+        { name: 'b', value: 2, color: t.success },
+      ],
+      valueFormat: String,
+    }),
+  };
+  for (const [name, option] of Object.entries(options)) {
+    const chart = echarts.init(null, null, {
+      renderer: 'svg',
+      ssr: true,
+      width: 600,
+      height: 300,
+    });
+    assert.doesNotThrow(() => {
+      chart.setOption({ ...option, animation: false }, { notMerge: true });
+      chart.renderToSVGString();
+    }, name);
+    chart.dispose();
+  }
+});

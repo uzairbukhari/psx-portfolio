@@ -252,14 +252,33 @@ export function timeSeriesOption(
   t: ChartTokens,
   c: TimeSeriesCfg,
 ): EChartsOption {
-  const main = c.color ?? t.primary;
+  // The green/red split only works when the data crosses zero: ECharts builds no gradient stops
+  // otherwise and throws, so a one-sided series is simply drawn in its own colour.
+  const crosses = c.data.some((d) => d.y > 0) && c.data.some((d) => d.y <= 0);
+  const oneSided = c.split && !crosses && c.data.length > 0;
+  const main = oneSided
+    ? c.data[0].y > 0
+      ? t.success
+      : t.danger
+    : (c.color ?? t.primary);
   const o = base(t, { top: 16, right: 12 });
   const long =
     c.data.length > 1 &&
     Math.abs(ms(c.data[c.data.length - 1].x) - ms(c.data[0].x)) >
       300 * 86_400_000;
   const numeric = typeof c.data[0]?.x === 'number';
-  const markLine = c.refLines?.length
+  // ECharts throws while rendering a marker whose coordinate is missing or NaN, so only finite ones go in.
+  const refLines = (c.refLines ?? []).filter((l) => Number.isFinite(l.y));
+  const markers = (c.markers ?? []).filter(
+    (m) => Number.isFinite(ms(m.x)) && Number.isFinite(m.y),
+  );
+  const areaRgb =
+    main === t.success
+      ? t.rgb.success
+      : main === t.danger
+        ? t.rgb.danger
+        : t.rgb.primary;
+  const markLine = refLines.length
     ? {
         silent: true,
         symbol: 'none',
@@ -270,7 +289,7 @@ export function timeSeriesOption(
           fontSize: 10,
           position: 'insideEndTop' as const,
         },
-        data: c.refLines.map((l) => ({
+        data: refLines.map((l) => ({
           yAxis: l.y,
           lineStyle: {
             color: l.color ?? t.muted,
@@ -296,7 +315,7 @@ export function timeSeriesOption(
     itemStyle: { color: main },
     emphasis: { focus: 'none' as const },
     areaStyle: c.area
-      ? c.split
+      ? c.split && crosses
         ? { opacity: 0.16, origin: 0 as unknown as 'auto' }
         : {
             color: {
@@ -308,29 +327,23 @@ export function timeSeriesOption(
               colorStops: [
                 {
                   offset: 0,
-                  color: rgba(
-                    c.color === t.success ? t.rgb.success : t.rgb.primary,
-                    0.28,
-                  ),
+                  color: rgba(areaRgb, 0.28),
                 },
                 {
                   offset: 1,
-                  color: rgba(
-                    c.color === t.success ? t.rgb.success : t.rgb.primary,
-                    0.02,
-                  ),
+                  color: rgba(areaRgb, 0.02),
                 },
               ],
             },
           }
       : undefined,
     markLine,
-    markPoint: c.markers?.length
+    markPoint: markers.length
       ? {
           symbol: 'circle',
           symbolSize: 9,
           animation: false,
-          data: c.markers.map((m) => ({
+          data: markers.map((m) => ({
             coord: [m.x, m.y],
             name: m.label,
             itemStyle: {
@@ -448,16 +461,18 @@ export function timeSeriesOption(
     }),
     dataZoom: zoom,
     visualMap:
-      c.split && c.data.length
+      c.split && crosses
         ? [
             {
               show: false,
               type: 'piecewise',
               dimension: 1,
               seriesIndex: 0,
+              // Finite bounds on purpose: open-ended pieces (gt/lte) leave ECharts with no gradient
+              // stops and it throws while drawing the line.
               pieces: [
-                { gt: 0, color: t.success },
-                { lte: 0, color: t.danger },
+                { min: 0, max: 1e15, color: t.success },
+                { min: -1e15, max: 0, color: t.danger },
               ],
               outOfRange: { color: t.danger },
             },

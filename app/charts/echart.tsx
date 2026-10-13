@@ -128,8 +128,13 @@ export function EChart({
     pick.current = onPick;
   });
   useEffect(() => {
-    if (ready && chart.current)
+    if (!ready || !chart.current) return;
+    // A malformed option must never take the page down; the chart just stays blank.
+    try {
       chart.current.setOption(latest.current.option, { notMerge: true });
+    } catch {
+      chart.current.clear();
+    }
   }, [ready, sig]);
 
   return (
