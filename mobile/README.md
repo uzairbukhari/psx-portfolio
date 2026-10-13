@@ -40,6 +40,8 @@ The Worker needs `GOOGLE_MOBILE_CLIENT_IDS` (wrangler var) = the web + iOS (+ An
 
 `eas build --profile staging --platform android` gives an APK install link; `--platform ios` gives an ad hoc build (devices registered once with `eas device:create`; needs an Apple Developer membership). JS-only changes can ship with `eas update --channel staging`.
 
+Before every native build, run `npx expo install --check` (or `npx expo-doctor`) in `mobile/` and take its patch updates first (`npx expo install --fix`), so the one build you spend already has the SDK's current patch versions. It needs network access to the Expo API, so it cannot run in the agent sandbox.
+
 To start the Android staging build without a local machine, run the **Mobile build (Android)** workflow from the Actions tab (pick `production` or `staging`, type `spend-one-build` to confirm). It uses the same `EXPO_TOKEN` secret as the OTA workflow, checks types and tests first, then queues one build and prints the link; the APK install link is on expo.dev when it finishes. It spends one of the 15 free builds, so use it only for native changes.
 
 ## Over-the-air updates
