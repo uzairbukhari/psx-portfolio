@@ -271,6 +271,7 @@ export default function PortfolioValueCard({
                 build={(t) =>
                   timeSeriesOption(t, {
                     name: 'Gain / loss',
+                    zoom: false,
                     data: data.map((d) => ({ x: d.date, y: d.gain })),
                     area: true,
                     split: true,

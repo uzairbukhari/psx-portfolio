@@ -967,7 +967,12 @@ tbody[data-open] .fund-row__chevron {
 /* One to four portfolios as compact rows: name and holdings on the left, value and gain on the right, the share bar underneath.
    The card is only as tall as its rows, so a single portfolio never leaves stretched, empty cards. */
 .overview-panel[aria-label='Portfolios'] {
-  align-self: start;
+  display: flex;
+  flex-direction: column;
+}
+.overview-panel[aria-label='Portfolios'] .overview-portfolios {
+  flex: 1;
+  align-content: start;
 }
 button.overview-portfolio:not([data-slot]) {
   grid-template-columns: minmax(0, 1fr) auto;
