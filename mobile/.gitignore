@@ -10,3 +10,4 @@ expo-env.d.ts
 
 # Firebase client config (holds an API key); EAS supplies it via the GOOGLE_SERVICES_JSON file env var
 google-services*.json
+!/modules/*/android/

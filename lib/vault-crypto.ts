@@ -105,6 +105,11 @@ export type CryptoAdapter = {
   randomBytes(length: number): Uint8Array;
   aesGcmEncrypt(key: Uint8Array, nonce: Uint8Array, aad: Uint8Array, plaintext: Uint8Array): Promise<Uint8Array>;
   aesGcmDecrypt(key: Uint8Array, nonce: Uint8Array, aad: Uint8Array, ciphertext: Uint8Array): Promise<Uint8Array>;
+  /**
+   * Optional native Argon2id (the phone). It must return exactly what @noble's argon2id returns for the same input
+   * (plain Argon2id v0x13, no secret or associated data). When it is missing or throws, passwordKey uses @noble.
+   */
+  argon2id?(password: Uint8Array, salt: Uint8Array, cost: { m: number; t: number; p: number; dkLen: number }): Promise<Uint8Array>;
 };
 
 /** AES-GCM in pure JS (@noble/ciphers). Used where WebCrypto is missing (Hermes) and by interoperability tests. */
@@ -288,7 +293,18 @@ export function onKdfProgress(listener: (fraction: number) => void): () => void 
 
 async function passwordKey(password: string, kdf: PasswordKdf, salt: Uint8Array): Promise<Uint8Array> {
   assertKdfAllowed(kdf);
-  const raw = await argon2idAsync(utf8(normalizePassword(password)), salt, {
+  const pw = utf8(normalizePassword(password));
+  const native = rt().argon2id;
+  let raw: Uint8Array | null = null;
+  if (native) {
+    try {
+      const out = await native(pw, salt, { m: kdf.m, t: kdf.t, p: kdf.p, dkLen: KEY_BYTES });
+      if (out instanceof Uint8Array && out.length === KEY_BYTES) raw = out;
+    } catch {
+      // Native code unavailable or out of memory: derive the same key in JS below.
+    }
+  }
+  raw ??= await argon2idAsync(pw, salt, {
     m: kdf.m,
     t: kdf.t,
     p: kdf.p,

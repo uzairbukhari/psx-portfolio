@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMobileAdapter, installMobileCrypto, resetMobileCrypto, NEEDS_NEW_BUILD } from './crypto-setup.ts';
+import { createMobileAdapter, installMobileCrypto, nativeKdfFrom, resetMobileCrypto, usesNativeKdf, NEEDS_NEW_BUILD } from './crypto-setup.ts';
 import { isLegacyPlaintextCacheName, vaultCacheName } from './cache-name.ts';
 import { assertSecureApiUrl } from './https.ts';
 import { mobilePublicData, mobileVaultTransport } from './transport.ts';
@@ -145,4 +145,39 @@ test('biometric key: a cancelled prompt or a failing store yields null, a wrong-
   const broken = { ...store, setSecret: async () => { throw new Error('keystore unavailable'); } };
   assert.equal(await saveBiometricKey(broken, 'me@example.com', 'v', nodeRandom(32)), false);
   assert.equal(items.size, 0, 'a failed save leaves no marker behind');
+});
+
+// Produced by the Kotlin module's code (Bouncy Castle Argon2BytesGenerator, compiled and run on a JVM) and by @noble
+// for the same input: password "password123", salt "somesaltsomesalt", m=65536 KiB, t=3, p=1, 32 bytes.
+const ARGON2_VECTOR = 'e105bdf0f06b3138c7241a99429bfec99c5ff06931f8dff6546b2d841b95070b';
+const enc = (s: string) => new TextEncoder().encode(s);
+
+test('the native Argon2 wrapper speaks hex and rejects malformed output', async () => {
+  const seen: unknown[] = [];
+  const kdf = nativeKdfFrom({ argon2id: async (...a) => (seen.push(a), ARGON2_VECTOR) });
+  const out = await kdf(enc('password123'), enc('somesaltsomesalt'), { m: 65536, t: 3, p: 1, dkLen: 32 });
+  assert.equal(Buffer.from(out).toString('hex'), ARGON2_VECTOR);
+  assert.deepEqual(seen[0], ['70617373776f7264313233', '736f6d6573616c74736f6d6573616c74', 65536, 3, 1, 32]);
+  const bad = nativeKdfFrom({ argon2id: async () => 'zz' });
+  await assert.rejects(bad(enc('a'), enc('b'), { m: 8, t: 1, p: 1, dkLen: 32 }), /malformed/);
+});
+
+test('a vault key derived by a (stand-in) native Argon2 equals the pure-JS key, and a failing native call falls back to JS', async () => {
+  const { argon2idAsync } = await import('@noble/hashes/argon2.js');
+  const viaNoble: NonNullable<Parameters<typeof createMobileAdapter>[1]> = async (pw, salt, c) => argon2idAsync(pw, salt, { ...c, maxmem: c.m * 1024 + 1048576 });
+  resetMobileCrypto();
+  assert.deepEqual(installMobileCrypto(() => nodeRandom, () => viaNoble), { ok: true });
+  assert.equal(usesNativeKdf(), true);
+  const keys = await createVaultKeys('correct horse battery staple');
+  const material = { ...keys.material, wrapperVersion: 1 as const };
+  assert.deepEqual(await unwrapWithPassword(material, 'correct horse battery staple'), keys.dataKey);
+  // Same material opens with no native KDF at all (the pure-JS path), and when the native call throws.
+  resetMobileCrypto();
+  assert.deepEqual(installMobileCrypto(() => nodeRandom, () => null), { ok: true });
+  assert.equal(usesNativeKdf(), false);
+  assert.deepEqual(await unwrapWithPassword(material, 'correct horse battery staple'), keys.dataKey);
+  resetMobileCrypto();
+  installMobileCrypto(() => nodeRandom, () => async () => { throw new Error('out of memory'); });
+  assert.deepEqual(await unwrapWithPassword(material, 'correct horse battery staple'), keys.dataKey);
+  resetMobileCrypto();
 });

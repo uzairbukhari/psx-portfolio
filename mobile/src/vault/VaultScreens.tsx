@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Pressable, Share, Text, View } from 'react-native';
 import { prepareVault, TransportError, type PreparedVault, type VaultCache, type VaultSession, type VaultStatus, type VaultTransport } from '../../../lib/vault-client.ts';
+import { usesNativeKdf } from './crypto-setup';
 import { MIN_PASSWORD_CHARS, VaultError, decodeRecoverySecret, onKdfProgress } from '../../../lib/vault-crypto.ts';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Button, Card, Input, Muted, Notice, Screen, StatusChip, useKitStyles } from '@/ui/kit';
@@ -84,6 +85,17 @@ function Deriving({ active, what }: { active: boolean; what: string }) {
   }, [active]);
   if (!active) return null;
   const percent = Math.min(100, Math.round(fraction * 100));
+  // Native Argon2 finishes in about a second and reports no progress: show a plain wait, not a stuck 0%.
+  if (usesNativeKdf() && fraction === 0) {
+    return (
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} accessibilityLiveRegion="polite">
+          <ActivityIndicator color={colors.primary} />
+          <Text style={{ color: colors.ink, ...type.headline, flex: 1 }}>{what}</Text>
+        </View>
+      </Card>
+    );
+  }
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>

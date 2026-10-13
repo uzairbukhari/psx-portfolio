@@ -1,5 +1,6 @@
 import { ActivityIndicator, AppState, Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthProvider';
@@ -84,12 +85,14 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Root />
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <Root />
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
