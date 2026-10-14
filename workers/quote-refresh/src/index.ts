@@ -4,7 +4,7 @@ import { sendAdminAlerts } from '../../../lib/admin-alerts';
 import { syncPlatformMetrics } from '../../../lib/cf-analytics';
 import { recordJobRun } from '../../../lib/job-runs';
 import { PIPELINES } from '../../../lib/pipelines';
-import { dispatchWorkflow, dueWorkflows } from '../../../lib/scrape-schedule';
+import { dispatchWorkflow, dueWorkflows, isFundRefreshTime, isPlatformTime } from '../../../lib/scrape-schedule';
 
 // This Worker has no VAULT_DB binding and no way to learn what any user holds: it only starts public scrapers.
 interface Env {
@@ -44,9 +44,7 @@ async function startDueScrapers(env: Env, scheduledTime: number) {
 }
 
 // MUFAP publishes at no fixed hour, so besides the nightly run (22:30 PKT) it is read again mid-morning and mid-afternoon.
-/** Platform numbers and admin alerts: minute 15 and 45 of every hour, any day. Must match `triggers.crons` in wrangler.jsonc. */
-const PLATFORM_CRON = '15,45 * * * *';
-const MUFAP_CRONS = new Set(['30 17 * * 1-5', '0 5 * * 1-5', '0 9 * * 1-5']);
+// There is a single Cron Trigger (every 5 minutes; the free plan allows 5 per account), so each firing checks what is due by time.
 
 export default {
   async fetch() {
@@ -66,9 +64,10 @@ export default {
       ).bind(beat, beat).run().catch(() => {}),
     );
     // Twice an hour, every day, after copying Cloudflare's own request, error and limit numbers for the two Workers (needs the
-    // optional token), tell super admins' phones (generic message, once a day per issue) if anything is wrong. This has its own
-    // Cron Trigger so it also runs outside market hours and at weekends, and never starts scrapers.
-    if (controller.cron === PLATFORM_CRON) {
+    // optional token), tell super admins' phones (generic message, once a day per issue) if anything is wrong. It runs outside market
+    // hours and at weekends too.
+    const when = new Date(controller.scheduledTime);
+    if (isPlatformTime(when)) {
       if (env.APP_ENV !== 'staging') ctx.waitUntil(
         (async () => {
           // The outcome is a job run, so the Platform page can say why the numbers are missing (wrong token, account id, ...).
@@ -85,10 +84,9 @@ export default {
           if (result.sent) console.log('Admin alert sent', result);
         })().catch((e) => console.error('Admin alerts failed', e)),
       );
-      return;
     }
     // MUFAP blocks GitHub's runners but answers Cloudflare, so the fund prices are fetched here (public data, no user data).
-    if (MUFAP_CRONS.has(controller.cron)) {
+    if (isFundRefreshTime(when)) {
       ctx.waitUntil(
         (async () => {
           // Two independent public sources: one failing must not stop the other.
@@ -110,7 +108,6 @@ export default {
             .catch((e) => console.error('Plan price refresh failed', e));
         })(),
       );
-      return;
     }
     ctx.waitUntil(
       startDueScrapers(env, controller.scheduledTime).catch((error) =>

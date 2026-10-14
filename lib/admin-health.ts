@@ -76,7 +76,7 @@ export async function pipelineRows(db: D1Database, now: Date, marketOpen: boolea
   }));
 }
 
-/** The cron Worker writes a heartbeat row on every firing (every 5 minutes on weekday market hours, plus the fund crons). */
+/** The cron Worker writes a heartbeat row on every firing (the single Cron Trigger fires every 5 minutes, every day). */
 export async function cronBeat(db: D1Database, now: Date): Promise<CronBeat> {
   const beat = (await first<{ t: string | null }>(db, "SELECT last_success_at AS t FROM refresh_state WHERE kind='cron' AND key='heartbeat'"))?.t ?? null;
   const def = { id: 'cron', label: 'Cron Worker', expected: '', cadence: 'daily' as const, lateHours: 30, failHours: 80, required: false, workflow: null, action: null };

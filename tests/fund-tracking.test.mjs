@@ -13,19 +13,14 @@ test('only tracked funds get a price row, and ids are validated as digits', () =
   assert.match(source, /\/\^\\d\{1,8\}\$\//);
 });
 
-test('the cron Worker runs the fund refresh on weekday nights only', () => {
+test('the cron Worker has one trigger and runs the fund refresh on weekday nights only', async () => {
   const wrangler = readFileSync(
     new URL('../workers/quote-refresh/wrangler.jsonc', import.meta.url),
     'utf8',
-  );
-  const worker = readFileSync(
-    new URL('../workers/quote-refresh/src/index.ts', import.meta.url),
-    'utf8',
-  );
-  const cron = /"(\d+ \d+ \* \* 1-5)"[^\n]*\n/.exec(
-    wrangler.replace(/\/\/[^\n]*/g, ''),
-  );
-  assert.ok(wrangler.includes('"30 17 * * 1-5"'));
-  assert.match(worker, /MUFAP_CRONS = new Set\(\['30 17 \* \* 1-5'/);
-  assert.ok(cron);
+  ).replace(/\/\/[^\n]*/g, '');
+  assert.deepEqual(JSON.parse(wrangler).triggers.crons, ['*/5 * * * *']);
+  const { isFundRefreshTime } = await import('../lib/scrape-schedule.ts');
+  assert.ok(isFundRefreshTime(new Date('2026-10-06T17:30:00Z')));
+  assert.ok(!isFundRefreshTime(new Date('2026-10-10T17:30:00Z')));
+  assert.ok(!isFundRefreshTime(new Date('2026-10-06T17:35:00Z')));
 });
