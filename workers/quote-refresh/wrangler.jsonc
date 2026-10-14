@@ -3,10 +3,9 @@
   "name": "psx-portfolio-sip-quote-refresh",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-22",
-  // Every 15 minutes, 04:00-11:45 UTC Monday-Friday = 09:00-16:45 Pakistan Standard Time
-  // (UTC+5): covers the session plus the post-close print (Friday closes 16:30). Runs
-  // outside trading hours cost no PSX calls once the closing quotes are cached.
-  "triggers": { "crons": ["*/5 4-11 * * 1-5", "10 12 * * 1-5", "30 17 * * 1-5", "0 5 * * 1-5", "0 9 * * 1-5", "15,45 * * * *"] },
+  // One trigger only: the free Workers plan allows 5 cron triggers per account. It fires every 5 minutes, every day, and
+  // src/index.ts works out from the time what is due (scrapers on weekdays 09:00-16:45 PKT, funds, platform checks).
+  "triggers": { "crons": ["*/5 * * * *"] },
   "vars": {
     "GITHUB_REPO": "uzairbukhari/psx-portfolio",
     "APP_ENV": "production",

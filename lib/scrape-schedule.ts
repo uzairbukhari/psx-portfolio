@@ -18,6 +18,24 @@ export function dueWorkflows(when: Date): ScheduledWorkflow[] {
   return due;
 }
 
+/**
+ * The free Workers plan allows 5 cron triggers per account, so the cron Worker has ONE trigger (every 5 minutes, every day)
+ * and decides here what is due, using the scheduled time (UTC). Keep `triggers.crons` in wrangler.jsonc to that one entry.
+ */
+/** MUFAP fund prices: weekdays 17:30 UTC (22:30 PKT), 05:00 and 09:00 UTC (mid-morning and mid-afternoon PKT). */
+export function isFundRefreshTime(when: Date): boolean {
+  const day = when.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const hm = when.getUTCHours() * 60 + when.getUTCMinutes();
+  return hm === 17 * 60 + 30 || hm === 5 * 60 || hm === 9 * 60;
+}
+
+/** Platform numbers and admin alerts: minute 15 and 45 of every hour, any day. */
+export function isPlatformTime(when: Date): boolean {
+  const minute = when.getUTCMinutes();
+  return minute === 15 || minute === 45;
+}
+
 export type DispatchSettings = { token?: string; repo?: string; appEnv?: string };
 
 /** Starts one workflow on main. Never throws; returns an error message or null. */

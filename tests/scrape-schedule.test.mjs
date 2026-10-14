@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dispatchWorkflow, dueWorkflows } from '../lib/scrape-schedule.ts';
+import { dispatchWorkflow, dueWorkflows, isPlatformTime } from '../lib/scrape-schedule.ts';
 
 const at = (iso) => dueWorkflows(new Date(iso)).map((item) => item.workflow);
 
@@ -28,4 +28,10 @@ test('dispatch posts to the workflow on main and reports failures', async () => 
   assert.match(await dispatchWorkflow({ token: 't', repo: 'o/r' }, 'x.yml', async () => new Response('', { status: 403 })), /403/);
   assert.match(await dispatchWorkflow({ repo: 'o/r' }, 'x.yml', ok), /not set/);
   assert.match(await dispatchWorkflow({ token: 't', repo: 'o/r', appEnv: 'staging' }, 'x.yml', ok), /staging/);
+});
+
+test('platform checks run at :15 and :45, any day', () => {
+  assert.ok(isPlatformTime(new Date('2026-10-10T03:15:00Z')));
+  assert.ok(isPlatformTime(new Date('2026-10-06T12:45:00Z')));
+  assert.ok(!isPlatformTime(new Date('2026-10-06T12:30:00Z')));
 });
