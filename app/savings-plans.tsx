@@ -1,13 +1,10 @@
 'use client';
 
+import { ownedKey } from './asset-keys';
 import { useMemo, useState } from 'react';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
-import { Line, LineChart, XAxis, YAxis } from 'recharts';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
+import { EChart } from './charts/echart';
+import { timeSeriesOption } from '@/lib/chart-kit';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,10 +29,8 @@ import {
   type PlanAsset,
 } from '@/lib/plans';
 import { money, moneyShort, today } from '@/lib/portfolio';
-import LedgerTimeline, {
-  NO_STOCKS,
-  buildAssetEntries,
-} from './ledger-timeline';
+import LedgerTimeline from './ledger-timeline';
+import { NO_STOCKS, buildAssetEntries } from '@/lib/ledger-entries';
 import CollapsiblePanel from './collapsible-panel';
 import { track } from './analytics';
 
@@ -72,8 +67,6 @@ const providerLabel = (asset: PlanAsset) =>
 const subFundName = (asset: PlanAsset) =>
   PAK_QATAR_SUBFUNDS.find((f) => f.id === asset.subFund)?.name;
 /** Identifies one plan on its own page (the same plan can sit in several portfolios on the All view). */
-export const planKey = (o: OwnedPlan) =>
-  `${o.asset.id}${o.portfolioName ? `@${o.portfolioName}` : ''}`;
 const ENTRY_HISTORY_LENGTH =
   typeof window === 'undefined' ? 0 : window.history.length;
 
@@ -186,7 +179,7 @@ export default function SavingsPlansSection({
     />
   ) : null;
   if (focusKey !== undefined) {
-    const row = rows.find((r) => planKey(r) === focusKey);
+    const row = rows.find((r) => ownedKey(r) === focusKey);
     const back = (
       <button
         type="button"
@@ -339,48 +332,21 @@ export default function SavingsPlansSection({
                 </small>
               </div>
             </div>
-            <ChartContainer
-              config={{ value: { label: 'Value', color: 'var(--primary)' } }}
+            <EChart
               className="company-chart"
-            >
-              <LineChart
-                data={points}
-                margin={{ top: 10, right: 12, bottom: 4, left: 8 }}
-              >
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  minTickGap={40}
-                  fontSize={11}
-                  tickFormatter={(d: string) => dateText(d)}
-                />
-                <YAxis
-                  domain={['auto', 'auto']}
-                  width={64}
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={11}
-                  tickFormatter={(n: number) => moneyShort(n)}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      labelFormatter={(d) => dateText(String(d))}
-                      formatter={(value) => <b>{money(Number(value))}</b>}
-                    />
-                  }
-                />
-                <Line
-                  dataKey="value"
-                  type="monotone"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  dot
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ChartContainer>
+              label={`Plan value over time, ${points.length} statements. Latest ${money(points[points.length - 1].value)}.`}
+              build={(t) =>
+                timeSeriesOption(t, {
+                  name: 'Value',
+                  data: points.map((d) => ({ x: d.date, y: d.value })),
+                  area: true,
+                  categorical: points.length < 12,
+                  valueFormat: money,
+                  axisFormat: (n) => moneyShort(n),
+                  dateLabel: (x) => dateText(String(x)),
+                })
+              }
+            />
           </section>
         )}
         {asset.subFund && !planNavs.some((n) => n.fundId === asset.subFund) && (
@@ -618,13 +584,13 @@ export default function SavingsPlansSection({
                   </tr>
                 </thead>
                 {g.rows.map((row) => (
-                  <tbody key={planKey(row)}>
+                  <tbody key={ownedKey(row)}>
                     <tr className="fund-row">
                       <td data-label="Plan" className="fund-row__name">
                         <button
                           type="button"
                           className="fund-row__toggle"
-                          onClick={() => onOpenAsset?.(planKey(row))}
+                          onClick={() => onOpenAsset?.(ownedKey(row))}
                         >
                           <span>
                             <b>{row.asset.name}</b>

@@ -1,8 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import './research-dossier.css';
-@import './research-jobs.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -447,12 +445,7 @@ html[data-app-env=staging] .app-header .brand::after{content:'STAGING';margin-le
 .value-card-aside{display:none}
 @media(min-width:1100px){
   .value-card-body{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:28px;align-items:stretch}
-  .value-card--with-aside .company-chart{height:480px;min-height:480px}
-  .value-card--short-aside .company-chart{height:340px;min-height:340px}
-  .value-card--with-aside .value-card-aside{position:relative;padding-left:0;border-left:0;margin-left:0}
-  .value-card--with-aside .value-card-aside .pulse{position:absolute;inset:0 0 0 28px;display:flex;flex-direction:column;border-left:1px solid var(--border);padding-left:28px}
-  .value-card--with-aside .value-card-aside .pulse-grid{flex:1;min-height:0;display:flex;flex-direction:column}
-  .value-card--with-aside .value-card-aside .pulse-shortlist{flex:1;min-height:0;display:flex;flex-direction:column}
+  .value-card--with-aside .company-chart{height:300px;min-height:300px}
   .value-card-aside{display:block;align-self:stretch;min-width:0;padding-left:28px;border-left:1px solid var(--border)}
   .value-card-aside .pulse{border:0;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;margin:0;overflow:visible}
   .value-card-aside .pulse::before{display:none}
@@ -534,3 +527,25 @@ html[data-app-env=staging] .app-header .brand::after{content:'STAGING';margin-le
 @media(max-width:480px){.header-brand-group .logo-word{display:none}.header-brand-group .brand{gap:4px}.app-header .hdr-btn{width:32px;height:32px;padding:0}.app-header .account-trigger{gap:4px;padding:3px 6px}}
 
 .pulse-holdings__cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}@media(max-width:620px){.pulse-holdings__cols{grid-template-columns:1fr;gap:18px}}
+
+/* Header navigation: links in a <nav> that keep the look of the old line tabs. */
+.app-nav{display:flex;align-items:stretch;justify-content:center}
+.app-nav-link{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-size:14px;font-weight:500;text-decoration:none;transition:color .15s ease}
+.app-nav-link::after{content:'';position:absolute;opacity:0;transition:opacity .15s ease}
+.app-nav-link[aria-current=page]::after{opacity:1}
+.app-nav-link:focus-visible{outline:2px solid var(--ring);outline-offset:-3px;border-radius:6px}
+@media(prefers-reduced-motion:reduce){.app-nav-link,.app-nav-link::after{transition:none}}
+/* Cross-fade between pages (see withViewTransition in app-nav.tsx). */
+::view-transition-old(root),::view-transition-new(root){animation-duration:160ms;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+@media(prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}}
+
+/* ECharts container: a floor so a chart is never collapsed; classes and inline heights win (zero specificity). */
+:where(.echart){min-height:200px;position:relative}
+
+/* Chart palettes (lib/chart-palette.ts): --cat-1..7 plus --chart-up/--chart-down, which the canvas charts read. */
+html[data-chart-palette=default],[data-chart-palette=default]{--cat-1:#2f7bdc;--cat-2:#d95926;--cat-3:#16876a;--cat-4:#a86f00;--cat-5:#d55181;--cat-6:#007a00;--cat-7:#6d5fd6;}
+:is(html[data-theme=dark],html[data-theme=midnight]) [data-chart-palette=default],html[data-chart-palette=default]:is([data-theme=dark],[data-theme=midnight]){--cat-1:#3987e5;--cat-2:#d95926;--cat-3:#199e70;--cat-4:#c98500;--cat-5:#d55181;--cat-6:#008300;--cat-7:#9085e9;}
+html[data-chart-palette=vibrant],[data-chart-palette=vibrant]{--cat-1:#1d6fff;--cat-2:#ff5a1f;--cat-3:#00b36b;--cat-4:#ffa800;--cat-5:#e5188f;--cat-6:#8a2be2;--cat-7:#00b8d9;--chart-up:#00a86b;--ch-chart-up:0 168 107;--chart-down:#ff2d55;--ch-chart-down:255 45 85;}
+:is(html[data-theme=dark],html[data-theme=midnight]) [data-chart-palette=vibrant],html[data-chart-palette=vibrant]:is([data-theme=dark],[data-theme=midnight]){--cat-1:#4d9dff;--cat-2:#ff7a3d;--cat-3:#19e68c;--cat-4:#ffc21a;--cat-5:#ff4db8;--cat-6:#b57bff;--cat-7:#22d3ee;--chart-up:#19f0a0;--ch-chart-up:25 240 160;--chart-down:#ff4d6d;--ch-chart-down:255 77 109;}
+html[data-chart-palette=accessible],[data-chart-palette=accessible]{--cat-1:#0072b2;--cat-2:#d55e00;--cat-3:#009e73;--cat-4:#e69f00;--cat-5:#cc79a7;--cat-6:#56b4e9;--cat-7:#8c7b00;--chart-up:#0072b2;--ch-chart-up:0 114 178;--chart-down:#d55e00;--ch-chart-down:213 94 0;}
+:is(html[data-theme=dark],html[data-theme=midnight]) [data-chart-palette=accessible],html[data-chart-palette=accessible]:is([data-theme=dark],[data-theme=midnight]){--cat-1:#4aa3e0;--cat-2:#ff8a33;--cat-3:#19c28f;--cat-4:#f5b82e;--cat-5:#e592c0;--cat-6:#7cc7f4;--cat-7:#f0e442;--chart-up:#56b4e9;--ch-chart-up:86 180 233;--chart-down:#ff8a33;--ch-chart-down:255 138 51;}

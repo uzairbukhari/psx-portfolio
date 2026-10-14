@@ -3,14 +3,8 @@
 import type { FundNavRow } from '@/lib/mufap';
 import type { PlanNavRow } from '@/lib/plans';
 import { useMemo, type ReactNode } from 'react';
-import { Bar, BarChart, Pie, PieChart, XAxis } from 'recharts';
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
+import { EChart } from './charts/echart';
+import { barOption, donutOption, type ChartTokens } from '@/lib/chart-kit';
 import { money, moneyShort, type DisplayPart } from '@/lib/portfolio';
 import {
   accountOverview,
@@ -20,6 +14,16 @@ import {
 import { ChartInfo } from './chart-info';
 import { daysBetween } from '@/lib/performance';
 import type { MetalRateRow } from '@/lib/metal-rates';
+
+/** The same colours as CLASS_COLORS, resolved for the canvas. */
+const classColor = (t: ChartTokens, k: AssetClassKey) =>
+  ({
+    stocks: t.cat[0],
+    gold: t.cat[3],
+    silver: t.neutral,
+    plans: t.cat[2],
+    funds: t.cat[6],
+  })[k];
 
 const CLASS_COLORS: Record<AssetClassKey, string> = {
   stocks: 'var(--cat-1)',
@@ -37,7 +41,13 @@ const SECTOR_COLORS = [
   'var(--cat-6)',
   'var(--cat-7)',
 ];
-const investedKeys: AssetClassKey[] = ['stocks', 'funds', 'plans', 'gold', 'silver'];
+const investedKeys: AssetClassKey[] = [
+  'stocks',
+  'funds',
+  'plans',
+  'gold',
+  'silver',
+];
 const OTHER_COLOR = 'var(--chart-other)';
 
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
@@ -197,40 +207,21 @@ export default function AccountOverview({
           </div>
           {total.value > 0 ? (
             <div className="overview-mix">
-              <ChartContainer
-                config={{ value: { label: 'Market value' } }}
+              <EChart
                 className="overview-donut"
-              >
-                <PieChart accessibilityLayer>
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        nameKey="label"
-                        formatter={(value, _name, item) => (
-                          <div className="report-tooltip-row">
-                            <span>{item.payload.label}</span>
-                            <b>
-                              {item.payload.share.toFixed(1)}% ·{' '}
-                              {money(Number(value))}
-                            </b>
-                          </div>
-                        )}
-                      />
-                    }
-                  />
-                  <Pie
-                    data={o.classes.map((c) => ({
-                      ...c,
-                      fill: CLASS_COLORS[c.key],
-                    }))}
-                    dataKey="value"
-                    nameKey="label"
-                    innerRadius="58%"
-                    outerRadius="82%"
-                    paddingAngle={2}
-                  />
-                </PieChart>
-              </ChartContainer>
+                label={`Asset mix: ${o.classes.map((c) => `${c.label} ${c.share.toFixed(1)}%`).join(', ')}.`}
+                build={(t) =>
+                  donutOption(t, {
+                    centerTitle: 'Net worth',
+                    slices: o.classes.map((c) => ({
+                      name: c.label,
+                      value: c.value,
+                      color: classColor(t, c.key),
+                    })),
+                    valueFormat: money,
+                  })
+                }
+              />
               <ul className="overview-classes">
                 {o.classes.map((c) => (
                   <li key={c.key}>
@@ -264,43 +255,43 @@ export default function AccountOverview({
         </section>
 
         {hasStocks && (
-        <section className="panel overview-panel" aria-label="Sectors">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">DIVERSIFICATION</p>
-              <h3>
-                Stocks by sector
-                <ChartInfo text="How the value of your PSX stocks is spread across sectors. The five largest sectors are shown; the rest are grouped as Other." />
-              </h3>
+          <section className="panel overview-panel" aria-label="Sectors">
+            <div className="report-heading">
+              <div>
+                <p className="eyebrow">DIVERSIFICATION</p>
+                <h3>
+                  Stocks by sector
+                  <ChartInfo text="How the value of your PSX stocks is spread across sectors. The five largest sectors are shown; the rest are grouped as Other." />
+                </h3>
+              </div>
+              <span>Across all portfolios</span>
             </div>
-            <span>Across all portfolios</span>
-          </div>
-          {sectorData.length ? (
-            <ul className="overview-sectors">
-              {sectorData.map((s) => (
-                <li key={s.sector}>
-                  <span>
-                    <i aria-hidden="true" style={{ background: s.fill }} />
-                    {s.sector}
-                  </span>
-                  <span className="bar" aria-hidden="true">
-                    <i
-                      style={{
-                        width: `${Math.min(100, s.share)}%`,
-                        background: s.fill,
-                      }}
-                    />
-                  </span>
-                  <b className="amount">{s.share.toFixed(1)}%</b>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="report-empty">
-              Add prices and sectors to see the split.
-            </p>
-          )}
-        </section>
+            {sectorData.length ? (
+              <ul className="overview-sectors">
+                {sectorData.map((s) => (
+                  <li key={s.sector}>
+                    <span>
+                      <i aria-hidden="true" style={{ background: s.fill }} />
+                      {s.sector}
+                    </span>
+                    <span className="bar" aria-hidden="true">
+                      <i
+                        style={{
+                          width: `${Math.min(100, s.share)}%`,
+                          background: s.fill,
+                        }}
+                      />
+                    </span>
+                    <b className="amount">{s.share.toFixed(1)}%</b>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="report-empty">
+                Add prices and sectors to see the split.
+              </p>
+            )}
+          </section>
         )}
         <section className="panel overview-panel" aria-label="Portfolios">
           <div className="report-heading">
@@ -361,67 +352,37 @@ export default function AccountOverview({
             <span>Last 12 months</span>
           </div>
           {invested.months.some((m) => m.amount > 0) ? (
-            <ChartContainer
-              config={Object.fromEntries(
-                investedKeys.map((k) => [
-                  k,
-                  { label: ASSET_CLASS_LABELS[k], color: CLASS_COLORS[k] },
-                ]),
-              )}
+            <EChart
               className="overview-income"
-            >
-              <BarChart
-                data={invested.months}
-                margin={{ top: 8, right: 4, bottom: 0, left: 4 }}
-              >
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={monthLabel}
-                  interval={0}
-                  fontSize={11}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      labelFormatter={(_l, items) =>
-                        String(items?.[0]?.payload?.month ?? '')
-                      }
-                      formatter={(value, name) =>
-                        Number(value) ? (
-                          <span>
-                            {ASSET_CLASS_LABELS[name as AssetClassKey]}{' '}
-                            <b>{money(Number(value))}</b>
-                          </span>
-                        ) : null
-                      }
-                    />
-                  }
-                />
-                {investedKeys.map((k, i) => (
-                  <Bar
-                    key={k}
-                    dataKey={k}
-                    stackId="invested"
-                    fill={CLASS_COLORS[k]}
-                    radius={i === investedKeys.length - 1 ? [3, 3, 0, 0] : 0}
-                  />
-                ))}
-                <ChartLegend content={<ChartLegendContent />} />
-              </BarChart>
-            </ChartContainer>
+              label={`Invested per month, last 12 months, ${money(invested.total)} in total.`}
+              build={(t) =>
+                barOption(t, {
+                  cats: invested.months.map((m) => monthLabel(m.month)),
+                  catTitle: (c) => c,
+                  stack: true,
+                  legend: true,
+                  series: investedKeys.map((k) => ({
+                    name: ASSET_CLASS_LABELS[k],
+                    data: invested.months.map(
+                      (m) => Number((m as Record<string, unknown>)[k]) || 0,
+                    ),
+                    color: classColor(t, k),
+                  })),
+                  valueFormat: money,
+                })
+              }
+            />
           ) : (
             <p className="report-empty">
               Nothing invested in the last 12 months.
             </p>
           )}
           <p className="report-source">
-            {money(invested.total)} invested in the last 12 months. Counts
-            money put in across every portfolio: stock buys (with fees), fund
-            and plan payments, and gold and silver purchases. Sales and
-            redemptions are not subtracted. Dividends are in the Income panel
-            ({money(income.receivedTotal)} received in total).
+            {money(invested.total)} invested in the last 12 months. Counts money
+            put in across every portfolio: stock buys (with fees), fund and plan
+            payments, and gold and silver purchases. Sales and redemptions are
+            not subtracted. Dividends are in the Income panel (
+            {money(income.receivedTotal)} received in total).
           </p>
         </section>
       </div>

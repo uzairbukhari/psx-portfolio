@@ -78,13 +78,7 @@ export function VaultSecurity({ session, onLock }: { session: VaultSession; onLo
       <p className="set-hint">
         Your portfolio is encrypted on this device. The server stores only ciphertext, so no one else can read it, and no one can recover it for you if you lose both your vault password and recovery key.
       </p>
-      <div>
-        <button type="button" className="secondary compact" onClick={onLock}>
-          <LockKeyhole size={14} /> Lock now
-        </button>
-        <p className="vault-hint muted">The vault also locks after 15 minutes without activity.</p>
-      </div>
-      <form onSubmit={changePassword}>
+      <form className="set-vault-card vault-pass" onSubmit={changePassword}>
         <strong>Change vault password</strong>
         <label>
           Current password
@@ -105,7 +99,15 @@ export function VaultSecurity({ session, onLock }: { session: VaultSession; onLo
           This re-protects the same encryption key with your new password. It does not undo access for anyone who already has your old password or a copy of your data.
         </p>
       </form>
-      <div>
+      <div className="vault-side">
+      <div className="set-vault-card vault-lock">
+        <strong>Lock</strong>
+        <button type="button" className="secondary compact" onClick={onLock}>
+          <LockKeyhole size={14} /> Lock now
+        </button>
+        <p className="vault-hint muted">The vault also locks after 15 minutes without activity.</p>
+      </div>
+      <div className="set-vault-card vault-rec">
         <strong>Recovery key</strong>
         {fresh ? (
           <>
@@ -133,8 +135,9 @@ export function VaultSecurity({ session, onLock }: { session: VaultSession; onLo
           </div>
         )}
       </div>
+      </div>
       {message && (
-        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'notice success' : 'notice error'}>
+        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'notice success vault-note' : 'notice error vault-note'}>
           {message.text}
         </p>
       )}

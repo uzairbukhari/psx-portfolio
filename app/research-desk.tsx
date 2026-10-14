@@ -1,4 +1,6 @@
 'use client';
+import './research-dossier.css';
+import './research-jobs.css';
 import { useConfirm } from '@/components/confirm-dialog';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {

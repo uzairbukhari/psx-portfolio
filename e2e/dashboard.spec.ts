@@ -3,7 +3,9 @@ import { expect, test, isLocal, pageText } from './fixtures';
 test('All view totals every asset class across the four portfolios', async ({ app }) => {
   await expect(app.getByText(/Net worth/)).toBeVisible();
   await expect(app.getByText('4 portfolios')).toBeVisible();
-  for (const label of ['Stocks', 'Gold', 'Silver', 'Savings plans', 'Mutual funds']) await expect(app.getByText(label, { exact: true }).first()).toBeVisible();
+  // The asset-mix donut is a canvas; its classes are listed beside it with the position count.
+  const mix = app.getByRole('region', { name: 'Asset mix' });
+  for (const label of ['Stocks', 'Gold', 'Silver', 'Savings plans', 'Mutual funds']) await expect(mix.getByText(label).first()).toBeVisible();
   await expect(app.getByText('Stocks by sector')).toBeVisible();
   for (const sector of ['Bank', 'Oil & Gas', 'Fertilizer', 'Cement', 'Technology']) await expect(app.getByText(sector, { exact: true }).first()).toBeVisible();
   const text = await pageText(app);

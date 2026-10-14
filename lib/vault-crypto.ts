@@ -291,19 +291,35 @@ export function onKdfProgress(listener: (fraction: number) => void): () => void 
   };
 }
 
+type KdfRun = (
+  password: Uint8Array,
+  salt: Uint8Array,
+  params: { m: number; t: number; p: number; dkLen: number },
+  onProgress: (fraction: number) => void,
+) => Promise<Uint8Array>;
+let kdfRunner: KdfRun | null = null;
+/** Lets the web run Argon2id in a Worker thread (same primitive and parameters). Default: in this thread. */
+export function setKdfRunner(runner: KdfRun | null) {
+  kdfRunner = runner;
+}
+
 async function passwordKey(password: string, kdf: PasswordKdf, salt: Uint8Array): Promise<Uint8Array> {
   assertKdfAllowed(kdf);
-  const raw = await argon2idAsync(utf8(normalizePassword(password)), salt, {
-    m: kdf.m,
-    t: kdf.t,
-    p: kdf.p,
-    dkLen: KEY_BYTES,
-    // Validated above; the library caps memory at its own default unless told.
-    maxmem: kdf.m * 1024 + 1024 * 1024,
-    asyncTick: kdfAsyncTick,
-    // Looked up per call, so a screen that subscribes just after starting the derivation still hears it.
-    onProgress: (fraction) => kdfProgressListener?.(fraction),
-  });
+  const input = utf8(normalizePassword(password));
+  // Looked up per call, so a screen that subscribes just after starting the derivation still hears it.
+  const progress = (fraction: number) => kdfProgressListener?.(fraction);
+  const raw = kdfRunner
+    ? await kdfRunner(input, salt, { m: kdf.m, t: kdf.t, p: kdf.p, dkLen: KEY_BYTES }, progress)
+    : await argon2idAsync(input, salt, {
+        m: kdf.m,
+        t: kdf.t,
+        p: kdf.p,
+        dkLen: KEY_BYTES,
+        // Validated above; the library caps memory at its own default unless told.
+        maxmem: kdf.m * 1024 + 1024 * 1024,
+        asyncTick: kdfAsyncTick,
+        onProgress: progress,
+      });
   // Domain separation from every other use of the Argon2 output.
   return hkdf(sha256, raw, undefined, utf8('sipwise-vault/v1/password-wrap-key'), KEY_BYTES);
 }

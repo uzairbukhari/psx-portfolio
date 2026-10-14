@@ -10,6 +10,9 @@ export type PanelFigure = {
   tone?: string;
 };
 
+/** The figure text the dashboard uses for a value it cannot work out yet; panels show a dash instead. */
+const UNKNOWN = 'Not yet known';
+
 // Panels start folded; the ones you open are remembered.
 const KEY = 'sipwise:opened:';
 const readOpen = (id: string) => {
@@ -83,7 +86,15 @@ export default function CollapsiblePanel({
             {figures.map((f) => (
               <div key={f.label}>
                 <dt>{f.label}</dt>
-                <dd className={`amount ${f.tone ?? ''}`}>{f.value}</dd>
+                <dd className={`amount ${f.tone ?? ''}`}>
+                  {f.value === UNKNOWN ? (
+                    <abbr title="Needs the cost of every holding" aria-label={UNKNOWN} className="no-underline">
+                      —
+                    </abbr>
+                  ) : (
+                    f.value
+                  )}
+                </dd>
               </div>
             ))}
           </dl>

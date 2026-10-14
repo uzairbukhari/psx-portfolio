@@ -43,7 +43,10 @@ export async function signIn(target) {
     redirect: 'manual',
   });
   if (res.status === 404) throw new Error('Test login is disabled there (needs APP_ENV=staging and the TEST_LOGIN_SECRET Worker secret).');
-  if (!res.ok) throw new Error(`Test login failed (${res.status}). Check TEST_LOGIN_SECRET.`);
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+    throw new Error(`Test login failed (${res.status}). Check TEST_LOGIN_SECRET.${detail ? ` Response: ${detail}` : ''}`);
+  }
   const cookie = /(?:^|,\s*)(session=[^;]+)/.exec(res.headers.get('set-cookie') ?? '')?.[1];
   if (!cookie) throw new Error('Test login returned no session cookie.');
   return cookie;

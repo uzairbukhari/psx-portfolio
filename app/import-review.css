@@ -232,3 +232,15 @@ button.rv-tile[aria-pressed=true]{outline:2px solid var(--primary);outline-offse
 .rv-hold{grid-template-columns:1fr;gap:6px}
 .rv-delta{text-align:left}
 }
+
+/* Settings > Sync dividends */
+.ds{display:grid;gap:4px}
+.ds-lead{margin:0 0 4px;font-size:14px;line-height:1.55;max-width:80ch;color:var(--muted-foreground)}
+.ds-how{margin:0 0 8px!important}
+.ds-how p{margin:8px 0 0;max-width:80ch}
+.ds .ir-controls{padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--secondary);margin:8px 0 4px}
+.ds-bar__actions{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.ds .ir-status{margin:2px 0 8px}
+.ds .ir-table-wrap{max-height:min(62vh,560px)}
+.ds .ir-totals{position:sticky;bottom:8px;margin-top:14px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--popover);box-shadow:0 -6px 20px rgb(var(--ch-shadow) / .16)}
+.ds .ir-totals small{display:block;margin-top:2px;color:var(--muted-foreground)}

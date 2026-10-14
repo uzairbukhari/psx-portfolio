@@ -1,4 +1,8 @@
 'use client';
+import './dashboard-styles';
+import { ownedKey } from './asset-keys';
+import { webMcpEnabled } from './webmcp-pref';
+import { cachedHoldings, cachedTaxSummary } from './portfolio-memo';
 import { useConfirm } from '@/components/confirm-dialog';
 import {
   useEffect,
@@ -9,7 +13,8 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { usePathname } from 'next/navigation';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { DashboardSkeleton } from './dashboard-skeleton';
+import { AppNav, NavPanel, useRouteMeta, type NavItem } from './app-nav';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +46,7 @@ import {
 } from '@/components/ui/popover';
 import {
   Plus,
+  Search,
   Briefcase,
   Upload,
   Wallet,
@@ -89,63 +95,49 @@ import {
 import { addNotifications, dividendNotifications } from '@/lib/notifications';
 import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
-import PortfolioReports from './portfolio-reports';
-import AssetReports, { AllReports } from './asset-reports';
 import { reportMode } from '@/lib/asset-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
-import GoldSilverSection, { metalKey, type OwnedMetal } from './gold-silver';
-import SavingsPlansSection, { planKey, type OwnedPlan } from './savings-plans';
 import { useMetalRates } from './use-metal-rates';
-import MutualFundsSection, { fundKey, type OwnedFund } from './mutual-funds';
 import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
 import CollapsiblePanel from './collapsible-panel';
 import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
-import CompanyDetail from './company-detail';
-import LedgerTimeline, {
-  buildAssetEntries,
-  buildEntries,
-} from './ledger-timeline';
+import {
+  PortfolioReports,
+  AssetReports,
+  AllReports,
+  LedgerTimeline,
+  MonthlyPicks,
+  CompanyDetail,
+  GoldSilverSection,
+  SavingsPlansSection,
+  MutualFundsSection,
+  SettingsView,
+  NotificationsView,
+  ResearchDesk,
+  AiLab,
+  TargetsEditor,
+  AhlImportDialog,
+  FinqalabImportDialog,
+  BrokerImportDialog,
+  IpoImportDialog,
+  DividendSyncView,
+} from './lazy-panels';
+import type { OwnedMetal } from './gold-silver';
+import type { OwnedPlan } from './savings-plans';
+import type { OwnedFund } from './mutual-funds';
+import { buildAssetEntries, buildEntries } from '@/lib/ledger-entries';
 import { CompanyNavProvider } from './ticker-link';
-import ResearchDesk from './research-desk';
-import AiLab from './ai-lab';
-import { SignIn, LoadError } from './sign-in';
+import { LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import { ThemeMenuItems } from './theme-menu';
-import NotificationsView from './notifications-view';
-import TargetsEditor from './targets-editor';
-import SettingsView from './settings-view';
-import { AhlImportDialog } from './ahl-import-dialog';
-import { DividendSyncView } from './dividend-sync-view';
-import {
-  parseAhlLedgerText,
-  type AhlLedgerStatement,
-} from '@/lib/ahl-ledger-pdf';
+import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import { MAX_WATCH_TICKERS } from '@/lib/market-watch';
-import MonthlyPicks from './monthly-picks';
-import { parseFinqalabReport } from './finqalab-import';
-import { FinqalabImportDialog } from './finqalab-import-dialog';
-import { BrokerImportDialog } from './broker-import-dialog';
-import { detectJsGlobalLedger, parseJsGlobalLedger } from '@/lib/js-global-ledger';
-import { detectPsxConfirmation, detectPsxLedger, parsePsxConfirmation, parsePsxLedger } from '@/lib/psx-confirmation';
+import type { BrokerStatement, BrokerFormat } from '@/lib/broker-import';
+import type { BrokerTable } from '@/lib/broker-file';
+import type { IpoAllotment } from '@/lib/ipo-list-import';
 import {
-  validateBrokerStatement,
-  type BrokerStatement,
-  type BrokerFormat,
-} from '@/lib/broker-import';
-import {
-  readBrokerTable,
-  parseSavedFormat,
-  formatFromReviewed,
-  redactBrokerText,
-  type BrokerTable,
-} from '@/lib/broker-file';
-import { IpoImportDialog } from './ipo-import-dialog';
-import { parseIpoList, type IpoAllotment } from '@/lib/ipo-list-import';
-import {
-  detectJsonImport,
-  detectPdfImport,
   summarizeImports,
   IMPORT_LABEL,
   UNSUPPORTED_FILE,
@@ -153,8 +145,6 @@ import {
 } from '@/lib/import-detect';
 import type { FinqalabTrade } from './finqalab-import';
 import { extractPdfText } from './research-pdf';
-import { importAhlTrades, parseAhlHistory } from './ahl-import';
-import { importCdcDividends } from '@/lib/cdc-import';
 import type { PortfolioResponse } from '@/lib/api-types';
 import {
   ConflictError,
@@ -792,6 +782,7 @@ function DashboardContent({
   const [planFocus, setPlanFocus] = useState(() =>
     planFromPathname(initialPathname),
   );
+  useRouteMeta(tab, tab === 'company' ? companyTicker : undefined);
   function setTab(requested: string) {
     const next = allowTab(requested, isAdmin);
     setTabState(next);
@@ -916,6 +907,7 @@ function DashboardContent({
       dir: 'asc' | 'desc';
     } | null>(null),
     [sectorFilter, setSectorFilter] = useState<string>(''),
+    [holdingsQuery, setHoldingsQuery] = useState(''),
     [showSoldOut, setShowSoldOut] = useState(false),
     [targetsOpen, setTargetsOpen] = useState(false);
   // Status messages surface as toasts instead of an inline banner: errors
@@ -1377,7 +1369,7 @@ function DashboardContent({
         };
       }
     ).modelContext;
-    if (!context?.registerTool || !p) return;
+    if (!context?.registerTool || !p || !webMcpEnabled()) return;
     const abort = new AbortController();
     try {
       Promise.resolve(
@@ -1400,7 +1392,7 @@ function DashboardContent({
               if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m))
                 throw Error('Invalid month');
               return {
-                holdings: holdings(p),
+                holdings: cachedHoldings(p),
                 plan: plan(p, m, fees, allowOld),
               };
             },
@@ -1518,17 +1510,9 @@ function DashboardContent({
     };
   }, [workspace, picksHome, p]);
   if (!p && email && !(failed && message))
-    return (
-      <main className="app-loading">
-        <div className="brand">
-          <LogoMark size={28} />
-          <Wordmark />
-        </div>
-        <Spinner className="size-6" />
-        <p className="muted">Loading your holdings…</p>
-      </main>
-    );
-  if (!p && !email) return <SignIn returnTo={initialPathname || '/'} />;
+    return <DashboardSkeleton />;
+  // Signed-out visitors never reach the dashboard: DashboardRoute (a Server Component) renders the landing.
+  if (!p && !email) return null;
   if (!p) return <LoadError message={message} busy={busy} onRetry={load} />;
   // The market pulse sends only these tickers to the server; names and saved quotes are merged back in locally.
   // The All view shows the index only; a single portfolio follows what it holds.
@@ -1536,7 +1520,7 @@ function DashboardContent({
     mode: (isAll ? 'index' : 'holdings') as 'index' | 'holdings',
     tickers: isAll
       ? []
-      : holdings(p)
+      : cachedHoldings(p)
           .filter((h) => h.shares > 0)
           .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
           .map((h) => h.ticker)
@@ -1566,6 +1550,7 @@ function DashboardContent({
     });
   }
   const runCdc = async (raw: unknown) => {
+    const { importCdcDividends } = await import('./import-parsers');
     const result = importCdcDividends(raw, p.companies, p.dividends ?? []);
     if (!result.imported) {
       if (result.skippedDuplicate)
@@ -1616,11 +1601,13 @@ function DashboardContent({
       `${result.imported} dividend${result.imported === 1 ? '' : 's'} imported${superseded ? `, replacing ${superseded} PSX auto record${superseded === 1 ? '' : 's'}` : ''}. Skipped: ${result.skippedNotPaid} not paid, ${result.skippedDuplicate} duplicate, ${result.skippedUnknownTicker} unknown ticker, ${result.skippedInvalid} invalid.`,
     );
   };
-  const runFinqalab = (text: string, fileName: string) => {
+  const runFinqalab = async (text: string, fileName: string) => {
     // Read locally, then review: nothing is saved until the preview is confirmed.
+    const { parseFinqalabReport } = await import('./import-parsers');
     setFinqalabReview({ rows: parseFinqalabReport(text), fileName });
   };
   const runAhlJson = async (raw: unknown) => {
+    const { parseAhlHistory, importAhlTrades } = await import('./import-parsers');
     const rows = parseAhlHistory(raw);
     const result = importAhlTrades(p, rows);
     if (!result.imported) {
@@ -1662,6 +1649,7 @@ function DashboardContent({
       setReadingImport(true);
       let reviewing = false;
       try {
+        const parsers = await import('./import-parsers');
         const bytes = await f.arrayBuffer();
         const hash = Array.from(
           new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
@@ -1683,10 +1671,10 @@ function DashboardContent({
         if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
           // Read locally, then review: nothing is saved until the preview is confirmed.
           pdf = await extractPdfText(new Uint8Array(bytes));
-          kind = detectPdfImport(pdf.text);
+          kind = parsers.detectPdfImport(pdf.text);
           unknownText = pdf.text;
         } else if (/\.(csv|xlsx)$/i.test(f.name)) {
-          table = await readBrokerTable(f);
+          table = await parsers.readBrokerTable(f);
           kind = null;
           unknownText = table.text;
           const saved = (p.brokerFormats ?? []).find(
@@ -1701,7 +1689,7 @@ function DashboardContent({
             try {
               reviewing = true;
               setBrokerReview({
-                statement: parseSavedFormat(table, saved),
+                statement: parsers.parseSavedFormat(table, saved),
                 fileName: f.name,
                 format: null,
                 hash,
@@ -1715,17 +1703,17 @@ function DashboardContent({
         } else {
           try {
             raw = JSON.parse(await f.text());
-            kind = detectJsonImport(raw);
+            kind = parsers.detectJsonImport(raw);
             unknownText = JSON.stringify(raw);
           } catch {
             throw Error(UNSUPPORTED_FILE);
           }
         }
-        if (!kind && pdf && !expected && detectPsxConfirmation(pdf.text)) {
+        if (!kind && pdf && !expected && parsers.detectPsxConfirmation(pdf.text)) {
           // Youngs Capital, Syed Faraz Equities and other brokers on the same PSX confirmation template.
           reviewing = true;
           setBrokerReview({
-            statement: validateBrokerStatement(parsePsxConfirmation(pdf.text)),
+            statement: parsers.validateBrokerStatement(parsers.parsePsxConfirmation(pdf.text)),
             fileName: f.name,
             format: null,
             hash,
@@ -1733,10 +1721,10 @@ function DashboardContent({
           });
           return;
         }
-        if (!kind && pdf && !expected && detectPsxLedger(pdf.text)) {
+        if (!kind && pdf && !expected && parsers.detectPsxLedger(pdf.text)) {
           reviewing = true;
           setBrokerReview({
-            statement: validateBrokerStatement(parsePsxLedger(pdf.text)),
+            statement: parsers.validateBrokerStatement(parsers.parsePsxLedger(pdf.text)),
             fileName: f.name,
             format: null,
             hash,
@@ -1744,10 +1732,10 @@ function DashboardContent({
           });
           return;
         }
-        if (!kind && pdf && !expected && detectJsGlobalLedger(pdf.text)) {
+        if (!kind && pdf && !expected && parsers.detectJsGlobalLedger(pdf.text)) {
           reviewing = true;
           setBrokerReview({
-            statement: validateBrokerStatement(parseJsGlobalLedger(pdf.text)),
+            statement: parsers.validateBrokerStatement(parsers.parseJsGlobalLedger(pdf.text)),
             fileName: f.name,
             format: null,
             hash,
@@ -1776,7 +1764,7 @@ function DashboardContent({
           const response = await fetch('/api/broker-import/extract', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: redactBrokerText(unknownText) }),
+            body: JSON.stringify({ text: parsers.redactBrokerText(unknownText) }),
             credentials: 'same-origin',
           });
           const data = (await response.json()) as {
@@ -1785,12 +1773,12 @@ function DashboardContent({
           };
           if (!response.ok)
             throw Error(data.error ?? 'Statement extraction failed.');
-          const statement = validateBrokerStatement(data.statement);
+          const statement = parsers.validateBrokerStatement(data.statement);
           reviewing = true;
           setBrokerReview({
             statement,
             fileName: f.name,
-            format: table ? formatFromReviewed(table, statement) : null,
+            format: table ? parsers.formatFromReviewed(table, statement) : null,
             hash,
             method: 'ai',
           });
@@ -1806,18 +1794,18 @@ function DashboardContent({
           );
         if (kind === 'finqalab') {
           reviewing = true;
-          runFinqalab(pdf!.text, f.name);
+          await runFinqalab(pdf!.text, f.name);
         } else if (kind === 'ahl' && pdf) {
           reviewing = true;
           setAhlStatement({
-            statement: await parseAhlLedgerText(pdf.text, pdf.pages),
+            statement: await parsers.parseAhlLedgerText(pdf.text, pdf.pages),
             fileName: f.name,
           });
         } else if (kind === 'ahl') await runAhlJson(raw);
         else if (kind === 'cdc') await runCdc(raw);
         else {
           reviewing = true;
-          setIpoReview({ items: parseIpoList(raw), fileName: f.name });
+          setIpoReview({ items: parsers.parseIpoList(raw), fileName: f.name });
         }
       } finally {
         if (!reviewing) {
@@ -1893,7 +1881,7 @@ function DashboardContent({
       await load();
       notify('Tax status saved for all portfolios.');
     });
-  const hs = holdings(p)
+  const hs = cachedHoldings(p)
       .slice()
       .sort((a, b) => (b.value ?? -1) - (a.value ?? -1)),
     held = hs.filter((h) => h.shares > 0),
@@ -1948,11 +1936,18 @@ function DashboardContent({
       new Set(hs.map((h) => h.sector).filter((s): s is string => !!s)),
     ),
     rowsBase = showSoldOut ? held.concat(soldOut) : held,
-    rowsFiltered = !sectorFilter
+    rowsBySector = !sectorFilter
       ? rowsBase
       : sectorFilter === SHORTLISTED
         ? rowsBase.filter((h) => h.target > 0)
         : rowsBase.filter((h) => h.sector === sectorFilter),
+    rowsFiltered = holdingsQuery.trim()
+      ? rowsBySector.filter((h) =>
+          `${h.ticker} ${h.name} ${h.sector ?? ''}`
+            .toLowerCase()
+            .includes(holdingsQuery.trim().toLowerCase()),
+        )
+      : rowsBySector,
     holdingsSortAccessor: Record<
       HoldingsSortKey,
       (h: (typeof hs)[number]) => number | string
@@ -2059,7 +2054,7 @@ function DashboardContent({
     tab === 'notifications';
   // A portfolio with nothing in it shows only its start screen: no tabs to open.
   const hideTabs = chromeless || (p.companies.length === 0 && !hasAssets);
-  const taxedDividends = taxSummary(p).dividends;
+  const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
       ...buildAssetEntries(ticker ? [] : allAssets, () => setTab('holdings')),
@@ -2111,7 +2106,7 @@ function DashboardContent({
   }
   function openFund(key: string) {
     // From the All view a fund opens inside its own portfolio, where it can be edited.
-    const owner = ownedFunds.find((o) => fundKey(o) === key) as
+    const owner = ownedFunds.find((o) => ownedKey(o) === key) as
       | (OwnedFund & { portfolioId?: string })
       | undefined;
     if (isAll && owner?.portfolioId) {
@@ -2620,6 +2615,20 @@ function DashboardContent({
     setCompany(null);
     setCreatingCompany(false);
   }
+  const navItems: NavItem[] = [
+    { tab: 'holdings', href: '/', label: 'Holdings', short: 'Holdings', icon: <Wallet className="tab-icon" aria-hidden="true" /> },
+    { tab: 'reports', href: '/reports', label: 'Reports', short: 'Reports', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
+    { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
+    ...(hasStocks
+      ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
+      : []),
+    ...(isAdmin
+      ? [
+          { tab: 'research-desk', href: '/research-desk', label: 'Research desk', short: 'Research', icon: <FlaskConical className="tab-icon" aria-hidden="true" /> },
+          { tab: 'ai-lab', href: '/ai-lab', label: 'AI Lab', short: 'AI Lab', icon: <Microscope className="tab-icon" aria-hidden="true" /> },
+        ]
+      : []),
+  ];
   return (
     <CompanyNavProvider value={openCompany}>
       <main className="desk">
@@ -2633,7 +2642,7 @@ function DashboardContent({
             } else processImportFile(request.file, request.expected);
           }}
         />
-        <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+        <div className="flex flex-col gap-2">
           <header className={'app-header' + (hideTabs ? ' no-tabs' : '')}>
             <div className="header-brand-group">
               <button
@@ -2825,47 +2834,14 @@ function DashboardContent({
               )}
             </div>
             {!hideTabs && (
-              <TabsList variant="line">
-                <TabsTrigger value="holdings">
-                  <Wallet className="tab-icon" aria-hidden="true" />
-                  <span className="tab-long">Holdings</span>
-                  <span className="tab-short">Holdings</span>
-                </TabsTrigger>
-                <TabsTrigger value="reports">
-                  <BarChart3 className="tab-icon" aria-hidden="true" />
-                  <span className="tab-long">Reports</span>
-                  <span className="tab-short">Reports</span>
-                </TabsTrigger>
-                <TabsTrigger value="history">
-                  <ScrollText className="tab-icon" aria-hidden="true" />
-                  <span className="tab-long">Activity</span>
-                  <span className="tab-short">Activity</span>
-                </TabsTrigger>
-                {hasStocks && (
-                  <TabsTrigger value="sip" title="Experimental feature">
-                    <FlaskConical className="tab-icon tab-flask" aria-hidden="true" />
-                    <span className="tab-long">Monthly Picks</span>
-                    <span className="tab-short">Picks</span>
-                  </TabsTrigger>
-                )}
-                {isAdmin && (
-                  <TabsTrigger value="research-desk">
-                    <FlaskConical className="tab-icon" aria-hidden="true" />
-                    <span className="tab-long">Research desk</span>
-                    <span className="tab-short">Research</span>
-                  </TabsTrigger>
-                )}
-                {isAdmin && (
-                  <TabsTrigger value="ai-lab">
-                    <Microscope className="tab-icon" aria-hidden="true" />
-                    <span className="tab-long">AI Lab</span>
-                    <span className="tab-short">AI Lab</span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
+              <AppNav
+                items={navItems}
+                active={tab}
+                onNavigate={setTab}
+              />
             )}
           </header>
-          <TabsContent value="holdings">
+          <NavPanel id="holdings" tab={tab}>
             {p.companies.length === 0 && !hasAssets ? (
               <div className="panel empty-holdings">
                 <span className="empty-holdings-icon" aria-hidden="true">
@@ -3036,6 +3012,16 @@ function DashboardContent({
                     ]}
                   >
                     <div className="holdings-head holdings-head--inline">
+                      <label className="holdings-search">
+                        <Search size={15} aria-hidden="true" />
+                        <input
+                          type="search"
+                          value={holdingsQuery}
+                          placeholder="Search company, ticker or sector"
+                          aria-label="Search companies"
+                          onChange={(e) => setHoldingsQuery(e.target.value)}
+                        />
+                      </label>
                       <button
                         className="secondary compact holdings-add holdings-targets"
                         disabled={busy || locked}
@@ -3362,7 +3348,7 @@ function DashboardContent({
                 openOwnedAsset(
                   'metal',
                   key,
-                  ownedMetals.find((o) => metalKey(o) === key),
+                  ownedMetals.find((o) => ownedKey(o) === key),
                 )
               }
             />
@@ -3389,7 +3375,7 @@ function DashboardContent({
                 openOwnedAsset(
                   'plan',
                   key,
-                  ownedPlans.find((o) => planKey(o) === key),
+                  ownedPlans.find((o) => ownedKey(o) === key),
                 )
               }
             />
@@ -3417,8 +3403,8 @@ function DashboardContent({
               }
               onOpenFund={openFund}
             />
-          </TabsContent>
-          <TabsContent value="reports">
+          </NavPanel>
+          <NavPanel id="reports" tab={tab}>
             {isAll ? (
               <AllReports
                 portfolio={p}
@@ -3438,8 +3424,8 @@ function DashboardContent({
             ) : (
               <PortfolioReports portfolio={p} />
             )}
-          </TabsContent>
-          <TabsContent value="sip">
+          </NavPanel>
+          <NavPanel id="sip" tab={tab}>
             {!hasStocks ? (
               <div className="panel empty-holdings">
                 <h2>Monthly Picks needs a stock</h2>
@@ -3481,8 +3467,8 @@ function DashboardContent({
                 }}
               />
             )}
-          </TabsContent>
-          <TabsContent value="history">
+          </NavPanel>
+          <NavPanel id="history" tab={tab}>
             <div className="activity-head">
               <h2>Activity</h2>
               <button
@@ -3502,12 +3488,12 @@ function DashboardContent({
               entries={ledgerEntries(undefined)}
               onOpenCompany={openCompany}
             />
-          </TabsContent>
-          <TabsContent value="fund">
+          </NavPanel>
+          <NavPanel id="fund" tab={tab}>
             <MutualFundsSection
               focusKey={fundFocus}
               onSwitchPortfolio={(key) => {
-                const owner = ownedFunds.find((o) => fundKey(o) === key) as
+                const owner = ownedFunds.find((o) => ownedKey(o) === key) as
                   | (OwnedFund & { portfolioId?: string })
                   | undefined;
                 if (!owner?.portfolioId) return;
@@ -3541,15 +3527,15 @@ function DashboardContent({
                 )
               }
             />
-          </TabsContent>
-          <TabsContent value="metal">
+          </NavPanel>
+          <NavPanel id="metal" tab={tab}>
             <GoldSilverSection
               focusKey={metalFocus}
               onBack={() => setTab('holdings')}
               onSwitchPortfolio={(key) =>
                 switchToOwner(
                   'metal',
-                  ownedMetals.find((o) => metalKey(o) === key),
+                  ownedMetals.find((o) => ownedKey(o) === key),
                 )
               }
               owned={ownedMetals}
@@ -3570,15 +3556,15 @@ function DashboardContent({
                 )
               }
             />
-          </TabsContent>
-          <TabsContent value="plan">
+          </NavPanel>
+          <NavPanel id="plan" tab={tab}>
             <SavingsPlansSection
               focusKey={planFocus}
               onBack={() => setTab('holdings')}
               onSwitchPortfolio={(key) =>
                 switchToOwner(
                   'plan',
-                  ownedPlans.find((o) => planKey(o) === key),
+                  ownedPlans.find((o) => ownedKey(o) === key),
                 )
               }
               owned={ownedPlans}
@@ -3599,8 +3585,8 @@ function DashboardContent({
                 )
               }
             />
-          </TabsContent>
-          <TabsContent value="company">
+          </NavPanel>
+          <NavPanel id="company" tab={tab}>
             {companyTicker && (
               <CompanyDetail
                 portfolio={p}
@@ -3636,27 +3622,27 @@ function DashboardContent({
                 onConfirmDividend={openReceipt}
               />
             )}
-          </TabsContent>
+          </NavPanel>
           {isAdmin && (
-            <TabsContent value="research-desk">
+            <NavPanel id="research-desk" tab={tab}>
               <ResearchDesk
                 portfolio={p}
                 onSave={save}
                 onOpenSettings={() => setTab('settings')}
               />
-            </TabsContent>
+            </NavPanel>
           )}
           {isAdmin && (
-            <TabsContent value="ai-lab">
+            <NavPanel id="ai-lab" tab={tab}>
               <AiLab
                 portfolio={p}
                 busy={busy}
                 onSave={save}
                 onOpenCompany={openCompany}
               />
-            </TabsContent>
+            </NavPanel>
           )}
-          <TabsContent value="settings">
+          <NavPanel id="settings" tab={tab}>
             <SettingsView
               key={settingsEntry.n}
               initialSection={settingsEntry.section}
@@ -3709,16 +3695,16 @@ function DashboardContent({
                 />
               }
             />
-          </TabsContent>
-          <TabsContent value="notifications">
+          </NavPanel>
+          <NavPanel id="notifications" tab={tab}>
             <NotificationsView
               notifications={allNotifications}
               busy={busy}
               onChange={updateNotifications}
               onBack={() => setTab('holdings')}
             />
-          </TabsContent>
-        </Tabs>
+          </NavPanel>
+        </div>
         {locked ? (
           <p className="notice">
             This portfolio is locked. Unlock it in Settings → Portfolios to make

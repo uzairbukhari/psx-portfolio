@@ -14,12 +14,11 @@ export async function readPublicData(db: D1Database, tickersInput: unknown): Pro
   const tickers = cleanLookupTickers(tickersInput, MAX_PUBLIC_TICKERS + 1);
   if (tickers.length > MAX_PUBLIC_TICKERS) throw new UserError(`Ask for at most ${MAX_PUBLIC_TICKERS} companies at a time.`);
   if (!tickers.length) return { tickers: [], quoteRows: [], announcements: [], faceValues: {}, corporateActions: [] };
-  const wanted = new Set(tickers);
   const [rows, announcements, faceValues, corporateActions] = await Promise.all([
-    readQuoteRows(db).catch(() => []),
+    readQuoteRows(db, tickers).catch(() => []),
     readAnnouncements(db, tickers).catch(() => []),
     readFaceValues(db, tickers).catch(() => ({})),
     readCorporateActions(db, tickers).catch(() => []),
   ]);
-  return { tickers, quoteRows: rows.filter((row) => wanted.has(row.ticker)), announcements, faceValues, corporateActions };
+  return { tickers, quoteRows: rows, announcements, faceValues, corporateActions };
 }

@@ -115,11 +115,21 @@ export function rebaseWatchQuotes<
 
 export async function readQuoteRows(db: D1Database, tickers?: string[]): Promise<QuoteRow[]> {
   // Callers that name tickers read only those rows; the table holds the whole PSX universe.
-  if (tickers && !tickers.length) return [];
-  const where = tickers ? ` WHERE ticker IN (${tickers.map(() => '?').join(',')})` : '';
-  const statement = db.prepare(`SELECT ticker,price,as_of,quote_date,source,fetched_at FROM quote_refreshes${where}`);
-  const rows = await (tickers ? statement.bind(...tickers) : statement).all<QuoteRow>();
-  return rows.results;
+  if (!tickers) {
+    const rows = await db.prepare('SELECT ticker,price,as_of,quote_date,source,fetched_at FROM quote_refreshes').all<QuoteRow>();
+    return rows.results;
+  }
+  // D1 allows at most 100 bound parameters per statement.
+  const out: QuoteRow[] = [];
+  for (let index = 0; index < tickers.length; index += 90) {
+    const part = tickers.slice(index, index + 90);
+    const rows = await db
+      .prepare(`SELECT ticker,price,as_of,quote_date,source,fetched_at FROM quote_refreshes WHERE ticker IN (${part.map(() => '?').join(',')})`)
+      .bind(...part)
+      .all<QuoteRow>();
+    out.push(...rows.results);
+  }
+  return out;
 }
 
 /** Upserts quotes in as few D1 statements as possible (one batch call); older observations lose. */

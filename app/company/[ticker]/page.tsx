@@ -1,17 +1,20 @@
-import { getViewer } from '@/lib/auth';
-import Dashboard from '../../portfolio';
+import { DashboardRoute } from '../../dashboard-route';
 export const metadata = {
   title: 'Company | Sipwise',
   description: 'Price performance, purchases and dividends for one company.',
 };
-export default async function CompanyPage() {
-  const user = await getViewer();
+export default async function CompanyPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ ticker: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { ticker } = await params;
   return (
-    <Dashboard
-      email={user?.email ?? null}
-      name={user?.name ?? null}
-      picture={user?.picture ?? null}
-      role={user?.role ?? 'user'}
+    <DashboardRoute
+      returnTo={`/company/${ticker}`}
+      searchParams={searchParams}
     />
   );
 }
