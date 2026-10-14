@@ -11,11 +11,12 @@ import {
   unresolvedFaceValueTickers,
   type DividendCandidate,
 } from '@/lib/dividend-history';
-import { money, today, type Portfolio } from '@/lib/portfolio';
+import { DISPLAY_PARTS, money, today, type Portfolio } from '@/lib/portfolio';
 import { undoAutoBatch } from '@/lib/dividend-auto';
 import { undoFundPayoutBatch } from '@/lib/fund-payouts';
 import { historicalTickers } from '@/lib/dividend-history';
 import { useConfirm } from '@/components/confirm-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import './import-review.css';
 import { readJson } from '@/lib/safe-json';
 import { track } from './analytics';
@@ -33,14 +34,24 @@ const STATE_LABEL: Record<DividendCandidate['state'], string> = {
 };
 
 export function DividendSyncView({
-  portfolio, revision, busy, onSave,
+  portfolio: viewPortfolio, locked, revision, busy, onSave,
 }: {
   portfolio: Portfolio;
+  /** Portfolio ids that cannot be saved to (shown disabled in the picker). */
+  locked?: string[];
   revision: number;
   busy: boolean;
-  onSave: (next: Portfolio, message: string) => Promise<void>;
+  /** `target` is set when the view shows All portfolios and the user picked where to save. */
+  onSave: (next: Portfolio, message: string, target?: string) => Promise<void>;
 }) {
   const { confirm, dialog } = useConfirm();
+  // In the All view the ledger is a combination of several portfolios; approvals are written to one of them.
+  const parts = viewPortfolio[DISPLAY_PARTS];
+  const [targetId, setTargetId] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [resume, setResume] = useState(false);
+  const part = parts?.find((entry) => entry.id === targetId);
+  const portfolio = part ? part.portfolio : viewPortfolio;
   const [from, setFrom] = useState(() => earliestHoldingDate(portfolio) ?? today());
   const [to, setTo] = useState(today());
   const [data, setData] = useState<DividendRefreshResponse | null>(null);
@@ -171,6 +182,10 @@ export function DividendSyncView({
 
   async function approve() {
     if (!data || !picked.length) return;
+    if (parts && !part) {
+      setPicking(true);
+      return;
+    }
     const ok = await confirm({
       title: `Approve ${picked.length} dividend${picked.length === 1 ? '' : 's'} as received?`,
       description: `Approving confirms that you received these dividends (about ${money(total)} gross in total). The amounts are calculated from your holdings and PSX's announced rate, not read from a bank or CDC statement. Payment dates stay unknown and no tax is recorded. A later CDC import will replace them with actual figures.`,
@@ -187,10 +202,17 @@ export function DividendSyncView({
       return;
     }
     setError('');
-    await onSave(result.portfolio, `${result.approved.length + result.converted.length} dividend${result.approved.length + result.converted.length === 1 ? '' : 's'} approved as received (${money(result.total)} gross).`);
+    await onSave(result.portfolio, `${result.approved.length + result.converted.length} dividend${result.approved.length + result.converted.length === 1 ? '' : 's'} approved as received (${money(result.total)} gross).`, part?.id);
     track('dividend_approved');
     setSelected(new Set());
   }
+
+  // Picking a portfolio re-plans against its own holdings; then the approval the user asked for carries on.
+  useEffect(() => {
+    if (!resume || !part) return;
+    setResume(false);
+    void approve().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  });
 
   // Dividends the automatic sync added (past payouts and expected ones it marked received), grouped by run.
   const batches = useMemo(() => {
@@ -210,7 +232,7 @@ export function DividendSyncView({
     if (!ok) return;
     const next = JSON.parse(JSON.stringify(portfolio)) as Portfolio;
     const n = undoAutoBatch(next, batch) + undoFundPayoutBatch(next.assets ?? [], batch);
-    await onSave(next, `${n} automatic dividend${n === 1 ? '' : 's'} voided.`);
+    await onSave(next, `${n} automatic dividend${n === 1 ? '' : 's'} voided.`, part?.id);
   }
 
   const status = data ? OVERALL[data.overall] : null;
@@ -237,6 +259,39 @@ export function DividendSyncView({
           ))}
         </div>
       )}
+      {parts && (
+        <div className="ir-banner" aria-live="polite">
+          Approving saves to: <b>{part ? part.name : 'no portfolio chosen yet'}</b>{' '}
+          <button type="button" className="secondary compact" disabled={busy} onClick={() => setPicking(true)}>{part ? 'Change' : 'Choose'}</button>
+          {part && <small> Amounts below use only this portfolio’s holdings.</small>}
+        </div>
+      )}
+      <Dialog open={picking} onOpenChange={setPicking}>
+        <DialogContent className="form-dialog">
+          <DialogTitle>Choose a portfolio</DialogTitle>
+          <DialogDescription>
+            Approved dividends are saved to one portfolio. The list then shows that portfolio’s own holdings and amounts.
+          </DialogDescription>
+          <div className="portfolio-action-choices">
+            {parts?.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="secondary"
+                disabled={locked?.includes(entry.id)}
+                onClick={() => {
+                  setTargetId(entry.id);
+                  setPicking(false);
+                  setResume(picked.length > 0);
+                }}
+              >
+                {entry.name}
+                {locked?.includes(entry.id) ? ' · locked' : ''}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="ir-controls">
         <label>Book closure from <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label>
         <label>to <input type="date" value={to} min={from} max={today()} onChange={(e) => setTo(e.target.value)} /></label>

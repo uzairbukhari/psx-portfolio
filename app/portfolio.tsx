@@ -3698,10 +3698,13 @@ function DashboardContent({
               dividendSync={
                 <DividendSyncView
                   portfolio={p}
+                  locked={workspace?.account.portfolios
+                    .filter((entry) => entry.locked)
+                    .map((entry) => entry.id)}
                   revision={revision}
                   busy={busy}
-                  onSave={async (next, message) => {
-                    await save(next, message);
+                  onSave={async (next, message, target) => {
+                    await save(next, message, target ? { target: { id: target } } : {});
                   }}
                 />
               }
