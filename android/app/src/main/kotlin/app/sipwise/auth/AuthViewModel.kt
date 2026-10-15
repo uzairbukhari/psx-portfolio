@@ -117,7 +117,10 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                     revoke = { container.revokeSession(it) },
                     queue = { sessions.queueSignOut(it) },
                 )
-            if (result == SignOutResult.QUEUED) _signOutPending.value = true
+            if (result == SignOutResult.QUEUED) {
+                _signOutPending.value = true
+                SignOutWorker.schedule(getApplication())
+            }
             clearLocal()
         }
     }

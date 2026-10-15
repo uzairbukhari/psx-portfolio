@@ -1,5 +1,6 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import app.sipwise.model.ActivityFilter
 import app.sipwise.model.money
 import app.sipwise.model.shortDate
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActivityScreen(
     viewModel: ActivityViewModel,
@@ -58,7 +60,7 @@ fun ActivityScreen(
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = Spacing.xl)) {
                 for (section in view.sections) {
-                    item(key = "h-${section.key}") {
+                    stickyHeader(key = "h-${section.key}") {
                         Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
                             Text(section.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(vertical = Spacing.sm))
                         }

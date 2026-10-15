@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
 import app.sipwise.designsystem.Spacing
+import app.sipwise.model.EntryForm
 import app.sipwise.model.EntryKind
 import app.sipwise.model.money
 import java.time.Instant
@@ -91,7 +92,15 @@ fun EntryScreen(
                 }
             }
         }
-        CompanyField(portfolio?.companies.orEmpty().map { it.ticker to it.name }, form.ticker, enabled = !ui.editing) { viewModel.update(form.copy(ticker = it)) }
+        CompanyField(
+            portfolio?.companies.orEmpty().map { it.ticker to it.name },
+            form.ticker,
+            newSelected = form.newCompany,
+            enabled = !ui.editing,
+            allowNew = !ui.editing,
+            onNew = { viewModel.update(form.copy(newCompany = true, ticker = "")) },
+        ) { viewModel.update(form.copy(newCompany = false, ticker = it)) }
+        if (form.newCompany) NewCompanyFields(form, options.sectors, viewModel::update)
         DateField(stringResource(R.string.entry_date), form.date) { viewModel.update(form.copy(date = it)) }
         when (form.kind) {
             EntryKind.DIVIDEND ->
@@ -104,6 +113,9 @@ fun EntryScreen(
                 NumberField(R.string.entry_shares, form.shares) { viewModel.update(form.copy(shares = it)) }
                 NumberField(R.string.entry_price, form.price) { viewModel.update(form.copy(price = it)) }
                 NumberField(R.string.entry_fees, form.fees) { viewModel.update(form.copy(fees = it)) }
+                if (form.kind == EntryKind.BUY) {
+                    MonthPickerField(stringResource(R.string.month_picker_label), form.month, !ui.busy) { viewModel.update(form.copy(month = it)) }
+                }
                 ui.totals?.let { totals ->
                     Text(totals.label, style = MaterialTheme.typography.labelLarge)
                     Text(money(totals.total), style = MaterialTheme.typography.titleLarge)
@@ -138,16 +150,49 @@ fun EntryScreen(
 }
 
 @Composable
+private fun NewCompanyFields(
+    form: EntryForm,
+    sectors: List<String>,
+    onChange: (EntryForm) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        OutlinedTextField(
+            value = form.symbol,
+            onValueChange = { onChange(form.copy(symbol = it.uppercase())) },
+            label = { Text(stringResource(R.string.entry_symbol)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = form.companyName,
+            onValueChange = { onChange(form.copy(companyName = it)) },
+            label = { Text(stringResource(R.string.entry_company_name)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            items(sectors) { sector ->
+                FilterChip(selected = sector == form.sector, onClick = { onChange(form.copy(sector = sector)) }, label = { Text(sector) })
+            }
+        }
+        Text(stringResource(R.string.entry_new_company_hint), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
 private fun CompanyField(
     companies: List<Pair<String, String>>,
     selected: String,
+    newSelected: Boolean,
     enabled: Boolean,
+    allowNew: Boolean,
+    onNew: () -> Unit,
     onSelect: (String) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { open = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-            Text(selected.ifEmpty { stringResource(R.string.entry_company) })
+            Text(if (newSelected) stringResource(R.string.entry_new_company) else selected.ifEmpty { stringResource(R.string.entry_company) })
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             for ((ticker, name) in companies) {
@@ -155,6 +200,15 @@ private fun CompanyField(
                     text = { Text("$ticker · $name") },
                     onClick = {
                         onSelect(ticker)
+                        open = false
+                    },
+                )
+            }
+            if (allowNew) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.entry_new_company_option)) },
+                    onClick = {
+                        onNew()
                         open = false
                     },
                 )

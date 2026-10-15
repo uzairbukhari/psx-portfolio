@@ -2,6 +2,7 @@ package app.sipwise.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sipwise.ledger.CompanyNotConfirmedException
 import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
 import app.sipwise.model.EntryDetail
@@ -10,6 +11,7 @@ import app.sipwise.model.EntryKind
 import app.sipwise.model.EntryOptions
 import app.sipwise.model.EntryTotals
 import app.sipwise.model.entryOperation
+import app.sipwise.model.isValidSymbol
 import app.sipwise.model.voidKind
 import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -43,6 +46,9 @@ class EntryViewModel(
     initial: EntryKind = EntryKind.BUY,
     private val editId: String? = null,
     private val initialTicker: String = "",
+    private val initialShares: String = "",
+    private val initialPrice: String = "",
+    private val initialMonth: String = "",
 ) : ViewModel() {
     private val _ui = MutableStateFlow(EntryUi(form = EntryForm(kind = initial)))
     val ui: StateFlow<EntryUi> = _ui.asStateFlow()
@@ -72,9 +78,12 @@ class EntryViewModel(
                                 portfolioId = owner?.id.orEmpty(),
                                 ticker = if (owner?.companies?.any { it.ticker == initialTicker } == true) initialTicker else "",
                                 date = options.today,
-                                month = options.month,
+                                month = initialMonth,
+                                shares = initialShares,
+                                price = initialPrice,
                             ),
                     )
+                refreshTotals(_ui.value.form)
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
             }
@@ -103,9 +112,11 @@ class EntryViewModel(
         val form = _ui.value.form
         viewModelScope.launch {
             _ui.value = _ui.value.copy(busy = true, error = null)
-            val (op, params) = entryOperation(form)
             try {
-                ledger.apply(form.portfolioId, op, params, form.kind, form.ticker, if (_ui.value.editing) LedgerAction.CORRECTION else LedgerAction.ENTRY)
+                val symbol = form.symbol.trim().uppercase()
+                val (op, base) = entryOperation(if (form.newCompany) form.copy(ticker = symbol) else form)
+                val params = if (form.newCompany) base.withNewCompany(form, symbol) else base
+                ledger.apply(form.portfolioId, op, params, form.kind, if (form.newCompany) symbol else form.ticker, if (_ui.value.editing) LedgerAction.CORRECTION else LedgerAction.ENTRY)
                 _ui.value = _ui.value.copy(busy = false, saved = true)
             } catch (e: EngineException) {
                 fail(e.message)
@@ -115,8 +126,29 @@ class EntryViewModel(
                 fail(e.message)
             } catch (e: ApiRequestException) {
                 fail(e.message)
+            } catch (e: CompanyNotConfirmedException) {
+                fail(e.message)
             }
         }
+    }
+
+    /** Checks the typed symbol, confirms it on PSX, and returns [this] with the new company to add in the same save. */
+    private suspend fun JsonObject.withNewCompany(
+        form: EntryForm,
+        symbol: String,
+    ): JsonObject {
+        val known = _ui.value.options?.portfolios?.firstOrNull { it.id == form.portfolioId }?.companies.orEmpty()
+        if (!isValidSymbol(symbol)) throw CompanyNotConfirmedException(invalidSymbol)
+        if (known.any { it.ticker == symbol }) throw CompanyNotConfirmedException("$symbol is already in your portfolio. Pick it from the list.")
+        val quote = ledger.confirmCompany(symbol)
+        val company =
+            buildJsonObject {
+                put("ticker", symbol)
+                put("name", form.companyName)
+                put("sector", form.sector)
+                put("quote", quote)
+            }
+        return JsonObject(this + ("newCompany" to company))
     }
 
     fun askVoid(open: Boolean) {
@@ -148,6 +180,8 @@ class EntryViewModel(
             }
         }
     }
+
+    private val invalidSymbol = "Enter a valid PSX symbol (2-12 letters or digits)."
 
     private fun fail(message: String?) {
         _ui.value = _ui.value.copy(busy = false, error = message)

@@ -114,6 +114,7 @@ fun UnlockScreen(
     onUnlock: (password: String, remember: Boolean) -> Unit,
     onBiometric: () -> Unit,
     onForgot: () -> Unit,
+    onErase: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     var password by rememberSaveable { mutableStateOf("") }
@@ -148,6 +149,7 @@ fun UnlockScreen(
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(if (busy) R.string.unlocking else R.string.unlock)) }
         TextButton(onClick = onForgot, enabled = !busy && !offline) { Text(stringResource(R.string.unlock_forgot)) }
+        TextButton(onClick = onErase, enabled = !busy && !offline) { Text(stringResource(R.string.erase_link)) }
         TextButton(onClick = onSignOut, enabled = !busy) { Text(stringResource(R.string.sign_out)) }
     }
 }
@@ -194,3 +196,35 @@ fun VaultFailedScreen(
         TextButton(onClick = onSignOut) { Text(stringResource(R.string.sign_out)) }
     }
 }
+
+@Composable
+fun EraseVaultScreen(
+    email: String,
+    busy: Boolean,
+    error: String?,
+    onErase: () -> Unit,
+    onBack: () -> Unit,
+) {
+    var typed by rememberSaveable { mutableStateOf("") }
+    ScreenColumn {
+        Text(stringResource(R.string.erase_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.erase_body, email), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        OutlinedTextField(
+            value = typed,
+            onValueChange = { typed = it },
+            label = { Text(stringResource(R.string.erase_type)) },
+            singleLine = true,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        ErrorText(error)
+        Button(
+            onClick = onErase,
+            enabled = !busy && typed.trim() == ERASE_WORD,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(if (busy) R.string.working else R.string.erase_action)) }
+        TextButton(onClick = onBack, enabled = !busy) { Text(stringResource(R.string.back)) }
+    }
+}
+
+private const val ERASE_WORD = "ERASE"

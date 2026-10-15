@@ -80,6 +80,7 @@ import app.sipwise.ui.CompanyScreen
 import app.sipwise.ui.CompanyViewModel
 import app.sipwise.ui.EntryScreen
 import app.sipwise.ui.EntryViewModel
+import app.sipwise.ui.EraseVaultScreen
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.InboxBell
@@ -125,7 +126,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable object More
 
-@Serializable data class AddEntry(val entryId: String? = null, val ticker: String? = null)
+@Serializable data class AddEntry(
+    val entryId: String? = null,
+    val ticker: String? = null,
+    val shares: String? = null,
+    val price: String? = null,
+    val month: String? = null,
+)
 
 @Serializable object Targets
 
@@ -211,6 +218,7 @@ private fun VaultGate(
     val busy by vault.busy.collectAsStateWithLifecycle()
     val error by vault.error.collectAsStateWithLifecycle()
     var recovering by remember { mutableStateOf(false) }
+    var erasing by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vault.onBackgrounded(System.currentTimeMillis()) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { vault.onForegrounded(System.currentTimeMillis()) }
     when (val current = ui) {
@@ -220,7 +228,9 @@ private fun VaultGate(
         is VaultUi.ConfirmRecovery ->
             RecoveryKeyScreen(current.recoveryKey, busy, error, onSaved = vault::confirmRecoverySaved, onCancel = vault::cancelSetup)
         is VaultUi.Locked ->
-            if (recovering) {
+            if (erasing) {
+                EraseVaultScreen(email, busy, error, onErase = vault::erase, onBack = { erasing = false })
+            } else if (recovering) {
                 RecoverScreen(busy, error, onRecover = vault::recover, onBack = { recovering = false })
             } else {
                 val biometric by vault.biometric.collectAsStateWithLifecycle()
@@ -233,6 +243,7 @@ private fun VaultGate(
                     onUnlock = { password, remember -> vault.unlock(password, remember, activity) },
                     onBiometric = { activity?.let(vault::unlockWithBiometric) },
                     onForgot = { recovering = true },
+                    onErase = { erasing = true },
                     onSignOut = onSignOut,
                 )
             }
@@ -421,7 +432,21 @@ private fun MainShell(
         },
     ) { padding ->
         NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
-            composable<Today> { TodayScreen(today) }
+            composable<Today> {
+                TodayScreen(
+                    today,
+                    onOpenCompany = { nav.navigate(CompanyRoute(it)) },
+                    onOpenTargets = { nav.navigate(Targets) },
+                    onAddEntry = { nav.navigate(AddEntry()) },
+                    onOpenPlan = {
+                        nav.navigate(Plan) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }, onOpenInsights = { nav.navigate(Insights) }) }
             composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
             composable<Insights> {
@@ -434,7 +459,10 @@ private fun MainShell(
                 val month = backStack.toRoute<Picks>().month
                 val picks: PicksViewModel =
                     viewModel(key = "picks-$month", factory = viewModelFactory { initializer { PicksViewModel(unlocked.ledger, api, month) } })
-                PicksScreen(picks, onRecordOne = { nav.navigate(AddEntry(ticker = it)) })
+                PicksScreen(
+                    picks,
+                    onRecordOne = { ticker, shares, price -> nav.navigate(AddEntry(ticker = ticker, shares = shares, price = price, month = month)) },
+                )
             }
             composable<Portfolios> {
                 val portfolios: PortfoliosViewModel =
@@ -466,8 +494,20 @@ private fun MainShell(
                 val route = it.toRoute<AddEntry>()
                 val form: EntryViewModel =
                     viewModel(
-                        key = "${route.entryId}/${route.ticker}",
-                        factory = viewModelFactory { initializer { EntryViewModel(unlocked.ledger, editId = route.entryId, initialTicker = route.ticker.orEmpty()) } },
+                        key = "${route.entryId}/${route.ticker}/${route.shares}/${route.price}/${route.month}",
+                        factory =
+                            viewModelFactory {
+                                initializer {
+                                    EntryViewModel(
+                                        unlocked.ledger,
+                                        editId = route.entryId,
+                                        initialTicker = route.ticker.orEmpty(),
+                                        initialShares = route.shares.orEmpty(),
+                                        initialPrice = route.price.orEmpty(),
+                                        initialMonth = route.month.orEmpty(),
+                                    )
+                                }
+                            },
                     )
                 EntryScreen(form, onDone = { nav.popBackStack() })
             }

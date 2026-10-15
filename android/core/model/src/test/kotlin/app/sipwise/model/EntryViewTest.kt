@@ -5,6 +5,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class EntryViewTest {
     @Test
@@ -15,6 +16,13 @@ class EntryViewTest {
         assertEquals("buy", params["kind"]?.jsonPrimitive?.content)
         assertEquals("10", params["shares"]?.jsonPrimitive?.content)
         assertFalse("editingId" in params)
+    }
+
+    @Test
+    fun aSellNeverCarriesASipMonth() {
+        val form = EntryForm(EntryKind.SELL, "p1", "LUCK", "2026-10-01", shares = "5", price = "120", month = "2026-10")
+        val (_, params) = entryOperation(form)
+        assertEquals("", params["month"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -43,5 +51,14 @@ class EntryViewTest {
         assertEquals(EntryKind.SELL, form.kind)
         assertEquals("t-1", form.editingId)
         assertEquals("p", form.portfolioId)
+    }
+
+    @Test
+    fun aPsxSymbolIsTwoToTwelveUppercaseLettersOrDigits() {
+        assertTrue(isValidSymbol("MEBL"))
+        assertTrue(isValidSymbol("K2"))
+        assertFalse(isValidSymbol("A"))
+        assertFalse(isValidSymbol("TOOLONGSYMBOL1"))
+        assertFalse(isValidSymbol("ME BL"))
     }
 }

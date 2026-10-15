@@ -40,10 +40,16 @@ export function mutateAccount(account: PortfolioAccount, portfolioId: string, op
   // One plan covers every portfolio, so a buy may name a company the receiving portfolio does not have yet: add it
   // with no target, like the Expo review sheet does.
   const params = op === 'buys' ? { ...p, buys: reviewedBuys(p) } : p;
-  const base = op === 'buys' ? withMissingCompanies(current, account, params.buys as BuyDraft[]) : current;
+  const withBuys = op === 'buys' ? withMissingCompanies(current, account, params.buys as BuyDraft[]) : current;
+  // A company typed into the entry form is added in the same save as its first entry, so one Undo removes both.
+  const base = isNewCompany(p.newCompany) ? addCompany(withBuys, { ticker: str(p.newCompany, 'ticker'), name: str(p.newCompany, 'name'), sector: str(p.newCompany, 'sector') }, p.newCompany.quote as Parameters<typeof addCompany>[2]) : withBuys;
   const next = apply(base, op, params);
   validate(next);
   return replacePortfolio(account, next, { id: portfolioId });
+}
+
+function isNewCompany(value: unknown): value is Params & { quote: unknown } {
+  return typeof value === 'object' && value !== null && 'quote' in value;
 }
 
 /** Buys from the review sheet's typed rows (validated like the sheet does), or already-parsed drafts. */

@@ -307,6 +307,25 @@ test('ledger changes validate like the Expo screens and return the next account 
   assert.equal(run('entry.totals', { kind: 'buy', shares: '', price: '100' }).value, null);
 });
 
+test('a new company is added in the same save as its first entry', () => {
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const portfolioId = account.portfolios[0].id;
+  const quote = { price: 50, asOf: `${today()}T10:00:00Z`, date: today(), source: 'https://dps.psx.com.pk/company/ZZTEST', fetchedAt: `${today()}T10:00:00Z` };
+  const newCompany = { ticker: 'ZZTEST', name: 'Zz Test Ltd', sector: 'Others', quote };
+  const trade = { ticker: 'ZZTEST', kind: 'buy', date: today(), shares: '10', price: '50', fees: '0', month: '', note: '' };
+  const done = run('mutate', { portfolio: portfolioId, op: 'trade', params: JSON.stringify({ ...trade, newCompany }) });
+  assert.equal(done.ok, true, done.error);
+  const next = JSON.parse(done.value.account).portfolios[0].portfolio;
+  assert.ok(next.companies.some((c) => c.ticker === 'ZZTEST' && c.name === 'Zz Test Ltd' && c.target === 0));
+  assert.ok(next.trades.some((t) => t.ticker === 'ZZTEST'));
+  const existing = account.portfolios[0].portfolio.companies[0].ticker;
+  const dup = run('mutate', { portfolio: portfolioId, op: 'trade', params: JSON.stringify({ ...trade, ticker: existing, newCompany: { ...newCompany, ticker: existing } }) });
+  assert.equal(dup.ok, false);
+  assert.match(dup.error, /already in your portfolio/);
+  assert.ok(run('entry.options', {}).value.sectors.includes('Others'));
+});
+
 test('portfolios can be added, renamed, locked and removed (only empty unlocked ones)', () => {
   run('account.load', { json: JSON.stringify(seed()) });
   const before = run('scope.list').value.portfolios;

@@ -12,6 +12,7 @@ import app.sipwise.network.ApiRequestException
 import app.sipwise.network.QuoteJob
 import app.sipwise.network.QuoteTickers
 import app.sipwise.network.QuotesJobResponse
+import app.sipwise.network.QuotesResponse
 import app.sipwise.network.followQuoteJob
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineClient
@@ -105,6 +106,18 @@ class Ledger(
         } catch (ignored: ApiRequestException) {
             null
         }
+    }
+
+    /** Confirms [ticker] is a current PSX symbol and returns its quote as the server sent it. Only the symbol leaves the phone. */
+    suspend fun confirmCompany(ticker: String): JsonElement {
+        val client = api ?: throw CompanyNotConfirmedException("$ticker could not be confirmed on PSX: you are offline.")
+        val reply =
+            try {
+                client.post("/api/quotes", QuoteTickers(listOf(ticker)), QuoteTickers.serializer(), QuotesResponse.serializer())
+            } catch (e: ApiRequestException) {
+                throw CompanyNotConfirmedException("$ticker could not be confirmed on PSX: ${e.message ?: "try again"}", e)
+            }
+        return reply.quotes[ticker] ?: throw CompanyNotConfirmedException("$ticker is not available as a current PSX symbol.")
     }
 
     /** Whether the PSX is open right now, by the shared market calendar. */
@@ -216,3 +229,5 @@ class Ledger(
 private const val PUBLIC_REFRESH_MS = 60_000L
 private const val MARKET_CHUNK = 100
 private const val LOOKUP_CHUNK = 50
+
+class CompanyNotConfirmedException(message: String, cause: Throwable? = null) : Exception(message, cause)

@@ -22,13 +22,17 @@ Add secrets under GitHub > Settings > Secrets and variables > Actions (use the `
 | Name | Kind | Where to find it |
 | --- | --- | --- |
 | `ANDROID_KEYSTORE_PROD_B64`, `ANDROID_KEYSTORE_STAGING_B64` | secret | `npx eas-cli credentials -p android` > Download existing keystore (pick the production and the staging profile), then `base64 -w0 keystore.jks` |
-| `ANDROID_KEYSTORE_*_PASSWORD`, `ANDROID_KEY_*_ALIAS`, `ANDROID_KEY_*_PASSWORD` | secret | Printed by the same EAS credentials download |
+| `ANDROID_KEYSTORE_PROD_PASSWORD`, `ANDROID_KEYSTORE_STAGING_PASSWORD` | secret | Printed by the same EAS credentials download |
+| `ANDROID_KEY_PROD_ALIAS`, `ANDROID_KEY_STAGING_ALIAS` | secret | Printed by the same EAS credentials download |
+| `ANDROID_KEY_PROD_PASSWORD`, `ANDROID_KEY_STAGING_PASSWORD` | secret | Printed by the same EAS credentials download |
 | `ANDROID_CERT_SHA1_PROD`, `ANDROID_CERT_SHA1_STAGING` | secret | `keytool -list -v -keystore keystore.jks` (SHA1 line) |
 | `ANDROID_GOOGLE_SERVICES_JSON_B64` | secret | Firebase console > Project settings > Your apps: register `com.uzairbukhari.sipwise` and `com.uzairbukhari.sipwise.staging`, download `google-services.json`, then `base64 -w0 google-services.json` |
 | `ANDROID_PREV_VERSION_CODE` | variable | `npx eas-cli build:version:get -p android` |
 | `API_BASE_URL_PROD` | variable | The production Worker URL, no trailing slash |
 | `FCM_SERVICE_ACCOUNT_JSON` | Worker secret (main and quote-refresh) | Firebase console > Project settings > Service accounts > Generate new private key; `npx wrangler secret put FCM_SERVICE_ACCOUNT_JSON` |
 | Google OAuth Android clients | Google Cloud console | APIs & Services > Credentials > Create OAuth client ID > Android, once per package name, with the SHA-1 of the matching keystore |
+
+The staging and production keystores are different, so each pin and each Google client takes its own SHA-1. The release workflow prints the real production SHA-1 when its pin check fails; the signing certificate of a published APK can also be read from its signing block. A wrong pin stops the release at the "Check the signing certificates are the pinned ones" step, and a Google client with the wrong SHA-1 or package makes sign-in end with "[16] Account reauth failed".
 
 Never commit the keystores, `google-services.json` or the service account file.
 

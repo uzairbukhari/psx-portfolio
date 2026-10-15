@@ -1,5 +1,6 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,11 +35,21 @@ import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
 
 @Composable
-fun TodayScreen(viewModel: TodayViewModel) {
+fun TodayScreen(
+    viewModel: TodayViewModel,
+    onOpenCompany: (String) -> Unit,
+    onOpenTargets: () -> Unit,
+    onOpenPlan: () -> Unit,
+    onAddEntry: () -> Unit,
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
         if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        return
+    }
+    if (view.firstUse && !ui.skippedWelcome) {
+        WelcomeCard(onAdd = onAddEntry, onSkip = viewModel::skipWelcome)
         return
     }
     LazyColumn(
@@ -54,7 +65,16 @@ fun TodayScreen(viewModel: TodayViewModel) {
         item { MonthCard(view.progress) }
         if (view.actions.isNotEmpty()) {
             item { Text(stringResource(R.string.actions_title), style = MaterialTheme.typography.titleMedium) }
-            item { ActionsCard(view.actions) }
+            item {
+                ActionsCard(view.actions, ui.pricing) { action ->
+                    when (action.key) {
+                        "dividend" -> action.ticker?.let(onOpenCompany)
+                        "prices" -> viewModel.refreshPrices()
+                        "targets" -> onOpenTargets()
+                        else -> onOpenPlan()
+                    }
+                }
+            }
         }
     }
 }
@@ -167,16 +187,52 @@ private fun MonthCard(progress: MonthProgress) {
 }
 
 @Composable
-private fun ActionsCard(actions: List<NextAction>) {
+private fun ActionsCard(
+    actions: List<NextAction>,
+    pricing: Boolean,
+    onAction: (NextAction) -> Unit,
+) {
     Card(Modifier.fillMaxWidth()) {
         Column {
             actions.forEachIndexed { index, action ->
                 ListItem(
                     headlineContent = { Text(action.title) },
-                    supportingContent = { Text(action.detail) },
+                    supportingContent = {
+                        Text(if (action.key == "prices" && pricing) stringResource(R.string.holdings_refreshing) else action.detail)
+                    },
+                    modifier = Modifier.clickable { onAction(action) },
                 )
                 if (index < actions.lastIndex) HorizontalDivider()
             }
         }
+    }
+}
+
+/** First-use welcome: add a first holding or skip, like the Expo app. */
+@Composable
+private fun WelcomeCard(
+    onAdd: () -> Unit,
+    onSkip: () -> Unit,
+) {
+    Column(Modifier.padding(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.welcome_subtitle), style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.welcome_start), style = MaterialTheme.typography.labelLarge)
+        Card(Modifier.fillMaxWidth()) {
+            Column {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.welcome_add_title)) },
+                    supportingContent = { Text(stringResource(R.string.welcome_add_detail)) },
+                    modifier = Modifier.clickable(onClick = onAdd),
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.welcome_skip_title)) },
+                    supportingContent = { Text(stringResource(R.string.welcome_skip_detail)) },
+                    modifier = Modifier.clickable(onClick = onSkip),
+                )
+            }
+        }
+        Text(stringResource(R.string.welcome_note), style = MaterialTheme.typography.bodySmall)
     }
 }

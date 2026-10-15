@@ -18,7 +18,7 @@ data class EntryPortfolio(
 
 /** What the add-entry form offers. Produced by the shared TypeScript (`entry.options`). */
 @Serializable
-data class EntryOptions(val today: String, val month: String, val portfolios: List<EntryPortfolio>)
+data class EntryOptions(val today: String, val month: String, val portfolios: List<EntryPortfolio>, val sectors: List<String> = emptyList())
 
 /** Live totals under the form, e.g. "Total cost including fees". */
 @Serializable
@@ -90,7 +90,14 @@ data class EntryForm(
     val oldShares: String = "",
     val newShares: String = "",
     val editingId: String? = null,
+    val newCompany: Boolean = false,
+    val symbol: String = "",
+    val companyName: String = "",
+    val sector: String = "Others",
 )
+
+/** A symbol PSX could list: 2-12 letters or digits (the same rule as the shared isValidSymbol). */
+fun isValidSymbol(symbol: String): Boolean = Regex("^[A-Z0-9]{2,12}$").matches(symbol)
 
 /** The ledger operation name and its parameters for [form]. */
 fun entryOperation(form: EntryForm): Pair<String, JsonObject> {
@@ -117,7 +124,7 @@ fun entryOperation(form: EntryForm): Pair<String, JsonObject> {
                     put("shares", form.shares)
                     put("price", form.price)
                     put("fees", form.fees)
-                    put("month", form.month)
+                    put("month", if (form.kind == EntryKind.BUY) form.month else "")
                 }
             }
         }
