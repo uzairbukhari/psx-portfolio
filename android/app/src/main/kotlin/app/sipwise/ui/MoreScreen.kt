@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -102,6 +103,7 @@ fun MoreScreen(
             OutlinedButton(onClick = onManagePortfolios) { Text(stringResource(R.string.portfolios_manage)) }
         }
         SecurityCard(vault, session)
+        if (user.role == "super_admin") AdminCard()
         NotificationsCard(push)
         AnalyticsCard()
         DevicesCard(ui, settings)
@@ -302,6 +304,18 @@ private fun UpdateCard(viewModel: UpdateViewModel = viewModel()) {
                     Button(onClick = { context.startActivity(viewModel.permissionIntent()) }) { Text(stringResource(R.string.update_open_settings)) }
                 }
             }
+        }
+    }
+}
+
+/** Super admins only: the Research desk and admin console live on the web, not in the app. */
+@Composable
+private fun AdminCard() {
+    val links = LocalUriHandler.current
+    SectionCard(R.string.admin_title) {
+        Text(stringResource(R.string.admin_hint), style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton(onClick = { links.openUri(BuildConfig.API_BASE_URL.trimEnd('/') + "/research-desk") }) {
+            Text(stringResource(R.string.admin_open))
         }
     }
 }

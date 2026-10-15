@@ -70,7 +70,7 @@ private fun gainColor(gain: Double?) =
     }
 
 @Composable
-private fun SectionCard(
+private fun InsightCard(
     title: Int,
     content: @Composable () -> Unit,
 ) {
@@ -85,7 +85,7 @@ private fun SectionCard(
 @Composable
 private fun SummaryHero(report: InsightsView) {
     val s = report.summary
-    SectionCard(R.string.insights_summary) {
+    InsightCard(R.string.insights_summary) {
         Text(moneyShort(s.pricedValue), style = MaterialTheme.typography.headlineMedium)
         Text(stringResource(R.string.insights_priced_value), style = MaterialTheme.typography.bodySmall)
         val gain = s.totalGain
@@ -109,7 +109,7 @@ private fun BarsCard(
     rows: List<Triple<String, Double, Double>>,
     money: Boolean = false,
 ) {
-    SectionCard(title) {
+    InsightCard(title) {
         for ((label, fraction, value) in rows) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(label)
@@ -123,7 +123,7 @@ private fun BarsCard(
 
 @Composable
 private fun TargetsCard(report: InsightsView) {
-    SectionCard(R.string.insights_targets) {
+    InsightCard(R.string.insights_targets) {
         for (t in report.targets) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(t.ticker)
@@ -136,7 +136,7 @@ private fun TargetsCard(report: InsightsView) {
 
 @Composable
 private fun GainCard(report: InsightsView) {
-    SectionCard(R.string.insights_gain_by_company) {
+    InsightCard(R.string.insights_gain_by_company) {
         for (g in report.performance) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(g.ticker)
@@ -153,7 +153,7 @@ private fun GainCard(report: InsightsView) {
 @Composable
 private fun IncomeCard(report: InsightsView) {
     val r = report.realized
-    SectionCard(R.string.insights_income) {
+    InsightCard(R.string.insights_income) {
         Text(stringResource(R.string.insights_realized, money(r.totalRealizedGain), money(r.dividendsGross)))
         r.capitalGainsTax?.let { Text(stringResource(R.string.insights_cgt, money(it))) }
         if (!r.taxProfileSet) Text(stringResource(R.string.insights_set_tax), style = MaterialTheme.typography.bodySmall)
@@ -168,7 +168,7 @@ private fun TrackSection(
 ) {
     if (ui.trackEmpty) return
     val track = ui.track
-    SectionCard(R.string.insights_value_vs_in) {
+    InsightCard(R.string.insights_value_vs_in) {
         when {
             track == null && ui.trackError != null -> {
                 Text(stringResource(R.string.insights_history_error), color = MaterialTheme.colorScheme.error)
@@ -220,7 +220,7 @@ private fun ReturnLine(track: TrackView) {
 @Composable
 private fun BenchmarkCard(track: TrackView) {
     val b = track.benchmark
-    SectionCard(R.string.insights_benchmark) {
+    InsightCard(R.string.insights_benchmark) {
         Text(b.summary)
         MultiLineChart(
             lines = listOf(ChartLine(b.portfolio, MaterialTheme.colorScheme.primary), ChartLine(b.benchmark, MaterialTheme.colorScheme.tertiary, dashed = true)),

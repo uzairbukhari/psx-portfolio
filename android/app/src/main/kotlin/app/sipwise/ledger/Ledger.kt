@@ -8,6 +8,10 @@ import app.sipwise.model.RatesWanted
 import app.sipwise.network.ApiClient
 import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
+import app.sipwise.network.QuoteJob
+import app.sipwise.network.QuoteTickers
+import app.sipwise.network.QuotesJobResponse
+import app.sipwise.network.followQuoteJob
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineClient
 import app.sipwise.session.LedgerWriter
@@ -87,6 +91,25 @@ class Ledger(
         val change = writer.applyAccount(op, params)
         _version.value += 1
         if (notify) _notices.tryEmit(LedgerNotice(null, label, change, action))
+    }
+
+    /**
+     * The manual "Refresh prices": asks the server to fetch fresh PSX prices for what this ledger holds or targets, follows
+     * the job until it settles, then reloads the shared prices. Returns the settled job (its message is the server's wording).
+     */
+    suspend fun refreshPrices(onPending: (QuoteJob) -> Unit = {}): QuoteJob? {
+        val client = api ?: return null
+        val tickers = ApiJson.decodeFromJsonElement(QuoteTickers.serializer(), engine.call("prices.tickers")).tickers
+        if (tickers.isEmpty()) return null
+        val list = encode(tickers)
+        val job =
+            followQuoteJob(
+                start = { client.post("/api/quotes", QuoteTickers(tickers), QuoteTickers.serializer(), QuotesJobResponse.serializer()).job },
+                poll = { since -> client.get("/api/quotes?tickers=$list&since=${URLEncoder.encode(since.orEmpty(), "UTF-8")}", QuotesJobResponse.serializer()).job },
+                onPending = onPending,
+            )
+        refreshPublic(force = true)
+        return job
     }
 
     /**

@@ -18,7 +18,7 @@ import {
   setPortfolioLocked,
   type PortfolioAccount,
 } from '../../../lib/portfolio-account.ts';
-import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
+import { openPositions, priceTickers, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
 import { blankPortfolio, today } from '../../../lib/portfolio.ts';
 import { contentsLabel, portfolioContents } from '../../../mobile/src/data/scope.ts';
@@ -199,6 +199,11 @@ const handlers: Record<string, Handler> = {
     const placeholders = [...new Set(account.portfolios.flatMap((x) => x.portfolio.companies.filter(hasPlaceholderDetails).map((c) => c.ticker)))];
     return { tickers, placeholders };
   },
+
+  // The companies a manual price refresh covers: everything held or targeted, plus the Monthly Picks shortlist.
+  'prices.tickers': () => ({
+    tickers: [...new Set(requireAccount().portfolios.flatMap((x) => priceTickers(x.portfolio)))],
+  }),
 
   // Starts a fresh round of public data; parts are added with public.add, company details with public.lookups.
   'public.reset': () => {

@@ -8,6 +8,7 @@ import app.sipwise.model.AssetsView
 import app.sipwise.model.HoldingSort
 import app.sipwise.model.HoldingsView
 import app.sipwise.network.ApiJson
+import app.sipwise.network.ApiRequestException
 import app.sipwise.session.EngineException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,8 @@ data class HoldingsUi(
     val sort: HoldingSort = HoldingSort.VALUE,
     val sector: String? = null,
     val showSold: Boolean = false,
+    val pricing: Boolean = false,
+    val priceMessage: String? = null,
     val error: String? = null,
 )
 
@@ -36,6 +39,21 @@ class HoldingsViewModel(private val ledger: Ledger) : ViewModel() {
     }
 
     fun openPortfolio(id: String) = ledger.select(id)
+
+    /** Fetches fresh PSX prices and waits for the result; the server words the outcome. */
+    fun refreshPrices() {
+        if (_ui.value.pricing) return
+        _ui.value = _ui.value.copy(pricing = true, priceMessage = null)
+        viewModelScope.launch {
+            val message =
+                try {
+                    ledger.refreshPrices { _ui.value = _ui.value.copy(priceMessage = it.message) }?.message
+                } catch (e: ApiRequestException) {
+                    e.message
+                }
+            _ui.value = _ui.value.copy(pricing = false, priceMessage = message)
+        }
+    }
 
     fun setSort(sort: HoldingSort) {
         _ui.value = _ui.value.copy(sort = sort)

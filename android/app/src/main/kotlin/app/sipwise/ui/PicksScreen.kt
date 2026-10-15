@@ -199,8 +199,10 @@ private fun PickCard(
                     Text(if (source.date.isEmpty()) source.title else "${source.title} · ${source.date}")
                 }
             }
-            if (row.price != null && row.shares != null) {
-                Text(pluralStringResource(R.plurals.picks_estimate, row.shares.toInt(), row.shares.toInt(), money(row.price), money(row.estimatedSpend ?: 0.0)), style = MaterialTheme.typography.bodySmall)
+            val shares = row.shares
+            val price = row.price
+            if (price != null && shares != null) {
+                Text(pluralStringResource(R.plurals.picks_estimate, shares.toInt(), shares.toInt(), money(price), money(row.estimatedSpend ?: 0.0)), style = MaterialTheme.typography.bodySmall)
                 if (row.recordable && !readOnly) TextButton(onClick = { onRecordOne(row.ticker) }) { Text(stringResource(R.string.picks_record_one)) }
             } else {
                 Text(stringResource(R.string.picks_no_price), style = MaterialTheme.typography.bodySmall)

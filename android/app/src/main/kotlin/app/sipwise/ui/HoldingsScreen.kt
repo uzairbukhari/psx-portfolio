@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -66,6 +67,14 @@ fun HoldingsScreen(
             if (isAll) item { PortfolioBreakdown(overview, viewModel::openPortfolio) }
         }
         if (view.rows.isEmpty() && ui.assets.isEmpty) item { Text(stringResource(R.string.holdings_empty), style = MaterialTheme.typography.bodyLarge) }
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(ui.priceMessage ?: stringResource(R.string.holdings_prices_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = viewModel::refreshPrices, enabled = !ui.pricing) {
+                    Text(stringResource(if (ui.pricing) R.string.holdings_refreshing else R.string.holdings_refresh_prices))
+                }
+            }
+        }
         item { OutlinedButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.insights_open)) } }
         item { SortRow(ui.sort, viewModel::setSort) }
         if (view.sectors.size > 1) item { SectorRow(view.sectors, ui.sector, viewModel::setSector) }
