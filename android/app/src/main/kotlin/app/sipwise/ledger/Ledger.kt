@@ -129,7 +129,7 @@ class Ledger(
         val found = mutableListOf<JsonElement>()
         for (part in tickers.chunked(LOOKUP_CHUNK)) {
             val reply = client.get("/api/companies?tickers=${encode(part)}", JsonObject.serializer())
-            (reply["companies"] as? JsonArray)?.let { found += it }
+            (reply["companies"] as? JsonArray)?.let { found.addAll(it) }
         }
         engine.call("public.lookups", mapOf("json" to JsonArray(found).toString()))
     }

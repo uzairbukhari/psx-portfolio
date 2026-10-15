@@ -2,6 +2,7 @@ package app.sipwise.push
 
 import android.Manifest
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -41,11 +42,8 @@ class SipwiseMessagingService : FirebaseMessagingService() {
         getSystemService(NotificationManager::class.java).notify(message.messageId.hashCode(), built)
     }
 
-    private fun launchIntent() =
-        android.app.PendingIntent.getActivity(
-            this,
-            0,
-            packageManager.getLaunchIntentForPackage(packageName),
-            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+    private fun launchIntent(): PendingIntent? {
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
+        return PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
 }
