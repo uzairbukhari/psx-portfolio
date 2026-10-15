@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -59,7 +60,7 @@ fun HoldingsScreen(
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        stringResource(R.string.holdings_show_sold, view.soldOut.size),
+                        pluralStringResource(R.plurals.holdings_show_sold, view.soldOut.size, view.soldOut.size),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -162,9 +163,9 @@ private fun HoldingItem(
             HorizontalDivider(Modifier.padding(vertical = Spacing.sm))
             val priceLine =
                 if (row.price != null) {
-                    stringResource(R.string.holding_priced, row.shares.toLong(), shortDate(row.priceDate))
+                    pluralStringResource(R.plurals.holding_priced, row.shares.toInt(), row.shares.toLong(), shortDate(row.priceDate))
                 } else {
-                    stringResource(R.string.holding_no_price, row.shares.toLong())
+                    pluralStringResource(R.plurals.holding_no_price, row.shares.toInt(), row.shares.toLong())
                 }
             Text(priceLine, style = MaterialTheme.typography.bodySmall)
             if (row.stale) Text(stringResource(R.string.holding_stale), style = MaterialTheme.typography.labelSmall, color = SipwiseTheme.colors.warn)

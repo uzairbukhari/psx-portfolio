@@ -47,14 +47,23 @@
     <string name="holdings_empty">No holdings yet. Add your first purchase to see your portfolio here.</string>
     <string name="holdings_value">Portfolio value</string>
     <string name="holdings_incomplete">Some prices or costs are missing, so the gain is not shown.</string>
-    <string name="holdings_show_sold">Show %1$d sold out</string>
+    <plurals name="holdings_show_sold">
+        <item quantity="one">Show %1$d sold-out holding</item>
+        <item quantity="other">Show %1$d sold-out holdings</item>
+    </plurals>
     <string name="sort_value">Value</string>
     <string name="sort_gain">Gain</string>
     <string name="sort_weight">Weight</string>
     <string name="sort_name">Name</string>
     <string name="sector_all">All sectors</string>
-    <string name="holding_priced">%1$d shares · priced %2$s</string>
-    <string name="holding_no_price">%1$d shares · no price yet</string>
+    <plurals name="holding_priced">
+        <item quantity="one">%1$d share · priced %2$s</item>
+        <item quantity="other">%1$d shares · priced %2$s</item>
+    </plurals>
+    <plurals name="holding_no_price">
+        <item quantity="one">%1$d share · no price yet</item>
+        <item quantity="other">%1$d shares · no price yet</item>
+    </plurals>
     <string name="holding_stale">Price is out of date</string>
     <string name="holding_dividend_expected">Dividend expected</string>
 </resources>

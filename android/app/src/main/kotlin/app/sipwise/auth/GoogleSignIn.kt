@@ -7,6 +7,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import app.sipwise.BuildConfig
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -35,6 +36,8 @@ class GoogleSignIn(private val appContext: Context) {
             throw SignInFailedException(IllegalStateException("Unexpected credential type ${credential.type}"))
         } catch (e: GetCredentialCancellationException) {
             throw SignInCancelledException().also { it.initCause(e) }
+        } catch (e: NoCredentialException) {
+            throw SignInFailedException(e)
         } catch (e: GetCredentialException) {
             throw SignInFailedException(e)
         }

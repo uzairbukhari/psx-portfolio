@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import androidx.core.content.edit
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -46,7 +47,7 @@ class SecureStorage(context: Context) {
     ) {
         val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.ENCRYPT_MODE, key()) }
         val sealed = cipher.iv + cipher.doFinal(value.toByteArray(Charsets.UTF_8))
-        prefs.edit().putString(name, Base64.encodeToString(sealed, Base64.NO_WRAP)).apply()
+        prefs.edit { putString(name, Base64.encodeToString(sealed, Base64.NO_WRAP)) }
     }
 
     @Synchronized
@@ -60,13 +61,13 @@ class SecureStorage(context: Context) {
                 }
             String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES), Charsets.UTF_8)
         } catch (ignored: java.security.GeneralSecurityException) {
-            prefs.edit().remove(name).apply()
+            prefs.edit { remove(name) }
             null
         }
     }
 
     @Synchronized
     fun remove(name: String) {
-        prefs.edit().remove(name).apply()
+        prefs.edit { remove(name) }
     }
 }
