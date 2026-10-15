@@ -12,6 +12,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +42,7 @@ import app.sipwise.model.signedPercent
 fun HoldingsScreen(
     viewModel: HoldingsViewModel,
     onOpenCompany: (String) -> Unit,
+    onOpenInsights: () -> Unit,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
@@ -64,6 +66,7 @@ fun HoldingsScreen(
             if (isAll) item { PortfolioBreakdown(overview, viewModel::openPortfolio) }
         }
         if (view.rows.isEmpty() && ui.assets.isEmpty) item { Text(stringResource(R.string.holdings_empty), style = MaterialTheme.typography.bodyLarge) }
+        item { OutlinedButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.insights_open)) } }
         item { SortRow(ui.sort, viewModel::setSort) }
         if (view.sectors.size > 1) item { SectorRow(view.sectors, ui.sector, viewModel::setSector) }
         items(view.rows, key = { it.ticker }) { HoldingItem(it, onOpenCompany) }

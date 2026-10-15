@@ -79,6 +79,8 @@ import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.InboxBell
 import app.sipwise.ui.InboxScreen
 import app.sipwise.ui.InboxViewModel
+import app.sipwise.ui.InsightsScreen
+import app.sipwise.ui.InsightsViewModel
 import app.sipwise.ui.LoadingScreen
 import app.sipwise.ui.MoreScreen
 import app.sipwise.ui.PicksScreen
@@ -124,6 +126,8 @@ import kotlinx.serialization.Serializable
 @Serializable object Portfolios
 
 @Serializable object Inbox
+
+@Serializable object Insights
 
 @Serializable data class Picks(val month: String)
 
@@ -294,7 +298,7 @@ private fun MainShell(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
-    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class, Picks::class, Inbox::class).any { entry?.destination?.hasRoute(it) == true }
+    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class, Picks::class, Inbox::class, Insights::class).any { entry?.destination?.hasRoute(it) == true }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
@@ -350,8 +354,13 @@ private fun MainShell(
     ) { padding ->
         NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
             composable<Today> { TodayScreen(today) }
-            composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
+            composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }, onOpenInsights = { nav.navigate(Insights) }) }
             composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
+            composable<Insights> {
+                val insights: InsightsViewModel =
+                    viewModel(factory = viewModelFactory { initializer { InsightsViewModel(unlocked.ledger, api) } })
+                InsightsScreen(insights)
+            }
             composable<Inbox> { InboxScreen(inbox, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
             composable<Picks> { backStack ->
                 val month = backStack.toRoute<Picks>().month
@@ -409,6 +418,7 @@ private fun subScreenTitle(
         destination.hasRoute(Portfolios::class) -> stringResource(R.string.portfolios_title)
         destination.hasRoute(Picks::class) -> stringResource(R.string.picks_title)
         destination.hasRoute(Inbox::class) -> stringResource(R.string.inbox_title)
+        destination.hasRoute(Insights::class) -> stringResource(R.string.insights_title)
         destination.hasRoute(AddEntry::class) ->
             stringResource(if (entry?.toRoute<AddEntry>()?.entryId != null) R.string.entry_edit_title else R.string.entry_title)
         else -> ""

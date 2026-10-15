@@ -405,3 +405,19 @@ test('inbox view and changes spread over every portfolio', () => {
   assert.equal(run('inbox.view', { scope: 'all', filter: 'cleared' }).value.items.length, 2);
   assert.equal(run('mutate.account', { op: 'inbox', params: JSON.stringify({ scope: 'all', action: 'nope' }) }).ok, false);
 });
+
+test('insights and track record views work from the shared report and performance code', () => {
+  run('account.load', { json: JSON.stringify(seed()) });
+  const insights = run('insights.view', { scope: 'all' });
+  assert.equal(insights.ok, true, insights.error);
+  assert.ok(insights.value.companyAllocation.length > 0);
+  assert.ok(insights.value.summary.pricedValue > 0);
+  const batches = run('track.batches', { scope: 'all' });
+  assert.equal(batches.ok, true, batches.error);
+  assert.equal(batches.value.empty, false);
+  assert.equal(batches.value.batches[0][0], 'KSE100');
+  const view = run('track.view', { scope: 'all', range: '1y', histories: JSON.stringify({}) });
+  assert.equal(view.ok, true, view.error);
+  assert.ok(['chart', 'empty'].includes(view.value.value.kind));
+  assert.ok(['chart', 'unavailable'].includes(view.value.benchmark.kind));
+});

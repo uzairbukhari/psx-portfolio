@@ -52,3 +52,23 @@ class InboxTest {
         assertEquals(view.counts.of(InboxFilter.UNREAD), view.counts.unread)
     }
 }
+
+class InsightsTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun resource(name: String) = checkNotNull(javaClass.getResource("/$name")).readText()
+
+    @Test
+    fun `decodes the insights reply`() {
+        val view = json.decodeFromString(InsightsView.serializer(), resource("insights-view.json"))
+        assertTrue(view.companyAllocation.isNotEmpty())
+        assertTrue(view.summary.pricedValue > 0)
+    }
+
+    @Test
+    fun `decodes the track record reply`() {
+        val view = json.decodeFromString(TrackView.serializer(), resource("track-view.json"))
+        assertTrue(view.value.kind == "empty" || view.value.isChart)
+        assertEquals(false, view.benchmark.isChart)
+    }
+}

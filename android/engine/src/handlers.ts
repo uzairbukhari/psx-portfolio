@@ -53,6 +53,9 @@ import {
   type NotificationFilter,
 } from '../../../lib/notification-actions.ts';
 import type { AppNotification } from '../../../lib/portfolio.ts';
+import { portfolioReport } from '../../../lib/portfolio-reports.ts';
+import { tradedTickers } from '../../../lib/performance.ts';
+import { benchmarkView, buildTrackRecord, historyBatches, returnView, valueChartView, type TrackRange } from '../../../mobile/src/data/track-record.ts';
 import { classifyFacts, GATHER_TIMEOUT_MS, needsScrape } from '../../../lib/monthly-picks-flow.ts';
 import { parsePublicAnalysis, pollIntervalMs } from '../../../lib/api-validate.ts';
 import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
@@ -620,6 +623,66 @@ const handlers: Record<string, Handler> = {
           expected: Boolean(expectedDividendFor(portfolio, n)),
         };
       }),
+    };
+  },
+
+  // Insights: the report sections (allocation, sectors, targets, gain by company, buying by month, income).
+  'insights.view': (args) => {
+    const portfolio = dashboardPortfolio(viewAccount(), typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS);
+    const r = portfolioReport(portfolio);
+    const s = r.summary;
+    return {
+      summary: {
+        pricedValue: s.pricedValue,
+        totalGain: s.totalGain,
+        totalGainPercent: s.totalGainPercent,
+        grandTotalReturn: s.grandTotalReturn,
+        quotesPriced: s.quoteCoverage.priced,
+        quotesHeld: s.quoteCoverage.held,
+        topThreeWeight: s.topThreeWeight,
+        largestSector: s.largestSector ? { name: s.largestSector.sector, weight: s.largestSector.weight } : null,
+      },
+      companyAllocation: r.companyAllocation.map((a) => ({ label: a.ticker, weight: a.weight })),
+      sectorAllocation: r.sectorAllocation.map((a) => ({ label: a.sector, weight: a.weight })),
+      targets: r.targetComparison.filter((t) => t.target > 0).map((t) => ({ ticker: t.ticker, actual: t.actual, target: t.target })),
+      performance: r.performance.map((p) => ({ ticker: p.ticker, gain: p.gain, gainPercent: p.gainPercent })),
+      monthly: r.monthlyActivity.slice(-6).map((m) => ({ month: m.month, invested: m.invested })),
+      realized: {
+        totalRealizedGain: r.realized.totalRealizedGain,
+        dividendsGross: r.realized.totalDividendIncomeGross,
+        capitalGainsTax: r.realized.totalCapitalGainsTax,
+        taxProfileSet: r.realized.taxProfileSet,
+      },
+    };
+  },
+
+  // The price-history requests the track record needs (the KSE-100 rides in the first batch), as ticker lists.
+  'track.batches': (args) => {
+    const portfolio = dashboardPortfolio(viewAccount(), typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS);
+    const tickers = tradedTickers(portfolio);
+    return { empty: tickers.length === 0, batches: tickers.length ? historyBatches(tickers) : [] };
+  },
+
+  // Value against money in, the money-weighted return and the KSE-100 comparison, worded for the chosen range.
+  'track.view': (args) => {
+    const portfolio = dashboardPortfolio(viewAccount(), typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS);
+    const range = (typeof args.range === 'string' ? args.range : '1y') as TrackRange;
+    const histories = JSON.parse(text(args, 'histories')) as Record<string, number[][]>;
+    const { held } = safeHoldings(portfolio);
+    const summary = totals(held);
+    const missing = summary.missingPrice ?? [];
+    const record = buildTrackRecord({
+      portfolio,
+      histories,
+      asOf: today(),
+      currentValue: missing.length === 0 ? summary.value : null,
+      missingPrice: missing,
+    });
+    const year = Number(today().slice(0, 4));
+    return {
+      value: valueChartView(record.value, range, year),
+      mwr: returnView(record.mwr, record.block),
+      benchmark: benchmarkView(record.benchmark, range, year, record.benchmarkBlock),
     };
   },
 
