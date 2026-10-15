@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonObject
 
 /** What kind of change was saved, so the notice can say it in words. */
-enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET }
+enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET, TARGETS }
 
 /** Something the person just recorded, so the shell can say so and offer Undo. */
 data class LedgerNotice(val kind: EntryKind?, val ticker: String, val change: SavedChange, val action: LedgerAction = LedgerAction.ENTRY)

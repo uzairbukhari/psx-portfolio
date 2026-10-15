@@ -250,4 +250,32 @@
     </plurals>
     <string name="notice_buys">Buys recorded for %1$s</string>
     <string name="notice_budget">Budget saved for %1$s</string>
+    <string name="targets_intro">Each month’s money goes first to the companies furthest below their target. Weights must add up to 100%%. A company can reach at most %1$d%% of the portfolio after this month’s money, so weights above %2$d%% are treated as %3$d%%.</string>
+    <string name="targets_total">Total %1$d%%</string>
+    <string name="targets_ready">Ready to save</string>
+    <string name="targets_over">%1$d%% over</string>
+    <string name="targets_to_go">%1$d%% to go</string>
+    <string name="targets_over_cap">%1$s above %2$d%%; the plan counts them at %2$d%%.</string>
+    <string name="targets_empty">No companies yet. Add the ones you want the monthly SIP to buy.</string>
+    <string name="targets_remove">Remove</string>
+    <string name="targets_minus">−</string>
+    <string name="targets_plus">+</string>
+    <string name="targets_weight">Target weight (%%)</string>
+    <string name="targets_screen_date">Screening effective date</string>
+    <string name="targets_screen_hint">YYYY-MM-DD</string>
+    <string name="targets_new_buys">New buys</string>
+    <string name="targets_add">Add company</string>
+    <string name="targets_search">Search your companies</string>
+    <string name="targets_no_match">No other company matches. A company that is not in your portfolio yet is added by recording a transaction for it.</string>
+    <plurals name="targets_showing">
+        <item quantity="one">Showing %1$d of %2$d. Type to narrow the list.</item>
+        <item quantity="other">Showing %1$d of %2$d. Type to narrow the list.</item>
+    </plurals>
+    <string name="targets_spread">Spread evenly</string>
+    <string name="targets_screen_note">A screen older than 183 days pauses new buys for that company until you renew its date. Today is %1$s.</string>
+    <string name="targets_save">Save targets</string>
+    <string name="targets_locked">This portfolio is locked. Unlock it in Settings → Portfolios.</string>
+    <string name="plan_set_targets">Set targets</string>
+    <string name="plan_edit_targets">Edit targets</string>
+    <string name="notice_targets">Targets saved</string>
 </resources>

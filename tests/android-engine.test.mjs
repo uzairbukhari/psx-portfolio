@@ -169,6 +169,31 @@ test('the plan view, review totals, budget and buys match the Expo plan code', a
   }
 });
 
+test('the targets editor matches the shared target rules', async () => {
+  const { targetRows, targetTotals, screenStatus, applyTargets, evenWeights } = await import('../lib/targets.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const reference = normalizeAccount(seed(), false);
+  const home = reference.portfolios[0];
+  const view = run('targets.view');
+  assert.deepEqual(view.value.rows.map((r) => r.ticker), targetRows(home.portfolio).map((r) => r.ticker));
+  const rows = view.value.rows;
+  const evaluated = run('targets.eval', { rows: JSON.stringify(rows) }).value;
+  assert.deepEqual(evaluated.totals, roundTrip(targetTotals(targetRows(home.portfolio))));
+  assert.deepEqual(evaluated.statuses[rows[0].ticker], roundTrip(screenStatus({ approved: rows[0].approved, screenDate: rows[0].screenDate })));
+  assert.deepEqual(run('targets.even', { count: '3' }).value, evenWeights(3));
+  const even = evenWeights(rows.length).map(String);
+  const evenRows = rows.map((r, i) => ({ ...r, weight: even[i], screenDate: '2026-09-01', approved: true }));
+  const saved = run('mutate', { portfolio: home.id, op: 'targets', params: JSON.stringify({ rows: evenRows }) });
+  assert.equal(saved.ok, true, saved.error);
+  {
+    const expected = applyTargets(home.portfolio, evenRows.map((r) => ({ ticker: r.ticker, target: Number(r.weight), approved: r.approved, screenDate: r.screenDate })));
+    assert.deepEqual(JSON.parse(saved.value.account).portfolios[0].portfolio.companies.map((c) => c.target), roundTrip(expected.companies.map((c) => c.target)));
+  }
+  assert.equal(run('mutate', { portfolio: home.id, op: 'targets', params: JSON.stringify({ rows: [{ ...rows[0], weight: '10' }] }) }).ok, false);
+  assert.equal(run('targets.search', { taken: JSON.stringify(rows.map((r) => r.ticker)), query: '' }).ok, true);
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();

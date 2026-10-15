@@ -4,6 +4,7 @@
 import { replacePortfolio, portfolioAt, type PortfolioAccount } from '../../../lib/portfolio-account.ts';
 import { validate } from '../../../lib/portfolio.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
+import { applyTargets } from '../../../lib/targets.ts';
 import { setBudget } from '../../../mobile/src/data/sip.ts';
 import {
   addCompany,
@@ -109,6 +110,13 @@ function apply(portfolio: Parameters<typeof recordTrade>[0], op: string, p: Para
       const paymentDate = str(p, 'paymentDate');
       if (!isIsoDate(paymentDate)) throw new Error('Enter the date as YYYY-MM-DD.');
       return markDividendReceived(portfolio, str(p, 'id'), { paymentDate, grossAmount: num(p, 'grossAmount'), taxWithheld: num(p, 'taxWithheld') });
+    }
+    case 'targets': {
+      const rows = (p.rows as { ticker: string; weight: string; approved: boolean; screenDate: string }[]) ?? [];
+      for (const r of rows) {
+        if (r.screenDate && !isIsoDate(r.screenDate)) throw new Error(`Enter ${r.ticker}'s screening date as YYYY-MM-DD, or leave it blank.`);
+      }
+      return applyTargets(portfolio, rows.map((r) => ({ ticker: r.ticker, target: parseNumber(r.weight) ?? 0, approved: r.approved, screenDate: r.screenDate })));
     }
     case 'budget': {
       const amount = num(p, 'amount');

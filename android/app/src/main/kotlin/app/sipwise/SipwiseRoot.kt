@@ -63,6 +63,8 @@ import app.sipwise.ui.PlanViewModel
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
 import app.sipwise.ui.SignInScreen
+import app.sipwise.ui.TargetsScreen
+import app.sipwise.ui.TargetsViewModel
 import app.sipwise.ui.TodayScreen
 import app.sipwise.ui.TodayViewModel
 import app.sipwise.ui.UnlockScreen
@@ -85,6 +87,8 @@ import kotlinx.serialization.Serializable
 @Serializable object More
 
 @Serializable object AddEntry
+
+@Serializable object Targets
 
 @Serializable data class CompanyRoute(val ticker: String)
 
@@ -177,6 +181,7 @@ private fun MainShell(
                             LedgerAction.VOID -> context.getString(R.string.notice_void, notice.ticker)
                             LedgerAction.BUYS -> context.getString(R.string.notice_buys, notice.ticker)
                             LedgerAction.BUDGET -> context.getString(R.string.notice_budget, notice.ticker)
+                            LedgerAction.TARGETS -> context.getString(R.string.notice_targets)
                         },
                     actionLabel = context.getString(R.string.entry_undo),
                     duration = SnackbarDuration.Long,
@@ -195,7 +200,7 @@ private fun MainShell(
             }
         }
     }
-    val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true
+    val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
@@ -229,7 +234,12 @@ private fun MainShell(
         NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
             composable<Today> { TodayScreen(today) }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
-            composable<Plan> { PlanScreen(plan) }
+            composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }) }
+            composable<Targets> {
+                val targets: TargetsViewModel =
+                    viewModel(factory = viewModelFactory { initializer { TargetsViewModel(unlocked.ledger) } })
+                TargetsScreen(targets, onDone = { nav.popBackStack() })
+            }
             composable<Activity> { ActivityScreen(activity) }
             composable<More> { MoreScreen(onLock, onSignOut) }
             composable<CompanyRoute> { backStack ->

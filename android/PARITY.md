@@ -33,8 +33,8 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Partial (date picker on the entry form; month picker pending) |
 | 27 | Manual price | `quote.tsx` | Done |
 | 28 | Mark dividend received | `received.tsx` | Done |
-| 29 | Targets editor | `targets.tsx`, `lib/targets.ts` | Pending |
-| 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Partial (targets mode: month, budget, suggested buys, review and record, fee and old-quote settings; Monthly Picks and the targets editor pending) |
+| 29 | Targets editor | `targets.tsx`, `lib/targets.ts` | Done |
+| 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Partial (targets mode: month, budget, suggested buys, review and record, fee and old-quote settings; Monthly Picks pending) |
 | 31 | Monthly Picks on device | `PicksView.tsx`, `lib/picks-run.ts` | Pending |
 | 32 | Refresh prices (queued job + poll) | `lib/import-refresh.ts` | Pending |
 | 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Partial (filters, search, month groups; sticky headers and edit pending) |

@@ -46,7 +46,10 @@ import app.sipwise.model.shiftMonth
 import app.sipwise.model.shortDate
 
 @Composable
-fun PlanScreen(viewModel: PlanViewModel) {
+fun PlanScreen(
+    viewModel: PlanViewModel,
+    onEditTargets: () -> Unit,
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
@@ -63,9 +66,9 @@ fun PlanScreen(viewModel: PlanViewModel) {
             items(view.bought, key = { it.id }) { BoughtItem(it) }
         }
         if (view.targetedCount == 0) {
-            item { NoTargets(view) }
+            item { NoTargets(view, onEditTargets) }
         } else {
-            item { PlanBody(view, ui, viewModel) }
+            item { PlanBody(view, ui, viewModel, onEditTargets) }
             item { PlanSettings(ui, viewModel) }
         }
     }
@@ -145,12 +148,16 @@ private fun BoughtItem(buy: MonthBuy) {
 }
 
 @Composable
-private fun NoTargets(view: PlanView) {
+private fun NoTargets(
+    view: PlanView,
+    onEditTargets: () -> Unit,
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.plan_no_targets_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.plan_no_targets_body), style = MaterialTheme.typography.bodyMedium)
             if (view.companyCount == 0) Text(stringResource(R.string.plan_no_companies), style = MaterialTheme.typography.bodyMedium)
+            Button(onClick = onEditTargets, enabled = !view.readOnly && view.companyCount > 0) { Text(stringResource(R.string.plan_set_targets)) }
         }
     }
 }
@@ -160,12 +167,16 @@ private fun PlanBody(
     view: PlanView,
     ui: PlanUi,
     viewModel: PlanViewModel,
+    onEditTargets: () -> Unit,
 ) {
     val plan = view.plan
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         view.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (view.targetState.status != "exact") {
             Text(stringResource(R.string.plan_targets_total, view.targetState.total.toInt()), style = MaterialTheme.typography.bodyMedium)
+        }
+        OutlinedButton(onClick = onEditTargets, enabled = !view.readOnly, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.plan_edit_targets))
         }
         view.priceErrors.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
         if (plan != null && !view.budgetSet) {

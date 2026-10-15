@@ -21,7 +21,9 @@ import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-for
 import { buildPlan, currentMonth, monthBuys, unifiedPlanSource } from '../../../mobile/src/data/sip.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
 import { parseNumber } from '../../../mobile/src/data/mutations.ts';
-import { targetTotals } from '../../../lib/targets.ts';
+import { evenWeights, screenStatus, targetRows, targetTotals } from '../../../lib/targets.ts';
+import { searchCompanies } from '../../../mobile/src/data/picks.ts';
+import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
 import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
 
 export const ENGINE_API_VERSION = 1;
@@ -209,6 +211,39 @@ const handlers: Record<string, Handler> = {
     const rows = JSON.parse(text(args, 'rows')) as ReviewRow[];
     const feePct = typeof args.feePct === 'string' ? (parseNumber(args.feePct) ?? 0) : 0;
     return parseReview(rows, feePct);
+  },
+
+  // The targets editor's starting point: the home portfolio's targets and the companies that could be added.
+  'targets.view': () => {
+    const account = requireAccount();
+    const home = account.portfolios[0];
+    return {
+      homeId: home.id,
+      locked: Boolean(home.locked),
+      today: today(),
+      cap: WEIGHT_CAP,
+      rows: targetRows(home.portfolio).map((r) => ({ ticker: r.ticker, weight: String(r.target), approved: r.approved, screenDate: r.screenDate })),
+      companies: home.portfolio.companies.map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })),
+    };
+  },
+
+  // Live totals and per-row screening status for the typed draft.
+  'targets.eval': (args) => {
+    const rows = JSON.parse(text(args, 'rows')) as { ticker: string; weight: string; approved: boolean; screenDate: string }[];
+    const weight = (t: string) => parseNumber(t) ?? 0;
+    return {
+      totals: targetTotals(rows.map((r) => ({ ticker: r.ticker, target: weight(r.weight) }))),
+      statuses: Object.fromEntries(rows.map((r) => [r.ticker, screenStatus({ approved: r.approved, screenDate: r.screenDate })])),
+    };
+  },
+
+  'targets.even': (args) => evenWeights(Number(text(args, 'count'))),
+
+  'targets.search': (args) => {
+    const home = requireAccount().portfolios[0].portfolio;
+    const taken = new Set(JSON.parse(text(args, 'taken')) as string[]);
+    const found = searchCompanies(home.companies.filter((c) => !taken.has(c.ticker)), typeof args.query === 'string' ? args.query : '');
+    return { total: found.length, items: found.slice(0, 8).map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })) };
   },
 
   // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.
