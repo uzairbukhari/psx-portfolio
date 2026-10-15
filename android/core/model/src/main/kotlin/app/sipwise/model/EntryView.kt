@@ -30,6 +30,49 @@ enum class EntryKind(val wire: String) {
     OPENING("opening"),
     DIVIDEND("dividend"),
     SPLIT("split"),
+    ;
+
+    companion object {
+        fun fromWire(wire: String): EntryKind? = entries.firstOrNull { it.wire == wire }
+    }
+}
+
+/** An existing entry as the form needs it to correct or void it (`entry.get`). */
+@Serializable
+data class EntryDetail(
+    val found: Boolean,
+    val portfolioId: String = "",
+    val id: String = "",
+    val readOnly: String? = null,
+    val entryKind: String = "",
+    val kind: String = "",
+    val ticker: String = "",
+    val date: String = "",
+    val shares: String = "",
+    val price: String = "",
+    val fees: String = "",
+    val month: String = "",
+    val note: String = "",
+    val perShare: String = "",
+    val oldShares: String = "",
+    val newShares: String = "",
+) {
+    fun toForm() =
+        EntryForm(
+            kind = EntryKind.fromWire(kind) ?: EntryKind.BUY,
+            portfolioId = portfolioId,
+            ticker = ticker,
+            date = date,
+            shares = shares,
+            price = price,
+            fees = fees,
+            month = month,
+            note = note,
+            perShare = perShare,
+            oldShares = oldShares,
+            newShares = newShares,
+            editingId = id,
+        )
 }
 
 /** The form exactly as typed. The shared TypeScript parses and validates the text, so messages match the other apps. */

@@ -4,13 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
-import app.sipwise.model.ActivityEntry
 import app.sipwise.model.CompanyView
 import app.sipwise.model.DividendRow
 import app.sipwise.model.HistoryRange
 import app.sipwise.model.HistorySeries
 import app.sipwise.model.splitEntryId
-import app.sipwise.model.voidKind
 import app.sipwise.network.ApiClient
 import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
@@ -32,8 +30,6 @@ sealed interface CompanyDialog {
     data object Price : CompanyDialog
 
     data class Received(val row: DividendRow) : CompanyDialog
-
-    data class Void(val entry: ActivityEntry) : CompanyDialog
 }
 
 data class CompanyUi(
@@ -131,14 +127,6 @@ class CompanyViewModel(
             put("paymentDate", paymentDate)
             put("grossAmount", gross)
             put("taxWithheld", tax)
-        }
-    }
-
-    fun voidEntry(entry: ActivityEntry) {
-        val (portfolio, id) = splitEntryId(entry.id, soleWritable())
-        change(portfolio, "void", LedgerAction.VOID) {
-            put("entryKind", voidKind(entry.kind))
-            put("id", id)
         }
     }
 

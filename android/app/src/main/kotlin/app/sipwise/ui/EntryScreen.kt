@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -54,22 +55,32 @@ fun EntryScreen(
         return
     }
     val form = ui.form
+    if (ui.missing) {
+        Text(stringResource(R.string.entry_missing), modifier = Modifier.padding(Spacing.gutter))
+        return
+    }
+    ui.readOnly?.let {
+        Text(it, modifier = Modifier.padding(Spacing.gutter))
+        return
+    }
     val portfolio = options.portfolios.firstOrNull { it.id == form.portfolioId }
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(Spacing.gutter),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        if (ui.editing) Text(stringResource(R.string.entry_edit_title), style = MaterialTheme.typography.titleLarge)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             items(EntryKind.entries) { kind ->
                 FilterChip(
                     selected = kind == form.kind,
+                    enabled = !ui.editing,
                     onClick = { viewModel.update(form.copy(kind = kind)) },
                     label = { Text(stringResource(kindLabel(kind))) },
                 )
             }
         }
         val writable = options.portfolios.filter { !it.locked }
-        if (writable.size > 1) {
+        if (writable.size > 1 && !ui.editing) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 items(writable) { p ->
                     FilterChip(
@@ -80,7 +91,7 @@ fun EntryScreen(
                 }
             }
         }
-        CompanyField(portfolio?.companies.orEmpty().map { it.ticker to it.name }, form.ticker) { viewModel.update(form.copy(ticker = it)) }
+        CompanyField(portfolio?.companies.orEmpty().map { it.ticker to it.name }, form.ticker, enabled = !ui.editing) { viewModel.update(form.copy(ticker = it)) }
         DateField(stringResource(R.string.entry_date), form.date) { viewModel.update(form.copy(date = it)) }
         when (form.kind) {
             EntryKind.DIVIDEND ->
@@ -109,6 +120,20 @@ fun EntryScreen(
         Button(onClick = viewModel::submit, enabled = !ui.busy, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(if (ui.busy) R.string.entry_saving else R.string.entry_save))
         }
+        if (ui.editing) {
+            OutlinedButton(onClick = { viewModel.askVoid(true) }, enabled = !ui.busy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.entry_void))
+            }
+        }
+    }
+    if (ui.confirmVoid) {
+        AlertDialog(
+            onDismissRequest = { viewModel.askVoid(false) },
+            title = { Text(stringResource(R.string.entry_void_title)) },
+            text = { Text(stringResource(R.string.entry_void_body)) },
+            confirmButton = { Button(onClick = viewModel::confirmVoid) { Text(stringResource(R.string.entry_void_confirm)) } },
+            dismissButton = { TextButton(onClick = { viewModel.askVoid(false) }) { Text(stringResource(R.string.entry_cancel)) } },
+        )
     }
 }
 
@@ -116,11 +141,12 @@ fun EntryScreen(
 private fun CompanyField(
     companies: List<Pair<String, String>>,
     selected: String,
+    enabled: Boolean,
     onSelect: (String) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { open = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
             Text(selected.ifEmpty { stringResource(R.string.entry_company) })
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {

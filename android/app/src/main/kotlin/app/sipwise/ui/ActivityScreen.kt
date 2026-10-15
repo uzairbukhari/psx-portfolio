@@ -1,5 +1,6 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,7 +28,10 @@ import app.sipwise.model.money
 import app.sipwise.model.shortDate
 
 @Composable
-fun ActivityScreen(viewModel: ActivityViewModel) {
+fun ActivityScreen(
+    viewModel: ActivityViewModel,
+    onOpenEntry: (String) -> Unit,
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     Column(Modifier.padding(horizontal = Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         OutlinedTextField(
@@ -65,6 +69,7 @@ fun ActivityScreen(viewModel: ActivityViewModel) {
                             headlineContent = { Text("${entry.ticker} · ${entry.title}") },
                             supportingContent = { Text(entry.detail) },
                             trailingContent = { entry.amount?.let { Text(money(it)) } },
+                            modifier = if (entry.editable) Modifier.clickable { onOpenEntry(entry.id) } else Modifier,
                         )
                         HorizontalDivider()
                     }

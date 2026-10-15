@@ -171,43 +171,58 @@ private fun PlanBody(
 ) {
     val plan = view.plan
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        view.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        if (view.targetState.status != "exact") {
-            Text(stringResource(R.string.plan_targets_total, view.targetState.total.toInt()), style = MaterialTheme.typography.bodyMedium)
-        }
+        PlanNotices(view)
         OutlinedButton(onClick = onEditTargets, enabled = !view.readOnly, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.plan_edit_targets))
         }
-        view.priceErrors.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        if (plan != null && !view.budgetSet) {
-            Text(stringResource(R.string.plan_set_budget_prompt, monthTitle(view.month)), style = MaterialTheme.typography.bodyMedium)
-        }
-        if (plan != null && view.budgetSet) view.otherErrors.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        if (view.complete) Text(stringResource(R.string.plan_complete), style = MaterialTheme.typography.titleSmall)
         if (plan != null && view.budgetSet && plan.errors.isEmpty()) {
             Text(stringResource(R.string.plan_suggested), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.plan_suggested_note, money(plan.invested), money(plan.leftover)), style = MaterialTheme.typography.bodySmall)
             plan.rows.forEach { SuggestionItem(it) }
-            if (view.receivers.size > 1 && view.buys.isNotEmpty() && !view.readOnly) {
-                Text(stringResource(R.string.plan_record_in), style = MaterialTheme.typography.labelLarge)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    items(view.receivers, key = { it.id }) {
-                        FilterChip(
-                            selected = (ui.receiverId ?: view.homeId) == it.id,
-                            onClick = { viewModel.setReceiver(it.id) },
-                            label = { Text(it.name) },
-                        )
-                    }
-                }
-                Text(stringResource(R.string.plan_record_in_note), style = MaterialTheme.typography.bodySmall)
-            }
             if (view.buys.isNotEmpty() && !view.readOnly) {
+                ReceiverChooser(view, ui, viewModel)
                 Button(onClick = viewModel::openReview, modifier = Modifier.fillMaxWidth()) {
                     Text(pluralStringResource(R.plurals.plan_record_all, view.buys.size, view.buys.size))
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PlanNotices(view: PlanView) {
+    view.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    if (view.targetState.status != "exact") {
+        Text(stringResource(R.string.plan_targets_total, view.targetState.total.toInt()), style = MaterialTheme.typography.bodyMedium)
+    }
+    view.priceErrors.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    if (view.plan == null) return
+    if (!view.budgetSet) {
+        Text(stringResource(R.string.plan_set_budget_prompt, monthTitle(view.month)), style = MaterialTheme.typography.bodyMedium)
+    } else {
+        view.otherErrors.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    }
+    if (view.complete) Text(stringResource(R.string.plan_complete), style = MaterialTheme.typography.titleSmall)
+}
+
+@Composable
+private fun ReceiverChooser(
+    view: PlanView,
+    ui: PlanUi,
+    viewModel: PlanViewModel,
+) {
+    if (view.receivers.size < 2) return
+    Text(stringResource(R.string.plan_record_in), style = MaterialTheme.typography.labelLarge)
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        items(view.receivers, key = { it.id }) {
+            FilterChip(
+                selected = (ui.receiverId ?: view.homeId) == it.id,
+                onClick = { viewModel.setReceiver(it.id) },
+                label = { Text(it.name) },
+            )
+        }
+    }
+    Text(stringResource(R.string.plan_record_in_note), style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable

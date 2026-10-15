@@ -178,9 +178,7 @@
     <string name="company_gross_hint">Leave blank to keep %1$s</string>
     <string name="company_tax">Tax withheld</string>
     <string name="company_tax_hint">Leave blank to use the tax estimate</string>
-    <string name="company_void_title">Void this entry?</string>
-    <string name="company_void_body">%1$s stays in your history as voided but no longer counts.</string>
-    <string name="company_void">Void</string>
+    <string name="company_add">Add transaction for %1$s</string>
     <string name="range_day">1D</string>
     <string name="range_week">1W</string>
     <string name="range_month">1M</string>
@@ -278,4 +276,11 @@
     <string name="plan_set_targets">Set targets</string>
     <string name="plan_edit_targets">Edit targets</string>
     <string name="notice_targets">Targets saved</string>
+    <string name="notice_correction">Correction saved for %1$s</string>
+    <string name="entry_edit_title">Edit entry</string>
+    <string name="entry_missing">That entry no longer exists.</string>
+    <string name="entry_void">Void this entry</string>
+    <string name="entry_void_title">Void this entry?</string>
+    <string name="entry_void_body">It stays in your history as voided but no longer counts.</string>
+    <string name="entry_void_confirm">Void</string>
 </resources>

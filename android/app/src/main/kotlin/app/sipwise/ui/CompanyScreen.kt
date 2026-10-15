@@ -34,7 +34,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,7 +55,11 @@ import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
 
 @Composable
-fun CompanyScreen(viewModel: CompanyViewModel) {
+fun CompanyScreen(
+    viewModel: CompanyViewModel,
+    onOpenEntry: (String) -> Unit,
+    onAdd: () -> Unit,
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
@@ -77,6 +80,9 @@ fun CompanyScreen(viewModel: CompanyViewModel) {
         }
         item { PriceCard(view, onSetPrice = { viewModel.open(CompanyDialog.Price) }) }
         item { PositionCard(view) }
+        item {
+            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.company_add, view.ticker)) }
+        }
         item { ChartCard(ui, viewModel) }
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -110,14 +116,13 @@ fun CompanyScreen(viewModel: CompanyViewModel) {
             items(view.dividends, key = { it.id }) { DividendItem(it, onReceive = { viewModel.open(CompanyDialog.Received(it)) }) }
         } else {
             if (view.entries.isEmpty()) item { Text(stringResource(R.string.company_no_entries, view.ticker)) }
-            items(view.entries, key = { it.id }) { EntryItem(it, onVoid = { viewModel.open(CompanyDialog.Void(it)) }) }
+            items(view.entries, key = { it.id }) { EntryItem(it, onOpen = { onOpenEntry(it.id) }) }
         }
     }
     when (val dialog = ui.dialog) {
         null -> Unit
         CompanyDialog.Price -> PriceDialog(view, ui.busy, ui.error, onSave = viewModel::savePrice, onDismiss = { viewModel.open(null) })
         is CompanyDialog.Received -> ReceivedDialog(dialog.row, ui.busy, ui.error, onSave = viewModel::markReceived, onDismiss = { viewModel.open(null) })
-        is CompanyDialog.Void -> VoidDialog(dialog.entry, ui.busy, ui.error, onConfirm = viewModel::voidEntry, onDismiss = { viewModel.open(null) })
     }
 }
 
@@ -298,14 +303,14 @@ private fun DividendItem(
 @Composable
 private fun EntryItem(
     entry: ActivityEntry,
-    onVoid: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     Column {
         ListItem(
             headlineContent = { Text(entry.title) },
             supportingContent = { Text("${shortDate(entry.date)} · ${entry.detail}") },
             trailingContent = { entry.amount?.let { Text(money(it)) } },
-            modifier = if (entry.editable) Modifier.clickable(onClick = onVoid) else Modifier,
+            modifier = if (entry.editable) Modifier.clickable(onClick = onOpen) else Modifier,
         )
         HorizontalDivider()
     }
@@ -408,28 +413,6 @@ private fun ReceivedDialog(
                 Text(stringResource(if (busy) R.string.entry_saving else R.string.company_mark_received))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.entry_cancel)) } },
-    )
-}
-
-@Composable
-private fun VoidDialog(
-    entry: ActivityEntry,
-    busy: Boolean,
-    error: String?,
-    onConfirm: (ActivityEntry) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.company_void_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Text(stringResource(R.string.company_void_body, entry.title))
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            }
-        },
-        confirmButton = { Button(onClick = { onConfirm(entry) }, enabled = !busy) { Text(stringResource(R.string.company_void)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.entry_cancel)) } },
     )
 }

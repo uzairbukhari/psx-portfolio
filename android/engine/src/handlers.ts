@@ -13,7 +13,7 @@ import {
 import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
 import { today } from '../../../lib/portfolio.ts';
-import { activityEntries, companyDividends } from '../../../mobile/src/data/derive.ts';
+import { activityEntries, companyDividends, readOnlyReason } from '../../../mobile/src/data/derive.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
 import { mutateAccount } from './mutate.ts';
@@ -244,6 +244,42 @@ const handlers: Record<string, Handler> = {
     const taken = new Set(JSON.parse(text(args, 'taken')) as string[]);
     const found = searchCompanies(home.companies.filter((c) => !taken.has(c.ticker)), typeof args.query === 'string' ? args.query : '');
     return { total: found.length, items: found.slice(0, 8).map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })) };
+  },
+
+  // One existing entry, to correct or void it. [id] may be `portfolio::entry` when portfolios are merged.
+  'entry.get': (args) => {
+    const account = requireAccount();
+    const full = text(args, 'id');
+    const at = full.indexOf('::');
+    const portfolioId = at >= 0 ? full.slice(0, at) : account.portfolios[0].id;
+    const id = at >= 0 ? full.slice(at + 2) : full;
+    const owner = account.portfolios.find((x) => x.id === portfolioId);
+    if (!owner) return { found: false };
+    const p = owner.portfolio;
+    const readOnly = owner.locked ? 'This portfolio is locked. Unlock it in Settings → Portfolios.' : readOnlyReason(p, id);
+    const base = { found: true, portfolioId, id, readOnly };
+    const t = p.trades.find((x) => x.id === id);
+    if (t) {
+      return {
+        ...base,
+        entryKind: 'trade',
+        kind: t.kind,
+        ticker: t.ticker,
+        date: t.date,
+        shares: String(t.shares),
+        price: t.price === null ? '' : String(t.price),
+        fees: t.fees ? String(t.fees) : '',
+        month: t.month,
+        note: t.note,
+      };
+    }
+    const d = p.dividends?.find((x) => x.id === id);
+    if (d) return { ...base, entryKind: 'dividend', kind: 'dividend', ticker: d.ticker, date: d.date, perShare: d.perShare ? String(d.perShare) : '', note: d.note };
+    const sp = p.stockSplits?.find((x) => x.id === id);
+    if (sp) {
+      return { ...base, entryKind: 'split', kind: 'split', ticker: sp.ticker, date: sp.date, oldShares: String(sp.oldShares), newShares: String(sp.newShares), note: sp.note };
+    }
+    return { found: false };
   },
 
   // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.

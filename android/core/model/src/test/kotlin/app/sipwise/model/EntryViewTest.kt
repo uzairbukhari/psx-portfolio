@@ -1,10 +1,10 @@
 package app.sipwise.model
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonPrimitive
 
 class EntryViewTest {
     @Test
@@ -34,5 +34,14 @@ class EntryViewTest {
         val json = """{"today":"2026-10-15","month":"2026-10","portfolios":[{"id":"a","name":"Core","locked":false,"companies":[{"ticker":"LUCK","name":"Lucky","sector":"Cement"}]}]}"""
         val options = Json { ignoreUnknownKeys = true }.decodeFromString(EntryOptions.serializer(), json)
         assertEquals("LUCK", options.portfolios.single().companies.single().ticker)
+    }
+
+    @Test
+    fun `turns an entry detail back into a form`() {
+        val detail = EntryDetail(found = true, portfolioId = "p", id = "t-1", entryKind = "trade", kind = "sell", ticker = "MEBL", date = "2026-01-02", shares = "10", price = "5")
+        val form = detail.toForm()
+        assertEquals(EntryKind.SELL, form.kind)
+        assertEquals("t-1", form.editingId)
+        assertEquals("p", form.portfolioId)
     }
 }

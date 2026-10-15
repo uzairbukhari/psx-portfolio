@@ -86,7 +86,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable object More
 
-@Serializable object AddEntry
+@Serializable data class AddEntry(val entryId: String? = null, val ticker: String? = null)
 
 @Serializable object Targets
 
@@ -182,6 +182,7 @@ private fun MainShell(
                             LedgerAction.BUYS -> context.getString(R.string.notice_buys, notice.ticker)
                             LedgerAction.BUDGET -> context.getString(R.string.notice_budget, notice.ticker)
                             LedgerAction.TARGETS -> context.getString(R.string.notice_targets)
+                            LedgerAction.CORRECTION -> context.getString(R.string.notice_correction, notice.ticker)
                         },
                     actionLabel = context.getString(R.string.entry_undo),
                     duration = SnackbarDuration.Long,
@@ -205,7 +206,7 @@ private fun MainShell(
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             if (!onAddScreen && entry?.destination?.hasRoute(More::class) != true) {
-                FloatingActionButton(onClick = { nav.navigate(AddEntry) }) {
+                FloatingActionButton(onClick = { nav.navigate(AddEntry()) }) {
                     Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.entry_title))
                 }
             }
@@ -240,7 +241,7 @@ private fun MainShell(
                     viewModel(factory = viewModelFactory { initializer { TargetsViewModel(unlocked.ledger) } })
                 TargetsScreen(targets, onDone = { nav.popBackStack() })
             }
-            composable<Activity> { ActivityScreen(activity) }
+            composable<Activity> { ActivityScreen(activity, onOpenEntry = { id -> nav.navigate(AddEntry(entryId = id)) }) }
             composable<More> { MoreScreen(onLock, onSignOut) }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker
@@ -249,11 +250,15 @@ private fun MainShell(
                         key = ticker,
                         factory = viewModelFactory { initializer { CompanyViewModel(unlocked.ledger, api, ticker) } },
                     )
-                CompanyScreen(company)
+                CompanyScreen(company, onOpenEntry = { id -> nav.navigate(AddEntry(entryId = id)) }, onAdd = { nav.navigate(AddEntry(ticker = ticker)) })
             }
             composable<AddEntry> {
+                val route = it.toRoute<AddEntry>()
                 val form: EntryViewModel =
-                    viewModel(factory = viewModelFactory { initializer { EntryViewModel(unlocked.ledger) } })
+                    viewModel(
+                        key = "${route.entryId}/${route.ticker}",
+                        factory = viewModelFactory { initializer { EntryViewModel(unlocked.ledger, editId = route.entryId, initialTicker = route.ticker.orEmpty()) } },
+                    )
                 EntryScreen(form, onDone = { nav.popBackStack() })
             }
         }

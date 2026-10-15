@@ -194,6 +194,28 @@ test('the targets editor matches the shared target rules', async () => {
   assert.equal(run('targets.search', { taken: JSON.stringify(rows.map((r) => r.ticker)), query: '' }).ok, true);
 });
 
+test('entry.get reads back what the form needs to correct or void an entry', () => {
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const owner = account.portfolios[0];
+  const trade = owner.portfolio.trades.find((t) => t.kind === 'buy' && (!t.source || t.source === 'manual'));
+  const got = run('entry.get', { id: `${owner.id}::${trade.id}` }).value;
+  assert.equal(got.found, true);
+  assert.equal(got.entryKind, 'trade');
+  assert.equal(got.ticker, trade.ticker);
+  assert.equal(got.shares, String(trade.shares));
+  assert.equal(got.readOnly, null);
+  const imported = account.portfolios.flatMap((x) => x.portfolio.trades.map((t) => ({ x, t }))).find(({ t }) => t.source && t.source !== 'manual');
+  if (imported) assert.match(run('entry.get', { id: `${imported.x.id}::${imported.t.id}` }).value.readOnly, /can't be edited|statement imports/);
+  const dividend = owner.portfolio.dividends?.find((d) => d.source === 'manual');
+  if (dividend) assert.equal(run('entry.get', { id: `${owner.id}::${dividend.id}` }).value.entryKind, 'dividend');
+  assert.equal(run('entry.get', { id: 'ahl-core::nope' }).value.found, false);
+  const edited = run('mutate', { portfolio: owner.id, op: 'trade', params: JSON.stringify({ editingId: trade.id, kind: 'buy', ticker: trade.ticker, date: trade.date, shares: String(trade.shares + 1), price: String(trade.price), fees: '', month: trade.month, note: '' }) });
+  assert.equal(edited.ok, true, edited.error);
+  const voided = run('mutate', { portfolio: owner.id, op: 'void', params: JSON.stringify({ entryKind: 'trade', id: trade.id }) });
+  assert.equal(JSON.parse(voided.value.account).portfolios[0].portfolio.trades.find((t) => t.id === trade.id).voided, true);
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();
