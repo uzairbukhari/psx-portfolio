@@ -7,6 +7,7 @@ import app.sipwise.model.AccountOverview
 import app.sipwise.model.AssetsView
 import app.sipwise.model.HoldingSort
 import app.sipwise.model.HoldingsView
+import app.sipwise.model.MarketSummaryBody
 import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.EngineException
@@ -25,6 +26,8 @@ data class HoldingsUi(
     val showSold: Boolean = false,
     val pricing: Boolean = false,
     val priceMessage: String? = null,
+    val market: MarketSummaryBody? = null,
+    val marketOpen: Boolean = false,
     val error: String? = null,
 )
 
@@ -53,6 +56,18 @@ class HoldingsViewModel(private val ledger: Ledger) : ViewModel() {
                 }
             _ui.value = _ui.value.copy(pricing = false, priceMessage = message)
         }
+    }
+
+    /** Reads the public market snapshot once; the screen repeats this while it is on screen and the market is open. */
+    suspend fun loadMarket() {
+        val reply = ledger.marketSummary() ?: return
+        val open =
+            try {
+                ledger.marketOpen()
+            } catch (ignored: EngineException) {
+                false
+            }
+        _ui.value = _ui.value.copy(market = reply.summary, marketOpen = open)
     }
 
     fun setSort(sort: HoldingSort) {

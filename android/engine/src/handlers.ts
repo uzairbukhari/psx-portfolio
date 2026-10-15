@@ -53,6 +53,7 @@ import {
   type NotificationFilter,
 } from '../../../lib/notification-actions.ts';
 import type { AppNotification } from '../../../lib/portfolio.ts';
+import { pakistanMarketState } from '../../../lib/psx-market.ts';
 import { portfolioReport } from '../../../lib/portfolio-reports.ts';
 import { tradedTickers } from '../../../lib/performance.ts';
 import { benchmarkView, buildTrackRecord, historyBatches, returnView, valueChartView, type TrackRange } from '../../../mobile/src/data/track-record.ts';
@@ -601,6 +602,9 @@ const handlers: Record<string, Handler> = {
   },
 
   'picks.config': () => ({ max: MAX_SHORTLIST, gatherTimeoutMs: GATHER_TIMEOUT_MS, pollFastMs: pollIntervalMs(0), pollSlowMs: pollIntervalMs(60_000) }),
+
+  // Whether the PSX session is open now (the phone polls the market card only then).
+  'market.open': () => ({ open: pakistanMarketState(new Date()).isOpen }),
 
   // The Inbox: dividend announcements and recorded payouts for the chosen scope, filtered, with counts.
   'inbox.view': (args) => {

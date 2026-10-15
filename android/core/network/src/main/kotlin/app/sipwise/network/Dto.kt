@@ -66,3 +66,10 @@ data class FactsRefreshRequest(
 data class FactsRefreshResponse(
     val waiting: Boolean = false,
 )
+
+@Serializable
+data class UsageResponse(
+    val inputTokens: Long = 0,
+    val outputTokens: Long = 0,
+    val costUsd: Double = 0.0,
+)

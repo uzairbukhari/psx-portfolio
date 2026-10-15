@@ -106,6 +106,7 @@ fun MoreScreen(
         if (user.role == "super_admin") AdminCard()
         NotificationsCard(push)
         AnalyticsCard()
+        UsageCard()
         DevicesCard(ui, settings)
         DataCard(settings)
         DeleteCard(user, ui, settings, onAccountDeleted)

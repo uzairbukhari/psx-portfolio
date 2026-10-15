@@ -17,6 +17,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,7 +26,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import app.sipwise.R
 import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.Spacing
@@ -38,6 +42,10 @@ import app.sipwise.model.plural
 import app.sipwise.model.shortDate
 import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
+import kotlinx.coroutines.delay
+
+private const val MARKET_POLL_MS = 60_000L
+private const val MARKET_IDLE_POLL_MS = 600_000L
 
 @Composable
 fun HoldingsScreen(
@@ -48,6 +56,15 @@ fun HoldingsScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     val isAll = viewModel.scope.collectAsStateWithLifecycle().value == ALL_PORTFOLIOS
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                viewModel.loadMarket()
+                delay(if (viewModel.ui.value.marketOpen) MARKET_POLL_MS else MARKET_IDLE_POLL_MS)
+            }
+        }
+    }
     if (view == null) {
         if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
         return
@@ -56,6 +73,8 @@ fun HoldingsScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
+        val market = ui.market
+        if (market?.index != null) item { MarketCard(market, ui.marketOpen) }
         val overview = ui.overview
         if (overview == null) {
             item { SummaryCard(view.summary) }

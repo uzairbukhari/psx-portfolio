@@ -72,3 +72,26 @@ class InsightsTest {
         assertEquals(false, view.benchmark.isChart)
     }
 }
+
+class MarketSummaryTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `decodes the market summary and tolerates extra fields`() {
+        val text =
+            """{"summary":{"index":{"name":"KSE100","close":120000.5,"change":-10.25,"changePercent":-0.01,"x":1},
+            |"indices":[{"code":"KMI30","label":"KMI 30","close":1.5,"changePercent":0.2,"asOf":"x","meta":{"freshness":"fresh","reason":"r"}}],
+            |"breadth":{"advances":5,"declines":3,"unchanged":1,"covered":9,"source":"All Share"},
+            |"series":[{"time":1.0,"value":2.0}],"market":{"label":"Open","estimated":false,"isOpen":true}},"fetchedAt":"2026-10-15T10:00:00Z"}
+            """.trimMargin()
+        val response = json.decodeFromString(MarketSummaryResponse.serializer(), text)
+        assertEquals(120000.5, response.summary?.index?.close)
+        assertEquals("fresh", response.summary?.indices?.first()?.meta?.freshness)
+        assertEquals(9, response.summary?.breadth?.covered)
+    }
+
+    @Test
+    fun `an empty reply decodes to no summary`() {
+        assertTrue(json.decodeFromString(MarketSummaryResponse.serializer(), "{}").summary == null)
+    }
+}

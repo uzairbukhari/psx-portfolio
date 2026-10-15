@@ -3,6 +3,7 @@ package app.sipwise.ledger
 import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.DividendSync
 import app.sipwise.model.EntryKind
+import app.sipwise.model.MarketSummaryResponse
 import app.sipwise.model.PublicWanted
 import app.sipwise.model.RatesWanted
 import app.sipwise.network.ApiClient
@@ -26,6 +27,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.URLEncoder
 
 /** What kind of change was saved, so the notice can say it in words. */
@@ -92,6 +96,19 @@ class Ledger(
         _version.value += 1
         if (notify) _notices.tryEmit(LedgerNotice(null, label, change, action))
     }
+
+    /** The public KSE-100 snapshot, or null while offline. No holdings are involved. */
+    suspend fun marketSummary(): MarketSummaryResponse? {
+        val client = api ?: return null
+        return try {
+            client.get("/api/market-summary", MarketSummaryResponse.serializer())
+        } catch (ignored: ApiRequestException) {
+            null
+        }
+    }
+
+    /** Whether the PSX is open right now, by the shared market calendar. */
+    suspend fun marketOpen(): Boolean = engine.call("market.open").jsonObject["open"]?.jsonPrimitive?.booleanOrNull ?: false
 
     /**
      * The manual "Refresh prices": asks the server to fetch fresh PSX prices for what this ledger holds or targets, follows

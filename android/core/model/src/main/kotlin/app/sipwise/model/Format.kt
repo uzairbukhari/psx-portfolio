@@ -50,6 +50,9 @@ fun signedMoney(
     return "${if (value > 0) '+' else MINUS}${format(kotlin.math.abs(value))}"
 }
 
+/** An index level such as "118,432.56". */
+fun indexLevel(value: Double): String = grouped(value, PAISE_DIGITS)
+
 /** "+12.93%" / "−6.90%". */
 fun signedPercent(value: Double?): String {
     if (value == null) return "—"
