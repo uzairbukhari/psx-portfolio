@@ -1,7 +1,7 @@
 name: Android promote
 
 # Turns a pre-release into the full "latest" release. The in-app updater only offers the latest full release to the
-# production app, so this is the gate between "built" and "reaches your phone". It runs in the `android-production`
+# production app, so this is the gate between "built" and "reaches your phone". It runs in the `prod`
 # environment, which requires your approval (Settings > Environments).
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
 jobs:
   promote:
     runs-on: ubuntu-latest
-    environment: android-production
+    environment: prod
     env:
       GH_TOKEN: ${{ github.token }}
     steps:

@@ -3,7 +3,7 @@ name: Android release
 # Builds signed release artifacts from a tagged commit and publishes a GitHub pre-release. Runs when a tag
 # `android-vMAJOR.MINOR.PATCH[-rc.N]` is pushed by hand, or is called by "Android cut release" (a tag created with
 # GITHUB_TOKEN does not trigger other workflows, so the cut workflow calls this one directly).
-# Signing material comes only from the `android-release` environment's secrets (see docs/android-release.md).
+# Signing material comes only from the `prod` environment's secrets (see docs/android-release.md).
 on:
   push:
     tags: ['android-v*']
@@ -25,7 +25,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: android-release
+    environment: prod
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
@@ -70,7 +70,7 @@ jobs:
           STAGING_B64: ${{ secrets.ANDROID_KEYSTORE_STAGING_B64 }}
         run: |
           for v in PROD_B64 STAGING_B64; do
-            [ -n "${!v}" ] || { echo "::error::Secret for $v is not set in the android-release environment (docs/android-release.md)."; exit 1; }
+            [ -n "${!v}" ] || { echo "::error::Secret for $v is not set in the prod environment (docs/android-release.md)."; exit 1; }
           done
           umask 077
           echo "$PROD_B64" | base64 -d > "$RUNNER_TEMP/prod.jks"

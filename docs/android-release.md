@@ -2,13 +2,13 @@
 
 1. Run **android-cut-release** (workflow_dispatch) with bump and optional rc number. It computes the next `android-v*` tag and calls the release workflow.
 2. **android-release** builds signed APKs and the AAB from the tagged commit, checks the signing certificate SHA-1 and that versionCode is above `ANDROID_PREV_VERSION_CODE`, and publishes a GitHub pre-release with `SHA256SUMS` and `mapping.txt`.
-3. **android-promote** (environment `android-production`, needs approval) makes that pre-release the latest release. The in-app updater reads the latest release.
+3. **android-promote** (environment `prod`) makes that pre-release the latest release. The in-app updater reads the latest release.
 
 versionCode = BASE + major*100000 + minor*1000 + patch*10 + slot (final slot 9, rc n = n-1). 1.0.0 is 100009.
 
 ## One-time owner setup
 
-- GitHub environments `android-release` and `android-production` (production with required reviewers)
+- The signing secrets and variables live in the existing `prod` GitHub environment (one job can read only one environment, so the staging keystore secrets are stored there too)
 - Secrets: base64 production and staging keystores, passwords, aliases, expected cert SHA-1, `google-services.json`
 - Repository variables: `API_BASE_URL_PROD`, `ANDROID_PREV_VERSION_CODE` (from `npx eas-cli build:version:get -p android`)
 - Branch protection requiring `android-ci / build`
@@ -17,7 +17,7 @@ versionCode = BASE + major*100000 + minor*1000 + patch*10 + slot (final slot 9, 
 
 ## Where each value comes from
 
-Add secrets under GitHub > Settings > Secrets and variables > Actions (use the `android-release` environment for the signing ones); variables are on the Variables tab.
+Add secrets under GitHub > Settings > Secrets and variables > Actions (use the `prod` environment for the signing ones); variables are on the Variables tab.
 
 | Name | Kind | Where to find it |
 | --- | --- | --- |
