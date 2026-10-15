@@ -69,6 +69,7 @@ import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
 import app.sipwise.ledger.LedgerNotice
 import app.sipwise.model.ALL_PORTFOLIOS
+import app.sipwise.model.DeepLinkTarget
 import app.sipwise.model.EntryKind
 import app.sipwise.network.Events
 import app.sipwise.network.MeResponse
@@ -137,6 +138,21 @@ import kotlinx.serialization.Serializable
 @Serializable data class Picks(val month: String)
 
 @Serializable data class CompanyRoute(val ticker: String)
+
+/** The navigation route for a link target. */
+private fun routeFor(target: DeepLinkTarget): Any =
+    when (target) {
+        DeepLinkTarget.Today -> Today
+        DeepLinkTarget.Portfolio -> Portfolio
+        DeepLinkTarget.Plan -> Plan
+        DeepLinkTarget.Activity -> Activity
+        DeepLinkTarget.More -> More
+        DeepLinkTarget.Inbox -> Inbox
+        DeepLinkTarget.Insights -> Insights
+        DeepLinkTarget.Targets -> Targets
+        DeepLinkTarget.Picks -> Plan
+        is DeepLinkTarget.Company -> CompanyRoute(target.ticker)
+    }
 
 /** The catalog name of a screen for usage events, or null for screens the catalog does not list. */
 private fun screenName(destination: NavDestination?): String? =
@@ -338,7 +354,13 @@ private fun MainShell(
     val context = LocalContext.current
     val api = (context.applicationContext as SipwiseApp).container.api
     LedgerNotices(unlocked.ledger, snackbar)
-    val analytics = (context.applicationContext as SipwiseApp).container.analytics
+    val container = (context.applicationContext as SipwiseApp).container
+    val analytics = container.analytics
+    val link by container.pendingLink.collectAsStateWithLifecycle()
+    LaunchedEffect(link) {
+        link?.let { nav.navigate(routeFor(it)) { launchSingleTop = true } }
+        container.pendingLink.value = null
+    }
     LaunchedEffect(Unit) { analytics.track(Events.APP_OPENED) }
     LaunchedEffect(entry?.destination?.route) { screenName(entry?.destination)?.let { analytics.track(Events.SCREEN_VIEWED, "screen" to it) } }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }

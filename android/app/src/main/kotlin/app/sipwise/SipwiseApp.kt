@@ -7,6 +7,7 @@ import app.sipwise.data.BiometricVault
 import app.sipwise.data.Preferences
 import app.sipwise.data.SecureStorage
 import app.sipwise.data.SessionStore
+import app.sipwise.model.DeepLinkTarget
 import app.sipwise.network.ApiClient
 import app.sipwise.network.ApiRequestException
 import app.sipwise.network.TokenSource
@@ -14,6 +15,7 @@ import app.sipwise.push.PushRegistrar
 import app.sipwise.push.ensureNotificationChannel
 import app.sipwise.session.ApiVaultTransport
 import app.sipwise.session.VaultTransport
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonElement
 
 /** Hand-wired dependencies: small enough that a DI framework would only add build time. */
@@ -35,6 +37,9 @@ class AppContainer(private val app: Application) {
     val vaultTransport: VaultTransport = ApiVaultTransport(api)
     val push = PushRegistrar(app, api)
     val analytics = Analytics(api, preferences)
+
+    /** A link or notification tap waiting for the unlocked app to open it. Cleared once handled. */
+    val pendingLink = MutableStateFlow<DeepLinkTarget?>(null)
 
     /** Re-registers this phone's push token after sign-in or app start, since Firebase can rotate it. Best effort. */
     suspend fun syncPush() {

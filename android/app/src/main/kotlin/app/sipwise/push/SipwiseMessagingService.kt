@@ -34,13 +34,13 @@ class SipwiseMessagingService : FirebaseMessagingService() {
                 .setContentTitle(notification.title)
                 .setContentText(notification.body)
                 .setAutoCancel(true)
-                .setContentIntent(launchIntent())
+                .setContentIntent(launchIntent(message.data["kind"]))
                 .build()
         getSystemService(NotificationManager::class.java).notify(message.messageId.hashCode(), built)
     }
 
-    private fun launchIntent(): PendingIntent? {
-        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
+    private fun launchIntent(kind: String?): PendingIntent? {
+        val intent = packageManager.getLaunchIntentForPackage(packageName)?.putExtra("kind", kind) ?: return null
         return PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 }

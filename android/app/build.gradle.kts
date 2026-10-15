@@ -63,12 +63,14 @@ android {
         create("staging") {
             dimension = "env"
             applicationIdSuffix = ".staging"
+            manifestPlaceholders["deepLinkScheme"] = "sipwise-staging"
             resValue("string", "app_name", "Sipwise Staging")
             buildConfigField("String", "API_BASE_URL", "\"https://psx-portfolio-sip-staging.suzairbukhari.workers.dev\"")
             buildConfigField("boolean", "INCLUDE_PRERELEASES", "true")
         }
         create("production") {
             dimension = "env"
+            manifestPlaceholders["deepLinkScheme"] = "sipwise"
             resValue("string", "app_name", "Sipwise")
             val api = providers.gradleProperty("apiBaseUrl").orElse("").get()
             buildConfigField("String", "API_BASE_URL", "\"$api\"")
