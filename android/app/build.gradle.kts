@@ -110,7 +110,7 @@ android {
     lint {
         warningsAsErrors = true
         abortOnError = true
-        disable += setOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable")
+        disable += setOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable", "UseTomlInstead")
     }
     packaging { resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/versions/**/OSGI-INF/MANIFEST.MF") }
 }

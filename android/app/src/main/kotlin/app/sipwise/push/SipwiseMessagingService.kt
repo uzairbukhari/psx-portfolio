@@ -1,11 +1,9 @@
 package app.sipwise.push
 
-import android.Manifest
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import app.sipwise.R
 import app.sipwise.SipwiseApp
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -28,8 +26,7 @@ class SipwiseMessagingService : FirebaseMessagingService() {
     /** Only called while the app is open; in the background the system shows the notification itself. */
     override fun onMessageReceived(message: RemoteMessage) {
         val notification = message.notification ?: return
-        val allowed = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (!allowed) return
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return
         ensureNotificationChannel(this)
         val built =
             NotificationCompat.Builder(this, DIVIDENDS_CHANNEL)

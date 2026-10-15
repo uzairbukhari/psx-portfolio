@@ -151,7 +151,7 @@ private fun ProgressCard(progress: PicksProgress) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.picks_progress, stringResource(label), progress.percent), style = MaterialTheme.typography.titleSmall)
             LinearProgressIndicator(progress = { progress.percent / PERCENT_FULL }, modifier = Modifier.fillMaxWidth())
-            if (progress.total > 0) Text(stringResource(R.string.picks_gathered, progress.completed, progress.total), style = MaterialTheme.typography.bodySmall)
+            if (progress.total > 0) Text(pluralStringResource(R.plurals.picks_gathered, progress.completed, progress.completed, progress.total), style = MaterialTheme.typography.bodySmall)
             if (progress.pending.isNotEmpty()) Text(stringResource(R.string.picks_waiting, progress.pending.joinToString(", ")), style = MaterialTheme.typography.bodySmall)
             if (progress.degraded) Text(stringResource(R.string.picks_partial), style = MaterialTheme.typography.bodySmall)
         }
@@ -200,7 +200,7 @@ private fun PickCard(
                 }
             }
             if (row.price != null && row.shares != null) {
-                Text(stringResource(R.string.picks_estimate, row.shares.toInt(), money(row.price), money(row.estimatedSpend ?: 0.0)), style = MaterialTheme.typography.bodySmall)
+                Text(pluralStringResource(R.plurals.picks_estimate, row.shares.toInt(), row.shares.toInt(), money(row.price), money(row.estimatedSpend ?: 0.0)), style = MaterialTheme.typography.bodySmall)
                 if (row.recordable && !readOnly) TextButton(onClick = { onRecordOne(row.ticker) }) { Text(stringResource(R.string.picks_record_one)) }
             } else {
                 Text(stringResource(R.string.picks_no_price), style = MaterialTheme.typography.bodySmall)
@@ -223,7 +223,8 @@ private fun ConfirmDialog(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 item { Text(stringResource(R.string.picks_confirm_note, monthTitle(view.month)), style = MaterialTheme.typography.bodySmall) }
                 items(rows, key = { it.ticker }) {
-                    Text(stringResource(R.string.picks_confirm_row, it.ticker, (it.shares ?: 0.0).toInt(), money(it.price ?: 0.0)))
+                    val count = (it.shares ?: 0.0).toInt()
+                    Text(pluralStringResource(R.plurals.picks_confirm_row, count, it.ticker, count, money(it.price ?: 0.0)))
                 }
                 item { Text(stringResource(R.string.picks_confirm_total, money(rows.sumOf { it.estimatedSpend ?: 0.0 })), style = MaterialTheme.typography.titleSmall) }
                 ui.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }

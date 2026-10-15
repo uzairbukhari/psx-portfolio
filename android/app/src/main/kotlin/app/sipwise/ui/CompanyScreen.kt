@@ -34,6 +34,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -101,7 +102,7 @@ fun CompanyScreen(
                         label = {
                             Text(
                                 if (expected > 0) {
-                                    stringResource(R.string.company_tab_dividends_expected, expected)
+                                    pluralStringResource(R.plurals.company_tab_dividends_expected, expected, expected)
                                 } else {
                                     stringResource(R.string.company_tab_dividends)
                                 },

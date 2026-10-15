@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -165,7 +166,7 @@ private fun PlanItem(
             style = MaterialTheme.typography.bodySmall,
         )
         if (plan.dueCount > 0) {
-            Text(stringResource(R.string.assets_plan_due, plan.dueCount, money(plan.dueAmount)), color = SipwiseTheme.colors.warn, style = MaterialTheme.typography.bodySmall)
+            Text(pluralStringResource(R.plurals.assets_plan_due, plan.dueCount, plan.dueCount, money(plan.dueAmount)), color = SipwiseTheme.colors.warn, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

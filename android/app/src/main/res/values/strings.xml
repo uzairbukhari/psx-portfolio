@@ -158,7 +158,10 @@
     <string name="company_chart_description">Price chart over %1$s</string>
     <string name="company_tab_ledger">Ledger</string>
     <string name="company_tab_dividends">Dividends</string>
-    <string name="company_tab_dividends_expected">Dividends · %1$d expected</string>
+    <plurals name="company_tab_dividends_expected">
+        <item quantity="one">Dividends · %1$d expected</item>
+        <item quantity="other">Dividends · %1$d expected</item>
+    </plurals>
     <string name="company_no_dividends">No dividends yet. PSX payout announcements for this company show up here as expected, and become income once you mark them received.</string>
     <string name="company_no_entries">No entries for %1$s</string>
     <string name="company_per_share">· %1$s/share</string>
@@ -212,7 +215,7 @@
         <item quantity="other">%1$d shares</item>
     </plurals>
     <string name="plan_no_targets_title">Choose your companies and targets</string>
-    <string name="plan_no_targets_body">Sipwise splits each month’s money toward the companies furthest below their target weight, in whole shares. Targets must add up to 100%, and any one company is capped at 20% of the portfolio.</string>
+    <string name="plan_no_targets_body">Sipwise splits each month’s money toward the companies furthest below their target weight, in whole shares. Targets must add up to 100%%, and any one company is capped at 20%% of the portfolio.</string>
     <string name="plan_no_companies">Add your first company by recording a purchase or importing your trades, then set its target here.</string>
     <string name="plan_targets_total">Your targets add up to %1$d%%, not 100%%. Adjust them to get suggested buys.</string>
     <string name="plan_set_budget_prompt">Set a budget for %1$s to see suggested buys.</string>
@@ -249,7 +252,7 @@
     <string name="picks_title">Monthly Picks</string>
     <string name="picks_open">Monthly Picks</string>
     <string name="picks_experimental">Experimental. Ranks the companies you choose and suggests how to split this month’s money. Not financial advice.</string>
-    <string name="picks_how">Each company’s public PSX data is scored 0–100 (earnings yield, profit growth, margins, 52-week position). The best scorers share your money, capped at 35% per pick and 20% of your portfolio per holding. Nothing is sold, leftovers stay cash, and nothing is recorded until you confirm.</string>
+    <string name="picks_how">Each company’s public PSX data is scored 0–100 (earnings yield, profit growth, margins, 52-week position). The best scorers share your money, capped at 35%% per pick and 20%% of your portfolio per holding. Nothing is sold, leftovers stay cash, and nothing is recorded until you confirm.</string>
     <string name="picks_read_only">%1$s is in the past, so picks are read only here.</string>
     <string name="picks_failed">The run failed. Try again.</string>
     <string name="picks_quant_note">Ranked by the numbers only, on this phone (no AI).</string>
@@ -257,7 +260,7 @@
     <string name="picks_record_all">Record these buys…</string>
     <string name="picks_unallocated">%1$d%% is left unallocated.</string>
     <string name="picks_companies">Companies to consider · %1$d/%2$d</string>
-    <string name="picks_counts">%1$d saved · %2$d held · %3$d shortlisted</string>
+    <string name="picks_counts">Saved %1$d · held %2$d · shortlisted %3$d</string>
     <string name="picks_search">Search companies</string>
     <string name="picks_use_targets">Use target companies</string>
     <string name="picks_clear">Clear</string>
@@ -273,7 +276,10 @@
     <string name="picks_step_allocating">Ranking and applying your limits on this phone</string>
     <string name="picks_step_saved">Saved</string>
     <string name="picks_progress">%1$s · %2$d%%</string>
-    <string name="picks_gathered">%1$d of %2$d companies gathered.</string>
+    <plurals name="picks_gathered">
+        <item quantity="one">Gathered %1$d of %2$d companies.</item>
+        <item quantity="other">Gathered %1$d of %2$d companies.</item>
+    </plurals>
     <string name="picks_waiting">Waiting on %1$s.</string>
     <string name="picks_partial">Continuing with partial evidence.</string>
     <string name="picks_outlook">Market outlook</string>
@@ -281,12 +287,18 @@
     <string name="picks_confidence">%1$s confidence</string>
     <string name="picks_evidence">Evidence: %1$s</string>
     <string name="picks_risks">Risks: %1$s</string>
-    <string name="picks_estimate">About %1$d shares at %2$s; spend %3$s.</string>
+    <plurals name="picks_estimate">
+        <item quantity="one">About %1$d share at %2$s; spend %3$s.</item>
+        <item quantity="other">About %1$d shares at %2$s; spend %3$s.</item>
+    </plurals>
     <string name="picks_record_one">Record only this buy</string>
     <string name="picks_no_price">No recent saved price, so no share estimate. Enter a price on the company page.</string>
     <string name="picks_confirm_title">Record these buys</string>
     <string name="picks_confirm_note">Counted toward %1$s. Nothing is saved until you confirm; you can undo afterwards.</string>
-    <string name="picks_confirm_row">%1$s · %2$d shares at %3$s</string>
+    <plurals name="picks_confirm_row">
+        <item quantity="one">%1$s · %2$d share at %3$s</item>
+        <item quantity="other">%1$s · %2$d shares at %3$s</item>
+    </plurals>
     <string name="picks_confirm_total">Estimated total %1$s</string>
     <string name="notice_buys">Buys recorded for %1$s</string>
     <string name="notice_budget">Budget saved for %1$s</string>
@@ -433,7 +445,10 @@
     <string name="assets_plan_statement">Value from your statement of %1$s.</string>
     <string name="assets_plan_estimate">Estimated from your statement of %1$s.</string>
     <string name="assets_plan_none">No statement value yet, so it is shown at the amount paid in.</string>
-    <string name="assets_plan_due">%1$d monthly contribution(s) due (%2$s). Confirm on the web.</string>
+    <plurals name="assets_plan_due">
+        <item quantity="one">%1$d monthly contribution due (%2$s). Confirm on the web.</item>
+        <item quantity="other">%1$d monthly contributions due (%2$s). Confirm on the web.</item>
+    </plurals>
     <string name="assets_grams_tola">%1$s g · %2$s tola</string>
     <string name="assets_older">Older entries are in the web app.</string>
     <string name="assets_metal_rate">Rate: %1$s per tola · %2$s · %3$s</string>
