@@ -4,6 +4,7 @@ import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.DividendSync
 import app.sipwise.model.EntryKind
 import app.sipwise.model.PublicWanted
+import app.sipwise.model.RatesWanted
 import app.sipwise.network.ApiClient
 import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import java.net.URLEncoder
 
@@ -101,6 +103,7 @@ class Ledger(
             val wanted = ApiJson.decodeFromJsonElement(PublicWanted.serializer(), engine.call("public.wanted"))
             if (wanted.tickers.isNotEmpty()) loadPrices(client, wanted.tickers)
             if (wanted.placeholders.isNotEmpty()) loadLookups(client, wanted.placeholders)
+            loadRates(client)
             _version.value += 1
             syncDividends()
         } catch (ignored: ApiRequestException) {
@@ -129,6 +132,23 @@ class Ledger(
             (reply["companies"] as? JsonArray)?.let { found += it }
         }
         engine.call("public.lookups", mapOf("json" to JsonArray(found).toString()))
+    }
+
+    /** Public gold and silver rates and fund prices, only for the kinds this ledger holds. They carry no parameters. */
+    private suspend fun loadRates(client: ApiClient) {
+        val wanted = ApiJson.decodeFromJsonElement(RatesWanted.serializer(), engine.call("rates.wanted"))
+        if (!wanted.metals && !wanted.funds) return
+        val args = mutableMapOf<String, String>()
+        if (wanted.metals) {
+            val reply = client.get("/api/public-data/metals", JsonObject.serializer())
+            args["metals"] = (reply["rates"] ?: JsonArray(emptyList())).toString()
+        }
+        if (wanted.funds) {
+            val reply = client.get("/api/public-data/funds", JsonObject.serializer())
+            val latest = (reply["funds"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.get("latest") }.filter { it !is JsonNull }
+            args["navs"] = JsonArray(latest).toString()
+        }
+        engine.call("rates.set", args)
     }
 
     private suspend fun syncDividends() {

@@ -83,3 +83,6 @@ fun mediumDate(iso: String): String {
 }
 
 private const val ISO_DATE_LENGTH = 10
+
+/** "12.5%" for a share of a total (0 to 100), one decimal, whatever the phone's locale. */
+fun sharePercent(value: Double): String = "${grouped(value, 1)}%"

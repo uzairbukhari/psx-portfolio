@@ -1,0 +1,442 @@
+{
+  "asOf": "2026-10-15",
+  "total": {
+    "value": 1085314.12,
+    "cost": null,
+    "gain": null,
+    "gainPercent": null,
+    "incomplete": [
+      "Needs the cost of 2 holdings.",
+      "Needs a gold rate and silver rate and fund price.",
+      "Needs the cost of 2 investments outside stocks."
+    ],
+    "oldestQuoteDate": "2026-10-15"
+  },
+  "classes": [
+    {
+      "key": "stocks",
+      "label": "Stocks",
+      "value": 885500,
+      "share": 81.58928218864415,
+      "cost": null,
+      "gain": null,
+      "gainPercent": null,
+      "count": 13,
+      "incomplete": true
+    },
+    {
+      "key": "gold",
+      "label": "Gold",
+      "value": 0,
+      "share": 0,
+      "cost": null,
+      "gain": null,
+      "gainPercent": null,
+      "count": 2,
+      "incomplete": true
+    },
+    {
+      "key": "silver",
+      "label": "Silver",
+      "value": 0,
+      "share": 0,
+      "cost": 82000,
+      "gain": null,
+      "gainPercent": null,
+      "count": 1,
+      "incomplete": true
+    },
+    {
+      "key": "plans",
+      "label": "Savings plans",
+      "value": 55880.37,
+      "share": 5.14877388677114,
+      "cost": 34000,
+      "gain": 21880.37,
+      "gainPercent": 64.3540294117647,
+      "count": 1,
+      "incomplete": false
+    },
+    {
+      "key": "funds",
+      "label": "Mutual funds",
+      "value": 143933.75,
+      "share": 13.261943924584706,
+      "cost": null,
+      "gain": null,
+      "gainPercent": null,
+      "count": 2,
+      "incomplete": true
+    }
+  ],
+  "portfolios": [
+    {
+      "id": "ahl-core",
+      "name": "AHL Core",
+      "locked": false,
+      "value": 671600,
+      "cost": null,
+      "gain": null,
+      "gainPercent": null,
+      "share": 61.880702335283345,
+      "heldCount": 13,
+      "missingPrice": 0,
+      "unknownCost": 2
+    },
+    {
+      "id": "finqalab",
+      "name": "Finqalab",
+      "locked": false,
+      "value": 213900,
+      "cost": 183257,
+      "gain": 30643,
+      "gainPercent": 16.721325788373704,
+      "share": 19.708579853360792,
+      "heldCount": 4,
+      "missingPrice": 0,
+      "unknownCost": 0
+    },
+    {
+      "id": "savings-gold",
+      "name": "Savings & Gold",
+      "locked": false,
+      "value": 199814.12,
+      "cost": null,
+      "gain": null,
+      "gainPercent": null,
+      "share": 18.41071781135585,
+      "heldCount": 6,
+      "missingPrice": 4,
+      "unknownCost": 2
+    },
+    {
+      "id": "empty",
+      "name": "Empty",
+      "locked": true,
+      "value": 0,
+      "cost": 0,
+      "gain": 0,
+      "gainPercent": null,
+      "share": 0,
+      "heldCount": 0,
+      "missingPrice": 0,
+      "unknownCost": 0
+    }
+  ],
+  "topHoldings": [
+    {
+      "ticker": "MEBL",
+      "name": "Meezan Bank",
+      "sector": "Bank",
+      "value": 166400,
+      "share": 15.331966748944534,
+      "gain": null,
+      "gainPercent": null,
+      "portfolios": [
+        "AHL Core",
+        "Finqalab"
+      ]
+    },
+    {
+      "ticker": "OGDC",
+      "name": "Oil & Gas Development",
+      "sector": "Oil & Gas",
+      "value": 161000,
+      "share": 14.834414943389845,
+      "gain": 19146.25,
+      "gainPercent": 13.497175788444085,
+      "portfolios": [
+        "AHL Core",
+        "Finqalab"
+      ]
+    },
+    {
+      "ticker": "HBL",
+      "name": "Habib Bank",
+      "sector": "Bank",
+      "value": 129000,
+      "share": 11.885959799362048,
+      "gain": 36373.75,
+      "gainPercent": 39.26937558197595,
+      "portfolios": [
+        "AHL Core",
+        "Finqalab"
+      ]
+    },
+    {
+      "ticker": "EFERT",
+      "name": "Engro Fertilizers",
+      "sector": "Fertilizer",
+      "value": 78400,
+      "share": 7.2237151028680975,
+      "gain": null,
+      "gainPercent": null,
+      "portfolios": [
+        "AHL Core",
+        "Finqalab"
+      ]
+    },
+    {
+      "ticker": "LUCK",
+      "name": "Lucky Cement",
+      "sector": "Cement",
+      "value": 69000,
+      "share": 6.357606404309933,
+      "gain": 6444,
+      "gainPercent": 10.301170151544216,
+      "portfolios": [
+        "AHL Core"
+      ]
+    },
+    {
+      "ticker": "FFC",
+      "name": "Fauji Fertilizer",
+      "sector": "Fertilizer",
+      "value": 64500,
+      "share": 5.942979899681024,
+      "gain": 6304.87,
+      "gainPercent": 10.834016523375753,
+      "portfolios": [
+        "AHL Core"
+      ]
+    },
+    {
+      "ticker": "AIRLINK",
+      "name": "Air Link Communication",
+      "sector": "Technology",
+      "value": 47500,
+      "share": 4.376613104416259,
+      "gain": 22437.5,
+      "gainPercent": 89.52618453865337,
+      "portfolios": [
+        "AHL Core"
+      ]
+    },
+    {
+      "ticker": "SEARL",
+      "name": "The Searle Company",
+      "sector": "Pharma",
+      "value": 39000,
+      "share": 3.5934297067838754,
+      "gain": 7922.5,
+      "gainPercent": 25.492719813369803,
+      "portfolios": [
+        "AHL Core"
+      ]
+    }
+  ],
+  "holdingCount": 13,
+  "sectors": [
+    {
+      "sector": "Bank",
+      "value": 295400,
+      "share": 33.359683794466406
+    },
+    {
+      "sector": "Oil & Gas",
+      "value": 189500,
+      "share": 21.40033879164314
+    },
+    {
+      "sector": "Fertilizer",
+      "value": 142900,
+      "share": 16.13777526821005
+    },
+    {
+      "sector": "Cement",
+      "value": 100200,
+      "share": 11.315640880858274
+    },
+    {
+      "sector": "Technology",
+      "value": 97000,
+      "share": 10.954263128176171
+    },
+    {
+      "sector": "Other",
+      "value": 60500,
+      "share": 6.832298136645963
+    }
+  ],
+  "invested": {
+    "months": [
+      {
+        "month": "2025-11",
+        "stocks": 52130,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 0,
+        "amount": 52130
+      },
+      {
+        "month": "2025-12",
+        "stocks": 40501,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 54000,
+        "amount": 94501
+      },
+      {
+        "month": "2026-01",
+        "stocks": 153633.13,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 0,
+        "amount": 153633.13
+      },
+      {
+        "month": "2026-02",
+        "stocks": 58646.25,
+        "gold": 830000,
+        "silver": 0,
+        "plans": 0,
+        "funds": 100000,
+        "amount": 988646.25
+      },
+      {
+        "month": "2026-03",
+        "stocks": 169021.5,
+        "gold": 0,
+        "silver": 0,
+        "plans": 50000,
+        "funds": 50000,
+        "amount": 269021.5
+      },
+      {
+        "month": "2026-04",
+        "stocks": 66165,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 0,
+        "amount": 66165
+      },
+      {
+        "month": "2026-05",
+        "stocks": 56140,
+        "gold": 1380000,
+        "silver": 0,
+        "plans": 5000,
+        "funds": 10000,
+        "amount": 1451140
+      },
+      {
+        "month": "2026-06",
+        "stocks": 20050,
+        "gold": 0,
+        "silver": 82000,
+        "plans": 5000,
+        "funds": 0,
+        "amount": 107050
+      },
+      {
+        "month": "2026-07",
+        "stocks": 26466,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 0,
+        "amount": 26466
+      },
+      {
+        "month": "2026-08",
+        "stocks": 23057.5,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 0,
+        "amount": 23057.5
+      },
+      {
+        "month": "2026-09",
+        "stocks": 63408.13,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 0,
+        "amount": 63408.13
+      },
+      {
+        "month": "2026-10",
+        "stocks": 20551.25,
+        "gold": 0,
+        "silver": 0,
+        "plans": 0,
+        "funds": 0,
+        "amount": 20551.25
+      }
+    ],
+    "total": 3315769.76
+  },
+  "income": {
+    "taxYear": "2026-27",
+    "received": 4650,
+    "previousTaxYear": "2025-26",
+    "receivedPrevious": 7200,
+    "unknownDateCount": 1,
+    "unknownDateAmount": 500,
+    "receivedTotal": 12350,
+    "expected": 3700,
+    "expectedCount": 2,
+    "months": [
+      {
+        "month": "2025-11",
+        "amount": 0
+      },
+      {
+        "month": "2025-12",
+        "amount": 0
+      },
+      {
+        "month": "2026-01",
+        "amount": 0
+      },
+      {
+        "month": "2026-02",
+        "amount": 0
+      },
+      {
+        "month": "2026-03",
+        "amount": 0
+      },
+      {
+        "month": "2026-04",
+        "amount": 0
+      },
+      {
+        "month": "2026-05",
+        "amount": 3900
+      },
+      {
+        "month": "2026-06",
+        "amount": 3300
+      },
+      {
+        "month": "2026-07",
+        "amount": 2600
+      },
+      {
+        "month": "2026-08",
+        "amount": 2050
+      },
+      {
+        "month": "2026-09",
+        "amount": 0
+      },
+      {
+        "month": "2026-10",
+        "amount": 0
+      }
+    ]
+  },
+  "returns": {
+    "rate": null,
+    "reason": "no-solution",
+    "days": 400,
+    "blockedBy": "Needs a price for every holding.",
+    "includesIncome": true
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "metals": [
+    {
+      "id": "gold-coins",
+      "name": "Wedding gold",
+      "portfolio": "Savings & Gold",
+      "grams": 46.628,
+      "tola": 3.9976679984224694,
+      "value": null,
+      "gain": null,
+      "costKnown": false,
+      "boughtGrams": 34.992,
+      "soldGrams": 11.664,
+      "realized": null,
+      "recent": [
+        {
+          "id": "g3",
+          "date": "2026-07-17",
+          "kind": "sell",
+          "pieces": "11.664 g",
+          "amount": 330000
+        },
+        {
+          "id": "g2",
+          "date": "2026-02-07",
+          "kind": "buy",
+          "pieces": "3 × 1 tola (34.992 g)",
+          "amount": 830000
+        },
+        {
+          "id": "g1",
+          "date": "2025-09-30",
+          "kind": "opening",
+          "pieces": "2 × 11.65 g (23.3 g)",
+          "amount": null
+        }
+      ],
+      "olderCount": 0,
+      "rate": null
+    },
+    {
+      "id": "gold-bar",
+      "name": "24k bar",
+      "portfolio": "Savings & Gold",
+      "grams": 50,
+      "tola": 4.286767605754557,
+      "value": null,
+      "gain": null,
+      "costKnown": true,
+      "boughtGrams": 50,
+      "soldGrams": 0,
+      "realized": 0,
+      "recent": [
+        {
+          "id": "gb1",
+          "date": "2026-05-18",
+          "kind": "buy",
+          "pieces": "1 × 50 g (50 g)",
+          "amount": 1380000
+        }
+      ],
+      "olderCount": 0,
+      "rate": null
+    },
+    {
+      "id": "silver",
+      "name": "Silver coins",
+      "portfolio": "Savings & Gold",
+      "grams": 233.28,
+      "tola": 20.00034294140846,
+      "value": null,
+      "gain": null,
+      "costKnown": true,
+      "boughtGrams": 233.28,
+      "soldGrams": 0,
+      "realized": 0,
+      "recent": [
+        {
+          "id": "s1",
+          "date": "2026-06-17",
+          "kind": "buy",
+          "pieces": "233.28 g",
+          "amount": 82000
+        }
+      ],
+      "olderCount": 0,
+      "rate": null
+    }
+  ],
+  "funds": [
+    {
+      "id": "fund-mm",
+      "name": "Test Money Market Fund",
+      "amc": "Test Asset Management",
+      "portfolio": "Savings & Gold",
+      "units": 1412.5,
+      "value": 143933.75,
+      "gain": null,
+      "cost": null,
+      "price": {
+        "nav": 101.9,
+        "date": "2026-10-13",
+        "source": "manual",
+        "stale": false
+      }
+    },
+    {
+      "id": "fund-eq",
+      "name": "Test Equity Fund",
+      "amc": "Test Asset Management",
+      "portfolio": "Savings & Gold",
+      "units": 400,
+      "value": null,
+      "gain": null,
+      "cost": 50000,
+      "price": null
+    },
+    {
+      "id": "fund-inc",
+      "name": "Sample Income Fund",
+      "amc": "Sample Investments",
+      "portfolio": "Savings & Gold",
+      "units": 0,
+      "value": 0,
+      "gain": 0,
+      "cost": 0,
+      "price": null
+    }
+  ],
+  "plans": [
+    {
+      "id": "plan-mbp",
+      "name": "Mahana Bachat",
+      "portfolio": "Savings & Gold",
+      "closed": false,
+      "value": 55880.37,
+      "gain": 3880.37,
+      "contributed": 60000,
+      "redeemed": 8000,
+      "cost": 52000,
+      "source": "estimate",
+      "statementDate": "2026-07-07",
+      "dueCount": 3,
+      "dueAmount": 5000
+    },
+    {
+      "id": "plan-old",
+      "name": "Old savings plan",
+      "portfolio": "Savings & Gold",
+      "closed": true,
+      "value": 0,
+      "gain": 18000,
+      "contributed": 100000,
+      "redeemed": 118000,
+      "cost": -18000,
+      "source": "statement",
+      "statementDate": "2026-09-04",
+      "dueCount": 0,
+      "dueAmount": 0
+    }
+  ]
+}

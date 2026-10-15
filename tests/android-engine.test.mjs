@@ -326,3 +326,19 @@ test('portfolios can be added, renamed, locked and removed (only empty unlocked 
   const removed = JSON.parse(run('mutate.account', { op: 'portfolio.remove', params: JSON.stringify({ id: 'new-one' }) }).value.account);
   assert.equal(removed.portfolios.length, before.length);
 });
+
+test('overview and assets views cover every portfolio and every asset class', () => {
+  run('account.load', { json: JSON.stringify(seed()) });
+  run('rates.set', { metals: JSON.stringify([]), navs: JSON.stringify([]) });
+  const overview = run('overview.view', { scope: 'all' });
+  assert.equal(overview.ok, true, overview.error);
+  assert.ok(overview.value.total.value > 0);
+  assert.ok(overview.value.classes.length >= 1);
+  assert.ok(overview.value.portfolios.length >= 2);
+  const assets = run('assets.view', { scope: 'all' });
+  assert.equal(assets.ok, true, assets.error);
+  assert.ok(Array.isArray(assets.value.metals) && Array.isArray(assets.value.funds) && Array.isArray(assets.value.plans));
+  assert.ok(assets.value.metals.length + assets.value.funds.length + assets.value.plans.length > 0, 'the seed holds other assets');
+  const wanted = run('rates.wanted').value;
+  assert.equal(typeof wanted.metals, 'boolean');
+});

@@ -53,4 +53,11 @@ class FormatTest {
         assertEquals("12 Oct 2026", mediumDate("2026-10-12T08:00:00.000Z"))
         assertEquals("nonsense", mediumDate("nonsense"))
     }
+
+    @Test
+    fun `formats a share with one decimal`() {
+        assertEquals("12.5%", sharePercent(12.5))
+        assertEquals("0.0%", sharePercent(0.0))
+        assertEquals("100.0%", sharePercent(100.0))
+    }
 }

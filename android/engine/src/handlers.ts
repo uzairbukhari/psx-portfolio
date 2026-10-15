@@ -38,6 +38,12 @@ import { evenWeights, screenStatus, targetRows, targetTotals } from '../../../li
 import { searchCompanies } from '../../../mobile/src/data/picks.ts';
 import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
 import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
+import { accountOverview } from '../../../lib/account-overview.ts';
+import { describePieces, valueMetal, type MetalAsset } from '../../../lib/assets.ts';
+import { valueFund, type FundAsset } from '../../../lib/funds.ts';
+import { dueEntries, planValue, type PlanAsset } from '../../../lib/plans.ts';
+import { tolaFromGrams, type MetalRateRow } from '../../../lib/metal-rates.ts';
+import type { FundNavRow } from '../../../lib/mufap.ts';
 
 export const ENGINE_API_VERSION = 1;
 
@@ -50,6 +56,9 @@ let loaded: PortfolioAccount | null = null;
 // saved: writes start from the stored account, so cached prices do not end up in the encrypted vault.
 type Overlay = { quoteRows: QuoteRow[]; announcements: unknown[]; faceValues: Record<string, unknown>; lookups: unknown[] };
 let overlay: Overlay = { quoteRows: [], announcements: [], faceValues: {}, lookups: [] };
+// Public gold and silver rates and mutual fund prices, kept beside the overlay.
+let metalRates: MetalRateRow[] = [];
+let fundNavs: FundNavRow[] = [];
 let overlaid: { source: PortfolioAccount; version: number; account: PortfolioAccount } | null = null;
 let overlayVersion = 0;
 
@@ -73,6 +82,13 @@ function viewAccount(): PortfolioAccount {
 function requireAccount(): PortfolioAccount {
   if (!loaded) throw new Error('No portfolio is loaded.');
   return loaded;
+}
+
+/** The portfolios the chosen scope covers: every one, or the one picked. */
+function scopeParts(args: Args) {
+  const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
+  const account = viewAccount();
+  return scope === ALL_PORTFOLIOS ? account.portfolios : account.portfolios.filter((x) => x.id === scope);
 }
 
 const text = (args: Args, key: string): string => {
@@ -182,6 +198,79 @@ const handlers: Record<string, Handler> = {
       sectors: sectorsOf(open),
       summary,
       error,
+    };
+  },
+
+  // Public gold, silver and fund prices (they have no parameters, so they say nothing about what is held).
+  'rates.set': (args) => {
+    metalRates = typeof args.metals === 'string' && args.metals ? (JSON.parse(args.metals) as MetalRateRow[]) : metalRates;
+    fundNavs = typeof args.navs === 'string' && args.navs ? (JSON.parse(args.navs) as FundNavRow[]) : fundNavs;
+    return { metals: metalRates.length, navs: fundNavs.length };
+  },
+  'rates.wanted': () => {
+    const assets = requireAccount().portfolios.flatMap((x) => x.portfolio.assets ?? []);
+    return { metals: assets.some((a) => a.kind === 'metal'), funds: assets.some((a) => a.kind === 'fund') };
+  },
+
+  // Net worth for the chosen portfolio (or all): asset mix, portfolios, holdings, sectors, income and money-weighted return.
+  'overview.view': (args) => {
+    const parts = scopeParts(args);
+    return parts.length ? accountOverview(parts, today(), { metalRates, fundNavs }) : null;
+  },
+
+  // Gold and silver, savings plans and mutual funds in the chosen scope (read-only on the phone).
+  'assets.view': (args) => {
+    const parts = scopeParts(args);
+    const asOf = today();
+    const labelled = parts.length > 1;
+    const owned = parts.flatMap((part) => (part.portfolio.assets ?? []).map((asset) => ({ asset, portfolio: labelled ? part.name : '' })));
+    const metals = owned.flatMap((o) => (o.asset.kind === 'metal' ? [{ asset: o.asset as MetalAsset, portfolio: o.portfolio }] : []));
+    const funds = owned.flatMap((o) => (o.asset.kind === 'fund' ? [{ asset: o.asset as FundAsset, portfolio: o.portfolio }] : []));
+    const plans = owned.flatMap((o) => (o.asset.kind === 'plan' ? [{ asset: o.asset as PlanAsset, portfolio: o.portfolio }] : []));
+    return {
+      metals: metals.map(({ asset, portfolio }) => {
+        const v = valueMetal(asset, metalRates, asOf);
+        const recent = [...v.history].reverse().slice(0, 3);
+        return {
+          id: asset.id,
+          name: asset.name,
+          portfolio,
+          grams: v.grams,
+          tola: tolaFromGrams(v.grams),
+          value: v.value,
+          gain: v.gain,
+          costKnown: v.cost !== null,
+          boughtGrams: v.bought.grams,
+          soldGrams: v.sold.grams,
+          realized: v.realized,
+          recent: recent.map((e) => ({ id: e.id, date: e.date, kind: e.type, pieces: describePieces(e), amount: e.amount })),
+          olderCount: Math.max(0, v.history.length - recent.length),
+          rate: v.rate ? { pkrPerTola: v.rate.pkrPerTola, kind: v.rate.kind, date: v.rate.date } : null,
+        };
+      }),
+      funds: funds.map(({ asset, portfolio }) => {
+        const v = valueFund(asset, fundNavs, asOf);
+        return { id: asset.id, name: asset.name, amc: asset.amc, portfolio, units: v.units, value: v.value, gain: v.gain, cost: v.cost, price: v.price };
+      }),
+      plans: plans.map(({ asset, portfolio }) => {
+        const v = planValue(asset, asOf);
+        const due = dueEntries(asset, asOf);
+        return {
+          id: asset.id,
+          name: asset.name,
+          portfolio,
+          closed: Boolean(asset.closed),
+          value: v.value,
+          gain: v.gain,
+          contributed: v.contributed,
+          redeemed: v.redeemed,
+          cost: v.cost,
+          source: v.source,
+          statementDate: v.statementDate ?? '',
+          dueCount: due.length,
+          dueAmount: due[0]?.amount ?? 0,
+        };
+      }),
     };
   },
 

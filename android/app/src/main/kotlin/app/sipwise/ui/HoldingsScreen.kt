@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
 import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.Spacing
+import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.HoldingRow
 import app.sipwise.model.HoldingSort
 import app.sipwise.model.PortfolioSummary
@@ -43,6 +44,7 @@ fun HoldingsScreen(
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
+    val isAll = viewModel.scope.collectAsStateWithLifecycle().value == ALL_PORTFOLIOS
     if (view == null) {
         if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
         return
@@ -51,11 +53,25 @@ fun HoldingsScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        item { SummaryCard(view.summary) }
-        if (view.rows.isEmpty()) item { Text(stringResource(R.string.holdings_empty), style = MaterialTheme.typography.bodyLarge) }
+        val overview = ui.overview
+        if (overview == null) {
+            item { SummaryCard(view.summary) }
+        } else {
+            item { NetWorthCard(overview, if (isAll) null else overview.portfolios.firstOrNull()?.name) }
+            if (overview.total.incomplete.isNotEmpty()) {
+                item { Text(overview.total.incomplete.joinToString(" "), color = SipwiseTheme.colors.warn, style = MaterialTheme.typography.bodyMedium) }
+            }
+            if (isAll) item { PortfolioBreakdown(overview, viewModel::openPortfolio) }
+        }
+        if (view.rows.isEmpty() && ui.assets.isEmpty) item { Text(stringResource(R.string.holdings_empty), style = MaterialTheme.typography.bodyLarge) }
         item { SortRow(ui.sort, viewModel::setSort) }
         if (view.sectors.size > 1) item { SectorRow(view.sectors, ui.sector, viewModel::setSector) }
         items(view.rows, key = { it.ticker }) { HoldingItem(it, onOpenCompany) }
+        if (!ui.assets.isEmpty) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) { AssetSections(ui.assets, java.time.LocalDate.now().year) }
+            }
+        }
         if (view.soldOut.isNotEmpty()) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
