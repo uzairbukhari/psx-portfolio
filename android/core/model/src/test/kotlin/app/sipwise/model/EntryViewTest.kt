@@ -1,10 +1,10 @@
 package app.sipwise.model
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonPrimitive
 
 class EntryViewTest {
     @Test
