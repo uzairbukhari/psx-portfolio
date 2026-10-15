@@ -106,7 +106,7 @@ export async function trackFunds(db: FundDb, ids: unknown, retry = false) {
   const directory =
     (
       await db
-        .prepare('SELECT COUNT(*) AS n FROM fund_catalog')
+        .prepare('SELECT 1 AS n FROM fund_catalog LIMIT 1')
         .all<{ n: number }>()
     ).results[0]?.n ?? 0;
   if (known.size + fresh.length > MAX_TRACKED)

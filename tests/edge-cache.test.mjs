@@ -50,3 +50,18 @@ test('a failing cache never breaks the response', async () => {
   };
   assert.equal(await edgeCached('k', 60, async () => 7, undefined, broken), 7);
 });
+
+test('serves from memory when the Cache API stores nothing (workers.dev)', async () => {
+  const cache = { async match() { return undefined; }, async put() {} };
+  let loads = 0;
+  const load = async () => ({ n: ++loads });
+  await edgeCached('mem', 60, load, undefined, cache);
+  await edgeCached('mem', 60, load, undefined, cache);
+  assert.equal(loads, 1);
+});
+
+test('a load that throws is not remembered', async () => {
+  const cache = { async match() { return undefined; }, async put() {} };
+  await assert.rejects(edgeCached('boom', 60, async () => { throw new Error('x'); }, undefined, cache));
+  assert.equal(await edgeCached('boom', 60, async () => 7, undefined, cache), 7);
+});
