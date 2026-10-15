@@ -40,3 +40,15 @@ class PicksTest {
         assertEquals(100, PicksProgress(PicksStep.SAVED).percent)
     }
 }
+
+class InboxTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `decodes the engine inbox reply`() {
+        val text = checkNotNull(javaClass.getResource("/inbox-view.json")).readText()
+        val view = json.decodeFromString(InboxView.serializer(), text)
+        assertEquals(view.counts.all, view.items.size)
+        assertEquals(view.counts.of(InboxFilter.UNREAD), view.counts.unread)
+    }
+}

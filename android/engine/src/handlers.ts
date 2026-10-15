@@ -39,6 +39,20 @@ import { MAX_SHORTLIST, initialShortlist, pickSources, searchCompanies } from '.
 import { estimateMonthlyPicks } from '../../../lib/monthly-picks.ts';
 import { explainSizing } from '../../../lib/monthly-picks-allocation.ts';
 import { portfolioCounts } from '../../../lib/portfolio-counts.ts';
+import {
+  clearAll,
+  clearOne,
+  deleteCleared,
+  expectedDividendFor,
+  filterNotifications,
+  isUnread,
+  markAllRead,
+  notificationCounts,
+  restoreOne,
+  setRead,
+  type NotificationFilter,
+} from '../../../lib/notification-actions.ts';
+import type { AppNotification } from '../../../lib/portfolio.ts';
 import { classifyFacts, GATHER_TIMEOUT_MS, needsScrape } from '../../../lib/monthly-picks-flow.ts';
 import { parsePublicAnalysis, pollIntervalMs } from '../../../lib/api-validate.ts';
 import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
@@ -101,6 +115,56 @@ const text = (args: Args, key: string): string => {
   if (typeof value !== 'string') throw new Error(`Missing ${key}.`);
   return value;
 };
+
+/** One inbox change (read, clear, restore, delete cleared) applied to the stored account, spread back over each portfolio. */
+function changeInbox(account: PortfolioAccount, params: Record<string, unknown>): PortfolioAccount {
+  const action = String(params.action ?? '');
+  const id = typeof params.id === 'string' ? params.id : '';
+  const at = new Date().toISOString();
+  const change = (list: AppNotification[]): AppNotification[] => {
+    switch (action) {
+      case 'read': return setRead(list, id, true);
+      case 'unread': return setRead(list, id, false);
+      case 'clear': return clearOne(list, id, at);
+      case 'restore': return restoreOne(list, id);
+      case 'markAll': return markAllRead(list);
+      case 'clearAll': return clearAll(list, at);
+      case 'deleteCleared': return deleteCleared(list);
+      default: throw new Error(`Unknown inbox change: ${action}`);
+    }
+  };
+  const scope = typeof params.scope === 'string' ? params.scope : ALL_PORTFOLIOS;
+  if (account.portfolios.length > 1 && scope === ALL_PORTFOLIOS) {
+    const merged = dashboardPortfolio(account, ALL_PORTFOLIOS).notifications ?? [];
+    const next = change(merged);
+    return {
+      ...account,
+      portfolios: account.portfolios.map((part) =>
+        part.locked
+          ? part
+          : {
+              ...part,
+              portfolio: {
+                ...part.portfolio,
+                notifications: next
+                  .filter((n) => n.id.startsWith(`${part.id}::`))
+                  .map((n) => ({ ...n, id: n.id.slice(part.id.length + 2), title: n.title.replace(`${part.name} · `, '') })),
+              },
+            },
+      ),
+    };
+  }
+  const targetId = account.portfolios.length === 1 ? account.portfolios[0].id : scope;
+  const found = account.portfolios.find((part) => part.id === targetId);
+  if (!found) throw new Error('Choose a portfolio first.');
+  if (found.locked) throw new Error('That portfolio is locked.');
+  return {
+    ...account,
+    portfolios: account.portfolios.map((part) =>
+      part.id === targetId ? { ...part, portfolio: { ...part.portfolio, notifications: change(part.portfolio.notifications ?? []) } } : part,
+    ),
+  };
+}
 
 const handlers: Record<string, Handler> = {
   'engine.version': () => ENGINE_API_VERSION,
@@ -530,6 +594,35 @@ const handlers: Record<string, Handler> = {
 
   'picks.config': () => ({ max: MAX_SHORTLIST, gatherTimeoutMs: GATHER_TIMEOUT_MS, pollFastMs: pollIntervalMs(0), pollSlowMs: pollIntervalMs(60_000) }),
 
+  // The Inbox: dividend announcements and recorded payouts for the chosen scope, filtered, with counts.
+  'inbox.view': (args) => {
+    const account = viewAccount();
+    const portfolio = dashboardPortfolio(account, typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS);
+    const list = portfolio.notifications ?? [];
+    const names = account.portfolios.map((p) => p.name);
+    const tickers = new Set(portfolio.companies.map((c) => c.ticker));
+    const filter = (typeof args.filter === 'string' ? args.filter : 'inbox') as NotificationFilter;
+    return {
+      counts: notificationCounts(list),
+      items: filterNotifications(list, filter).map((n) => {
+        const from = names.find((name) => n.title.startsWith(`${name} · `)) ?? null;
+        return {
+          id: n.id,
+          at: n.at,
+          ticker: n.ticker ?? null,
+          title: from ? n.title.slice(from.length + 3) : n.title,
+          from: names.length > 1 ? from : null,
+          body: n.body,
+          read: Boolean(n.read),
+          cleared: Boolean(n.clearedAt),
+          unread: isUnread(n),
+          canOpen: Boolean(n.ticker && tickers.has(n.ticker)),
+          expected: Boolean(expectedDividendFor(portfolio, n)),
+        };
+      }),
+    };
+  },
+
   // Account-wide settings the Settings screen shows.
   'settings.view': () => ({ filerStatus: accountTaxProfile(requireAccount())?.filerStatus ?? '' }),
 
@@ -542,6 +635,7 @@ const handlers: Record<string, Handler> = {
       if (status !== 'filer' && status !== 'non-filer') throw new Error('Choose filer or non-filer.');
       return { account: JSON.stringify(setAccountFilerStatus(requireAccount(), status)) };
     }
+    if (op === 'inbox') return { account: JSON.stringify(changeInbox(requireAccount(), params)) };
     const id = typeof params.id === 'string' ? params.id : '';
     const account = requireAccount();
     if (op === 'portfolio.add') {

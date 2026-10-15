@@ -76,6 +76,9 @@ import app.sipwise.ui.EntryScreen
 import app.sipwise.ui.EntryViewModel
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
+import app.sipwise.ui.InboxBell
+import app.sipwise.ui.InboxScreen
+import app.sipwise.ui.InboxViewModel
 import app.sipwise.ui.LoadingScreen
 import app.sipwise.ui.MoreScreen
 import app.sipwise.ui.PicksScreen
@@ -119,6 +122,8 @@ import kotlinx.serialization.Serializable
 @Serializable object Targets
 
 @Serializable object Portfolios
+
+@Serializable object Inbox
 
 @Serializable data class Picks(val month: String)
 
@@ -276,6 +281,9 @@ private fun MainShell(
         viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.ledger) } })
     val plan: PlanViewModel =
         viewModel(factory = viewModelFactory { initializer { PlanViewModel(unlocked.ledger) } })
+    val inbox: InboxViewModel =
+        viewModel(factory = viewModelFactory { initializer { InboxViewModel(unlocked.ledger) } })
+    val inboxUi by inbox.ui.collectAsStateWithLifecycle()
     val scopes: ScopeViewModel =
         viewModel(factory = viewModelFactory { initializer { ScopeViewModel(unlocked.ledger) } })
     val snackbar = remember { SnackbarHostState() }
@@ -286,7 +294,7 @@ private fun MainShell(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
-    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class, Picks::class).any { entry?.destination?.hasRoute(it) == true }
+    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class, Picks::class, Inbox::class).any { entry?.destination?.hasRoute(it) == true }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
@@ -296,7 +304,10 @@ private fun MainShell(
                 top != null ->
                     TopAppBar(
                         title = { Text(stringResource(top.label)) },
-                        actions = { if (top.route != More && top.route != Plan) ScopeChooser(scopes) },
+                        actions = {
+                            if (top.route != More && top.route != Plan) ScopeChooser(scopes)
+                            InboxBell(inboxUi.counts.unread) { nav.navigate(Inbox) }
+                        },
                     )
                 destination != null ->
                     TopAppBar(
@@ -341,6 +352,7 @@ private fun MainShell(
             composable<Today> { TodayScreen(today) }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
             composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
+            composable<Inbox> { InboxScreen(inbox, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
             composable<Picks> { backStack ->
                 val month = backStack.toRoute<Picks>().month
                 val picks: PicksViewModel =
@@ -396,6 +408,7 @@ private fun subScreenTitle(
         destination.hasRoute(Targets::class) -> stringResource(R.string.targets_title)
         destination.hasRoute(Portfolios::class) -> stringResource(R.string.portfolios_title)
         destination.hasRoute(Picks::class) -> stringResource(R.string.picks_title)
+        destination.hasRoute(Inbox::class) -> stringResource(R.string.inbox_title)
         destination.hasRoute(AddEntry::class) ->
             stringResource(if (entry?.toRoute<AddEntry>()?.entryId != null) R.string.entry_edit_title else R.string.entry_title)
         else -> ""

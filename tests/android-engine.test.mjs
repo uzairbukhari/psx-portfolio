@@ -385,3 +385,23 @@ test('monthly picks: stale check, inputs, run and view round-trip on the device'
   assert.ok(Array.isArray(after.value.picks));
   assert.equal(run('picks.config').value.max, 15);
 });
+
+test('inbox view and changes spread over every portfolio', () => {
+  const account = seed();
+  const [first, second] = account.portfolios;
+  first.portfolio.notifications = [{ id: 'ann:1:cash', at: '2026-10-10T08:00:00Z', kind: 'payout-announced', ticker: 'MEBL', title: 'MEBL dividend', body: 'Cash dividend', read: false }];
+  second.portfolio.notifications = [{ id: 'div:9', at: '2026-10-11T08:00:00Z', kind: 'dividend-recorded', title: 'Second alert', body: '', read: false }];
+  run('account.load', { json: JSON.stringify(account) });
+  const view = run('inbox.view', { scope: 'all', filter: 'inbox' });
+  assert.equal(view.ok, true, view.error);
+  assert.equal(view.value.counts.inbox, 2);
+  assert.equal(view.value.items[0].from, second.name);
+  const cleared = run('mutate.account', { op: 'inbox', params: JSON.stringify({ scope: 'all', action: 'clearAll' }) });
+  assert.equal(cleared.ok, true, cleared.error);
+  const next = JSON.parse(cleared.value.account);
+  assert.ok(next.portfolios[0].portfolio.notifications[0].clearedAt);
+  assert.equal(next.portfolios[0].portfolio.notifications[0].id, 'ann:1:cash');
+  run('account.load', { json: cleared.value.account });
+  assert.equal(run('inbox.view', { scope: 'all', filter: 'cleared' }).value.items.length, 2);
+  assert.equal(run('mutate.account', { op: 'inbox', params: JSON.stringify({ scope: 'all', action: 'nope' }) }).ok, false);
+});

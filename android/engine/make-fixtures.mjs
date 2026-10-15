@@ -18,6 +18,7 @@ for (const [file, name, args] of [
   ['overview.json', 'overview.view', { scope: 'all' }],
   ['assets.json', 'assets.view', { scope: 'all' }],
   ['picks-view.json', 'picks.view', { month: '2026-10' }],
+  ['inbox-view.json', 'inbox.view', { scope: 'all', filter: 'all' }],
   ['activity-view.json', 'activity.view', { scope: 'all', filter: 'all', query: '' }],
 ]) {
   const reply = JSON.parse(call(name, JSON.stringify(args)));

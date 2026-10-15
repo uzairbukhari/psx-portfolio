@@ -82,10 +82,11 @@ class Ledger(
         params: JsonObject,
         label: String = "",
         action: LedgerAction = LedgerAction.TAX,
+        notify: Boolean = true,
     ) {
         val change = writer.applyAccount(op, params)
         _version.value += 1
-        _notices.tryEmit(LedgerNotice(null, label, change, action))
+        if (notify) _notices.tryEmit(LedgerNotice(null, label, change, action))
     }
 
     /**
