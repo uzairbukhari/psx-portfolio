@@ -383,7 +383,11 @@ button.overview-portfolio:not([data-slot]):focus-visible {
 /* Folding panels (All companies, gold, plans, funds) */
 .collapsible {
   margin-top: 12px;
-  padding: 0;
+  padding: 5px;
+}
+/* .panel (globals.css, research-dossier.css) has the same specificity and can load later, so match it with two classes. */
+.panel.collapsible {
+  padding: 5px;
 }
 .collapsible__head {
   display: flex;
