@@ -18,6 +18,13 @@ class EntryViewTest {
     }
 
     @Test
+    fun aSellNeverCarriesASipMonth() {
+        val form = EntryForm(EntryKind.SELL, "p1", "LUCK", "2026-10-01", shares = "5", price = "120", month = "2026-10")
+        val (_, params) = entryOperation(form)
+        assertEquals("", params["month"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun dividendsAndSplitsUseTheirOwnFields() {
         val dividend = entryOperation(EntryForm(EntryKind.DIVIDEND, ticker = "MEBL", date = "2026-10-02", perShare = "4.5", editingId = "e1"))
         assertEquals("dividend", dividend.first)

@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.work.runtime)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     testImplementation(kotlin("test"))

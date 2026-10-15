@@ -6,8 +6,8 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | # | Feature | Expo implementation | Status |
 |---|---|---|---|
 | 1 | Google sign-in, token exchange | `AuthProvider.tsx`, google-signin | Done |
-| 2 | Session token, 401 sign-out, queued revoke | `token-store.ts`, `session-cleanup.ts` | Partial (token, profile, queued revoke done; WorkManager retry pending) |
-| 3 | Vault status/setup/recovery key/unlock/recover/erase | `VaultProvider.tsx`, `VaultScreens.tsx`, `lib/vault-client.ts` | Done (erase pending) |
+| 2 | Session token, 401 sign-out, queued revoke | `token-store.ts`, `session-cleanup.ts` | Done (token, profile, queued revoke retried on launch and by WorkManager once the phone is online) |
+| 3 | Vault status/setup/recovery key/unlock/recover/erase | `VaultProvider.tsx`, `VaultScreens.tsx`, `lib/vault-client.ts` | Done (erase vault from the unlock screen, type ERASE to confirm) |
 | 4 | Native Argon2id | `modules/sipwise-argon2` | Done |
 | 5 | Biometric vault unlock | `biometric-key*.ts` | Done (Android Keystore key behind BiometricPrompt, dropped when biometrics change; opt-in on the unlock screen and in More) |
 | 6 | Privacy cover + 60 s relock | `app-active.ts`, `lock-policy.ts` | Done (60 s relock, recents thumbnail off, in-app cover as soon as the app leaves the foreground) |
@@ -18,7 +18,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 11 | Today hero, return breakdown | `(tabs)/index.tsx`, `data/today.ts` | Partial (headline, return breakdown on Today; net worth lives at the top of Holdings) |
 | 12 | Next actions | `data/today.ts#nextActions` | Done (tap opens the company page for a dividend, refreshes prices, opens Targets or the Plan tab) |
 | 13 | Month progress | `data/today.ts#monthProgress` | Done |
-| 14 | First-use welcome | index.tsx | Pending |
+| 14 | First-use welcome | index.tsx | Done (add first holding or skip) |
 | 15 | Market pulse + live SSE | `MarketPulse.tsx`, `useLiveMarket.ts`, `live-market.ts` | Partial: KSE-100, indices, breadth and day chart are polled every 60 s while the market is open; live SSE ticks skipped |
 | 16 | Value vs money in, XIRR, KSE-100 compare | `track-record.ts`, `TrackRecordCards.tsx` | Done (in Insights: value vs money in, yearly return, KSE-100 comparison with range chips; the collapsed card on Today is not repeated) |
 | 17 | Net worth card + donut | `NetWorthCard.tsx`, `lib/account-overview.ts` | Done (net worth, asset mix donut and legend at the top of Holdings; incomplete-valuation notice) |
@@ -30,7 +30,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 23 | Company ledger + dividends tab | same | Done (tap an editable entry to void it; correcting an entry pending) |
 | 24 | Add/edit/void transaction (5 kinds) | `transaction.tsx`, `data/mutations.ts`, `entry-form.ts` | Done (add, edit, void with Undo for all five kinds) |
 | 25 | New company confirmed via PSX | transaction.tsx | Pending |
-| 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Partial (date picker on the entry form; month picker pending) |
+| 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Done (date picker and SIP month picker on the entry form; the month starts blank, like Expo) |
 | 27 | Manual price | `quote.tsx` | Done |
 | 28 | Mark dividend received | `received.tsx` | Done |
 | 29 | Targets editor | `targets.tsx`, `lib/targets.ts` | Done |

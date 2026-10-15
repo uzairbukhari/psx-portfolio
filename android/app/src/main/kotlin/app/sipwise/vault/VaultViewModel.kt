@@ -226,6 +226,17 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         open(session)
     }
 
+    /** Lost both the password and the recovery key: the server deletes the vault and the person starts again. */
+    fun erase() =
+        run {
+            container.vaultTransport.deleteVault()
+            container.biometric.forget(email)
+            cache.clear()
+            _biometric.value = BiometricState(_biometric.value.available, false)
+            status = null
+            refresh()
+        }
+
     private suspend fun open(session: VaultSession) {
         val engine = engine()
         engine.call("account.load", mapOf("json" to session.account))

@@ -101,6 +101,11 @@
         <item quantity="other">%1$d buys suggested</item>
     </plurals>
     <string name="actions_title">Next actions</string>
+    <string name="erase_link">Lost both? Erase the vault</string>
+    <string name="erase_title">Erase this vault</string>
+    <string name="erase_body">If you have lost both your vault password and your recovery key, the data cannot be recovered. You can erase it and start with an empty portfolio. This permanently deletes everything saved for %1$s.</string>
+    <string name="erase_type">Type ERASE to confirm</string>
+    <string name="erase_action">Erase vault and start over</string>
     <string name="month_picker_label">SIP month (optional)</string>
     <string name="month_picker_none">No SIP month</string>
     <string name="month_picker_prev">Previous</string>

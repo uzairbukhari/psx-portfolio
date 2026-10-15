@@ -80,6 +80,7 @@ import app.sipwise.ui.CompanyScreen
 import app.sipwise.ui.CompanyViewModel
 import app.sipwise.ui.EntryScreen
 import app.sipwise.ui.EntryViewModel
+import app.sipwise.ui.EraseVaultScreen
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.InboxBell
@@ -217,6 +218,7 @@ private fun VaultGate(
     val busy by vault.busy.collectAsStateWithLifecycle()
     val error by vault.error.collectAsStateWithLifecycle()
     var recovering by remember { mutableStateOf(false) }
+    var erasing by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vault.onBackgrounded(System.currentTimeMillis()) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { vault.onForegrounded(System.currentTimeMillis()) }
     when (val current = ui) {
@@ -226,7 +228,9 @@ private fun VaultGate(
         is VaultUi.ConfirmRecovery ->
             RecoveryKeyScreen(current.recoveryKey, busy, error, onSaved = vault::confirmRecoverySaved, onCancel = vault::cancelSetup)
         is VaultUi.Locked ->
-            if (recovering) {
+            if (erasing) {
+                EraseVaultScreen(email, busy, error, onErase = vault::erase, onBack = { erasing = false })
+            } else if (recovering) {
                 RecoverScreen(busy, error, onRecover = vault::recover, onBack = { recovering = false })
             } else {
                 val biometric by vault.biometric.collectAsStateWithLifecycle()
@@ -239,6 +243,7 @@ private fun VaultGate(
                     onUnlock = { password, remember -> vault.unlock(password, remember, activity) },
                     onBiometric = { activity?.let(vault::unlockWithBiometric) },
                     onForgot = { recovering = true },
+                    onErase = { erasing = true },
                     onSignOut = onSignOut,
                 )
             }
