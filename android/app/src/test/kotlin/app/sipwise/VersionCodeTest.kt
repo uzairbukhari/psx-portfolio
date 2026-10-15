@@ -5,7 +5,12 @@ import kotlin.test.assertTrue
 
 /** The version-code formula lives in app/build.gradle.kts; this documents and pins its ordering rules. */
 class VersionCodeTest {
-    private fun code(major: Int, minor: Int, patch: Int, rc: Int = 0): Int {
+    private fun code(
+        major: Int,
+        minor: Int,
+        patch: Int,
+        rc: Int = 0,
+    ): Int {
         val slot = if (rc > 0) (rc - 1).coerceAtMost(8) else 9
         return major * 100_000 + minor * 1_000 + patch * 10 + slot
     }

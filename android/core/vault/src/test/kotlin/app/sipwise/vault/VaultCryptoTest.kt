@@ -1,23 +1,25 @@
 package app.sipwise.vault
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class VaultCryptoTest {
     private val vault = VaultCrypto()
     private val vector: JsonObject = Json.parseToJsonElement(File(System.getProperty("sipwise.vectorFile")).readText()).jsonObject
 
     private fun JsonObject.str(key: String) = getValue(key).jsonPrimitive.content
+
     private fun JsonObject.obj(key: String) = getValue(key).jsonObject
+
     private fun hex(text: String) = ByteArray(text.length / 2) { text.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 
     private fun material(): VaultKeyMaterial {
@@ -26,10 +28,15 @@ class VaultCryptoTest {
         val kdf = pw.obj("kdf")
         val rec = m.obj("recovery")
         return VaultKeyMaterial(
-            m.str("vaultId"), m.getValue("formatVersion").jsonPrimitive.int, m.getValue("keyVersion").jsonPrimitive.int, m.getValue("wrapperVersion").jsonPrimitive.int,
+            m.str("vaultId"),
+            m.getValue("formatVersion").jsonPrimitive.int,
+            m.getValue("keyVersion").jsonPrimitive.int,
+            m.getValue("wrapperVersion").jsonPrimitive.int,
             PasswordWrapper(
                 PasswordKdf(kdf.str("alg"), kdf.getValue("v").jsonPrimitive.int, kdf.getValue("m").jsonPrimitive.int, kdf.getValue("t").jsonPrimitive.int, kdf.getValue("p").jsonPrimitive.int),
-                pw.str("salt"), pw.str("nonce"), pw.str("ct"),
+                pw.str("salt"),
+                pw.str("nonce"),
+                pw.str("ct"),
             ),
             RecoveryWrapper(rec.str("nonce"), rec.str("ct")),
         )
@@ -51,10 +58,16 @@ class VaultCryptoTest {
     @Test
     fun `envelope written by the TypeScript client decrypts`() {
         val e = vector.obj("envelope")
-        val envelope = PortfolioEnvelope(
-            e.getValue("v").jsonPrimitive.int, e.str("alg"), e.str("vaultId"), e.getValue("keyVersion").jsonPrimitive.int,
-            e.getValue("revision").jsonPrimitive.int, e.str("nonce"), e.str("ct"),
-        )
+        val envelope =
+            PortfolioEnvelope(
+                e.getValue("v").jsonPrimitive.int,
+                e.str("alg"),
+                e.str("vaultId"),
+                e.getValue("keyVersion").jsonPrimitive.int,
+                e.getValue("revision").jsonPrimitive.int,
+                e.str("nonce"),
+                e.str("ct"),
+            )
         val plain = vault.decryptPortfolio(hex(vector.str("dataKeyHex")), envelope, envelope.vaultId, envelope.keyVersion, envelope.revision)
         assertEquals(vector.str("plaintext"), plain)
     }

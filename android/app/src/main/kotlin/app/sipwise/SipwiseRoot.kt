@@ -19,12 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import kotlinx.serialization.Serializable
 
 /** Type-safe top-level routes. The four destinations match the Expo app's tabs. */
@@ -38,12 +38,13 @@ import kotlinx.serialization.Serializable
 
 private data class TopLevel(val route: Any, val label: Int, val icon: ImageVector)
 
-private val topLevel = listOf(
-    TopLevel(Today, R.string.nav_today, Icons.Outlined.Home),
-    TopLevel(Portfolio, R.string.nav_portfolio, Icons.Outlined.PieChart),
-    TopLevel(Plan, R.string.nav_plan, Icons.Outlined.Timeline),
-    TopLevel(Activity, R.string.nav_activity, Icons.Outlined.List),
-)
+private val topLevel =
+    listOf(
+        TopLevel(Today, R.string.nav_today, Icons.Outlined.Home),
+        TopLevel(Portfolio, R.string.nav_portfolio, Icons.Outlined.PieChart),
+        TopLevel(Plan, R.string.nav_plan, Icons.Outlined.Timeline),
+        TopLevel(Activity, R.string.nav_activity, Icons.Outlined.List),
+    )
 
 @Composable
 fun SipwiseRoot() {
