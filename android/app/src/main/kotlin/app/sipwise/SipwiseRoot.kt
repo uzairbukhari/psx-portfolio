@@ -190,20 +190,22 @@ private fun MainShell(
             }
         },
         bottomBar = {
-            if (!onAddScreen) NavigationBar {
-                for (item in topLevel) {
-                    NavigationBarItem(
-                        selected = entry?.destination?.hasRoute(item.route::class) == true,
-                        onClick = {
-                            nav.navigate(item.route) {
-                                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(item.icon, contentDescription = null) },
-                        label = { Text(stringResource(item.label)) },
-                    )
+            if (!onAddScreen) {
+                NavigationBar {
+                    for (item in topLevel) {
+                        NavigationBarItem(
+                            selected = entry?.destination?.hasRoute(item.route::class) == true,
+                            onClick = {
+                                nav.navigate(item.route) {
+                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = { Icon(item.icon, contentDescription = null) },
+                            label = { Text(stringResource(item.label)) },
+                        )
+                    }
                 }
             }
         },

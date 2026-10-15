@@ -35,7 +35,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
 import app.sipwise.designsystem.Spacing
-import app.sipwise.model.EntryForm
 import app.sipwise.model.EntryKind
 import app.sipwise.model.money
 import java.time.Instant
