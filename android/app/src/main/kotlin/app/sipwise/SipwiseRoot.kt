@@ -1,9 +1,7 @@
 package app.sipwise
 
 import android.app.Application
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -12,11 +10,9 @@ import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material.icons.outlined.Timeline
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,10 +39,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
-import app.sipwise.designsystem.Spacing
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.LoadingScreen
+import app.sipwise.ui.MoreScreen
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
 import app.sipwise.ui.SignInScreen
@@ -161,21 +157,6 @@ private fun MainShell(
             composable<Activity> { Placeholder(R.string.nav_activity) }
             composable<More> { MoreScreen(onLock, onSignOut) }
         }
-    }
-}
-
-@Composable
-private fun MoreScreen(
-    onLock: () -> Unit,
-    onSignOut: () -> Unit,
-) {
-    Column(
-        Modifier.fillMaxSize().padding(Spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-    ) {
-        Text(stringResource(R.string.more_account))
-        Button(onClick = onLock) { Text(stringResource(R.string.lock_now)) }
-        OutlinedButton(onClick = onSignOut) { Text(stringResource(R.string.sign_out)) }
     }
 }
 

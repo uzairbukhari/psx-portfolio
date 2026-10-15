@@ -66,4 +66,15 @@
     </plurals>
     <string name="holding_stale">Price is out of date</string>
     <string name="holding_dividend_expected">Dividend expected</string>
+
+    <string name="update_title">App updates</string>
+    <string name="update_version_installed">Installed version %1$s</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You have the latest version.</string>
+    <string name="update_available">Version %1$s is available</string>
+    <string name="update_install">Download and install</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_permission">To install updates, allow Sipwise to install apps in the next screen, then come back and tap Install again.</string>
+    <string name="update_open_settings">Open settings</string>
 </resources>
