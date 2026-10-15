@@ -21,7 +21,10 @@ android {
     }
 
     buildFeatures { compose = true }
-    lint { warningsAsErrors = true }
+    lint {
+        warningsAsErrors = true
+        disable += setOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable")
+    }
 }
 
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
