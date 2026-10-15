@@ -9,7 +9,13 @@ const dir = new URL('../core/model/src/test/resources/', import.meta.url);
 mkdirSync(dir, { recursive: true });
 const account = JSON.parse(JSON.stringify(buildTestAccount('2026-10-15', new Date('2026-10-15T08:00:00Z'))));
 call('account.load', JSON.stringify({ json: JSON.stringify(account) }));
-const reply = JSON.parse(call('holdings.view', JSON.stringify({ scope: 'all' })));
-if (!reply.ok) throw new Error(reply.error);
-writeFileSync(new URL('holdings-view.json', dir), `${JSON.stringify(reply.value, null, 2)}\n`);
-console.log(`holdings-view.json: ${reply.value.rows.length} rows, ${reply.value.soldOut.length} sold out`);
+for (const [file, name, args] of [
+  ['holdings-view.json', 'holdings.view', { scope: 'all' }],
+  ['today-view.json', 'today.view', { scope: 'all', month: '2026-10' }],
+  ['activity-view.json', 'activity.view', { scope: 'all', filter: 'all', query: '' }],
+]) {
+  const reply = JSON.parse(call(name, JSON.stringify(args)));
+  if (!reply.ok) throw new Error(`${name}: ${reply.error}`);
+  writeFileSync(new URL(file, dir), `${JSON.stringify(reply.value, null, 2)}\n`);
+  console.log(`${file} written`);
+}

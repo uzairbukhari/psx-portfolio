@@ -77,4 +77,38 @@
     <string name="update_downloading">Downloading…</string>
     <string name="update_permission">To install updates, allow Sipwise to install apps in the next screen, then come back and tap Install again.</string>
     <string name="update_open_settings">Open settings</string>
+
+    <string name="today_hero_label">Market value of holdings</string>
+    <string name="today_hero_incomplete">Market value · incomplete</string>
+    <string name="today_gain_unknown">Unrealised gain on current holdings: not yet known</string>
+    <string name="today_gain_label">unrealised gain on current holdings</string>
+    <string name="today_cost">Cost of current holdings</string>
+    <string name="today_not_known">Not yet known</string>
+    <string name="today_holdings">Holdings</string>
+    <string name="today_see_return">See total return</string>
+    <string name="today_hide_return">Hide total return</string>
+    <string name="return_unrealised">Unrealised gain</string>
+    <string name="return_realised">Realised gain (sales)</string>
+    <string name="return_dividends">Dividends received</string>
+    <string name="return_total">Total return</string>
+    <string name="return_after_tax">After estimated tax: %1$s</string>
+    <string name="return_note">Before estimated capital gains tax. Expected dividends are not included.</string>
+    <string name="month_title">This month · %1$s</string>
+    <string name="month_of_budget">of %1$s</string>
+    <string name="month_left">%1$s left</string>
+    <string name="month_all_invested">All of this month’s budget is invested</string>
+    <string name="month_no_budget">No budget set for %1$s. Set one on the web or in the Expo app for now; planning arrives in a later update.</string>
+    <plurals name="month_suggested">
+        <item quantity="one">%1$d buy suggested</item>
+        <item quantity="other">%1$d buys suggested</item>
+    </plurals>
+    <string name="actions_title">Next actions</string>
+    <string name="today_first_use">Your portfolio is empty. Add your first purchase to get started.</string>
+    <string name="filter_all">All</string>
+    <string name="filter_buy">Buys</string>
+    <string name="filter_sell">Sells</string>
+    <string name="filter_dividend">Dividends</string>
+    <string name="filter_split">Splits</string>
+    <string name="activity_search">Search activity</string>
+    <string name="activity_empty">Nothing matches.</string>
 </resources>

@@ -1,0 +1,59 @@
+{
+  "now": "2026-10-15",
+  "month": "2026-10",
+  "summary": {
+    "heldCount": 13,
+    "value": 885500,
+    "cost": null,
+    "gain": null,
+    "gainPercent": null,
+    "missingPrice": [],
+    "unknownCost": [
+      "MEBL",
+      "EFERT"
+    ],
+    "incomplete": [
+      "unknown-cost"
+    ],
+    "oldestQuoteDate": "2026-10-15"
+  },
+  "openCount": 13,
+  "error": null,
+  "firstUse": false,
+  "breakdown": {
+    "unrealised": null,
+    "realised": 8908.75,
+    "dividendsReceived": 9100,
+    "totalBeforeTax": null,
+    "afterTax": null,
+    "expected": {
+      "count": 2,
+      "gross": 3700
+    }
+  },
+  "progress": {
+    "month": "2026-10",
+    "budgetSet": true,
+    "budget": 150000,
+    "bought": 20551.25,
+    "remaining": 129448.75,
+    "fraction": 0.13700833333333334,
+    "suggested": 0,
+    "blockers": [],
+    "planError": null
+  },
+  "actions": [
+    {
+      "key": "dividend",
+      "title": "Confirm 2 expected dividends",
+      "detail": "Mark received once it arrives so it counts as income.",
+      "id": "ahl-core::d-34",
+      "ticker": "OGDC"
+    },
+    {
+      "key": "targets",
+      "title": "Set your targets",
+      "detail": "Choose the companies your monthly SIP buys and their weights."
+    }
+  ]
+}

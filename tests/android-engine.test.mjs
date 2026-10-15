@@ -74,3 +74,29 @@ test('a locked portfolio cannot be edited through the writable check', () => {
   assert.equal(result.ok, false);
   assert.equal(run('account.assertWritable', { current: JSON.stringify(account), next: JSON.stringify(account) }).ok, true);
 });
+
+test('the today and activity views match the Expo view-models', async () => {
+  const { activityEntries } = await import('../mobile/src/data/derive.ts');
+  const { filterActivity, groupByMonth } = await import('../mobile/src/data/activity-view.ts');
+  const { monthProgress, nextActions, returnBreakdown } = await import('../mobile/src/data/today.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const reference = normalizeAccount(seed(), false);
+  for (const scope of [ALL_PORTFOLIOS, ...account.portfolios.map((p) => p.id)]) {
+    const portfolio = dashboardPortfolio(reference, scope);
+    const { held } = safeHoldings(portfolio);
+    const summary = totals(held);
+    const view = run('today.view', { scope, month: '2026-10' });
+    assert.equal(view.ok, true, view.error);
+    assert.deepEqual(view.value.breakdown, roundTrip(returnBreakdown(portfolio, summary.gain)));
+    assert.deepEqual(view.value.progress, roundTrip(monthProgress(portfolio, '2026-10')));
+    assert.deepEqual(view.value.actions, roundTrip(nextActions(portfolio, held, '2026-10', today())));
+    for (const filter of ['all', 'buy', 'sell', 'dividend', 'split']) {
+      for (const query of ['', 'a']) {
+        const act = run('activity.view', { scope, filter, query });
+        const expected = groupByMonth(filterActivity(activityEntries(portfolio), filter, query));
+        assert.deepEqual(act.value.sections, roundTrip(expected));
+      }
+    }
+  }
+});

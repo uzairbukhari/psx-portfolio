@@ -15,9 +15,9 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 8 | Account load + public overlay | `usePortfolio.ts`, `lib/portfolio-view.ts` | Pending |
 | 9 | Revisioned save, conflict, undo | `usePortfolio.save`, Toast | Partial (save/conflict in `VaultSession`; Undo UI pending) |
 | 10 | Portfolio selection (All / one), chooser sheet | `PortfolioSelection.tsx`, `PortfolioChooser.tsx` | Pending |
-| 11 | Today hero, return breakdown | `(tabs)/index.tsx`, `data/today.ts` | Pending |
-| 12 | Next actions | `data/today.ts#nextActions` | Pending |
-| 13 | Month progress | `data/today.ts#monthProgress` | Pending |
+| 11 | Today hero, return breakdown | `(tabs)/index.tsx`, `data/today.ts` | Partial (headline, return breakdown; net-worth overview pending) |
+| 12 | Next actions | `data/today.ts#nextActions` | Partial (shown; tapping an action pending) |
+| 13 | Month progress | `data/today.ts#monthProgress` | Done |
 | 14 | First-use welcome | index.tsx | Pending |
 | 15 | Market pulse + live SSE | `MarketPulse.tsx`, `useLiveMarket.ts`, `live-market.ts` | Pending |
 | 16 | Value vs money in, XIRR, KSE-100 compare | `track-record.ts`, `TrackRecordCards.tsx` | Pending |
@@ -37,7 +37,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Pending |
 | 31 | Monthly Picks on device | `PicksView.tsx`, `lib/picks-run.ts` | Pending |
 | 32 | Refresh prices (queued job + poll) | `lib/import-refresh.ts` | Pending |
-| 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Pending |
+| 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Partial (filters, search, month groups; sticky headers and edit pending) |
 | 34 | Inbox with filters and actions | `inbox.tsx`, `lib/notification-actions.ts` | Pending |
 | 35 | Auto dividends on load | `data/auto-dividends.ts`, `lib/dividend-sync.ts` | Pending |
 | 36 | Push opt-in, token, test, tap routing | `push.ts`, `PushBridge.tsx` | Pending |

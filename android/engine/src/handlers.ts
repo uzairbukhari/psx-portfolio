@@ -13,6 +13,10 @@ import {
 import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
 import { today } from '../../../lib/portfolio.ts';
+import { activityEntries } from '../../../mobile/src/data/derive.ts';
+import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
+import { currentMonth } from '../../../mobile/src/data/sip.ts';
+import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
 
 export const ENGINE_API_VERSION = 1;
 
@@ -86,6 +90,38 @@ const handlers: Record<string, Handler> = {
       summary,
       error,
     };
+  },
+
+  // The Today screen: headline figures, return breakdown, this month's progress and the next actions.
+  'today.view': (args) => {
+    const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
+    const month = typeof args.month === 'string' && args.month ? args.month : currentMonth();
+    const now = today();
+    const account = requireAccount();
+    const portfolio = dashboardPortfolio(account, scope);
+    const { held, error } = safeHoldings(portfolio);
+    const summary = totals(held);
+    const open = openPositions(held);
+    return {
+      now,
+      month,
+      summary,
+      openCount: open.length,
+      error,
+      firstUse: portfolio.companies.length === 0 && portfolio.trades.length === 0 && !(portfolio.dividends ?? []).length,
+      breakdown: returnBreakdown(portfolio, summary.gain),
+      progress: monthProgress(portfolio, month),
+      actions: nextActions(portfolio, held, month, now),
+    };
+  },
+
+  // The Activity ledger: filtered, searched and grouped by month, newest first.
+  'activity.view': (args) => {
+    const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
+    const filter = (typeof args.filter === 'string' ? args.filter : 'all') as ActivityFilter;
+    const query = typeof args.query === 'string' ? args.query : '';
+    const entries = filterActivity(activityEntries(dashboardPortfolio(requireAccount(), scope)), filter, query);
+    return { count: entries.length, sections: groupByMonth(entries) };
   },
 };
 

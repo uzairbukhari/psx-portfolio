@@ -39,6 +39,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
+import app.sipwise.ui.ActivityScreen
+import app.sipwise.ui.ActivityViewModel
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.LoadingScreen
@@ -46,6 +48,8 @@ import app.sipwise.ui.MoreScreen
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
 import app.sipwise.ui.SignInScreen
+import app.sipwise.ui.TodayScreen
+import app.sipwise.ui.TodayViewModel
 import app.sipwise.ui.UnlockScreen
 import app.sipwise.ui.VaultFailedScreen
 import app.sipwise.ui.VaultSetupScreen
@@ -130,6 +134,10 @@ private fun MainShell(
     val entry by nav.currentBackStackEntryAsState()
     val holdings: HoldingsViewModel =
         viewModel(factory = viewModelFactory { initializer { HoldingsViewModel(unlocked.engine) } })
+    val today: TodayViewModel =
+        viewModel(factory = viewModelFactory { initializer { TodayViewModel(unlocked.engine) } })
+    val activity: ActivityViewModel =
+        viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.engine) } })
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -150,11 +158,11 @@ private fun MainShell(
             }
         },
     ) { padding ->
-        NavHost(nav, startDestination = Portfolio, modifier = Modifier.padding(padding)) {
-            composable<Today> { Placeholder(R.string.nav_today) }
+        NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
+            composable<Today> { TodayScreen(today) }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = {}) }
             composable<Plan> { Placeholder(R.string.nav_plan) }
-            composable<Activity> { Placeholder(R.string.nav_activity) }
+            composable<Activity> { ActivityScreen(activity) }
             composable<More> { MoreScreen(onLock, onSignOut) }
         }
     }
