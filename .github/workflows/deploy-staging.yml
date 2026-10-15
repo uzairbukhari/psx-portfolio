@@ -44,7 +44,7 @@ jobs:
     outputs:
       sha: ${{ steps.merge.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # staging = main + every open same-repo PR into main (+ an optional manual ref). Merging is incremental, so
@@ -104,10 +104,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: staging
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - run: npm ci
@@ -124,7 +124,7 @@ jobs:
       url: ${{ steps.deploy.outputs.url }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: staging
       # Until the owner creates the staging D1 database and pastes its id into
@@ -139,7 +139,7 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.configured.outputs.ready == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
       - if: steps.configured.outputs.ready == 'true'
@@ -238,11 +238,11 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.configured.outputs.ready == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: staging
       - if: steps.configured.outputs.ready == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
       - if: steps.configured.outputs.ready == 'true'
@@ -254,7 +254,7 @@ jobs:
         env:
           CI: 'true'
       - if: failure() && steps.configured.outputs.ready == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
