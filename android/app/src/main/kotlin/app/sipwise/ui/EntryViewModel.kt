@@ -45,6 +45,7 @@ class EntryViewModel(
     private val initialTicker: String = "",
     private val initialShares: String = "",
     private val initialPrice: String = "",
+    private val initialMonth: String = "",
 ) : ViewModel() {
     private val _ui = MutableStateFlow(EntryUi(form = EntryForm(kind = initial)))
     val ui: StateFlow<EntryUi> = _ui.asStateFlow()
@@ -74,7 +75,7 @@ class EntryViewModel(
                                 portfolioId = owner?.id.orEmpty(),
                                 ticker = if (owner?.companies?.any { it.ticker == initialTicker } == true) initialTicker else "",
                                 date = options.today,
-                                month = options.month,
+                                month = initialMonth,
                                 shares = initialShares,
                                 price = initialPrice,
                             ),

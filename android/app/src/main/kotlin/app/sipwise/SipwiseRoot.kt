@@ -130,6 +130,7 @@ import kotlinx.serialization.Serializable
     val ticker: String? = null,
     val shares: String? = null,
     val price: String? = null,
+    val month: String? = null,
 )
 
 @Serializable object Targets
@@ -431,6 +432,7 @@ private fun MainShell(
                     today,
                     onOpenCompany = { nav.navigate(CompanyRoute(it)) },
                     onOpenTargets = { nav.navigate(Targets) },
+                    onAddEntry = { nav.navigate(AddEntry()) },
                     onOpenPlan = {
                         nav.navigate(Plan) {
                             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -452,7 +454,10 @@ private fun MainShell(
                 val month = backStack.toRoute<Picks>().month
                 val picks: PicksViewModel =
                     viewModel(key = "picks-$month", factory = viewModelFactory { initializer { PicksViewModel(unlocked.ledger, api, month) } })
-                PicksScreen(picks, onRecordOne = { ticker, shares, price -> nav.navigate(AddEntry(ticker = ticker, shares = shares, price = price)) })
+                PicksScreen(
+                    picks,
+                    onRecordOne = { ticker, shares, price -> nav.navigate(AddEntry(ticker = ticker, shares = shares, price = price, month = month)) },
+                )
             }
             composable<Portfolios> {
                 val portfolios: PortfoliosViewModel =
@@ -484,7 +489,7 @@ private fun MainShell(
                 val route = it.toRoute<AddEntry>()
                 val form: EntryViewModel =
                     viewModel(
-                        key = "${route.entryId}/${route.ticker}/${route.shares}/${route.price}",
+                        key = "${route.entryId}/${route.ticker}/${route.shares}/${route.price}/${route.month}",
                         factory =
                             viewModelFactory {
                                 initializer {
@@ -494,6 +499,7 @@ private fun MainShell(
                                         initialTicker = route.ticker.orEmpty(),
                                         initialShares = route.shares.orEmpty(),
                                         initialPrice = route.price.orEmpty(),
+                                        initialMonth = route.month.orEmpty(),
                                     )
                                 }
                             },

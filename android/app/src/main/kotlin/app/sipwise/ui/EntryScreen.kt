@@ -104,6 +104,9 @@ fun EntryScreen(
                 NumberField(R.string.entry_shares, form.shares) { viewModel.update(form.copy(shares = it)) }
                 NumberField(R.string.entry_price, form.price) { viewModel.update(form.copy(price = it)) }
                 NumberField(R.string.entry_fees, form.fees) { viewModel.update(form.copy(fees = it)) }
+                if (form.kind == EntryKind.BUY) {
+                    MonthPickerField(stringResource(R.string.month_picker_label), form.month, !ui.busy) { viewModel.update(form.copy(month = it)) }
+                }
                 ui.totals?.let { totals ->
                     Text(totals.label, style = MaterialTheme.typography.labelLarge)
                     Text(money(totals.total), style = MaterialTheme.typography.titleLarge)

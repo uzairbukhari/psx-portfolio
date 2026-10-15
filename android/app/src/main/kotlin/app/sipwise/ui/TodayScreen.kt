@@ -40,11 +40,16 @@ fun TodayScreen(
     onOpenCompany: (String) -> Unit,
     onOpenTargets: () -> Unit,
     onOpenPlan: () -> Unit,
+    onAddEntry: () -> Unit,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
         if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        return
+    }
+    if (view.firstUse && !ui.skippedWelcome) {
+        WelcomeCard(onAdd = onAddEntry, onSkip = viewModel::skipWelcome)
         return
     }
     LazyColumn(
@@ -200,5 +205,34 @@ private fun ActionsCard(
                 if (index < actions.lastIndex) HorizontalDivider()
             }
         }
+    }
+}
+
+/** First-use welcome: add a first holding or skip, like the Expo app. */
+@Composable
+private fun WelcomeCard(
+    onAdd: () -> Unit,
+    onSkip: () -> Unit,
+) {
+    Column(Modifier.padding(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.welcome_subtitle), style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.welcome_start), style = MaterialTheme.typography.labelLarge)
+        Card(Modifier.fillMaxWidth()) {
+            Column {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.welcome_add_title)) },
+                    supportingContent = { Text(stringResource(R.string.welcome_add_detail)) },
+                    modifier = Modifier.clickable(onClick = onAdd),
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.welcome_skip_title)) },
+                    supportingContent = { Text(stringResource(R.string.welcome_skip_detail)) },
+                    modifier = Modifier.clickable(onClick = onSkip),
+                )
+            }
+        }
+        Text(stringResource(R.string.welcome_note), style = MaterialTheme.typography.bodySmall)
     }
 }

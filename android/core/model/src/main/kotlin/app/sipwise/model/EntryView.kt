@@ -117,7 +117,7 @@ fun entryOperation(form: EntryForm): Pair<String, JsonObject> {
                     put("shares", form.shares)
                     put("price", form.price)
                     put("fees", form.fees)
-                    put("month", form.month)
+                    put("month", if (form.kind == EntryKind.BUY) form.month else "")
                 }
             }
         }

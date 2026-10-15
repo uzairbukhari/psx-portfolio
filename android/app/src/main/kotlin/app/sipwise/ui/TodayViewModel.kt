@@ -16,6 +16,7 @@ data class TodayUi(
     val view: TodayView? = null,
     val showReturn: Boolean = false,
     val pricing: Boolean = false,
+    val skippedWelcome: Boolean = false,
     val error: String? = null,
 )
 
@@ -26,6 +27,10 @@ class TodayViewModel(private val ledger: Ledger) : ViewModel() {
 
     init {
         viewModelScope.launch { ledger.version.collect { load() } }
+    }
+
+    fun skipWelcome() {
+        _ui.value = _ui.value.copy(skippedWelcome = true)
     }
 
     fun toggleReturn() {

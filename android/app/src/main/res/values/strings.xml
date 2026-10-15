@@ -101,6 +101,22 @@
         <item quantity="other">%1$d buys suggested</item>
     </plurals>
     <string name="actions_title">Next actions</string>
+    <string name="month_picker_label">SIP month (optional)</string>
+    <string name="month_picker_none">No SIP month</string>
+    <string name="month_picker_prev">Previous</string>
+    <string name="month_picker_next">Next</string>
+    <string name="month_picker_prev_year">Previous year</string>
+    <string name="month_picker_next_year">Next year</string>
+    <string name="month_picker_use">Use</string>
+    <string name="month_picker_clear">Clear</string>
+    <string name="welcome_title">Welcome</string>
+    <string name="welcome_subtitle">Let’s set up your portfolio</string>
+    <string name="welcome_start">Start with</string>
+    <string name="welcome_add_title">Add my first holding</string>
+    <string name="welcome_add_detail">Enter a buy by hand</string>
+    <string name="welcome_skip_title">Skip for now</string>
+    <string name="welcome_skip_detail">You can add holdings later</string>
+    <string name="welcome_note">Prices are delayed PSX quotes, and every figure says which date it used. Your data syncs with the Sipwise website.</string>
     <string name="today_first_use">Your portfolio is empty. Add your first purchase to get started.</string>
     <string name="filter_all">All</string>
     <string name="filter_buy">Buys</string>
