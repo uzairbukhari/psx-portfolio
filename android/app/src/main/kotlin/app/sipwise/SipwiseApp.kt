@@ -42,4 +42,3 @@ class SipwiseApp : Application() {
         container = AppContainer(this)
     }
 }
-

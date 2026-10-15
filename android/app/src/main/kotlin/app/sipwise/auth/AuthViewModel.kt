@@ -92,7 +92,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 sessions.saveToken(result.token)
                 sessions.saveProfile(result.user)
                 _state.value = AuthState.SignedIn(result.user)
-            } catch (e: SignInCancelledException) {
+            } catch (ignored: SignInCancelledException) {
                 _message.value = null
             } catch (e: SignInFailedException) {
                 _message.value = e.message
@@ -159,4 +159,3 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         const val HTTP_UNAUTHORIZED = 401
     }
 }
-

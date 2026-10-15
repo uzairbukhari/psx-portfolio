@@ -24,8 +24,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
-import app.sipwise.designsystem.Spacing
 import app.sipwise.designsystem.SipwiseTheme
+import app.sipwise.designsystem.Spacing
 import app.sipwise.model.HoldingRow
 import app.sipwise.model.HoldingSort
 import app.sipwise.model.PortfolioSummary

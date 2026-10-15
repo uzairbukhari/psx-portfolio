@@ -59,7 +59,7 @@ class SecureStorage(context: Context) {
                     init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(GCM_TAG_BITS, bytes, 0, IV_BYTES))
                 }
             String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES), Charsets.UTF_8)
-        } catch (e: java.security.GeneralSecurityException) {
+        } catch (ignored: java.security.GeneralSecurityException) {
             prefs.edit().remove(name).apply()
             null
         }
