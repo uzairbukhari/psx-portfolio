@@ -43,7 +43,12 @@ class JsEngineBridge private constructor(
                 throw EngineUnavailableException("This phone's WebView does not support the calculation engine. Update Android System WebView.")
             }
             val sandbox = JavaScriptSandbox.createConnectedInstanceAsync(context.applicationContext).await()
-            val params = IsolateStartupParameters().apply { maxHeapSizeBytes = MAX_HEAP_BYTES }
+            val params =
+                IsolateStartupParameters().apply {
+                    if (sandbox.isFeatureSupported(JavaScriptSandbox.JS_FEATURE_ISOLATE_MAX_HEAP_SIZE)) {
+                        maxHeapSizeBytes = MAX_HEAP_BYTES
+                    }
+                }
             val isolate = sandbox.createIsolate(params)
             val source = context.applicationContext.assets.open(ENGINE_ASSET).bufferedReader().use { it.readText() }
             isolate.evaluateJavaScriptAsync(source).await()
