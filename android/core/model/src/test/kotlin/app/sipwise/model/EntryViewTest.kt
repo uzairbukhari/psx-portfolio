@@ -5,6 +5,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class EntryViewTest {
     @Test
@@ -50,5 +51,14 @@ class EntryViewTest {
         assertEquals(EntryKind.SELL, form.kind)
         assertEquals("t-1", form.editingId)
         assertEquals("p", form.portfolioId)
+    }
+
+    @Test
+    fun aPsxSymbolIsTwoToTwelveUppercaseLettersOrDigits() {
+        assertTrue(isValidSymbol("MEBL"))
+        assertTrue(isValidSymbol("K2"))
+        assertFalse(isValidSymbol("A"))
+        assertFalse(isValidSymbol("TOOLONGSYMBOL1"))
+        assertFalse(isValidSymbol("ME BL"))
     }
 }

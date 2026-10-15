@@ -2,6 +2,7 @@ package app.sipwise.network
 
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class QuoteTickers(val tickers: List<String>)
@@ -22,6 +23,10 @@ data class QuoteJob(
 
 @Serializable
 data class QuotesJobResponse(val job: QuoteJob? = null)
+
+/** The quotes the server confirmed for the symbols asked about, each kept as the server sent it. */
+@Serializable
+data class QuotesResponse(val quotes: Map<String, JsonElement> = emptyMap())
 
 const val QUOTE_POLL_MS = 5_000L
 

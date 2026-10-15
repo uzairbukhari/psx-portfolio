@@ -91,7 +91,35 @@ fun EntryScreen(
                 }
             }
         }
-        CompanyField(portfolio?.companies.orEmpty().map { it.ticker to it.name }, form.ticker, enabled = !ui.editing) { viewModel.update(form.copy(ticker = it)) }
+        CompanyField(
+            portfolio?.companies.orEmpty().map { it.ticker to it.name },
+            if (form.newCompany) stringResource(R.string.entry_new_company) else form.ticker,
+            enabled = !ui.editing,
+            allowNew = !ui.editing,
+            onNew = { viewModel.update(form.copy(newCompany = true, ticker = "")) },
+        ) { viewModel.update(form.copy(newCompany = false, ticker = it)) }
+        if (form.newCompany) {
+            OutlinedTextField(
+                value = form.symbol,
+                onValueChange = { viewModel.update(form.copy(symbol = it.uppercase())) },
+                label = { Text(stringResource(R.string.entry_symbol)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = form.companyName,
+                onValueChange = { viewModel.update(form.copy(companyName = it)) },
+                label = { Text(stringResource(R.string.entry_company_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                items(options.sectors) { sector ->
+                    FilterChip(selected = sector == form.sector, onClick = { viewModel.update(form.copy(sector = sector)) }, label = { Text(sector) })
+                }
+            }
+            Text(stringResource(R.string.entry_new_company_hint), style = MaterialTheme.typography.bodySmall)
+        }
         DateField(stringResource(R.string.entry_date), form.date) { viewModel.update(form.copy(date = it)) }
         when (form.kind) {
             EntryKind.DIVIDEND ->
@@ -145,6 +173,8 @@ private fun CompanyField(
     companies: List<Pair<String, String>>,
     selected: String,
     enabled: Boolean,
+    allowNew: Boolean,
+    onNew: () -> Unit,
     onSelect: (String) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -158,6 +188,15 @@ private fun CompanyField(
                     text = { Text("$ticker · $name") },
                     onClick = {
                         onSelect(ticker)
+                        open = false
+                    },
+                )
+            }
+            if (allowNew) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.entry_new_company_option)) },
+                    onClick = {
+                        onNew()
                         open = false
                     },
                 )

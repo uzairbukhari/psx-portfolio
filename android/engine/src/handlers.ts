@@ -20,7 +20,7 @@ import {
 } from '../../../lib/portfolio-account.ts';
 import { openPositions, priceTickers, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
-import { blankPortfolio, today } from '../../../lib/portfolio.ts';
+import { SECTORS, blankPortfolio, today } from '../../../lib/portfolio.ts';
 import { contentsLabel, portfolioContents } from '../../../mobile/src/data/scope.ts';
 import { activityEntries, companyDividends, readOnlyReason } from '../../../mobile/src/data/derive.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
@@ -741,6 +741,7 @@ const handlers: Record<string, Handler> = {
     return {
       today: today(),
       month: currentMonth(),
+      sectors: SECTORS,
       portfolios: account.portfolios.map((p) => ({
         id: p.id,
         name: p.name,

@@ -138,6 +138,11 @@
     <string name="entry_kind_dividend">Dividend</string>
     <string name="entry_kind_split">Split</string>
     <string name="entry_company">Company</string>
+    <string name="entry_new_company">New company</string>
+    <string name="entry_new_company_option">+ New company</string>
+    <string name="entry_symbol">PSX symbol</string>
+    <string name="entry_company_name">Company name</string>
+    <string name="entry_new_company_hint">The symbol is confirmed against PSX when you save.</string>
     <string name="entry_date">Date (YYYY-MM-DD)</string>
     <string name="entry_pick_date">Pick</string>
     <string name="entry_date_ok">OK</string>

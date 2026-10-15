@@ -29,7 +29,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 22 | Company page, chart ranges | `company/[ticker].tsx`, `lib/price-history.ts` | Done |
 | 23 | Company ledger + dividends tab | same | Done (tap an editable entry to void it; correcting an entry pending) |
 | 24 | Add/edit/void transaction (5 kinds) | `transaction.tsx`, `data/mutations.ts`, `entry-form.ts` | Done (add, edit, void with Undo for all five kinds) |
-| 25 | New company confirmed via PSX | transaction.tsx | Pending |
+| 25 | New company confirmed via PSX | transaction.tsx | Done ("+ New company" in the entry form: symbol, name and sector; the symbol is confirmed on PSX and added in the same save as the entry, so one Undo removes both) |
 | 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Done (date picker and SIP month picker on the entry form; the month starts blank, like Expo) |
 | 27 | Manual price | `quote.tsx` | Done |
 | 28 | Mark dividend received | `received.tsx` | Done |
