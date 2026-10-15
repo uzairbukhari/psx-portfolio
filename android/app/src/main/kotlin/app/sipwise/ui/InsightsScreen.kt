@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
@@ -96,7 +97,7 @@ private fun SummaryHero(report: InsightsView) {
         val total = s.grandTotalReturn
         Text(if (total == null) stringResource(R.string.insights_return_unknown) else stringResource(R.string.insights_total_return, signedMoney(total)))
         Text(stringResource(R.string.insights_return_note), style = MaterialTheme.typography.bodySmall)
-        Text(stringResource(R.string.insights_coverage, s.quotesPriced, s.quotesHeld), style = MaterialTheme.typography.bodySmall)
+        Text(pluralStringResource(R.plurals.insights_coverage, s.quotesHeld, s.quotesPriced, s.quotesHeld), style = MaterialTheme.typography.bodySmall)
         s.topThreeWeight?.let { Text(stringResource(R.string.insights_top_three, it.toInt()), style = MaterialTheme.typography.bodySmall) }
         s.largestSector?.let { Text(stringResource(R.string.insights_largest_sector, it.name, it.weight.toInt()), style = MaterialTheme.typography.bodySmall) }
     }

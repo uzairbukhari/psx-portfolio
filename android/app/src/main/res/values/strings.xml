@@ -342,7 +342,10 @@
     <string name="insights_return_unknown">Total return not yet known</string>
     <string name="insights_total_return">Total return: %1$s</string>
     <string name="insights_return_note">Unrealised gain plus realised gains and dividends received, after estimated tax. Shown as not yet known when a price or cost is missing.</string>
-    <string name="insights_coverage">Quotes for %1$d of %2$d holdings.</string>
+    <plurals name="insights_coverage">
+        <item quantity="one">Quotes for %1$d of %2$d holding.</item>
+        <item quantity="other">Quotes for %1$d of %2$d holdings.</item>
+    </plurals>
     <string name="insights_top_three">Top three are %1$d%% of value.</string>
     <string name="insights_largest_sector">Largest sector: %1$s (%2$d%%).</string>
     <string name="insights_allocation">Allocation</string>
