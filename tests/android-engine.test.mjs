@@ -262,6 +262,17 @@ test('public data is laid over the stored ledger for display only', () => {
   assert.equal(run('holdings.view', { scope: 'all' }).value.rows.find((r) => r.ticker === holding.ticker).price, holding.price);
 });
 
+test('the readable export carries the whole account', () => {
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const out = run('backup.readable').value;
+  assert.equal(out.ok, true);
+  assert.match(out.title, /^sipwise-all-portfolios-\d{4}-\d{2}-\d{2}\.json$/);
+  const doc = JSON.parse(out.text);
+  assert.equal(doc.kind, 'sipwise-portfolio-account-backup');
+  assert.equal(doc.account.portfolios.length, account.portfolios.length);
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();

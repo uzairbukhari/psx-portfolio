@@ -24,6 +24,7 @@ import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-for
 import { buildPlan, currentMonth, monthBuys, unifiedPlanSource } from '../../../mobile/src/data/sip.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
 import { parseNumber } from '../../../mobile/src/data/mutations.ts';
+import { accountBackupShare } from '../../../mobile/src/data/backup.ts';
 import { planAutoDividendUpdate } from '../../../lib/dividend-sync.ts';
 import { applyLookups, hasPlaceholderDetails } from '../../../lib/company-enrichment.ts';
 import { mergeQuotes, type QuoteRow } from '../../../lib/quote-merge.ts';
@@ -378,6 +379,12 @@ const handlers: Record<string, Handler> = {
       return { account: JSON.stringify(setAccountFilerStatus(requireAccount(), status)) };
     }
     throw new Error(`Unknown account change: ${op}`);
+  },
+
+  // The readable (NOT encrypted) export of the whole account. The app asks the person to confirm before sharing it.
+  'backup.readable': () => {
+    const result = accountBackupShare(requireAccount());
+    return result.ok ? { ok: true, text: result.text, title: result.title } : { ok: false, reason: result.reason };
   },
 
   // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.

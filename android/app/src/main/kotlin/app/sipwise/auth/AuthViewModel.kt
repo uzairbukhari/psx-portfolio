@@ -8,8 +8,6 @@ import androidx.lifecycle.viewModelScope
 import app.sipwise.SipwiseApp
 import app.sipwise.data.FileVaultCache
 import app.sipwise.network.ApiRequestException
-import app.sipwise.network.DeleteAccountRequest
-import app.sipwise.network.DeleteAccountResponse
 import app.sipwise.network.MeResponse
 import app.sipwise.network.MobileSignInRequest
 import app.sipwise.network.MobileSignInResponse
@@ -116,20 +114,9 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun deleteAccount(confirm: String) {
-        viewModelScope.launch {
-            try {
-                container.api.delete(
-                    "/api/me",
-                    DeleteAccountRequest(confirm),
-                    DeleteAccountRequest.serializer(),
-                    DeleteAccountResponse.serializer(),
-                )
-                clearLocal()
-            } catch (e: ApiRequestException) {
-                _message.value = e.message
-            }
-        }
+    /** The server has deleted the account; this only clears what the phone still holds. */
+    fun accountDeleted() {
+        viewModelScope.launch { clearLocal() }
     }
 
     fun dismissMessage() {

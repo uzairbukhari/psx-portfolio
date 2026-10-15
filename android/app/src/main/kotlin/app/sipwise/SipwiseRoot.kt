@@ -128,7 +128,7 @@ fun SipwiseRoot() {
     when (val current = state) {
         AuthState.Loading -> LoadingScreen()
         AuthState.SignedOut -> SignInScreen(message, onSignIn = auth::signIn)
-        is AuthState.SignedIn -> VaultGate(current.user, onSignOut = auth::signOut)
+        is AuthState.SignedIn -> VaultGate(current.user, onSignOut = auth::signOut, onAccountDeleted = auth::accountDeleted)
     }
 }
 
@@ -136,6 +136,7 @@ fun SipwiseRoot() {
 private fun VaultGate(
     user: MeResponse,
     onSignOut: () -> Unit,
+    onAccountDeleted: () -> Unit,
 ) {
     val email = user.email
     val app = LocalContext.current.applicationContext as Application
@@ -162,7 +163,7 @@ private fun VaultGate(
             } else {
                 UnlockScreen(current.offline, busy, error, onUnlock = vault::unlock, onForgot = { recovering = true }, onSignOut = onSignOut)
             }
-        is VaultUi.Unlocked -> MainShell(current, user, onLock = vault::lock, onSignOut = onSignOut)
+        is VaultUi.Unlocked -> MainShell(current, user, onLock = vault::lock, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
     }
 }
 
@@ -173,6 +174,7 @@ private fun MainShell(
     user: MeResponse,
     onLock: () -> Unit,
     onSignOut: () -> Unit,
+    onAccountDeleted: () -> Unit,
 ) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
@@ -289,8 +291,8 @@ private fun MainShell(
             composable<Activity> { ActivityScreen(activity, onOpenEntry = { id -> nav.navigate(AddEntry(entryId = id)) }) }
             composable<More> {
                 val settings: SettingsViewModel =
-                    viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger) } })
-                MoreScreen(settings, user, onLock, onSignOut)
+                    viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger, unlocked.session) } })
+                MoreScreen(settings, user, onLock, onSignOut, onAccountDeleted)
             }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker

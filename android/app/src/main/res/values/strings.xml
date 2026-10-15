@@ -299,4 +299,19 @@
     <string name="settings_device_sign_out_title">Sign out this device?</string>
     <string name="settings_admin">Admin</string>
     <string name="notice_tax">Tax status saved</string>
+    <string name="settings_data">Data</string>
+    <string name="settings_backup_note">The encrypted backup is useless without your vault password or recovery key, so it is safe to keep anywhere.</string>
+    <string name="settings_backup_encrypted">Share encrypted backup</string>
+    <string name="settings_backup_readable">Share readable copy (not encrypted)</string>
+    <string name="settings_backup_too_large">Your backup is too large to share from the phone. Use Settings > Backup on the website.</string>
+    <string name="settings_readable_title">Share a readable copy?</string>
+    <string name="settings_readable_body">This file is NOT encrypted. Anyone who gets it can read every holding, trade and note. Prefer the encrypted backup.</string>
+    <string name="settings_readable_confirm">Share unencrypted</string>
+    <string name="settings_delete_title">Delete account</string>
+    <string name="settings_delete_note">Permanently delete your account and everything stored for it on Sipwise.</string>
+    <string name="settings_delete_button">Delete account…</string>
+    <string name="settings_delete_dialog_title">Delete your account?</string>
+    <string name="settings_delete_dialog_body">This permanently deletes everything stored for %1$s: your portfolio and ledger, AI reviews and usage, research jobs and every signed-in phone. It cannot be undone. Export a backup first if you might need it.</string>
+    <string name="settings_delete_confirm_label">Type your email address to confirm</string>
+    <string name="settings_delete_everything">Delete everything</string>
 </resources>

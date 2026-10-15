@@ -16,9 +16,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.sipwise.BuildConfig
 import app.sipwise.R
 import app.sipwise.data.Appearance
+import app.sipwise.data.ShareFiles
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.mediumDate
 import app.sipwise.network.MeResponse
@@ -45,8 +49,12 @@ fun MoreScreen(
     user: MeResponse,
     onLock: () -> Unit,
     onSignOut: () -> Unit,
+    onAccountDeleted: () -> Unit,
 ) {
     val ui by settings.ui.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(settings) { settings.shares.collect { ShareFiles.share(context, it.title, it.text) } }
+    DisposableEffect(Unit) { onDispose { ShareFiles.clear(context) } }
     val appearance by settings.appearance.collectAsStateWithLifecycle()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.gutter),
@@ -84,6 +92,8 @@ fun MoreScreen(
             Text(stringResource(R.string.settings_tax_note), style = MaterialTheme.typography.bodySmall)
         }
         DevicesCard(ui, settings)
+        DataCard(settings)
+        DeleteCard(user, ui, settings, onAccountDeleted)
         UpdateCard()
         Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lock_now)) }
         OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sign_out)) }
@@ -121,6 +131,92 @@ private fun SectionCard(
             Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
             content()
         }
+    }
+}
+
+@Composable
+private fun DataCard(settings: SettingsViewModel) {
+    var confirmReadable by remember { mutableStateOf(false) }
+    SectionCard(R.string.settings_data) {
+        Text(stringResource(R.string.settings_backup_note), style = MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick = settings::exportEncrypted, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.settings_backup_encrypted))
+        }
+        OutlinedButton(onClick = { confirmReadable = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.settings_backup_readable))
+        }
+    }
+    if (confirmReadable) {
+        AlertDialog(
+            onDismissRequest = { confirmReadable = false },
+            title = { Text(stringResource(R.string.settings_readable_title)) },
+            text = { Text(stringResource(R.string.settings_readable_body)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmReadable = false
+                        settings.exportReadable()
+                    },
+                ) { Text(stringResource(R.string.settings_readable_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmReadable = false }) { Text(stringResource(R.string.entry_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun DeleteCard(
+    user: MeResponse,
+    ui: SettingsUi,
+    settings: SettingsViewModel,
+    onDeleted: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    var typed by remember { mutableStateOf("") }
+    SectionCard(R.string.settings_delete_title) {
+        Text(stringResource(R.string.settings_delete_note), style = MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_delete_button)) }
+    }
+    if (open) {
+        val ready = typed.trim().equals(user.email.trim(), ignoreCase = true)
+        AlertDialog(
+            onDismissRequest = {
+                if (!ui.deleting) {
+                    open = false
+                    typed = ""
+                    settings.clearDeleteError()
+                }
+            },
+            title = { Text(stringResource(R.string.settings_delete_dialog_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(stringResource(R.string.settings_delete_dialog_body, user.email))
+                    OutlinedTextField(
+                        value = typed,
+                        onValueChange = { typed = it },
+                        label = { Text(stringResource(R.string.settings_delete_confirm_label)) },
+                        placeholder = { Text(user.email) },
+                        singleLine = true,
+                    )
+                    ui.deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { settings.deleteAccount(typed.trim(), onDeleted) }, enabled = ready && !ui.deleting) {
+                    Text(stringResource(R.string.settings_delete_everything))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        open = false
+                        typed = ""
+                        settings.clearDeleteError()
+                    },
+                    enabled = !ui.deleting,
+                ) { Text(stringResource(R.string.entry_cancel)) }
+            },
+        )
     }
 }
 

@@ -99,3 +99,12 @@ data class PublicWanted(val tickers: List<String> = emptyList(), val placeholder
 
 @Serializable
 data class DividendSync(val changed: Boolean, val account: String? = null)
+
+/** The readable (not encrypted) export, or why it cannot be shared (`backup.readable`). */
+@Serializable
+data class ReadableExport(
+    val ok: Boolean,
+    val text: String = "",
+    val title: String = "",
+    val reason: String? = null,
+)
