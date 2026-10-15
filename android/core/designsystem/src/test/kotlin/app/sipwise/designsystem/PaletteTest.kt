@@ -4,7 +4,10 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class PaletteTest {
-    private fun check(name: String, palette: Palette) {
+    private fun check(
+        name: String,
+        palette: Palette,
+    ) {
         for ((fg, bg) in TextPairs) {
             val ratio = contrast(fg(palette), bg(palette))
             assertTrue(ratio >= 4.5, "$name text pair ${"%08X".format(fg(palette))} on ${"%08X".format(bg(palette))} is $ratio:1")
