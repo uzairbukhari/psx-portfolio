@@ -46,6 +46,7 @@ import app.sipwise.update.UpdateViewModel
 @Composable
 fun MoreScreen(
     settings: SettingsViewModel,
+    push: PushViewModel,
     user: MeResponse,
     onLock: () -> Unit,
     onSignOut: () -> Unit,
@@ -91,6 +92,7 @@ fun MoreScreen(
             }
             Text(stringResource(R.string.settings_tax_note), style = MaterialTheme.typography.bodySmall)
         }
+        NotificationsCard(push)
         DevicesCard(ui, settings)
         DataCard(settings)
         DeleteCard(user, ui, settings, onAccountDeleted)
@@ -122,7 +124,7 @@ private fun AccountCard(user: MeResponse) {
 }
 
 @Composable
-private fun SectionCard(
+internal fun SectionCard(
     title: Int,
     content: @Composable () -> Unit,
 ) {

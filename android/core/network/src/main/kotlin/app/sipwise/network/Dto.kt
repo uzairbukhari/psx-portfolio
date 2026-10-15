@@ -45,3 +45,13 @@ data class MobileSessionInfo(
 
 @Serializable
 data class MobileSessionsResponse(val sessions: List<MobileSessionInfo> = emptyList())
+
+@Serializable
+data class PushTokenRequest(
+    val token: String,
+)
+
+@Serializable
+data class PushTestResponse(
+    val sent: Int = 0,
+)

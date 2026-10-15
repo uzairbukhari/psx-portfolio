@@ -75,6 +75,16 @@ jobs:
           umask 077
           echo "$PROD_B64" | base64 -d > "$RUNNER_TEMP/prod.jks"
           echo "$STAGING_B64" | base64 -d > "$RUNNER_TEMP/staging.jks"
+      - name: Firebase config (push notifications)
+        env:
+          GOOGLE_SERVICES_B64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_B64" ]; then
+            echo "::warning::ANDROID_GOOGLE_SERVICES_JSON_B64 is not set: this build will have push notifications switched off."
+          else
+            umask 077
+            echo "$GOOGLE_SERVICES_B64" | base64 -d > android/app/google-services.json
+          fi
       - name: Check the signing certificates are the pinned ones
         env:
           PROD_PASS: ${{ secrets.ANDROID_KEYSTORE_PROD_PASSWORD }}

@@ -42,6 +42,15 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Accept Android SDK licences
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Firebase config (a placeholder, so the push build path is compiled; real ones are used only in releases)
+        run: |
+          cat > app/google-services.json <<'JSON'
+          {"project_info":{"project_number":"1","project_id":"sipwise-ci","storage_bucket":"sipwise-ci.appspot.com"},
+           "client":[
+            {"client_info":{"mobilesdk_app_id":"1:1:android:0000000000000001","android_client_info":{"package_name":"com.uzairbukhari.sipwise"}},"api_key":[{"current_key":"ci-placeholder-key"}]},
+            {"client_info":{"mobilesdk_app_id":"1:1:android:0000000000000002","android_client_info":{"package_name":"com.uzairbukhari.sipwise.staging"}},"api_key":[{"current_key":"ci-placeholder-key"}]}],
+           "configuration_version":"1"}
+          JSON
       - name: Style and static analysis
         run: ./gradlew ktlintCheck detekt --continue
       - name: Android Lint (warnings are errors)

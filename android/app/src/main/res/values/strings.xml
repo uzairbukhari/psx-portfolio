@@ -314,4 +314,16 @@
     <string name="settings_delete_dialog_body">This permanently deletes everything stored for %1$s: your portfolio and ledger, AI reviews and usage, research jobs and every signed-in phone. It cannot be undone. Export a backup first if you might need it.</string>
     <string name="settings_delete_confirm_label">Type your email address to confirm</string>
     <string name="settings_delete_everything">Delete everything</string>
+    <string name="push_channel_name">Dividend alerts</string>
+    <string name="push_channel_description">Tells you when new payout announcements are available.</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_hint">Get a heads-up when PSX announces payouts. The message never names a company or an amount.</string>
+    <string name="settings_notifications_switch">Dividend alerts</string>
+    <string name="settings_notifications_test">Send a test notification</string>
+    <string name="settings_notifications_unavailable">Notifications are not available in this build.</string>
+    <string name="settings_notifications_denied">Notifications are blocked. Allow them for Sipwise in the phone\'s settings.</string>
+    <string name="settings_notifications_no_token">Could not get a notification address from Google. Check your connection and try again.</string>
+    <string name="settings_notifications_on_done">Notifications are on.</string>
+    <string name="settings_notifications_off_done">Notifications are off.</string>
+    <string name="settings_notifications_test_done">Test sent. It should arrive in a moment.</string>
 </resources>

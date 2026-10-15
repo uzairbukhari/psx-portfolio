@@ -75,6 +75,7 @@ import app.sipwise.ui.LoadingScreen
 import app.sipwise.ui.MoreScreen
 import app.sipwise.ui.PlanScreen
 import app.sipwise.ui.PlanViewModel
+import app.sipwise.ui.PushViewModel
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
 import app.sipwise.ui.ScopeViewModel
@@ -227,6 +228,7 @@ private fun MainShell(
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
+    LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
     val onCompany = entry?.destination?.hasRoute(CompanyRoute::class) == true
     Scaffold(
@@ -292,7 +294,8 @@ private fun MainShell(
             composable<More> {
                 val settings: SettingsViewModel =
                     viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger, unlocked.session) } })
-                MoreScreen(settings, user, onLock, onSignOut, onAccountDeleted)
+                val push: PushViewModel = viewModel()
+                MoreScreen(settings, push, user, onLock, onSignOut, onAccountDeleted)
             }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker

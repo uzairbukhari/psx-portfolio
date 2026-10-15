@@ -1,3 +1,12 @@
+// Firebase config is a CI secret written to app/google-services.json (git-ignored). Without it the build still works and push is off,
+// so the plugin is put on the classpath and applied only when the file exists.
+buildscript {
+    if (File(projectDir, "google-services.json").exists()) {
+        repositories { google() }
+        dependencies { classpath("com.google.gms:google-services:4.4.2") }
+    }
+}
+
 import java.util.Properties
 
 plugins {
@@ -8,6 +17,8 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
 }
+
+if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
 
 // Version comes from the release tag (android-v1.4.0 -> -PversionName=1.4.0 [-PrcNumber=2]); local builds get 0.0.1-dev.
 val versionNameValue = providers.gradleProperty("versionName").orElse("0.0.1-dev").get()
@@ -131,6 +142,8 @@ dependencies {
     implementation(libs.androidx.credentials.play)
     implementation(libs.googleid)
     implementation(libs.androidx.lifecycle.process)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
     testImplementation(kotlin("test"))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
