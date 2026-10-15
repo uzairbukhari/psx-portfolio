@@ -51,7 +51,11 @@ enum class VaultErrorCode {
     TOO_LARGE,
 }
 
-class VaultException(val code: VaultErrorCode, message: String) : Exception(message)
+class VaultException(
+    val code: VaultErrorCode,
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
 
 /** Randomness and the key derivation, injectable so tests can be deterministic and the app can swap in native code. */
 interface CryptoProvider {
@@ -110,7 +114,7 @@ fun fromB64u(text: String): ByteArray {
         try {
             Base64.getUrlDecoder().decode(text)
         } catch (e: IllegalArgumentException) {
-            throw VaultException(VaultErrorCode.INVALID, "Invalid encoding.")
+            throw VaultException(VaultErrorCode.INVALID, "Invalid encoding.", e)
         }
     if (toB64u(out) != text) throw VaultException(VaultErrorCode.INVALID, "Invalid encoding.")
     return out
@@ -180,9 +184,7 @@ fun validateEnvelope(
     if (e.v != VaultFormat.ENVELOPE_VERSION || e.alg != VaultFormat.ENVELOPE_ALG) throw VaultException(VaultErrorCode.UNSUPPORTED, "Unsupported encrypted portfolio format.")
     if (!VAULT_ID_PATTERN.matches(e.vaultId) || e.keyVersion < 1 || e.revision < 0) invalid("Invalid encrypted portfolio.")
     if (!isB64Len(e.nonce, VaultFormat.NONCE_BYTES)) invalid("Invalid encrypted portfolio.")
-    if (e.ct.length > b64uLength(maxCtBytes) || e.ct.length < b64uLength(VaultFormat.TAG_BYTES) || !B64_PATTERN.matches(e.ct) || e.ct.length % 4 == 1) {
-        invalid("Invalid encrypted portfolio.")
-    }
+    if (!ciphertextShapeOk(e.ct, maxCtBytes)) invalid("Invalid encrypted portfolio.")
 }
 
 fun validateVaultKeyMaterial(m: VaultKeyMaterial) {
@@ -389,7 +391,7 @@ private fun openKey(
             aesGcmDecrypt(wrapKey, fromB64u(nonce), aad, fromB64u(ct))
         } catch (e: Exception) {
             val message = if (fail == VaultErrorCode.WRONG_PASSWORD) "That password is not correct." else "That recovery key is not correct."
-            throw VaultException(fail, message)
+            throw VaultException(fail, message, e)
         }
     if (key.size != VaultFormat.KEY_BYTES) throw VaultException(fail, "That key is not correct.")
     return key
@@ -497,7 +499,15 @@ class VaultCrypto(private val crypto: CryptoProvider = DefaultCryptoProvider) {
             val plain = aesGcmDecrypt(dataKey, fromB64u(envelope.nonce), aadFor(Purpose.PORTFOLIO, envelope.vaultId, envelope.keyVersion, envelope.revision), fromB64u(envelope.ct))
             return String(plain, Charsets.UTF_8)
         } catch (e: Exception) {
-            throw VaultException(VaultErrorCode.TAMPERED, "The encrypted portfolio could not be verified. It may be damaged or belong to another vault.")
+            throw VaultException(VaultErrorCode.TAMPERED, "The encrypted portfolio could not be verified. It may be damaged or belong to another vault.", e)
         }
     }
+}
+
+private fun ciphertextShapeOk(
+    ct: String,
+    maxCtBytes: Int,
+): Boolean {
+    val lengthOk = ct.length <= b64uLength(maxCtBytes) && ct.length >= b64uLength(VaultFormat.TAG_BYTES)
+    return lengthOk && B64_PATTERN.matches(ct) && ct.length % 4 != 1
 }

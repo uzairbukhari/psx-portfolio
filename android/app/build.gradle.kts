@@ -14,7 +14,10 @@ val versionNameValue = providers.gradleProperty("versionName").orElse("0.0.1-dev
 val rcNumber = providers.gradleProperty("rcNumber").map(String::toInt).orElse(0).get()
 val versionBase = Properties().apply { file("../version.properties").inputStream().use(::load) }.getProperty("VERSION_CODE_BASE").toInt()
 
-fun versionCodeFor(name: String, rc: Int): Int {
+fun versionCodeFor(
+    name: String,
+    rc: Int,
+): Int {
     val core = name.substringBefore('-').split('.').map(String::toInt)
     if (core.size != 3) return 1
     val (major, minor, patch) = core
@@ -24,7 +27,10 @@ fun versionCodeFor(name: String, rc: Int): Int {
 }
 
 /** Signing material comes from the environment (decoded from GitHub Secrets by the release workflow), never from git. */
-fun signingEnv(flavor: String, key: String): String? = System.getenv("SIPWISE_${flavor.uppercase()}_$key")
+fun signingEnv(
+    flavor: String,
+    key: String,
+): String? = System.getenv("SIPWISE_${flavor.uppercase()}_$key")
 
 android {
     namespace = "app.sipwise"
