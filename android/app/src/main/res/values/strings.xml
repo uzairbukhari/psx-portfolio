@@ -5,4 +5,56 @@
     <string name="nav_plan">Plan</string>
     <string name="nav_activity">Activity</string>
     <string name="placeholder_title">%1$s</string>
+
+    <string name="working">Working…</string>
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+    <string name="retry">Try again</string>
+    <string name="sign_out">Sign out</string>
+
+    <string name="sign_in_tagline">Your PSX portfolio and monthly SIP plan, private to you.</string>
+    <string name="sign_in_google">Continue with Google</string>
+    <string name="sign_in_privacy">Your portfolio is encrypted on this phone before it is saved. Sipwise cannot read it.</string>
+
+    <string name="vault_setup_title">Create your vault password</string>
+    <string name="vault_setup_body">This password encrypts your portfolio on your phone. Sipwise never sees it, so it cannot be reset for you. Use at least 15 characters; a phrase of several random words works well.</string>
+    <string name="vault_password">Vault password</string>
+    <string name="vault_password_again">Type it again</string>
+    <string name="vault_password_mismatch">The passwords do not match.</string>
+    <string name="vault_create">Create vault</string>
+    <string name="vault_failed_title">Could not open your vault</string>
+
+    <string name="recovery_title">Save your recovery key</string>
+    <string name="recovery_body">This key is the only way back in if you forget your password. Write it down or store it in a password manager. It is shown once and Sipwise cannot recover it.</string>
+    <string name="recovery_saved">I saved my recovery key</string>
+
+    <string name="unlock_title">Unlock your portfolio</string>
+    <string name="unlock_offline">You are offline. Your last saved portfolio will open.</string>
+    <string name="unlock">Unlock</string>
+    <string name="unlocking">Unlocking…</string>
+    <string name="unlock_forgot">Forgot password?</string>
+
+    <string name="recover_title">Reset with your recovery key</string>
+    <string name="recover_body">Enter your recovery key and choose a new vault password.</string>
+    <string name="recover_key">Recovery key</string>
+    <string name="recover_new_password">New vault password</string>
+    <string name="recover_action">Reset password</string>
+
+    <string name="lock_now">Lock now</string>
+    <string name="nav_more">More</string>
+    <string name="more_account">Account</string>
+
+    <string name="holdings_empty">No holdings yet. Add your first purchase to see your portfolio here.</string>
+    <string name="holdings_value">Portfolio value</string>
+    <string name="holdings_incomplete">Some prices or costs are missing, so the gain is not shown.</string>
+    <string name="holdings_show_sold">Show %1$d sold out</string>
+    <string name="sort_value">Value</string>
+    <string name="sort_gain">Gain</string>
+    <string name="sort_weight">Weight</string>
+    <string name="sort_name">Name</string>
+    <string name="sector_all">All sectors</string>
+    <string name="holding_priced">%1$d shares · priced %2$s</string>
+    <string name="holding_no_price">%1$d shares · no price yet</string>
+    <string name="holding_stale">Price is out of date</string>
+    <string name="holding_dividend_expected">Dividend expected</string>
 </resources>

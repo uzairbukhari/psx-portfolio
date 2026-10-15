@@ -10,7 +10,9 @@ import {
   normalizeAccount,
   type PortfolioAccount,
 } from '../../../lib/portfolio-account.ts';
-import { safeHoldings, totals } from '../../../mobile/src/data/derive.ts';
+import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
+import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
+import { today } from '../../../lib/portfolio.ts';
 
 export const ENGINE_API_VERSION = 1;
 
@@ -51,12 +53,39 @@ const handlers: Record<string, Handler> = {
     return true;
   },
 
-  // Holdings and headline totals for one portfolio or for all of them.
-  'holdings.snapshot': (args) => {
+  // The Holdings screen: sorted, filtered rows plus the headline numbers, for one portfolio or all of them.
+  'holdings.view': (args) => {
     const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
+    const sort = (typeof args.sort === 'string' ? args.sort : 'value') as HoldingSort;
+    const sector = typeof args.sector === 'string' && args.sector ? args.sector : null;
     const portfolio = dashboardPortfolio(requireAccount(), scope);
     const { held, error } = safeHoldings(portfolio);
-    return { held, error, totals: totals(held) };
+    const open = openPositions(held);
+    const summary = totals(held);
+    const flags = holdingFlags(portfolio, open, today());
+    const row = (h: Holding) => ({
+      ticker: h.ticker,
+      name: h.name,
+      sector: h.sector,
+      shares: h.shares,
+      average: h.average,
+      price: h.quote?.price ?? null,
+      priceDate: h.quote?.date ?? null,
+      value: h.value,
+      cost: h.cost,
+      gain: h.gain,
+      gainPercent: h.gain === null || !h.cost ? null : (h.gain / h.cost) * 100,
+      weight: weightOf(h, summary.value),
+      stale: flags.get(h.ticker)?.stale ?? false,
+      expectedDividend: flags.get(h.ticker)?.expectedDividend ?? false,
+    });
+    return {
+      rows: filterBySector(sortHoldings(open, sort), sector).map(row),
+      soldOut: soldOutPositions(portfolio, held).map(row),
+      sectors: sectorsOf(open),
+      summary,
+      error,
+    };
   },
 };
 
