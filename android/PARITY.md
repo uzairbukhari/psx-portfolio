@@ -16,13 +16,13 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 9 | Revisioned save, conflict, undo | `usePortfolio.save`, Toast | Done |
 | 10 | Portfolio selection (All / one), chooser sheet | `PortfolioSelection.tsx`, `PortfolioChooser.tsx` | Done (chooser in the top bar; selection is kept only while unlocked, like Expo) |
 | 11 | Today hero, return breakdown | `(tabs)/index.tsx`, `data/today.ts` | Partial (headline, return breakdown on Today; net worth lives at the top of Holdings) |
-| 12 | Next actions | `data/today.ts#nextActions` | Partial (shown; tapping an action pending) |
+| 12 | Next actions | `data/today.ts#nextActions` | Done (tap opens the company page for a dividend, refreshes prices, opens Targets or the Plan tab) |
 | 13 | Month progress | `data/today.ts#monthProgress` | Done |
 | 14 | First-use welcome | index.tsx | Pending |
 | 15 | Market pulse + live SSE | `MarketPulse.tsx`, `useLiveMarket.ts`, `live-market.ts` | Partial: KSE-100, indices, breadth and day chart are polled every 60 s while the market is open; live SSE ticks skipped |
 | 16 | Value vs money in, XIRR, KSE-100 compare | `track-record.ts`, `TrackRecordCards.tsx` | Done (in Insights: value vs money in, yearly return, KSE-100 comparison with range chips; the collapsed card on Today is not repeated) |
 | 17 | Net worth card + donut | `NetWorthCard.tsx`, `lib/account-overview.ts` | Done (net worth, asset mix donut and legend at the top of Holdings; incomplete-valuation notice) |
-| 18 | Holdings list, sort, sector filter, include sold | `portfolio.tsx`, `holdings-view.ts` | Partial (sort, sector, sold-out done; scope chooser pending) |
+| 18 | Holdings list, sort, sector filter, include sold | `portfolio.tsx`, `holdings-view.ts` | Done (sort, sector, sold-out; the portfolio chooser is in the top bar) |
 | 19 | Per-portfolio breakdown (All) | `AccountOverview.tsx` | Done (per-portfolio breakdown in the All view; tap opens that portfolio) |
 | 20 | Funds / plans / gold (read-only) | `MutualFunds`, `SavingsPlans`, `GoldSilver` | Done (mutual funds, savings plans, gold and silver, read-only, with public rates and fund prices) |
 | 21 | Insights report sections | `Insights.tsx`, `lib/portfolio-reports.ts` | Done (summary, allocation, sectors, actual vs target, gain by company, recent buying, income and realised) |
@@ -34,10 +34,10 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 27 | Manual price | `quote.tsx` | Done |
 | 28 | Mark dividend received | `received.tsx` | Done |
 | 29 | Targets editor | `targets.tsx`, `lib/targets.ts` | Done |
-| 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Partial (targets mode: month, budget, suggested buys, review and record, fee and old-quote settings; Monthly Picks pending) |
-| 31 | Monthly Picks on device | `PicksView.tsx`, `lib/picks-run.ts` | Done (shortlist, amount, public data gathering with scrape wait, ranking and sizing on the phone, results saved to the vault, record all via a confirm dialog; "record only this buy" opens the entry form for the ticker, share and price prefill pending) |
+| 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Done (month, budget, suggested buys, review and record, fee and old-quote settings; Monthly Picks has its own screen, row 31) |
+| 31 | Monthly Picks on device | `PicksView.tsx`, `lib/picks-run.ts` | Done (shortlist, amount, public data gathering with scrape wait, ranking and sizing on the phone, results saved to the vault, record all via a confirm dialog; "record only this buy" opens the entry form with the ticker, whole shares and price filled in) |
 | 32 | Refresh prices (queued job + poll) | `lib/import-refresh.ts` | Done (queued job with polling; server wording shown; prices reload when it settles) |
-| 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Partial (filters, search, month groups, tap to edit or void; sticky headers pending) |
+| 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Done (filters, search, sticky month headers, tap to edit or void) |
 | 34 | Inbox with filters and actions | `inbox.tsx`, `lib/notification-actions.ts` | Done (bell with unread badge; Inbox, Unread, Cleared, History; read, clear, restore, delete cleared; Mark received opens the company page) |
 | 35 | Auto dividends on load | `data/auto-dividends.ts`, `lib/dividend-sync.ts` | Done (fund payouts pending with funds) |
 | 36 | Push opt-in, token, test, tap routing | `push.ts`, `PushBridge.tsx` | Done (opt-in, FCM token, test notification, tap on a market update opens the Inbox; needs google-services.json and the FCM server secret) |

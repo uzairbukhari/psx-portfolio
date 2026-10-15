@@ -43,6 +43,8 @@ class EntryViewModel(
     initial: EntryKind = EntryKind.BUY,
     private val editId: String? = null,
     private val initialTicker: String = "",
+    private val initialShares: String = "",
+    private val initialPrice: String = "",
 ) : ViewModel() {
     private val _ui = MutableStateFlow(EntryUi(form = EntryForm(kind = initial)))
     val ui: StateFlow<EntryUi> = _ui.asStateFlow()
@@ -73,8 +75,11 @@ class EntryViewModel(
                                 ticker = if (owner?.companies?.any { it.ticker == initialTicker } == true) initialTicker else "",
                                 date = options.today,
                                 month = options.month,
+                                shares = initialShares,
+                                price = initialPrice,
                             ),
                     )
+                refreshTotals(_ui.value.form)
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
             }

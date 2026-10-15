@@ -125,7 +125,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable object More
 
-@Serializable data class AddEntry(val entryId: String? = null, val ticker: String? = null)
+@Serializable data class AddEntry(
+    val entryId: String? = null,
+    val ticker: String? = null,
+    val shares: String? = null,
+    val price: String? = null,
+)
 
 @Serializable object Targets
 
@@ -421,7 +426,20 @@ private fun MainShell(
         },
     ) { padding ->
         NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
-            composable<Today> { TodayScreen(today) }
+            composable<Today> {
+                TodayScreen(
+                    today,
+                    onOpenCompany = { nav.navigate(CompanyRoute(it)) },
+                    onOpenTargets = { nav.navigate(Targets) },
+                    onOpenPlan = {
+                        nav.navigate(Plan) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }, onOpenInsights = { nav.navigate(Insights) }) }
             composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
             composable<Insights> {
@@ -434,7 +452,7 @@ private fun MainShell(
                 val month = backStack.toRoute<Picks>().month
                 val picks: PicksViewModel =
                     viewModel(key = "picks-$month", factory = viewModelFactory { initializer { PicksViewModel(unlocked.ledger, api, month) } })
-                PicksScreen(picks, onRecordOne = { nav.navigate(AddEntry(ticker = it)) })
+                PicksScreen(picks, onRecordOne = { ticker, shares, price -> nav.navigate(AddEntry(ticker = ticker, shares = shares, price = price)) })
             }
             composable<Portfolios> {
                 val portfolios: PortfoliosViewModel =
@@ -466,8 +484,19 @@ private fun MainShell(
                 val route = it.toRoute<AddEntry>()
                 val form: EntryViewModel =
                     viewModel(
-                        key = "${route.entryId}/${route.ticker}",
-                        factory = viewModelFactory { initializer { EntryViewModel(unlocked.ledger, editId = route.entryId, initialTicker = route.ticker.orEmpty()) } },
+                        key = "${route.entryId}/${route.ticker}/${route.shares}/${route.price}",
+                        factory =
+                            viewModelFactory {
+                                initializer {
+                                    EntryViewModel(
+                                        unlocked.ledger,
+                                        editId = route.entryId,
+                                        initialTicker = route.ticker.orEmpty(),
+                                        initialShares = route.shares.orEmpty(),
+                                        initialPrice = route.price.orEmpty(),
+                                    )
+                                }
+                            },
                     )
                 EntryScreen(form, onDone = { nav.popBackStack() })
             }

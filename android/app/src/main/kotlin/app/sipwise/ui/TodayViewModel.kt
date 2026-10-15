@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.sipwise.ledger.Ledger
 import app.sipwise.model.TodayView
 import app.sipwise.network.ApiJson
+import app.sipwise.network.ApiRequestException
 import app.sipwise.session.EngineException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 data class TodayUi(
     val view: TodayView? = null,
     val showReturn: Boolean = false,
+    val pricing: Boolean = false,
     val error: String? = null,
 )
 
@@ -28,6 +30,20 @@ class TodayViewModel(private val ledger: Ledger) : ViewModel() {
 
     fun toggleReturn() {
         _ui.value = _ui.value.copy(showReturn = !_ui.value.showReturn)
+    }
+
+    /** The "Refresh prices" action: runs the queued price job and reloads Today when it settles. */
+    fun refreshPrices() {
+        if (_ui.value.pricing) return
+        _ui.value = _ui.value.copy(pricing = true)
+        viewModelScope.launch {
+            try {
+                ledger.refreshPrices()
+            } catch (ignored: ApiRequestException) {
+                // A failed refresh leaves the old prices; Holdings shows the server's wording for it.
+            }
+            _ui.value = _ui.value.copy(pricing = false)
+        }
     }
 
     fun load() {

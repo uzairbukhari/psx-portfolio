@@ -41,7 +41,7 @@ import app.sipwise.model.monthTitle
 @Composable
 fun PicksScreen(
     viewModel: PicksViewModel,
-    onRecordOne: (String) -> Unit,
+    onRecordOne: (ticker: String, shares: String, price: String) -> Unit,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
@@ -174,7 +174,7 @@ private fun OutlookCard(text: String) {
 private fun PickCard(
     row: PickRow,
     readOnly: Boolean,
-    onRecordOne: (String) -> Unit,
+    onRecordOne: (ticker: String, shares: String, price: String) -> Unit,
 ) {
     val links = LocalUriHandler.current
     Card(Modifier.fillMaxWidth()) {
@@ -203,7 +203,7 @@ private fun PickCard(
             val price = row.price
             if (price != null && shares != null) {
                 Text(pluralStringResource(R.plurals.picks_estimate, shares.toInt(), shares.toInt(), money(price), money(row.estimatedSpend ?: 0.0)), style = MaterialTheme.typography.bodySmall)
-                if (row.recordable && !readOnly) TextButton(onClick = { onRecordOne(row.ticker) }) { Text(stringResource(R.string.picks_record_one)) }
+                if (row.recordable && !readOnly) TextButton(onClick = { onRecordOne(row.ticker, shares.toLong().toString(), plainNumber(price)) }) { Text(stringResource(R.string.picks_record_one)) }
             } else {
                 Text(stringResource(R.string.picks_no_price), style = MaterialTheme.typography.bodySmall)
             }
@@ -240,3 +240,6 @@ private fun ConfirmDialog(
         dismissButton = { TextButton(onClick = { viewModel.confirm(false) }) { Text(stringResource(R.string.entry_cancel)) } },
     )
 }
+
+/** A number as plain digits for a form field, whatever the phone's locale: no grouping, no exponent. */
+private fun plainNumber(value: Double): String = java.math.BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
