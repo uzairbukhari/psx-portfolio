@@ -5,5 +5,4 @@
     <string name="nav_plan">Plan</string>
     <string name="nav_activity">Activity</string>
     <string name="placeholder_title">%1$s</string>
-    <string name="placeholder_body">This screen is being rebuilt as a native Android screen.</string>
 </resources>
