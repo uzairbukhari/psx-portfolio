@@ -50,3 +50,18 @@ mobile/sipwise-37903-firebase-adminsdk-fbsvc-9f5b18a76e.json
 /playwright-report/
 .env.test.local
 financial-data/
+
+# android (native app)
+/android/.gradle/
+/android/build/
+/android/**/build/
+/android/local.properties
+/android/*.jks
+/android/*.keystore
+*.jks
+*.keystore
+
+# Android engine bundle (built by android/engine/build.mjs)
+android/engine/node_modules/
+android/core/engine/src/main/assets/engine.js
+/android/app/google-services.json

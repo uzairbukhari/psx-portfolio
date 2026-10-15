@@ -4,6 +4,7 @@
 import { adminHealth, type AdminHealth, type AdminHealthOptions } from './admin-health.ts';
 import { platformReport, type PlatformReport } from './admin-platform.ts';
 import { isExpoPushToken, type PushMessage } from './dividend-push.ts';
+import { isFcmToken, sendFcm } from './fcm.ts';
 
 export type Alert = { key: string; label: string };
 export const ALERT_PUSH = { title: 'Sipwise admin', body: 'Something needs a look in the admin console.' } as const;
@@ -44,7 +45,7 @@ async function clientErrorCounts(db: D1Database, now: Date) {
  * Looks at the same numbers the admin console shows and pushes one generic message for issues not yet alerted today.
  * Returns what was found and sent. Never throws.
  */
-export async function sendAdminAlerts(db: D1Database, opts: AdminHealthOptions = {}, fetcher: typeof fetch = fetch): Promise<{ found: number; fresh: number; sent: number }> {
+export async function sendAdminAlerts(db: D1Database, opts: AdminHealthOptions & { fcmServiceAccount?: string } = {}, fetcher: typeof fetch = fetch): Promise<{ found: number; fresh: number; sent: number }> {
   const now = opts.now ?? new Date();
   try {
     const [health, platform, errors] = await Promise.all([adminHealth(db, opts), platformReport(db, { ...opts.platform, now }), clientErrorCounts(db, now)]);
@@ -58,18 +59,28 @@ export async function sendAdminAlerts(db: D1Database, opts: AdminHealthOptions =
       `SELECT DISTINCT m.push_token AS token FROM mobile_sessions m JOIN user_roles r ON lower(r.email)=lower(m.email)
        WHERE r.role='super_admin' AND m.revoked_at IS NULL AND m.push_token IS NOT NULL`).all<{ token: string }>()).results.map((r) => r.token);
     const messages = buildAlertPush(tokens);
-    if (!messages.length) return { found: alerts.length, fresh: fresh.length, sent: 0 }; // nobody to tell; try again next time
-    const response = await fetcher(EXPO_PUSH_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(messages), signal: AbortSignal.timeout(10_000) });
-    if (!response.ok) return { found: alerts.length, fresh: fresh.length, sent: 0 };
+    const fcmTokens = tokens.filter(isFcmToken);
+    if (!messages.length && !fcmTokens.length) return { found: alerts.length, fresh: fresh.length, sent: 0 }; // nobody to tell; try again next time
+    let sent = 0;
+    if (messages.length) {
+      const response = await fetcher(EXPO_PUSH_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(messages), signal: AbortSignal.timeout(10_000) });
+      if (response.ok) sent += messages.length;
+    }
+    if (fcmTokens.length) {
+      const fcm = await sendFcm(opts.fcmServiceAccount, fcmTokens, ALERT_PUSH, fetcher);
+      sent += fcm.sent;
+      for (const token of fcm.unregistered) await db.prepare('UPDATE mobile_sessions SET push_token=NULL WHERE push_token=?').bind(token).run().catch(() => {});
+    }
+    if (!sent) return { found: alerts.length, fresh: fresh.length, sent: 0 };
     const at = now.toISOString();
     await db.batch([
       ...fresh.map((a) => db.prepare(
         `INSERT INTO refresh_state (kind,key,last_attempt_at,last_success_at,failure_count) VALUES ('admin-alert',?,?,?,0)
          ON CONFLICT(kind,key) DO UPDATE SET last_attempt_at=excluded.last_attempt_at, last_success_at=excluded.last_success_at`).bind(a.key, at, at)),
       db.prepare('INSERT INTO admin_actions (at,actor,action,target,result) VALUES (?,?,?,?,?)')
-        .bind(at, 'system', 'alert_sent', fresh.map((a) => a.label).join('; ').slice(0, 200), `${messages.length} phone${messages.length === 1 ? '' : 's'}`),
+        .bind(at, 'system', 'alert_sent', fresh.map((a) => a.label).join('; ').slice(0, 200), `${sent} phone${sent === 1 ? '' : 's'}`),
     ]);
-    return { found: alerts.length, fresh: fresh.length, sent: messages.length };
+    return { found: alerts.length, fresh: fresh.length, sent };
   } catch (error) {
     console.error('Admin alerts failed', error);
     return { found: 0, fresh: 0, sent: 0 };

@@ -1,0 +1,63 @@
+name: Android cut release
+
+# Creates the next android-v* tag on a branch and builds it. Claude cannot push tags from cloud sessions and a tag made
+# with GITHUB_TOKEN does not start other workflows, so this workflow creates the tag and then calls the release workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Which part of the version to raise'
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      rc:
+        description: 'Release candidate number (blank for a final release)'
+        required: false
+        default: ''
+      ref:
+        description: 'Branch to tag (main, or release/1.4.x for a hotfix)'
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Work out the next version
+        id: next
+        run: |
+          if ! [[ "${{ inputs.ref }}" =~ ^(main|release/.+)$ ]]; then echo "::error::ref must be main or release/*"; exit 1; fi
+          last=$(git tag -l 'android-v[0-9]*' --sort=-v:refname | grep -vE -- '-rc\.' | head -1 || true)
+          cur=${last#android-v}; cur=${cur:-0.0.0}
+          IFS=. read -r ma mi pa <<< "$cur"
+          case "${{ inputs.bump }}" in
+            major) ma=$((ma+1)); mi=0; pa=0 ;;
+            minor) mi=$((mi+1)); pa=0 ;;
+            patch) pa=$((pa+1)) ;;
+          esac
+          tag="android-v$ma.$mi.$pa"
+          [ -n "${{ inputs.rc }}" ] && tag="$tag-rc.${{ inputs.rc }}"
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then echo "::error::$tag already exists"; exit 1; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Create the tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.next.outputs.tag }}" -m "Sipwise Android ${{ steps.next.outputs.tag }}"
+          git push origin "refs/tags/${{ steps.next.outputs.tag }}"
+
+  release:
+    needs: tag
+    uses: ./.github/workflows/android-release.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets: inherit

@@ -1,0 +1,503 @@
+{
+  "count": 42,
+  "sections": [
+    {
+      "key": "2026-10",
+      "title": "October 2026",
+      "data": [
+        {
+          "id": "ahl-core::d-35",
+          "date": "2026-10-12",
+          "kind": "dividend",
+          "ticker": "MEBL",
+          "title": "Dividend (expected)",
+          "detail": "AHL Core · 8 per share",
+          "amount": 2800,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::d-34",
+          "date": "2026-10-10",
+          "kind": "dividend",
+          "ticker": "OGDC",
+          "title": "Dividend (expected)",
+          "detail": "AHL Core · 3 per share",
+          "amount": 900,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::t-17",
+          "date": "2026-10-05",
+          "kind": "buy",
+          "ticker": "HBL",
+          "title": "Bought 100",
+          "detail": "AHL Core · @ 205 · fees 51.25",
+          "amount": 20500,
+          "editable": true
+        }
+      ]
+    },
+    {
+      "key": "2026-09",
+      "title": "September 2026",
+      "data": [
+        {
+          "id": "ahl-core::t-16",
+          "date": "2026-09-25",
+          "kind": "buy",
+          "ticker": "OGDC",
+          "title": "Bought 100",
+          "detail": "AHL Core · @ 225 · fees 56.25",
+          "amount": 22500,
+          "editable": true
+        },
+        {
+          "id": "finqalab::t-42",
+          "date": "2026-09-20",
+          "kind": "buy",
+          "ticker": "MEBL",
+          "title": "Bought 20",
+          "detail": "Finqalab · @ 315 · fees 15.75",
+          "amount": 6300,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-15",
+          "date": "2026-09-15",
+          "kind": "buy",
+          "ticker": "LUCK",
+          "title": "Bought 20",
+          "detail": "AHL Core · @ 1,100 · fees 55",
+          "amount": 22000,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-25",
+          "date": "2026-09-10",
+          "kind": "adjustment",
+          "ticker": "EFERT",
+          "title": "Holding adjustment 20",
+          "detail": "AHL Core · Statement balance correction · acquisition cost unknown",
+          "amount": null,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::t-24",
+          "date": "2026-09-05",
+          "kind": "buy",
+          "ticker": "FFC",
+          "title": "Bought 30",
+          "detail": "AHL Core · @ 415 · fees 31.13",
+          "amount": 12450,
+          "editable": false
+        }
+      ]
+    },
+    {
+      "key": "2026-08",
+      "title": "August 2026",
+      "data": [
+        {
+          "id": "ahl-core::t-21",
+          "date": "2026-08-31",
+          "kind": "sell",
+          "ticker": "HUBC",
+          "title": "Sold 150",
+          "detail": "AHL Core · @ 220 · fees 82.5",
+          "amount": 33000,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-20",
+          "date": "2026-08-16",
+          "kind": "sell",
+          "ticker": "PPL",
+          "title": "Sold 100",
+          "detail": "AHL Core · @ 180 · fees 45",
+          "amount": 18000,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-14",
+          "date": "2026-08-16",
+          "kind": "buy",
+          "ticker": "MEBL",
+          "title": "Bought 50",
+          "detail": "AHL Core · @ 305 · fees 38.13",
+          "amount": 15250,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-23",
+          "date": "2026-08-06",
+          "kind": "sell",
+          "ticker": "TRG",
+          "title": "Sold 100",
+          "detail": "AHL Core · @ 82 · fees 20.5",
+          "amount": 8200,
+          "editable": false
+        },
+        {
+          "id": "finqalab::t-41",
+          "date": "2026-08-06",
+          "kind": "buy",
+          "ticker": "EFERT",
+          "title": "Bought 100",
+          "detail": "Finqalab · @ 230 · fees 57.5",
+          "amount": 23000,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::d-33",
+          "date": "2026-08-01",
+          "kind": "dividend",
+          "ticker": "EFERT",
+          "title": "Dividend",
+          "detail": "AHL Core · 4 per share",
+          "amount": 800,
+          "editable": false
+        }
+      ]
+    },
+    {
+      "key": "2026-07",
+      "title": "July 2026",
+      "data": [
+        {
+          "id": "finqalab::t-40",
+          "date": "2026-07-27",
+          "kind": "sell",
+          "ticker": "PSO",
+          "title": "Sold 100",
+          "detail": "Finqalab · @ 400 · fees 100",
+          "amount": 40000,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::t-13",
+          "date": "2026-07-17",
+          "kind": "buy",
+          "ticker": "FCCL",
+          "title": "Bought 600",
+          "detail": "AHL Core · @ 44 · fees 66",
+          "amount": 26400,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-19",
+          "date": "2026-07-07",
+          "kind": "sell",
+          "ticker": "OGDC",
+          "title": "Sold 100",
+          "detail": "AHL Core · @ 238 · fees 59.5",
+          "amount": 23800,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::d-32",
+          "date": "2026-07-07",
+          "kind": "dividend",
+          "ticker": "SEARL",
+          "title": "Dividend",
+          "detail": "AHL Core · 1 per share",
+          "amount": 500,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::d-31",
+          "date": "2026-07-07",
+          "kind": "dividend",
+          "ticker": "FFC",
+          "title": "Dividend",
+          "detail": "AHL Core · 5 per share",
+          "amount": 600,
+          "editable": false
+        }
+      ]
+    },
+    {
+      "key": "2026-06",
+      "title": "June 2026",
+      "data": [
+        {
+          "id": "ahl-core::d-30",
+          "date": "2026-06-27",
+          "kind": "dividend",
+          "ticker": "OGDC",
+          "title": "Dividend",
+          "detail": "AHL Core · Fictional CDC import.",
+          "amount": 1445,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::t-12",
+          "date": "2026-06-17",
+          "kind": "buy",
+          "ticker": "INDU",
+          "title": "Bought 10",
+          "detail": "AHL Core · @ 2,000 · fees 50",
+          "amount": 20000,
+          "editable": true
+        },
+        {
+          "id": "finqalab::d-43",
+          "date": "2026-06-17",
+          "kind": "dividend",
+          "ticker": "OGDC",
+          "title": "Dividend",
+          "detail": "Finqalab · 4 per share",
+          "amount": 1600,
+          "editable": true
+        }
+      ]
+    },
+    {
+      "key": "2026-05",
+      "title": "May 2026",
+      "data": [
+        {
+          "id": "ahl-core::d-28",
+          "date": "2026-05-28",
+          "kind": "dividend",
+          "ticker": "HBL",
+          "title": "Dividend",
+          "detail": "AHL Core · 6 per share",
+          "amount": 1800,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-11",
+          "date": "2026-05-18",
+          "kind": "buy",
+          "ticker": "SEARL",
+          "title": "Bought 500",
+          "detail": "AHL Core · @ 62 · fees 77.5",
+          "amount": 31000,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::d-27",
+          "date": "2026-05-18",
+          "kind": "dividend",
+          "ticker": "MEBL",
+          "title": "Dividend",
+          "detail": "AHL Core · 7 per share",
+          "amount": 2100,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-26",
+          "date": "2026-05-08",
+          "kind": "buy",
+          "ticker": "AIRLINK",
+          "title": "Bought 500",
+          "detail": "AHL Core · @ 50 · fees 62.5",
+          "amount": 25000,
+          "editable": false
+        }
+      ]
+    },
+    {
+      "key": "2026-04",
+      "title": "April 2026",
+      "data": [
+        {
+          "id": "ahl-core::t-22",
+          "date": "2026-04-18",
+          "kind": "buy",
+          "ticker": "TRG",
+          "title": "Bought 400",
+          "detail": "AHL Core · @ 70 · fees 70",
+          "amount": 28000,
+          "editable": false
+        },
+        {
+          "id": "finqalab::t-39",
+          "date": "2026-04-18",
+          "kind": "buy",
+          "ticker": "PSO",
+          "title": "Bought 100",
+          "detail": "Finqalab · @ 380 · fees 95",
+          "amount": 38000,
+          "editable": false
+        }
+      ]
+    },
+    {
+      "key": "2026-03",
+      "title": "March 2026",
+      "data": [
+        {
+          "id": "ahl-core::t-10",
+          "date": "2026-03-29",
+          "kind": "buy",
+          "ticker": "FFC",
+          "title": "Bought 120",
+          "detail": "AHL Core · @ 380 · fees 114",
+          "amount": 45600,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::split-sys",
+          "date": "2026-03-29",
+          "kind": "split",
+          "ticker": "SYS",
+          "title": "Stock split",
+          "detail": "AHL Core · 1 → 5 shares",
+          "amount": null,
+          "editable": true
+        },
+        {
+          "id": "finqalab::t-38",
+          "date": "2026-03-29",
+          "kind": "buy",
+          "ticker": "OGDC",
+          "title": "Bought 400",
+          "detail": "Finqalab · @ 200 · fees 200",
+          "amount": 80000,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::t-9",
+          "date": "2026-03-09",
+          "kind": "buy",
+          "ticker": "EFERT",
+          "title": "Bought 200",
+          "detail": "AHL Core · @ 215 · fees 107.5",
+          "amount": 43000,
+          "editable": true
+        }
+      ]
+    },
+    {
+      "key": "2026-02",
+      "title": "February 2026",
+      "data": [
+        {
+          "id": "finqalab::t-37",
+          "date": "2026-02-17",
+          "kind": "buy",
+          "ticker": "HBL",
+          "title": "Bought 200",
+          "detail": "Finqalab · @ 150 · fees 75",
+          "amount": 30000,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::t-8",
+          "date": "2026-02-07",
+          "kind": "buy",
+          "ticker": "HUBC",
+          "title": "Bought 150",
+          "detail": "AHL Core · @ 190 · fees 71.25",
+          "amount": 28500,
+          "editable": true
+        }
+      ]
+    },
+    {
+      "key": "2026-01",
+      "title": "January 2026",
+      "data": [
+        {
+          "id": "finqalab::t-36",
+          "date": "2026-01-28",
+          "kind": "buy",
+          "ticker": "MEBL",
+          "title": "Bought 150",
+          "detail": "Finqalab · @ 290 · fees 108.75",
+          "amount": 43500,
+          "editable": false
+        },
+        {
+          "id": "ahl-core::t-7",
+          "date": "2026-01-08",
+          "kind": "buy",
+          "ticker": "PPL",
+          "title": "Bought 250",
+          "detail": "AHL Core · @ 205 · fees 128.13",
+          "amount": 51250,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-6",
+          "date": "2026-01-08",
+          "kind": "buy",
+          "ticker": "OGDC",
+          "title": "Bought 300",
+          "detail": "AHL Core · @ 195 · fees 146.25",
+          "amount": 58500,
+          "editable": true
+        }
+      ]
+    },
+    {
+      "key": "2025-12",
+      "title": "December 2025",
+      "data": [
+        {
+          "id": "ahl-core::t-5",
+          "date": "2025-12-19",
+          "kind": "buy",
+          "ticker": "LUCK",
+          "title": "Bought 40",
+          "detail": "AHL Core · @ 1,010 · fees 101",
+          "amount": 40400,
+          "editable": true
+        }
+      ]
+    },
+    {
+      "key": "2025-11",
+      "title": "November 2025",
+      "data": [
+        {
+          "id": "ahl-core::t-4",
+          "date": "2025-11-19",
+          "kind": "buy",
+          "ticker": "SYS",
+          "title": "Bought 40",
+          "detail": "AHL Core · @ 600 · fees 60",
+          "amount": 24000,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-3",
+          "date": "2025-11-19",
+          "kind": "buy",
+          "ticker": "MEBL",
+          "title": "Bought 100",
+          "detail": "AHL Core · @ 280 · fees 70",
+          "amount": 28000,
+          "editable": true
+        }
+      ]
+    },
+    {
+      "key": "2025-09",
+      "title": "September 2025",
+      "data": [
+        {
+          "id": "ahl-core::t-2",
+          "date": "2025-09-10",
+          "kind": "opening",
+          "ticker": "MEBL",
+          "title": "Opening 200",
+          "detail": "AHL Core · price unknown",
+          "amount": null,
+          "editable": true
+        },
+        {
+          "id": "ahl-core::t-1",
+          "date": "2025-09-10",
+          "kind": "opening",
+          "ticker": "HBL",
+          "title": "Opening 300",
+          "detail": "AHL Core · @ 140",
+          "amount": 42000,
+          "editable": true
+        }
+      ]
+    }
+  ]
+}

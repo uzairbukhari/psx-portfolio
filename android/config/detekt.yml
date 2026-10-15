@@ -1,0 +1,32 @@
+# Defaults plus the few rules that fight Compose and the wire-format code.
+complexity:
+  LongMethod:
+    threshold: 80
+    ignoreAnnotated: ['Composable']
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 12
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    active: false
+  CyclomaticComplexMethod:
+    threshold: 20
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    max: 4
+  ThrowsCount:
+    max: 4
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Za-z][_A-Za-z0-9]*'
+exceptions:
+  TooGenericExceptionCaught:
+    active: false

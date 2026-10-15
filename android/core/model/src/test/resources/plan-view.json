@@ -1,0 +1,203 @@
+{
+  "now": "2026-10",
+  "month": "2026-10",
+  "homeId": "ahl-core",
+  "readOnly": false,
+  "receivers": [
+    {
+      "id": "ahl-core",
+      "name": "AHL Core"
+    },
+    {
+      "id": "finqalab",
+      "name": "Finqalab"
+    },
+    {
+      "id": "savings-gold",
+      "name": "Savings & Gold"
+    }
+  ],
+  "companyCount": 15,
+  "targetedCount": 12,
+  "targetState": {
+    "total": 92,
+    "remaining": 8,
+    "status": "under",
+    "overCap": []
+  },
+  "budgetSet": true,
+  "budget": 100000,
+  "error": null,
+  "planErrors": [],
+  "plan": {
+    "budget": 100000,
+    "already": 20551.25,
+    "remaining": 79448.75,
+    "total": 885500,
+    "invested": 0,
+    "leftover": 79448.75,
+    "errors": [
+      "Target weights must total 100%."
+    ],
+    "stale": [],
+    "rows": [
+      {
+        "ticker": "MEBL",
+        "name": "Meezan Bank",
+        "price": 320,
+        "asOf": "2026-10-15",
+        "currentWeight": 18.791643139469226,
+        "target": 15,
+        "gap": 0,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "HBL",
+        "name": "Habib Bank",
+        "price": 215,
+        "asOf": "2026-10-15",
+        "currentWeight": 14.568040654997178,
+        "target": 12,
+        "gap": 0,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "LUCK",
+        "name": "Lucky Cement",
+        "price": 1150,
+        "asOf": "2026-10-15",
+        "currentWeight": 7.792207792207792,
+        "target": 10,
+        "gap": 27494.875,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "FCCL",
+        "name": "Fauji Cement",
+        "price": 52,
+        "asOf": "2026-10-15",
+        "currentWeight": 3.52343308865048,
+        "target": 5,
+        "gap": 17047.4375,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "OGDC",
+        "name": "Oil & Gas Development",
+        "price": 230,
+        "asOf": "2026-10-15",
+        "currentWeight": 18.181818181818183,
+        "target": 10,
+        "gap": 0,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "PPL",
+        "name": "Pakistan Petroleum",
+        "price": 190,
+        "asOf": "2026-10-15",
+        "currentWeight": 3.2185206098249575,
+        "target": 8,
+        "gap": 48695.90000000001,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "FFC",
+        "name": "Fauji Fertilizer",
+        "price": 430,
+        "asOf": "2026-10-15",
+        "currentWeight": 7.284020327498589,
+        "target": 8,
+        "gap": 12695.900000000009,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "SYS",
+        "name": "Systems",
+        "price": 135,
+        "asOf": "2026-10-15",
+        "currentWeight": 3.0491247882552233,
+        "target": 6,
+        "gap": 30896.924999999996,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "AIRLINK",
+        "name": "Air Link Communication",
+        "price": 95,
+        "asOf": "2026-10-15",
+        "currentWeight": 5.364201016374929,
+        "target": 4,
+        "gap": 0,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "SEARL",
+        "name": "The Searle Company",
+        "price": 78,
+        "asOf": "2026-10-15",
+        "currentWeight": 4.4042913608131,
+        "target": 4,
+        "gap": 0,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "INDU",
+        "name": "Indus Motor",
+        "price": 2150,
+        "asOf": "2026-10-15",
+        "currentWeight": 2.4280067758328627,
+        "target": 6,
+        "gap": 36396.924999999996,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      },
+      {
+        "ticker": "TRG",
+        "name": "TRG Pakistan",
+        "price": 75,
+        "asOf": "2026-10-15",
+        "currentWeight": 2.5409373235460193,
+        "target": 4,
+        "gap": 16097.950000000004,
+        "shares": 0,
+        "amount": 0,
+        "reason": "Paused / screening confirmation needed"
+      }
+    ]
+  },
+  "buys": [],
+  "bought": [
+    {
+      "id": "ahl-core::t-17",
+      "date": "2026-10-05",
+      "ticker": "HBL",
+      "shares": 100,
+      "price": 205,
+      "fees": 51.25,
+      "amount": 20551.25,
+      "note": "AHL Core · Fictional test trade."
+    }
+  ]
+}

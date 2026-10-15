@@ -1,0 +1,189 @@
+{
+  "summary": {
+    "pricedValue": 885500,
+    "totalGain": 106873.49,
+    "totalGainPercent": 20.02,
+    "grandTotalReturn": 121643.48,
+    "quotesPriced": 13,
+    "quotesHeld": 13,
+    "topThreeWeight": 51.54,
+    "largestSector": {
+      "name": "Bank",
+      "weight": 33.36
+    }
+  },
+  "companyAllocation": [
+    {
+      "label": "MEBL",
+      "weight": 18.79
+    },
+    {
+      "label": "OGDC",
+      "weight": 18.18
+    },
+    {
+      "label": "HBL",
+      "weight": 14.57
+    },
+    {
+      "label": "EFERT",
+      "weight": 8.85
+    },
+    {
+      "label": "LUCK",
+      "weight": 7.79
+    },
+    {
+      "label": "FFC",
+      "weight": 7.28
+    },
+    {
+      "label": "AIRLINK",
+      "weight": 5.36
+    },
+    {
+      "label": "SEARL",
+      "weight": 4.4
+    },
+    {
+      "label": "FCCL",
+      "weight": 3.52
+    },
+    {
+      "label": "PPL",
+      "weight": 3.22
+    },
+    {
+      "label": "SYS",
+      "weight": 3.05
+    },
+    {
+      "label": "TRG",
+      "weight": 2.54
+    },
+    {
+      "label": "INDU",
+      "weight": 2.43
+    }
+  ],
+  "sectorAllocation": [
+    {
+      "label": "Bank",
+      "weight": 33.36
+    },
+    {
+      "label": "Oil & Gas",
+      "weight": 21.4
+    },
+    {
+      "label": "Fertilizer",
+      "weight": 16.14
+    },
+    {
+      "label": "Cement",
+      "weight": 11.32
+    },
+    {
+      "label": "Technology",
+      "weight": 10.95
+    },
+    {
+      "label": "Pharma",
+      "weight": 4.4
+    },
+    {
+      "label": "Auto",
+      "weight": 2.43
+    }
+  ],
+  "targets": [],
+  "performance": [
+    {
+      "ticker": "HBL",
+      "gain": 36373.75,
+      "gainPercent": 39.27
+    },
+    {
+      "ticker": "AIRLINK",
+      "gain": 22437.5,
+      "gainPercent": 89.53
+    },
+    {
+      "ticker": "OGDC",
+      "gain": 19146.25,
+      "gainPercent": 13.5
+    },
+    {
+      "ticker": "SEARL",
+      "gain": 7922.5,
+      "gainPercent": 25.49
+    },
+    {
+      "ticker": "LUCK",
+      "gain": 6444,
+      "gainPercent": 10.3
+    },
+    {
+      "ticker": "FFC",
+      "gain": 6304.87,
+      "gainPercent": 10.83
+    },
+    {
+      "ticker": "FCCL",
+      "gain": 4734,
+      "gainPercent": 17.89
+    },
+    {
+      "ticker": "SYS",
+      "gain": 2940,
+      "gainPercent": 12.22
+    },
+    {
+      "ticker": "INDU",
+      "gain": 1450,
+      "gainPercent": 7.23
+    },
+    {
+      "ticker": "TRG",
+      "gain": 1447.5,
+      "gainPercent": 6.88
+    },
+    {
+      "ticker": "PPL",
+      "gain": -2326.88,
+      "gainPercent": -7.55
+    }
+  ],
+  "monthly": [
+    {
+      "month": "2026-05",
+      "invested": 56140
+    },
+    {
+      "month": "2026-06",
+      "invested": 20050
+    },
+    {
+      "month": "2026-07",
+      "invested": 26466
+    },
+    {
+      "month": "2026-08",
+      "invested": 38345.63
+    },
+    {
+      "month": "2026-09",
+      "invested": 63408.13
+    },
+    {
+      "month": "2026-10",
+      "invested": 20551.25
+    }
+  ],
+  "realized": {
+    "totalRealizedGain": 8908.75,
+    "dividendsGross": 9100,
+    "capitalGainsTax": 1843.76,
+    "taxProfileSet": true
+  }
+}

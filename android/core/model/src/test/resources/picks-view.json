@@ -1,0 +1,94 @@
+{
+  "portfolioId": "ahl-core",
+  "locked": false,
+  "readOnly": false,
+  "month": "2026-10",
+  "max": 15,
+  "shortlist": [
+    "MEBL",
+    "LUCK",
+    "FFC",
+    "TRG"
+  ],
+  "budget": 100000,
+  "counts": {
+    "saved": 14,
+    "held": 13,
+    "shortlisted": 4
+  },
+  "targeted": [
+    "MEBL",
+    "HBL",
+    "LUCK",
+    "FCCL",
+    "OGDC",
+    "PPL",
+    "FFC",
+    "SYS",
+    "AIRLINK",
+    "SEARL",
+    "INDU",
+    "TRG"
+  ],
+  "companies": [
+    {
+      "ticker": "MEBL",
+      "name": "Meezan Bank"
+    },
+    {
+      "ticker": "HBL",
+      "name": "Habib Bank"
+    },
+    {
+      "ticker": "LUCK",
+      "name": "Lucky Cement"
+    },
+    {
+      "ticker": "FCCL",
+      "name": "Fauji Cement"
+    },
+    {
+      "ticker": "OGDC",
+      "name": "Oil & Gas Development"
+    },
+    {
+      "ticker": "PPL",
+      "name": "Pakistan Petroleum"
+    },
+    {
+      "ticker": "HUBC",
+      "name": "Hub Power"
+    },
+    {
+      "ticker": "EFERT",
+      "name": "Engro Fertilizers"
+    },
+    {
+      "ticker": "FFC",
+      "name": "Fauji Fertilizer"
+    },
+    {
+      "ticker": "SYS",
+      "name": "Systems"
+    },
+    {
+      "ticker": "AIRLINK",
+      "name": "Air Link Communication"
+    },
+    {
+      "ticker": "SEARL",
+      "name": "The Searle Company"
+    },
+    {
+      "ticker": "INDU",
+      "name": "Indus Motor"
+    },
+    {
+      "ticker": "TRG",
+      "name": "TRG Pakistan"
+    }
+  ],
+  "run": null,
+  "picks": [],
+  "estimateError": null
+}

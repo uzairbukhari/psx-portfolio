@@ -1,0 +1,15 @@
+{
+  "value": {
+    "kind": "empty",
+    "reason": "Price history is not available yet for enough days to draw a chart. No price history yet for HBL, MEBL, SYS, LUCK, OGDC, PPL, EFERT, FFC, SEARL, INDU, FCCL, TRG and AIRLINK, so their value is left out of the chart. The cost of EFERT and MEBL is not known, so their money in is left out. The gap between the lines overstates growth."
+  },
+  "mwr": {
+    "headline": null,
+    "spoken": null,
+    "note": "Needs the cost of EFERT and MEBL. Edit the opening entry to add it."
+  },
+  "benchmark": {
+    "kind": "unavailable",
+    "reason": "Needs the cost of EFERT and MEBL. Edit the opening entry to add it."
+  }
+}

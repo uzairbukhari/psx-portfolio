@@ -1,0 +1,86 @@
+{
+  "found": true,
+  "ticker": "HBL",
+  "name": "Habib Bank",
+  "sector": "Bank",
+  "shares": 600,
+  "average": 154.37708333333333,
+  "cost": 92626.25,
+  "value": 129000,
+  "gain": 36373.75,
+  "gainPercent": 39.26937558197595,
+  "realized": 0,
+  "price": 215,
+  "priceDate": "2026-10-15",
+  "priceManual": false,
+  "hiddenQuoteDate": null,
+  "portfolios": [
+    {
+      "id": "ahl-core",
+      "name": "AHL Core",
+      "locked": false
+    },
+    {
+      "id": "finqalab",
+      "name": "Finqalab",
+      "locked": false
+    }
+  ],
+  "dividends": [
+    {
+      "id": "ahl-core::d-28",
+      "status": "received",
+      "date": "2026-05-28",
+      "paymentDate": null,
+      "entitlementDate": null,
+      "perShare": 6,
+      "gross": 1800,
+      "tax": 270,
+      "taxIsActual": true,
+      "net": 1530,
+      "source": "manual"
+    }
+  ],
+  "entries": [
+    {
+      "id": "ahl-core::t-17",
+      "date": "2026-10-05",
+      "kind": "buy",
+      "ticker": "HBL",
+      "title": "Bought 100",
+      "detail": "AHL Core · @ 205 · fees 51.25",
+      "amount": 20500,
+      "editable": true
+    },
+    {
+      "id": "ahl-core::d-28",
+      "date": "2026-05-28",
+      "kind": "dividend",
+      "ticker": "HBL",
+      "title": "Dividend",
+      "detail": "AHL Core · 6 per share",
+      "amount": 1800,
+      "editable": true
+    },
+    {
+      "id": "finqalab::t-37",
+      "date": "2026-02-17",
+      "kind": "buy",
+      "ticker": "HBL",
+      "title": "Bought 200",
+      "detail": "Finqalab · @ 150 · fees 75",
+      "amount": 30000,
+      "editable": false
+    },
+    {
+      "id": "ahl-core::t-1",
+      "date": "2025-09-10",
+      "kind": "opening",
+      "ticker": "HBL",
+      "title": "Opening 300",
+      "detail": "AHL Core · @ 140",
+      "amount": 42000,
+      "editable": true
+    }
+  ]
+}

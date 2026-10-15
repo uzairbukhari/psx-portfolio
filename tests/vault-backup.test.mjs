@@ -67,6 +67,6 @@ test('a tampered backup envelope is refused before anything is restored', async 
   const server = createVaultServer();
   const { session } = await seed(server, 'a@example.com');
   const pkg = await session.backupPackage();
-  const flipped = { ...pkg, portfolio: { ...pkg.portfolio, envelope: { ...pkg.portfolio.envelope, ct: 'A' + pkg.portfolio.envelope.ct.slice(1) } } };
+  const flipped = { ...pkg, portfolio: { ...pkg.portfolio, envelope: { ...pkg.portfolio.envelope, ct: (pkg.portfolio.envelope.ct[0] === 'A' ? 'B' : 'A') + pkg.portfolio.envelope.ct.slice(1) } } };
   await assert.rejects(b.openBackup(b.parseBackup(JSON.stringify(flipped)).backup, { password: PASSWORD }), (e) => e.code === 'tampered');
 });
