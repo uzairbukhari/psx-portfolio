@@ -45,7 +45,7 @@ jobs:
         run: |
           for f in $(find . -name 'lint-results-*.txt' -path '*intermediates*'); do echo "=== $f"; grep -E "^.*(Error|Warning):" "$f" | sed 's#.*/android/##' | head -60; done
       - name: Unit tests (vault parity, palette contrast, version codes)
-        run: ./gradlew :core:model:test :core:vault:test :core:designsystem:testDebugUnitTest :app:testStagingDebugUnitTest
+        run: ./gradlew :core:model:test :core:vault:test :core:network:test :core:designsystem:testDebugUnitTest :app:testStagingDebugUnitTest
       - name: Debug build
         run: ./gradlew :app:assembleStagingDebug
       - uses: actions/upload-artifact@v4

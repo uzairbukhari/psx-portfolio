@@ -25,6 +25,7 @@ rootProject.name = "sipwise-android"
 // Pure Kotlin/JVM modules: built and tested without the Android SDK.
 include(":core:model")
 include(":core:vault")
+include(":core:network")
 
 // Android modules need the Android SDK (CI, a developer machine). Without one, Gradle still runs the JVM modules above.
 val hasAndroidSdk = listOf("ANDROID_HOME", "ANDROID_SDK_ROOT").any { !System.getenv(it).isNullOrBlank() } ||
