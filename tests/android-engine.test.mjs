@@ -239,6 +239,29 @@ test('the tax status is read and changed for the whole account', () => {
   assert.equal(run('mutate.account', { op: 'nope' }).ok, false);
 });
 
+test('public data is laid over the stored ledger for display only', () => {
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const wanted = run('public.wanted').value;
+  assert.ok(wanted.tickers.length > 0);
+  const holding = run('holdings.view', { scope: 'all' }).value.rows.find((r) => r.price !== null);
+  const row = { ticker: holding.ticker, price: holding.price + 10, as_of: '2099-01-01T10:00:00Z', quote_date: holding.priceDate, source: 'https://dps.psx.com.pk/test', fetched_at: '2099-01-01T10:00:00Z' };
+  assert.equal(run('public.reset').ok, true);
+  assert.equal(run('public.add', { json: JSON.stringify({ quoteRows: [row], announcements: [], faceValues: {} }) }).ok, true);
+  const after = run('holdings.view', { scope: 'all' }).value.rows.find((r) => r.ticker === holding.ticker);
+  assert.equal(after.price, holding.price + 10);
+  // A change starts from the stored account, so the cached price is not written into the vault.
+  const owner = account.portfolios.find((x) => x.portfolio.companies.some((c) => c.ticker === holding.ticker));
+  const changed = run('mutate', { portfolio: owner.id, op: 'budget', params: JSON.stringify({ month: '2026-12', amount: '1' }) });
+  assert.equal(changed.ok, true, changed.error);
+  const quote = JSON.parse(changed.value.account).portfolios.find((x) => x.id === owner.id).portfolio.quotes[holding.ticker];
+  assert.notEqual(quote?.fetchedAt, '2099-01-01T10:00:00Z');
+  assert.equal(run('dividends.sync').ok, true);
+  run('account.unload');
+  run('account.load', { json: JSON.stringify(account) });
+  assert.equal(run('holdings.view', { scope: 'all' }).value.rows.find((r) => r.ticker === holding.ticker).price, holding.price);
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();

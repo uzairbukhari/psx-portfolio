@@ -151,7 +151,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         val engine = engine()
         engine.call("account.load", mapOf("json" to session.account))
         session.onLock { dropEngine() }
-        _ui.value = VaultUi.Unlocked(session, Ledger(engine, LedgerWriter(session.asStore(), engine)))
+        _ui.value = VaultUi.Unlocked(session, Ledger(engine, LedgerWriter(session.asStore(), engine), container.api))
     }
 
     private fun dropEngine() {

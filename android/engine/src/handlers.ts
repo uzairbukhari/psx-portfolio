@@ -24,6 +24,9 @@ import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-for
 import { buildPlan, currentMonth, monthBuys, unifiedPlanSource } from '../../../mobile/src/data/sip.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
 import { parseNumber } from '../../../mobile/src/data/mutations.ts';
+import { planAutoDividendUpdate } from '../../../lib/dividend-sync.ts';
+import { applyLookups, hasPlaceholderDetails } from '../../../lib/company-enrichment.ts';
+import { mergeQuotes, type QuoteRow } from '../../../lib/quote-merge.ts';
 import { evenWeights, screenStatus, targetRows, targetTotals } from '../../../lib/targets.ts';
 import { searchCompanies } from '../../../mobile/src/data/picks.ts';
 import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
@@ -35,6 +38,30 @@ type Args = Record<string, unknown>;
 type Handler = (args: Args) => unknown;
 
 let loaded: PortfolioAccount | null = null;
+
+// Public data (shared quotes, announcements, company details) laid over the stored ledger for display. It is never
+// saved: writes start from the stored account, so cached prices do not end up in the encrypted vault.
+type Overlay = { quoteRows: QuoteRow[]; announcements: unknown[]; faceValues: Record<string, unknown>; lookups: unknown[] };
+let overlay: Overlay = { quoteRows: [], announcements: [], faceValues: {}, lookups: [] };
+let overlaid: { source: PortfolioAccount; version: number; account: PortfolioAccount } | null = null;
+let overlayVersion = 0;
+
+/** The stored account with the public data applied: what every screen reads. */
+function viewAccount(): PortfolioAccount {
+  const stored = requireAccount();
+  if (overlaid && overlaid.source === stored && overlaid.version === overlayVersion) return overlaid.account;
+  const account: PortfolioAccount = {
+    ...stored,
+    portfolios: stored.portfolios.map((entry) => {
+      const portfolio = JSON.parse(JSON.stringify(entry.portfolio)) as typeof entry.portfolio;
+      portfolio.quotes = mergeQuotes(portfolio.quotes ?? {}, overlay.quoteRows, portfolio.companies.map((c) => c.ticker));
+      applyLookups(portfolio.companies, overlay.lookups as Parameters<typeof applyLookups>[1]);
+      return { ...entry, portfolio };
+    }),
+  };
+  overlaid = { source: stored, version: overlayVersion, account };
+  return account;
+}
 
 function requireAccount(): PortfolioAccount {
   if (!loaded) throw new Error('No portfolio is loaded.');
@@ -65,7 +92,55 @@ const handlers: Record<string, Handler> = {
   },
   'account.unload': () => {
     loaded = null;
+    overlaid = null;
+    overlay = { quoteRows: [], announcements: [], faceValues: {}, lookups: [] };
     return true;
+  },
+
+  // Tickers the public lookups need, and the companies whose name or sector is still a placeholder.
+  'public.wanted': () => {
+    const account = requireAccount();
+    const tickers = [...new Set(account.portfolios.flatMap((x) => x.portfolio.companies.map((c) => c.ticker)))];
+    const placeholders = [...new Set(account.portfolios.flatMap((x) => x.portfolio.companies.filter(hasPlaceholderDetails).map((c) => c.ticker)))];
+    return { tickers, placeholders };
+  },
+
+  // Starts a fresh round of public data; parts are added with public.add, company details with public.lookups.
+  'public.reset': () => {
+    overlay = { quoteRows: [], announcements: [], faceValues: {}, lookups: overlay.lookups };
+    overlayVersion++;
+    return true;
+  },
+  'public.add': (args) => {
+    const part = JSON.parse(text(args, 'json')) as Partial<Overlay>;
+    overlay = {
+      ...overlay,
+      quoteRows: [...overlay.quoteRows, ...(part.quoteRows ?? [])],
+      announcements: [...overlay.announcements, ...(part.announcements ?? [])],
+      faceValues: { ...overlay.faceValues, ...(part.faceValues ?? {}) },
+    };
+    overlayVersion++;
+    return true;
+  },
+  'public.lookups': (args) => {
+    overlay = { ...overlay, lookups: JSON.parse(text(args, 'json')) as unknown[] };
+    overlayVersion++;
+    return true;
+  },
+
+  // Automatic dividends from the announcements, for unlocked portfolios. Returns the next account when something
+  // changed; the app saves it (revision-checked) like any other change.
+  'dividends.sync': () => {
+    const account = requireAccount();
+    let changed = false;
+    const portfolios = account.portfolios.map((entry) => {
+      if (entry.locked) return entry;
+      const update = planAutoDividendUpdate(entry.portfolio, overlay.announcements as never, undefined, undefined, overlay.faceValues as never);
+      if (!update) return entry;
+      changed = true;
+      return { ...entry, portfolio: update.next };
+    });
+    return changed ? { changed, account: JSON.stringify({ ...account, portfolios }) } : { changed };
   },
 
   // The Holdings screen: sorted, filtered rows plus the headline numbers, for one portfolio or all of them.
@@ -73,7 +148,7 @@ const handlers: Record<string, Handler> = {
     const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
     const sort = (typeof args.sort === 'string' ? args.sort : 'value') as HoldingSort;
     const sector = typeof args.sector === 'string' && args.sector ? args.sector : null;
-    const portfolio = dashboardPortfolio(requireAccount(), scope);
+    const portfolio = dashboardPortfolio(viewAccount(), scope);
     const { held, error } = safeHoldings(portfolio);
     const open = openPositions(held);
     const summary = totals(held);
@@ -108,7 +183,7 @@ const handlers: Record<string, Handler> = {
     const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
     const month = typeof args.month === 'string' && args.month ? args.month : currentMonth();
     const now = today();
-    const account = requireAccount();
+    const account = viewAccount();
     const portfolio = dashboardPortfolio(account, scope);
     const { held, error } = safeHoldings(portfolio);
     const summary = totals(held);
@@ -131,7 +206,7 @@ const handlers: Record<string, Handler> = {
     const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
     const filter = (typeof args.filter === 'string' ? args.filter : 'all') as ActivityFilter;
     const query = typeof args.query === 'string' ? args.query : '';
-    const entries = filterActivity(activityEntries(dashboardPortfolio(requireAccount(), scope)), filter, query);
+    const entries = filterActivity(activityEntries(dashboardPortfolio(viewAccount(), scope)), filter, query);
     return { count: entries.length, sections: groupByMonth(entries) };
   },
 
@@ -139,7 +214,7 @@ const handlers: Record<string, Handler> = {
   'company.view': (args) => {
     const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
     const ticker = text(args, 'ticker').toUpperCase();
-    const portfolio = dashboardPortfolio(requireAccount(), scope);
+    const portfolio = dashboardPortfolio(viewAccount(), scope);
     const { held, error } = safeHoldings(portfolio);
     const h = held.find((x) => x.ticker === ticker);
     if (!h) return { found: false, error };
@@ -160,7 +235,7 @@ const handlers: Record<string, Handler> = {
       priceDate: h.quote?.date ?? null,
       priceManual: Boolean(h.quote?.manual),
       hiddenQuoteDate: !h.quote && saved ? saved.date : null,
-      portfolios: requireAccount()
+      portfolios: viewAccount()
         .portfolios.filter((x) => x.portfolio.companies.some((c) => c.ticker === ticker))
         .map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked) })),
       dividends: companyDividends(portfolio, ticker),
@@ -177,7 +252,7 @@ const handlers: Record<string, Handler> = {
 
   // The Plan tab (targets mode): one plan for the whole account, the month's buys and the review rows.
   'plan.view': (args) => {
-    const account = requireAccount();
+    const account = viewAccount();
     const now = currentMonth();
     const month = typeof args.month === 'string' && args.month ? args.month : now;
     const feePct = typeof args.feePct === 'string' ? (parseNumber(args.feePct) ?? 0) : 0;
@@ -287,7 +362,7 @@ const handlers: Record<string, Handler> = {
 
   // The portfolio chooser: every portfolio with what it holds, in words.
   'scope.list': () => ({
-    portfolios: requireAccount().portfolios.map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked), contents: contentsLabel(portfolioContents(x.portfolio)) })),
+    portfolios: viewAccount().portfolios.map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked), contents: contentsLabel(portfolioContents(x.portfolio)) })),
   }),
 
   // Account-wide settings the Settings screen shows.

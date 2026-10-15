@@ -47,6 +47,9 @@ class LedgerWriter(private val store: AccountStore, private val engine: EngineCl
         return commit(next)
     }
 
+    /** Saves an account the engine built on its own (automatic dividends), revision-checked like any change. */
+    suspend fun saveNext(next: String): SavedChange = commit(next)
+
     /**
      * A change to the account as a whole (the tax status), written into every portfolio, locked ones too: it is a
      * setting, not a ledger record, so it is saved as an explicit replace.

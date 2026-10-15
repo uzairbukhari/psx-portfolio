@@ -92,3 +92,10 @@ const val ALL_PORTFOLIOS = "all"
 /** Account-wide settings (`settings.view`): the tax status is "filer", "non-filer" or empty when never chosen. */
 @Serializable
 data class SettingsView(val filerStatus: String = "")
+
+/** What the public lookups need: every ticker, and the ones whose name or sector is still a placeholder. */
+@Serializable
+data class PublicWanted(val tickers: List<String> = emptyList(), val placeholders: List<String> = emptyList())
+
+@Serializable
+data class DividendSync(val changed: Boolean, val account: String? = null)

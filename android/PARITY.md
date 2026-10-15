@@ -12,7 +12,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 5 | Biometric vault unlock | `biometric-key*.ts` | Pending |
 | 6 | Privacy cover + 60 s relock | `app-active.ts`, `lock-policy.ts` | Partial (60 s relock + recents thumbnail off; cover pending) |
 | 7 | Offline ciphertext cache | `file-cache.ts` | Done |
-| 8 | Account load + public overlay | `usePortfolio.ts`, `lib/portfolio-view.ts` | Pending |
+| 8 | Account load + public overlay | `usePortfolio.ts`, `lib/portfolio-view.ts` | Done (prices, announcements, face values and company names overlay the ledger on the device, never saved) |
 | 9 | Revisioned save, conflict, undo | `usePortfolio.save`, Toast | Done |
 | 10 | Portfolio selection (All / one), chooser sheet | `PortfolioSelection.tsx`, `PortfolioChooser.tsx` | Done (chooser in the top bar; selection is kept only while unlocked, like Expo) |
 | 11 | Today hero, return breakdown | `(tabs)/index.tsx`, `data/today.ts` | Partial (headline, return breakdown; net-worth overview pending) |
@@ -39,7 +39,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 32 | Refresh prices (queued job + poll) | `lib/import-refresh.ts` | Pending |
 | 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Partial (filters, search, month groups; sticky headers and edit pending) |
 | 34 | Inbox with filters and actions | `inbox.tsx`, `lib/notification-actions.ts` | Pending |
-| 35 | Auto dividends on load | `data/auto-dividends.ts`, `lib/dividend-sync.ts` | Pending |
+| 35 | Auto dividends on load | `data/auto-dividends.ts`, `lib/dividend-sync.ts` | Done (fund payouts pending with funds) |
 | 36 | Push opt-in, token, test, tap routing | `push.ts`, `PushBridge.tsx` | Pending |
 | 37 | Appearance setting | `ThemeProvider.tsx` | Done |
 | 38 | Signed-in devices | more.tsx | Done |

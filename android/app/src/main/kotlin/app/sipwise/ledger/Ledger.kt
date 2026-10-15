@@ -1,7 +1,13 @@
 package app.sipwise.ledger
 
 import app.sipwise.model.ALL_PORTFOLIOS
+import app.sipwise.model.DividendSync
 import app.sipwise.model.EntryKind
+import app.sipwise.model.PublicWanted
+import app.sipwise.network.ApiClient
+import app.sipwise.network.ApiJson
+import app.sipwise.network.ApiRequestException
+import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineClient
 import app.sipwise.session.LedgerWriter
 import app.sipwise.session.SavedChange
@@ -11,7 +17,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import java.net.URLEncoder
 
 /** What kind of change was saved, so the notice can say it in words. */
 enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET, TARGETS, CORRECTION, TAX }
@@ -23,7 +32,12 @@ data class LedgerNotice(val kind: EntryKind?, val ticker: String, val change: Sa
  * The unlocked account as the screens see it: the calculation engine to read from, and one place to write through.
  * [version] changes after every committed change or undo, which is the screens' cue to read again.
  */
-class Ledger(val engine: EngineClient, private val writer: LedgerWriter) {
+class Ledger(
+    val engine: EngineClient,
+    private val writer: LedgerWriter,
+    private val api: ApiClient? = null,
+) {
+    private var lastPublicRefresh = 0L
     private val _version = MutableStateFlow(0)
     val version: StateFlow<Int> = _version.asStateFlow()
     private val _scope = MutableStateFlow(ALL_PORTFOLIOS)
@@ -71,8 +85,62 @@ class Ledger(val engine: EngineClient, private val writer: LedgerWriter) {
         _notices.tryEmit(LedgerNotice(null, label, change, action))
     }
 
+    /**
+     * Lays the shared public data (prices, payout announcements, company names) over the ledger for display, then
+     * adds any automatic dividends. Best effort: offline or a server hiccup leaves the ledger as it was. Only ticker
+     * symbols are sent. Throttled so returning to the app does not refetch every time.
+     */
+    suspend fun refreshPublic(
+        now: Long = System.currentTimeMillis(),
+        force: Boolean = false,
+    ) {
+        val client = api ?: return
+        if (!force && now - lastPublicRefresh < PUBLIC_REFRESH_MS) return
+        lastPublicRefresh = now
+        try {
+            val wanted = ApiJson.decodeFromJsonElement(PublicWanted.serializer(), engine.call("public.wanted"))
+            if (wanted.tickers.isNotEmpty()) {
+                engine.call("public.reset")
+                for (part in wanted.tickers.chunked(MARKET_CHUNK)) {
+                    val reply = client.get("/api/public-data?tickers=${encode(part)}", JsonElement.serializer())
+                    engine.call("public.add", mapOf("json" to reply.toString()))
+                }
+            }
+            if (wanted.placeholders.isNotEmpty()) {
+                val found = mutableListOf<JsonElement>()
+                for (part in wanted.placeholders.chunked(LOOKUP_CHUNK)) {
+                    val reply = client.get("/api/companies?tickers=${encode(part)}", JsonObject.serializer())
+                    (reply["companies"] as? JsonArray)?.let { found += it }
+                }
+                engine.call("public.lookups", mapOf("json" to JsonArray(found).toString()))
+            }
+            _version.value += 1
+            syncDividends()
+        } catch (ignored: ApiRequestException) {
+            // Public data is optional; the ledger still shows what it has saved.
+        }
+    }
+
+    private suspend fun syncDividends() {
+        val sync = ApiJson.decodeFromJsonElement(DividendSync.serializer(), engine.call("dividends.sync"))
+        val next = sync.account ?: return
+        if (!sync.changed) return
+        try {
+            writer.saveNext(next)
+            _version.value += 1
+        } catch (ignored: ConflictException) {
+            // Another device saved first; the next refresh plans again from the newer ledger.
+        }
+    }
+
+    private fun encode(tickers: List<String>) = URLEncoder.encode(tickers.joinToString(","), Charsets.UTF_8.name())
+
     suspend fun undo(change: SavedChange) {
         writer.undo(change)
         _version.value += 1
     }
 }
+
+private const val PUBLIC_REFRESH_MS = 60_000L
+private const val MARKET_CHUNK = 100
+private const val LOOKUP_CHUNK = 50

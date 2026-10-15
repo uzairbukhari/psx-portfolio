@@ -224,6 +224,7 @@ private fun MainShell(
             }
         }
     }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
     val onCompany = entry?.destination?.hasRoute(CompanyRoute::class) == true
     Scaffold(
