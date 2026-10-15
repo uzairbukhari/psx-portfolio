@@ -219,6 +219,7 @@ export default function AccountOverview({
                       color: classColor(t, c.key),
                     })),
                     valueFormat: money,
+                    centerFormat: (n) => money(Math.round(n)).replace(/\.\d+$/, ''),
                   })
                 }
               />
