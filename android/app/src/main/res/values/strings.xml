@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_today">Today</string>
+    <string name="nav_portfolio">Portfolio</string>
+    <string name="nav_plan">Plan</string>
+    <string name="nav_activity">Activity</string>
+    <string name="placeholder_title">%1$s</string>
+    <string name="placeholder_body">This screen is being rebuilt as a native Android screen.</string>
+</resources>
