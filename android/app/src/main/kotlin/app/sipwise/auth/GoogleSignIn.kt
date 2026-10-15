@@ -3,6 +3,7 @@ package app.sipwise.auth
 import android.content.Context
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
+import androidx.credentials.CredentialOption
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -10,6 +11,7 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
 import app.sipwise.BuildConfig
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 
 class SignInCancelledException : Exception("Google sign-in was cancelled.")
@@ -20,13 +22,31 @@ class SignInFailedException(cause: Throwable) : Exception("Google sign-in did no
 class GoogleSignIn(private val appContext: Context) {
     private val manager = CredentialManager.create(appContext)
 
-    /** [activityContext] must be an Activity: Credential Manager shows its account sheet on top of it. */
+    /**
+     * [activityContext] must be an Activity: Credential Manager shows its account sheet on top of it. The quiet account
+     * list is tried first; when Google offers no account there, the full "Sign in with Google" sheet is shown instead.
+     */
     suspend fun idToken(activityContext: Context): String {
-        val option =
+        val quiet =
             GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
                 .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
                 .build()
+        try {
+            return fetch(activityContext, quiet)
+        } catch (ignored: NoCredentialException) {
+            try {
+                return fetch(activityContext, GetSignInWithGoogleOption.Builder(BuildConfig.GOOGLE_WEB_CLIENT_ID).build())
+            } catch (e: NoCredentialException) {
+                throw SignInFailedException(e)
+            }
+        }
+    }
+
+    private suspend fun fetch(
+        activityContext: Context,
+        option: CredentialOption,
+    ): String {
         val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
         try {
             val credential = manager.getCredential(activityContext, request).credential
@@ -37,7 +57,7 @@ class GoogleSignIn(private val appContext: Context) {
         } catch (e: GetCredentialCancellationException) {
             throw SignInCancelledException().also { it.initCause(e) }
         } catch (e: NoCredentialException) {
-            throw SignInFailedException(e)
+            throw e
         } catch (e: GetCredentialException) {
             throw SignInFailedException(e)
         }
