@@ -52,7 +52,7 @@ jobs:
       - name: Gate
         id: gate
         run: echo "run=true" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.gate.outputs.run == 'true'
       # The staging database id comes from wrangler.jsonc (env.staging), as in seed-staging.yml.
       - name: Read staging database id
@@ -63,7 +63,7 @@ jobs:
             exit 1
           fi
           echo "D1_DATABASE_ID=$id" >> "$GITHUB_ENV"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.gate.outputs.run == 'true'
         with:
           node-version: 24
