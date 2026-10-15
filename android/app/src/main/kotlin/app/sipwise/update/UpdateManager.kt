@@ -5,9 +5,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.net.toUri
 import app.sipwise.BuildConfig
 import app.sipwise.network.ApiJson
 import app.sipwise.network.AvailableUpdate
@@ -86,7 +86,7 @@ class UpdateManager(private val context: Context, private val http: OkHttpClient
 
     /** Opens the system screen where the person lets this app install updates. */
     fun permissionIntent(): Intent =
-        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${context.packageName}".toUri())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     fun install(apk: File) {
