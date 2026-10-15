@@ -61,7 +61,7 @@ class CompanyViewModel(
 
     private suspend fun load() {
         try {
-            val reply = ledger.engine.call("company.view", mapOf("ticker" to ticker))
+            val reply = ledger.view("company.view", mapOf("ticker" to ticker))
             _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(CompanyView.serializer(), reply))
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)

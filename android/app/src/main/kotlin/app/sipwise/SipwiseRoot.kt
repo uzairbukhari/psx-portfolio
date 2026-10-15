@@ -1,16 +1,25 @@
 package app.sipwise
 
 import android.app.Application
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material.icons.outlined.Timeline
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -19,6 +28,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +46,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -45,7 +57,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
+import app.sipwise.designsystem.Spacing
 import app.sipwise.ledger.LedgerAction
+import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.EntryKind
 import app.sipwise.session.ConflictException
 import app.sipwise.ui.ActivityScreen
@@ -62,6 +76,7 @@ import app.sipwise.ui.PlanScreen
 import app.sipwise.ui.PlanViewModel
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
+import app.sipwise.ui.ScopeViewModel
 import app.sipwise.ui.SignInScreen
 import app.sipwise.ui.TargetsScreen
 import app.sipwise.ui.TargetsViewModel
@@ -148,6 +163,7 @@ private fun VaultGate(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainShell(
     unlocked: VaultUi.Unlocked,
@@ -164,6 +180,8 @@ private fun MainShell(
         viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.ledger) } })
     val plan: PlanViewModel =
         viewModel(factory = viewModelFactory { initializer { PlanViewModel(unlocked.ledger) } })
+    val scopes: ScopeViewModel =
+        viewModel(factory = viewModelFactory { initializer { ScopeViewModel(unlocked.ledger) } })
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -202,10 +220,31 @@ private fun MainShell(
         }
     }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
+    val onCompany = entry?.destination?.hasRoute(CompanyRoute::class) == true
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
+        topBar = {
+            val destination = entry?.destination
+            val top = topLevel.firstOrNull { destination?.hasRoute(it.route::class) == true }
+            when {
+                top != null ->
+                    TopAppBar(
+                        title = { Text(stringResource(top.label)) },
+                        actions = { if (top.route != More && top.route != Plan) ScopeChooser(scopes) },
+                    )
+                destination != null ->
+                    TopAppBar(
+                        title = { Text(subScreenTitle(destination, entry)) },
+                        navigationIcon = {
+                            IconButton(onClick = { nav.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.nav_back))
+                            }
+                        },
+                    )
+            }
+        },
         floatingActionButton = {
-            if (!onAddScreen && entry?.destination?.hasRoute(More::class) != true) {
+            if (!onAddScreen && !onCompany && entry?.destination?.hasRoute(More::class) != true) {
                 FloatingActionButton(onClick = { nav.navigate(AddEntry()) }) {
                     Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.entry_title))
                 }
@@ -260,6 +299,54 @@ private fun MainShell(
                         factory = viewModelFactory { initializer { EntryViewModel(unlocked.ledger, editId = route.entryId, initialTicker = route.ticker.orEmpty()) } },
                     )
                 EntryScreen(form, onDone = { nav.popBackStack() })
+            }
+        }
+    }
+}
+
+@Composable
+private fun subScreenTitle(
+    destination: NavDestination,
+    entry: NavBackStackEntry?,
+): String =
+    when {
+        destination.hasRoute(CompanyRoute::class) -> entry?.toRoute<CompanyRoute>()?.ticker.orEmpty()
+        destination.hasRoute(Targets::class) -> stringResource(R.string.targets_title)
+        destination.hasRoute(AddEntry::class) ->
+            stringResource(if (entry?.toRoute<AddEntry>()?.entryId != null) R.string.entry_edit_title else R.string.entry_title)
+        else -> ""
+    }
+
+@Composable
+private fun ScopeChooser(scopes: ScopeViewModel) {
+    val list by scopes.portfolios.collectAsStateWithLifecycle()
+    val selected by scopes.selected.collectAsStateWithLifecycle()
+    if (list.size < 2) return
+    var open by remember { mutableStateOf(false) }
+    val label = list.firstOrNull { it.id == selected }?.name ?: stringResource(R.string.scope_all)
+    Box {
+        AssistChip(onClick = { open = true }, label = { Text(label) }, modifier = Modifier.padding(end = Spacing.sm))
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.scope_all)) },
+                onClick = {
+                    scopes.select(ALL_PORTFOLIOS)
+                    open = false
+                },
+            )
+            for (portfolio in list) {
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(portfolio.name)
+                            Text(portfolio.contents, style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+                    onClick = {
+                        scopes.select(portfolio.id)
+                        open = false
+                    },
+                )
             }
         }
     }

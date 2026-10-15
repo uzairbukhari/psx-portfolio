@@ -216,6 +216,16 @@ test('entry.get reads back what the form needs to correct or void an entry', () 
   assert.equal(JSON.parse(voided.value.account).portfolios[0].portfolio.trades.find((t) => t.id === trade.id).voided, true);
 });
 
+test('scope.list names every portfolio and what it holds', async () => {
+  const { contentsLabel, portfolioContents } = await import('../mobile/src/data/scope.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const reference = normalizeAccount(seed(), false);
+  const list = run('scope.list').value.portfolios;
+  assert.deepEqual(list.map((x) => x.id), reference.portfolios.map((x) => x.id));
+  assert.deepEqual(list.map((x) => x.contents), reference.portfolios.map((x) => contentsLabel(portfolioContents(x.portfolio))));
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();

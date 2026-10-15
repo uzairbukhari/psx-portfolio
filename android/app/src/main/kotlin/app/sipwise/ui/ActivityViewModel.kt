@@ -46,7 +46,7 @@ class ActivityViewModel(private val ledger: Ledger) : ViewModel() {
             viewModelScope.launch {
                 val current = _ui.value
                 try {
-                    val reply = ledger.engine.call("activity.view", mapOf("filter" to current.filter.wire, "query" to current.query))
+                    val reply = ledger.view("activity.view", mapOf("filter" to current.filter.wire, "query" to current.query))
                     _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(ActivityView.serializer(), reply), error = null)
                 } catch (e: EngineException) {
                     _ui.value = _ui.value.copy(error = e.message)

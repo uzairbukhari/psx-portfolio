@@ -14,14 +14,14 @@ import app.sipwise.network.AvailableUpdate
 import app.sipwise.network.GithubRelease
 import app.sipwise.network.expectedSha256
 import app.sipwise.network.findUpdate
+import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
-import java.io.IOException
-import java.security.MessageDigest
 
 class UpdateException(message: String, cause: Throwable? = null) : Exception(message, cause)
 

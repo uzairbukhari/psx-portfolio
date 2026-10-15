@@ -73,3 +73,18 @@ fun voidKind(activityKind: String): String =
         "split" -> "split"
         else -> "trade"
     }
+
+/** A portfolio in the chooser, with what it holds in words ("21 stocks · 1 plan"). */
+@Serializable
+data class ScopePortfolio(
+    val id: String,
+    val name: String,
+    val locked: Boolean = false,
+    val contents: String = "",
+)
+
+@Serializable
+data class ScopeList(val portfolios: List<ScopePortfolio>)
+
+/** The scope value that means every portfolio together. */
+const val ALL_PORTFOLIOS = "all"

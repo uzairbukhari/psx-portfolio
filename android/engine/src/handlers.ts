@@ -13,6 +13,7 @@ import {
 import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
 import { today } from '../../../lib/portfolio.ts';
+import { contentsLabel, portfolioContents } from '../../../mobile/src/data/scope.ts';
 import { activityEntries, companyDividends, readOnlyReason } from '../../../mobile/src/data/derive.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
@@ -281,6 +282,11 @@ const handlers: Record<string, Handler> = {
     }
     return { found: false };
   },
+
+  // The portfolio chooser: every portfolio with what it holds, in words.
+  'scope.list': () => ({
+    portfolios: requireAccount().portfolios.map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked), contents: contentsLabel(portfolioContents(x.portfolio)) })),
+  }),
 
   // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.
   mutate: (args) => {

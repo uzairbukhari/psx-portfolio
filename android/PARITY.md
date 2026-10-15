@@ -14,7 +14,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 7 | Offline ciphertext cache | `file-cache.ts` | Done |
 | 8 | Account load + public overlay | `usePortfolio.ts`, `lib/portfolio-view.ts` | Pending |
 | 9 | Revisioned save, conflict, undo | `usePortfolio.save`, Toast | Done |
-| 10 | Portfolio selection (All / one), chooser sheet | `PortfolioSelection.tsx`, `PortfolioChooser.tsx` | Pending |
+| 10 | Portfolio selection (All / one), chooser sheet | `PortfolioSelection.tsx`, `PortfolioChooser.tsx` | Done (chooser in the top bar; selection is kept only while unlocked, like Expo) |
 | 11 | Today hero, return breakdown | `(tabs)/index.tsx`, `data/today.ts` | Partial (headline, return breakdown; net-worth overview pending) |
 | 12 | Next actions | `data/today.ts#nextActions` | Partial (shown; tapping an action pending) |
 | 13 | Month progress | `data/today.ts#monthProgress` | Done |

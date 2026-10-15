@@ -283,4 +283,7 @@
     <string name="entry_void_title">Void this entry?</string>
     <string name="entry_void_body">It stays in your history as voided but no longer counts.</string>
     <string name="entry_void_confirm">Void</string>
+    <string name="nav_back">Back</string>
+    <string name="scope_all">All portfolios</string>
+    <string name="targets_title">Targets</string>
 </resources>

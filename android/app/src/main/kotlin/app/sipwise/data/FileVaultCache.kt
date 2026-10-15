@@ -6,9 +6,9 @@ import app.sipwise.session.CachedVault
 import app.sipwise.session.VaultCache
 import app.sipwise.session.isLegacyPlaintextCacheName
 import app.sipwise.session.vaultCacheName
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Ciphertext-only cache on the phone so the vault can be opened offline. It holds the wrappers and the encrypted

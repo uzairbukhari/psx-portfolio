@@ -48,7 +48,7 @@ class HoldingsViewModel(private val ledger: Ledger) : ViewModel() {
             val current = _ui.value
             val args = buildMap { put("sort", current.sort.wire).also { current.sector?.let { s -> put("sector", s) } } }
             try {
-                val reply = ledger.engine.call("holdings.view", args)
+                val reply = ledger.view("holdings.view", args)
                 _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(HoldingsView.serializer(), reply), error = null)
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)

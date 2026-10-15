@@ -33,7 +33,7 @@ class TodayViewModel(private val ledger: Ledger) : ViewModel() {
     fun load() {
         viewModelScope.launch {
             try {
-                val reply = ledger.engine.call("today.view", emptyMap())
+                val reply = ledger.view("today.view")
                 _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(TodayView.serializer(), reply), error = null)
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
