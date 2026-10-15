@@ -42,14 +42,15 @@ class ActivityViewModel(private val engine: EngineClient) : ViewModel() {
 
     private fun load() {
         job?.cancel()
-        job = viewModelScope.launch {
-            val current = _ui.value
-            try {
-                val reply = engine.call("activity.view", mapOf("filter" to current.filter.wire, "query" to current.query))
-                _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(ActivityView.serializer(), reply), error = null)
-            } catch (e: EngineException) {
-                _ui.value = _ui.value.copy(error = e.message)
+        job =
+            viewModelScope.launch {
+                val current = _ui.value
+                try {
+                    val reply = engine.call("activity.view", mapOf("filter" to current.filter.wire, "query" to current.query))
+                    _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(ActivityView.serializer(), reply), error = null)
+                } catch (e: EngineException) {
+                    _ui.value = _ui.value.copy(error = e.message)
+                }
             }
-        }
     }
 }
