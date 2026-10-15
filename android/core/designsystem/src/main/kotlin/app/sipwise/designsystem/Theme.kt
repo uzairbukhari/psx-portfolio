@@ -18,6 +18,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -96,7 +97,12 @@ private fun Palette.darkScheme() =
 
 /** Tabular figures so digits never shift as a value changes. */
 private const val TABULAR = "tnum"
-private val Font = FontFamily.Default
+private val InterFamily =
+    FontFamily(
+        Font(R.font.inter_regular, FontWeight.Normal),
+        Font(R.font.inter_medium, FontWeight.Medium),
+        Font(R.font.inter_semibold, FontWeight.SemiBold),
+    )
 
 private fun style(
     size: Int,
@@ -106,7 +112,7 @@ private fun style(
     tabular: Boolean = false,
 ) =
     TextStyle(
-        fontFamily = Font,
+        fontFamily = InterFamily,
         fontSize = size.sp,
         lineHeight = line.sp,
         fontWeight = weight,
