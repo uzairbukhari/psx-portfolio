@@ -26,6 +26,7 @@ rootProject.name = "sipwise-android"
 include(":core:model")
 include(":core:vault")
 include(":core:network")
+include(":core:session")
 
 // Android modules need the Android SDK (CI, a developer machine). Without one, Gradle still runs the JVM modules above.
 val hasAndroidSdk = listOf("ANDROID_HOME", "ANDROID_SDK_ROOT").any { !System.getenv(it).isNullOrBlank() } ||

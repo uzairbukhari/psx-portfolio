@@ -1,5 +1,6 @@
 package app.sipwise.vault
 
+import kotlinx.serialization.Serializable
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.security.MessageDigest
@@ -126,12 +127,16 @@ private fun utf8(text: String): ByteArray = text.toByteArray(Charsets.UTF_8)
 
 // ---- Shapes -------------------------------------------------------------------------------------------------
 
+@Serializable
 data class PasswordKdf(val alg: String, val v: Int, val m: Int, val t: Int, val p: Int)
 
+@Serializable
 data class PasswordWrapper(val kdf: PasswordKdf, val salt: String, val nonce: String, val ct: String)
 
+@Serializable
 data class RecoveryWrapper(val nonce: String, val ct: String)
 
+@Serializable
 data class VaultKeyMaterial(
     val vaultId: String,
     val formatVersion: Int,
@@ -139,8 +144,11 @@ data class VaultKeyMaterial(
     val wrapperVersion: Int,
     val password: PasswordWrapper,
     val recovery: RecoveryWrapper,
+    /** Only present on what the server returns. */
+    val createdAt: String? = null,
 )
 
+@Serializable
 data class PortfolioEnvelope(
     val v: Int,
     val alg: String,
