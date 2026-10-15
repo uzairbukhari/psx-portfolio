@@ -49,6 +49,7 @@ import app.sipwise.model.shortDate
 fun PlanScreen(
     viewModel: PlanViewModel,
     onEditTargets: () -> Unit,
+    onOpenPicks: (String) -> Unit,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
@@ -61,6 +62,7 @@ fun PlanScreen(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item { BudgetCard(view, onShift = viewModel::shift, onEdit = { viewModel.editBudget(true) }) }
+        item { OutlinedButton(onClick = { onOpenPicks(view.month) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.picks_open)) } }
         if (view.bought.isNotEmpty()) {
             item { Text(pluralStringResource(R.plurals.plan_bought_title, view.bought.size, monthTitle(view.month, false), view.bought.size), style = MaterialTheme.typography.titleMedium) }
             items(view.bought, key = { it.id }) { BoughtItem(it) }

@@ -25,7 +25,7 @@ import kotlinx.serialization.json.JsonObject
 import java.net.URLEncoder
 
 /** What kind of change was saved, so the notice can say it in words. */
-enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET, TARGETS, CORRECTION, TAX, PORTFOLIOS }
+enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET, TARGETS, CORRECTION, TAX, PORTFOLIOS, PICKS }
 
 /** Something the person just recorded, so the shell can say so and offer Undo. */
 data class LedgerNotice(val kind: EntryKind?, val ticker: String, val change: SavedChange, val action: LedgerAction = LedgerAction.ENTRY)
@@ -69,10 +69,11 @@ class Ledger(
         kind: EntryKind? = null,
         ticker: String = "",
         action: LedgerAction = LedgerAction.ENTRY,
+        notify: Boolean = true,
     ) {
         val change = writer.apply(portfolioId, op, params)
         _version.value += 1
-        _notices.tryEmit(LedgerNotice(kind, ticker, change, action))
+        if (notify) _notices.tryEmit(LedgerNotice(kind, ticker, change, action))
     }
 
     /** A change to the account as a whole, such as the tax status. */

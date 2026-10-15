@@ -6,6 +6,9 @@ import { validate } from '../../../lib/portfolio.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
 import { applyTargets } from '../../../lib/targets.ts';
 import { setBudget } from '../../../mobile/src/data/sip.ts';
+import { withPicksInputs } from '../../../mobile/src/data/picks.ts';
+import { heldValues, recordRun, runLocalPicks } from '../../../lib/picks-local.ts';
+import { parsePublicAnalysis } from '../../../lib/api-validate.ts';
 import {
   addCompany,
   isIsoDate,
@@ -122,6 +125,22 @@ function apply(portfolio: Parameters<typeof recordTrade>[0], op: string, p: Para
       const amount = num(p, 'amount');
       if (amount === null) throw new Error('Enter the monthly budget.');
       return setBudget(portfolio, str(p, 'month'), amount);
+    }
+    case 'picksInputs': {
+      const amount = num(p, 'amount');
+      if (amount === null) throw new Error('Enter the amount to invest.');
+      const list = Array.isArray(p.shortlist) ? (p.shortlist as unknown[]).filter((t): t is string => typeof t === 'string') : [];
+      if (!list.length) throw new Error('Choose at least one company.');
+      return withPicksInputs(portfolio, str(p, 'month'), list, amount) ?? portfolio;
+    }
+    case 'picksRun': {
+      const amount = num(p, 'amount');
+      if (amount === null || amount <= 0) throw new Error('Enter the amount to invest.');
+      const analysis = parsePublicAnalysis(JSON.parse(str(p, 'analysis')));
+      if (!analysis) throw new Error('The company data response was not understood.');
+      const shortlist = Array.isArray(p.shortlist) ? (p.shortlist as unknown[]).filter((t): t is string => typeof t === 'string') : [];
+      const run = runLocalPicks({ analysis, month: str(p, 'month'), amount, feePct: num(p, 'feePct') ?? 0, shortlist, holdings: heldValues(portfolio) });
+      return { ...portfolio, monthlyPicksRuns: recordRun(portfolio.monthlyPicksRuns, run) };
     }
     case 'buys':
       return recordBuys(portfolio, p.buys as BuyDraft[], str(p, 'month'), date || undefined, note);

@@ -78,6 +78,8 @@ import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.LoadingScreen
 import app.sipwise.ui.MoreScreen
+import app.sipwise.ui.PicksScreen
+import app.sipwise.ui.PicksViewModel
 import app.sipwise.ui.PlanScreen
 import app.sipwise.ui.PlanViewModel
 import app.sipwise.ui.PortfoliosScreen
@@ -117,6 +119,8 @@ import kotlinx.serialization.Serializable
 @Serializable object Targets
 
 @Serializable object Portfolios
+
+@Serializable data class Picks(val month: String)
 
 @Serializable data class CompanyRoute(val ticker: String)
 
@@ -230,6 +234,7 @@ private fun LedgerNotices(
                             LedgerAction.TARGETS -> context.getString(R.string.notice_targets)
                             LedgerAction.TAX -> context.getString(R.string.notice_tax)
                             LedgerAction.PORTFOLIOS -> context.getString(R.string.notice_portfolios)
+                            LedgerAction.PICKS -> context.getString(R.string.notice_picks)
                             LedgerAction.CORRECTION -> context.getString(R.string.notice_correction, notice.ticker)
                         },
                     actionLabel = context.getString(R.string.entry_undo),
@@ -281,7 +286,7 @@ private fun MainShell(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
-    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class).any { entry?.destination?.hasRoute(it) == true }
+    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class, Picks::class).any { entry?.destination?.hasRoute(it) == true }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
@@ -335,7 +340,13 @@ private fun MainShell(
         NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
             composable<Today> { TodayScreen(today) }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
-            composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }) }
+            composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
+            composable<Picks> { backStack ->
+                val month = backStack.toRoute<Picks>().month
+                val picks: PicksViewModel =
+                    viewModel(key = "picks-$month", factory = viewModelFactory { initializer { PicksViewModel(unlocked.ledger, api, month) } })
+                PicksScreen(picks, onRecordOne = { nav.navigate(AddEntry(ticker = it)) })
+            }
             composable<Portfolios> {
                 val portfolios: PortfoliosViewModel =
                     viewModel(factory = viewModelFactory { initializer { PortfoliosViewModel(unlocked.ledger) } })
@@ -384,6 +395,7 @@ private fun subScreenTitle(
         destination.hasRoute(CompanyRoute::class) -> entry?.toRoute<CompanyRoute>()?.ticker.orEmpty()
         destination.hasRoute(Targets::class) -> stringResource(R.string.targets_title)
         destination.hasRoute(Portfolios::class) -> stringResource(R.string.portfolios_title)
+        destination.hasRoute(Picks::class) -> stringResource(R.string.picks_title)
         destination.hasRoute(AddEntry::class) ->
             stringResource(if (entry?.toRoute<AddEntry>()?.entryId != null) R.string.entry_edit_title else R.string.entry_title)
         else -> ""

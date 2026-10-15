@@ -55,3 +55,14 @@ data class PushTokenRequest(
 data class PushTestResponse(
     val sent: Int = 0,
 )
+
+@Serializable
+data class FactsRefreshRequest(
+    val tickers: List<String>,
+    val action: String = "refresh-facts",
+)
+
+@Serializable
+data class FactsRefreshResponse(
+    val waiting: Boolean = false,
+)

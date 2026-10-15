@@ -35,7 +35,12 @@ import { planAutoDividendUpdate } from '../../../lib/dividend-sync.ts';
 import { applyLookups, hasPlaceholderDetails } from '../../../lib/company-enrichment.ts';
 import { mergeQuotes, type QuoteRow } from '../../../lib/quote-merge.ts';
 import { evenWeights, screenStatus, targetRows, targetTotals } from '../../../lib/targets.ts';
-import { searchCompanies } from '../../../mobile/src/data/picks.ts';
+import { MAX_SHORTLIST, initialShortlist, pickSources, searchCompanies } from '../../../mobile/src/data/picks.ts';
+import { estimateMonthlyPicks } from '../../../lib/monthly-picks.ts';
+import { explainSizing } from '../../../lib/monthly-picks-allocation.ts';
+import { portfolioCounts } from '../../../lib/portfolio-counts.ts';
+import { classifyFacts, GATHER_TIMEOUT_MS, needsScrape } from '../../../lib/monthly-picks-flow.ts';
+import { parsePublicAnalysis, pollIntervalMs } from '../../../lib/api-validate.ts';
 import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
 import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
 import { accountOverview } from '../../../lib/account-overview.ts';
@@ -467,6 +472,63 @@ const handlers: Record<string, Handler> = {
       canDelete: x.id !== LEGACY_PORTFOLIO_ID && !x.locked && !hasFinancialRecords(x.portfolio) && all.length > 1,
     })),
   }),
+
+  // Monthly Picks: the shortlist, the amount, the newest run for the month and its estimated buys.
+  'picks.view': (args) => {
+    const account = viewAccount();
+    const home = account.portfolios[0];
+    const portfolio = home.portfolio;
+    const month = typeof args.month === 'string' && args.month ? args.month : currentMonth();
+    const shortlist = initialShortlist(portfolio);
+    const current = portfolio.monthlyPicksRuns?.find((r) => r.month === month) ?? null;
+    const counts = portfolioCounts(portfolio, shortlist);
+    let estimateError: string | null = null;
+    let picks: unknown[] = [];
+    if (current?.result && current.status === 'completed') {
+      try {
+        picks = estimateMonthlyPicks(current.result, portfolio, current.amount, current.feePct).map((e) => ({
+          ticker: e.ticker, name: e.name, allocationPct: e.allocationPct, allocationPkr: e.allocationPkr, confidence: e.confidence,
+          thesis: e.thesis, risks: e.risks, evidence: (e.evidenceRefs ?? []).map((r) => ({ label: r.label, value: r.value })),
+          sources: pickSources(e), price: e.price, shares: e.shares, estimatedSpend: e.estimatedSpend,
+        }));
+      } catch (e) {
+        estimateError = e instanceof Error ? e.message : 'Could not work out share counts.';
+      }
+    }
+    return {
+      portfolioId: home.id,
+      locked: Boolean(home.locked),
+      readOnly: Boolean(home.locked) || month < currentMonth(),
+      month,
+      max: MAX_SHORTLIST,
+      shortlist,
+      budget: portfolio.budgets[month] ?? null,
+      counts: { saved: counts.savedCompanies, held: counts.holdings, shortlisted: counts.shortlisted },
+      targeted: portfolio.companies.filter((c) => c.target > 0).map((c) => c.ticker).slice(0, MAX_SHORTLIST),
+      companies: portfolio.companies.map((c) => ({ ticker: c.ticker, name: c.name })),
+      run: current
+        ? {
+            status: current.status, error: current.error, amount: current.amount, feePct: current.feePct, dataAsOf: current.dataAsOf,
+            marketOutlook: current.result?.marketOutlook ?? '', fallbackReason: current.result?.fallbackReason ?? null,
+            unallocatedPct: current.result?.unallocatedPct ?? 0, sizing: explainSizing(current.result?.sizing),
+          }
+        : null,
+      picks,
+      estimateError,
+    };
+  },
+
+  // Which shortlisted companies still need a fresh PSX company-data scrape, from a public-analysis response.
+  'picks.stale': (args) => {
+    const raw = JSON.parse(text(args, 'json')) as Record<string, unknown>;
+    const parsed = parsePublicAnalysis(raw);
+    if (!parsed) throw new Error('The company data response was not understood.');
+    const stale = parsed.facts.filter((f) => needsScrape(classifyFacts(f.ticker, f.fetchedOn, null, parsed.dataAsOf))).map((f) => f.ticker);
+    const waiting = (typeof args.stale === 'string' ? (JSON.parse(args.stale) as string[]) : []).filter((t) => parsed.facts.some((f) => f.ticker === t && f.state !== 'fresh'));
+    return { stale, waiting, dispatchEnabled: Boolean(raw.dispatchEnabled) };
+  },
+
+  'picks.config': () => ({ max: MAX_SHORTLIST, gatherTimeoutMs: GATHER_TIMEOUT_MS, pollFastMs: pollIntervalMs(0), pollSlowMs: pollIntervalMs(60_000) }),
 
   // Account-wide settings the Settings screen shows.
   'settings.view': () => ({ filerStatus: accountTaxProfile(requireAccount())?.filerStatus ?? '' }),

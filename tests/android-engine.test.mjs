@@ -342,3 +342,46 @@ test('overview and assets views cover every portfolio and every asset class', ()
   const wanted = run('rates.wanted').value;
   assert.equal(typeof wanted.metals, 'boolean');
 });
+
+test('monthly picks: stale check, inputs, run and view round-trip on the device', async () => {
+  const { createD1 } = await import('./helpers/d1.mjs');
+  const { buildPublicAnalysis } = await import('../lib/public-analysis.ts');
+  const day = today();
+  const q = (period, eps) => ({ period, revenue: null, pat: null, eps });
+  const facts = (ticker) => ({
+    ticker, name: `${ticker} Ltd`, sector: 'CEMENT', price: 100, priceDate: day, peTtm: 8,
+    week52: { low: 50, high: 150 }, change1y: 20, changeYtd: 5, marketCapThousands: 1, freeFloatPct: 20,
+    annual: [q('2026', 16), q('2025', 8)], quarterly: [q('Q3 2026', 5), q('Q2 2026', 4), q('Q1 2026', 3), q('Q4 2025', 2), q('Q3 2025', 1)],
+    ratios: { grossMargin: [], netMargin: [], epsGrowth: [], peg: [] }, announcements: [],
+    source: `https://dps.psx.com.pk/company/${ticker}`, fetchedAt: `${day}T10:00:00Z`,
+  });
+  run('account.load', { json: JSON.stringify(seed()) });
+  const month = day.slice(0, 7);
+  const view = run('picks.view', { month });
+  assert.equal(view.ok, true, view.error);
+  assert.ok(view.value.companies.length >= 2);
+  const shortlist = view.value.companies.slice(0, 2).map((c) => c.ticker);
+  const db = createD1();
+  for (const ticker of shortlist)
+    await db.prepare('INSERT INTO company_facts (ticker,fetched_on,payload,fetched_at) VALUES (?,?,?,?)').bind(ticker, day, JSON.stringify(facts(ticker)), `${day}T10:00:00Z`).run();
+  const analysis = JSON.stringify({ ...(await buildPublicAnalysis(db, shortlist)), dispatchEnabled: true });
+  const stale = run('picks.stale', { json: analysis });
+  assert.equal(stale.ok, true, stale.error);
+  assert.deepEqual(stale.value.stale, []);
+  assert.equal(stale.value.dispatchEnabled, true);
+  assert.equal(run('picks.stale', { json: '{"nope":1}' }).ok, false);
+  const saved = run('mutate', { portfolio: view.value.portfolioId, op: 'picksInputs', params: JSON.stringify({ month, amount: '100000', shortlist }) });
+  assert.equal(saved.ok, true, saved.error);
+  run('account.load', { json: saved.value.account });
+  const ran = run('mutate', { portfolio: view.value.portfolioId, op: 'picksRun', params: JSON.stringify({ month, amount: '100000', feePct: '0', shortlist, analysis }) });
+  assert.equal(ran.ok, true, ran.error);
+  run('account.load', { json: ran.value.account });
+  const after = run('picks.view', { month });
+  assert.equal(after.ok, true, after.error);
+  assert.deepEqual(after.value.shortlist, shortlist);
+  assert.equal(after.value.budget, 100000);
+  assert.equal(after.value.run.status, 'completed');
+  assert.equal(after.value.estimateError, null);
+  assert.ok(Array.isArray(after.value.picks));
+  assert.equal(run('picks.config').value.max, 15);
+});
