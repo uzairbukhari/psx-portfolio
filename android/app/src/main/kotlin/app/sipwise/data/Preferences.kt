@@ -21,6 +21,7 @@ enum class Appearance(val wire: String) {
 private const val PREFS = "sipwise_prefs"
 private const val KEY_APPEARANCE = "appearance"
 private const val KEY_PUSH = "pushEnabled"
+private const val KEY_ANALYTICS = "analyticsEnabled"
 
 /** Device preferences (not account data), so they survive sign-out like the Expo app's. */
 class Preferences(context: Context) {
@@ -30,6 +31,16 @@ class Preferences(context: Context) {
 
     private val _pushEnabled = MutableStateFlow(prefs.getBoolean(KEY_PUSH, false))
     val pushEnabled: StateFlow<Boolean> = _pushEnabled.asStateFlow()
+
+    private val _analyticsEnabled = MutableStateFlow(prefs.getBoolean(KEY_ANALYTICS, true))
+
+    /** Whether anonymous usage stats are shared. On by default; a per-device switch in More. */
+    val analyticsEnabled: StateFlow<Boolean> = _analyticsEnabled.asStateFlow()
+
+    fun setAnalyticsEnabled(value: Boolean) {
+        prefs.edit { putBoolean(KEY_ANALYTICS, value) }
+        _analyticsEnabled.value = value
+    }
 
     fun setPushEnabled(value: Boolean) {
         prefs.edit { putBoolean(KEY_PUSH, value) }

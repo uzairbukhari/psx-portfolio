@@ -377,6 +377,9 @@
     <string name="insights_benchmark">Compared with the KSE-100</string>
     <string name="insights_yours">Yours</string>
     <string name="insights_index">KSE-100</string>
+    <string name="settings_analytics">Usage stats</string>
+    <string name="settings_analytics_hint">Share anonymous usage stats: which screens and features are used, never your holdings, amounts or notes. This setting is for this phone only.</string>
+    <string name="settings_analytics_switch">Share anonymous usage stats</string>
     <string name="notice_buys">Buys recorded for %1$s</string>
     <string name="notice_budget">Budget saved for %1$s</string>
     <string name="targets_intro">Each month’s money goes first to the companies furthest below their target. Weights must add up to 100%%. A company can reach at most %1$d%% of the portfolio after this month’s money, so weights above %2$d%% are treated as %3$d%%.</string>

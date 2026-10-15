@@ -103,6 +103,7 @@ fun MoreScreen(
         }
         SecurityCard(vault, session)
         NotificationsCard(push)
+        AnalyticsCard()
         DevicesCard(ui, settings)
         DataCard(settings)
         DeleteCard(user, ui, settings, onAccountDeleted)

@@ -16,8 +16,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import app.sipwise.R
+import app.sipwise.SipwiseApp
 
 @Composable
 fun NotificationsCard(viewModel: PushViewModel) {
@@ -49,5 +51,20 @@ fun NotificationsCard(viewModel: PushViewModel) {
         if (ui.enabled) OutlinedButton(onClick = viewModel::test, enabled = !ui.busy) { Text(stringResource(R.string.settings_notifications_test)) }
         ui.notice?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
         ui.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    }
+}
+
+/** The per-device switch for anonymous usage stats (feature and screen names only; on by default). */
+@Composable
+fun AnalyticsCard() {
+    val analytics = (LocalContext.current.applicationContext as SipwiseApp).container.analytics
+    val preferences = (LocalContext.current.applicationContext as SipwiseApp).container.preferences
+    val on by preferences.analyticsEnabled.collectAsState()
+    SectionCard(R.string.settings_analytics) {
+        Text(stringResource(R.string.settings_analytics_hint), style = MaterialTheme.typography.bodyMedium)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(R.string.settings_analytics_switch), style = MaterialTheme.typography.bodyLarge)
+            Switch(checked = on, onCheckedChange = analytics::setEnabled)
+        }
     }
 }

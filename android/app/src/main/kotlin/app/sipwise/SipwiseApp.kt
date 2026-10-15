@@ -1,6 +1,7 @@
 package app.sipwise
 
 import android.app.Application
+import app.sipwise.analytics.Analytics
 import app.sipwise.auth.GoogleSignIn
 import app.sipwise.data.BiometricVault
 import app.sipwise.data.Preferences
@@ -33,6 +34,7 @@ class AppContainer(private val app: Application) {
         )
     val vaultTransport: VaultTransport = ApiVaultTransport(api)
     val push = PushRegistrar(app, api)
+    val analytics = Analytics(api, preferences)
 
     /** Re-registers this phone's push token after sign-in or app start, since Firebase can rotate it. Best effort. */
     suspend fun syncPush() {

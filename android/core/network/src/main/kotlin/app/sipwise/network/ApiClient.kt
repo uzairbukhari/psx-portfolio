@@ -3,6 +3,7 @@ package app.sipwise.network
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -22,6 +23,7 @@ import kotlin.coroutines.resumeWithException
 
 private const val REQUEST_TIMEOUT_SECONDS = 30L
 private const val STATUS_UNAUTHORIZED = 401
+private val SUCCESS_RANGE = 200..299
 private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
 
 /** A failed API call: the server's own message and machine-readable code, or a platform message. */
@@ -72,6 +74,19 @@ class ApiClient(
         serializer: KSerializer<T>,
         authed: Boolean = true,
     ): T = request("POST", path, body?.let { ApiJson.encodeToString(bodySerializer, it) }, serializer, authed)
+
+    /** A POST whose answer is an empty 204 (usage events): success is any 2xx, and a body is not expected. */
+    suspend fun <B> postNoContent(
+        path: String,
+        body: B,
+        bodySerializer: KSerializer<B>,
+    ) {
+        try {
+            request("POST", path, ApiJson.encodeToString(bodySerializer, body), JsonElement.serializer())
+        } catch (e: ApiRequestException) {
+            if (e.status !in SUCCESS_RANGE) throw e
+        }
+    }
 
     suspend fun <B, T> put(
         path: String,

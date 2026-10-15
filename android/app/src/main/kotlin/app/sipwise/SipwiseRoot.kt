@@ -41,7 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -59,13 +61,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import app.sipwise.analytics.Analytics
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
 import app.sipwise.designsystem.Spacing
 import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
+import app.sipwise.ledger.LedgerNotice
 import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.EntryKind
+import app.sipwise.network.Events
 import app.sipwise.network.MeResponse
 import app.sipwise.session.ConflictException
 import app.sipwise.ui.ActivityScreen
@@ -133,6 +138,21 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class CompanyRoute(val ticker: String)
 
+/** The catalog name of a screen for usage events, or null for screens the catalog does not list. */
+private fun screenName(destination: NavDestination?): String? =
+    when {
+        destination == null -> null
+        destination.hasRoute(Today::class) -> "today"
+        destination.hasRoute(Portfolio::class) -> "portfolio"
+        destination.hasRoute(Plan::class) -> "plan"
+        destination.hasRoute(Activity::class) -> "activity"
+        destination.hasRoute(More::class) -> "more"
+        destination.hasRoute(CompanyRoute::class) -> "company"
+        destination.hasRoute(Inbox::class) -> "inbox"
+        destination.hasRoute(Insights::class) -> "reports"
+        else -> null
+    }
+
 private data class TopLevel(val route: Any, val label: Int, val icon: ImageVector)
 
 private val topLevel =
@@ -149,6 +169,8 @@ fun SipwiseRoot() {
     val auth: AuthViewModel = viewModel()
     val state by auth.state.collectAsStateWithLifecycle()
     val message by auth.message.collectAsStateWithLifecycle()
+    val analytics = (LocalContext.current.applicationContext as SipwiseApp).container.analytics
+    LaunchedEffect(state) { analytics.setSignedIn(state is AuthState.SignedIn) }
     when (val current = state) {
         AuthState.Loading -> LoadingScreen()
         AuthState.SignedOut -> SignInScreen(message, onSignIn = auth::signIn)
@@ -219,6 +241,23 @@ private fun PrivacyCover(content: @Composable () -> Unit) {
     }
 }
 
+/** Turns a saved change into its usage event (feature names only; never a ticker or an amount). */
+private fun trackNotice(
+    analytics: Analytics,
+    notice: LedgerNotice,
+) {
+    val kind = notice.kind?.wire ?: "other"
+    when (notice.action) {
+        LedgerAction.ENTRY -> analytics.track(Events.ENTRY_ADDED, "kind" to kind)
+        LedgerAction.BUYS -> analytics.track(Events.ENTRY_ADDED, "kind" to "buy")
+        LedgerAction.CORRECTION -> analytics.track(Events.ENTRY_EDITED, "kind" to kind)
+        LedgerAction.VOID -> analytics.track(Events.ENTRY_DELETED, "kind" to kind)
+        LedgerAction.TARGETS -> analytics.track(Events.TARGETS_SAVED)
+        LedgerAction.PICKS -> analytics.track(Events.PICKS_COMPLETED)
+        else -> Unit
+    }
+}
+
 /** Shows the "Recorded ... Undo" snackbar for each change the ledger reports, and performs the undo. */
 @Composable
 private fun LedgerNotices(
@@ -227,8 +266,12 @@ private fun LedgerNotices(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+    val analytics = (context.applicationContext as SipwiseApp).container.analytics
     LaunchedEffect(ledger) {
         ledger.notices.collect { notice ->
+            trackNotice(analytics, notice)
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
             val kind = notice.kind?.let { context.getString(entryKindLabel(it)) } ?: ""
             val result =
                 snackbar.showSnackbar(
@@ -295,6 +338,9 @@ private fun MainShell(
     val context = LocalContext.current
     val api = (context.applicationContext as SipwiseApp).container.api
     LedgerNotices(unlocked.ledger, snackbar)
+    val analytics = (context.applicationContext as SipwiseApp).container.analytics
+    LaunchedEffect(Unit) { analytics.track(Events.APP_OPENED) }
+    LaunchedEffect(entry?.destination?.route) { screenName(entry?.destination)?.let { analytics.track(Events.SCREEN_VIEWED, "screen" to it) } }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true

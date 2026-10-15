@@ -12,6 +12,7 @@ import app.sipwise.engine.EngineUnavailableException
 import app.sipwise.engine.JsEngineBridge
 import app.sipwise.ledger.Ledger
 import app.sipwise.network.ApiRequestException
+import app.sipwise.network.Events
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineAccountRules
 import app.sipwise.session.EngineClient
@@ -79,8 +80,12 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
             _ui.value = VaultUi.Checking
             try {
                 when (val found = loadVaultStatus(container.vaultTransport, cache)) {
-                    VaultStatus.None -> _ui.value = VaultUi.NeedsSetup
+                    VaultStatus.None -> {
+                        container.analytics.reportAccountState(false)
+                        _ui.value = VaultUi.NeedsSetup
+                    }
                     is VaultStatus.Locked -> {
+                        container.analytics.reportAccountState(true)
                         status = found
                         _biometric.value =
                             BiometricState(container.biometric.available(), container.biometric.has(email, found.vault.vaultId))
@@ -131,6 +136,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         run {
             val draft = checkNotNull(prepared) { "No vault is being created." }
             val session = draft.finish()
+            container.analytics.track(Events.VAULT_CREATED)
             prepared = null
             open(session)
         }
@@ -150,6 +156,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         val locked = checkNotNull(status) { "Nothing to unlock." }
         val engine = engine()
         val session = unlockVault(container.vaultTransport, EngineAccountRules(engine), locked, UnlockSecret.Password(password), cache)
+        container.analytics.track(Events.VAULT_UNLOCKED, "method" to "password")
         open(session)
         if (remember && activity != null) rememberBiometric(activity, session)
     }
@@ -174,6 +181,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
             val key = recallKey(activity, locked) ?: return@run
             try {
                 open(openWithKey(container.vaultTransport, EngineAccountRules(engine()), locked, key, cache))
+                container.analytics.track(Events.VAULT_UNLOCKED, "method" to "biometric")
             } catch (e: VaultException) {
                 container.biometric.forget(email)
                 _biometric.value = _biometric.value.copy(enabled = false)
