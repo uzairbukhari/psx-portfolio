@@ -115,7 +115,7 @@ class Ledger(
             try {
                 client.post("/api/quotes", QuoteTickers(listOf(ticker)), QuoteTickers.serializer(), QuotesResponse.serializer())
             } catch (e: ApiRequestException) {
-                throw CompanyNotConfirmedException("$ticker could not be confirmed on PSX: ${e.message ?: "try again"}")
+                throw CompanyNotConfirmedException("$ticker could not be confirmed on PSX: ${e.message ?: "try again"}", e)
             }
         return reply.quotes[ticker] ?: throw CompanyNotConfirmedException("$ticker is not available as a current PSX symbol.")
     }
@@ -230,4 +230,4 @@ private const val PUBLIC_REFRESH_MS = 60_000L
 private const val MARKET_CHUNK = 100
 private const val LOOKUP_CHUNK = 50
 
-class CompanyNotConfirmedException(message: String) : Exception(message)
+class CompanyNotConfirmedException(message: String, cause: Throwable? = null) : Exception(message, cause)
