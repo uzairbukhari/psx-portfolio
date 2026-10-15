@@ -26,20 +26,26 @@ class PushViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(PushUi(available = push.available(), enabled = container.preferences.pushEnabled.value))
     val ui: StateFlow<PushUi> = _ui.asStateFlow()
 
-    fun enable() = run(R.string.settings_notifications_on_done) {
-        val token = push.token() ?: error(getApplication<Application>().getString(R.string.settings_notifications_no_token))
-        push.register(token)
-        container.preferences.setPushEnabled(true)
-        _ui.value = _ui.value.copy(enabled = true)
+    fun enable() {
+        run(R.string.settings_notifications_on_done) {
+            val token = push.token() ?: error(getApplication<Application>().getString(R.string.settings_notifications_no_token))
+            push.register(token)
+            container.preferences.setPushEnabled(true)
+            _ui.value = _ui.value.copy(enabled = true)
+        }
     }
 
-    fun disable() = run(R.string.settings_notifications_off_done) {
-        push.unregister()
-        container.preferences.setPushEnabled(false)
-        _ui.value = _ui.value.copy(enabled = false)
+    fun disable() {
+        run(R.string.settings_notifications_off_done) {
+            push.unregister()
+            container.preferences.setPushEnabled(false)
+            _ui.value = _ui.value.copy(enabled = false)
+        }
     }
 
-    fun test() = run(R.string.settings_notifications_test_done) { push.test() }
+    fun test() {
+        run(R.string.settings_notifications_test_done) { push.test() }
+    }
 
     fun denied() {
         _ui.value = _ui.value.copy(notice = R.string.settings_notifications_denied)

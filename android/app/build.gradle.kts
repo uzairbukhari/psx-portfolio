@@ -1,13 +1,13 @@
 // Firebase config is a CI secret written to app/google-services.json (git-ignored). Without it the build still works and push is off,
 // so the plugin is put on the classpath and applied only when the file exists.
+import java.util.Properties
+
 buildscript {
     if (File(projectDir, "google-services.json").exists()) {
         repositories { google() }
         dependencies { classpath("com.google.gms:google-services:4.4.2") }
     }
 }
-
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)

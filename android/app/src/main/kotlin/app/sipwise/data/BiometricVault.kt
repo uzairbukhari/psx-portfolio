@@ -95,10 +95,8 @@ class BiometricVault(context: Context) {
         title: String,
         cancel: String,
     ): ByteArray? {
-        if (!has(email, vaultId)) return null
+        val (iv, blob) = stored(email, vaultId) ?: return null
         val name = name(email)
-        val iv = prefs.getString("$name.iv", null)?.let { Base64.decode(it, Base64.NO_WRAP) } ?: return null
-        val blob = prefs.getString("$name.blob", null)?.let { Base64.decode(it, Base64.NO_WRAP) } ?: return null
         return try {
             val key = KeyStore.getInstance(KEYSTORE).apply { load(null) }.getKey(name, null) as? SecretKey ?: throw BiometricInvalidatedException()
             val cipher = Cipher.getInstance(TRANSFORM).apply { init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv)) }
@@ -111,6 +109,17 @@ class BiometricVault(context: Context) {
             forget(email)
             throw BiometricInvalidatedException()
         }
+    }
+
+    private fun stored(
+        email: String,
+        vaultId: String,
+    ): Pair<ByteArray, ByteArray>? {
+        if (!has(email, vaultId)) return null
+        val name = name(email)
+        val iv = prefs.getString("$name.iv", null)?.let { Base64.decode(it, Base64.NO_WRAP) }
+        val blob = prefs.getString("$name.blob", null)?.let { Base64.decode(it, Base64.NO_WRAP) }
+        return if (iv != null && blob != null) iv to blob else null
     }
 
     /** Secure-store names keep the email out of them. */

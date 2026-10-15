@@ -68,9 +68,11 @@ class PortfoliosViewModel(private val ledger: Ledger) : ViewModel() {
         }
     }
 
-    fun toggleLock(item: ScopePortfolio) = change("portfolio.lock", item.name) {
-        put("id", item.id)
-        put("locked", !item.locked)
+    fun toggleLock(item: ScopePortfolio) {
+        change("portfolio.lock", item.name) {
+            put("id", item.id)
+            put("locked", !item.locked)
+        }
     }
 
     fun delete(item: ScopePortfolio) {
@@ -86,10 +88,11 @@ class PortfoliosViewModel(private val ledger: Ledger) : ViewModel() {
         viewModelScope.launch {
             _ui.value = _ui.value.copy(busy = true, error = null)
             try {
-                val params = buildJsonObject {
-                    fill()
-                    if (op == "portfolio.add" || op == "portfolio.rename") put("name", _ui.value.name)
-                }
+                val params =
+                    buildJsonObject {
+                        fill()
+                        if (op == "portfolio.add" || op == "portfolio.rename") put("name", _ui.value.name)
+                    }
                 ledger.applyAccount(op, params, label, LedgerAction.PORTFOLIOS)
                 _ui.value = _ui.value.copy(busy = false, editing = null, name = "")
             } catch (e: EngineException) {

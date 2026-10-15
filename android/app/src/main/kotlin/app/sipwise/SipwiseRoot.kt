@@ -281,7 +281,7 @@ private fun MainShell(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
-    val onCompany = entry?.destination?.hasRoute(CompanyRoute::class) == true
+    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class).any { entry?.destination?.hasRoute(it) == true }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
@@ -305,7 +305,7 @@ private fun MainShell(
             }
         },
         floatingActionButton = {
-            if (!onAddScreen && !onCompany && entry?.destination?.hasRoute(More::class) != true && entry?.destination?.hasRoute(Portfolios::class) != true) {
+            if (!onAddScreen && !noAddButton) {
                 FloatingActionButton(onClick = { nav.navigate(AddEntry()) }) {
                     Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.entry_title))
                 }

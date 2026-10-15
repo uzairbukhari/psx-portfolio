@@ -34,6 +34,17 @@ class AppContainer(private val app: Application) {
     val vaultTransport: VaultTransport = ApiVaultTransport(api)
     val push = PushRegistrar(app, api)
 
+    /** Re-registers this phone's push token after sign-in or app start, since Firebase can rotate it. Best effort. */
+    suspend fun syncPush() {
+        if (!preferences.pushEnabled.value) return
+        val token = push.token() ?: return
+        try {
+            push.register(token)
+        } catch (ignored: ApiRequestException) {
+            // The next launch tries again.
+        }
+    }
+
     /** Ends one server session using [token] rather than the stored one (sign-out of a queued token). */
     suspend fun revokeSession(token: String) {
         ApiClient(BuildConfig.API_BASE_URL, TokenSource { token })
