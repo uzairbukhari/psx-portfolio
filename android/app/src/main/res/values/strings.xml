@@ -307,7 +307,7 @@
     <string name="inbox_filter_cleared">Cleared</string>
     <string name="inbox_filter_all">History</string>
     <string name="inbox_filter_count">%1$s · %2$d</string>
-    <string name="inbox_new">%1$d new</string>
+    <string name="inbox_new">New: %1$d</string>
     <string name="inbox_nothing_new">Nothing new</string>
     <string name="inbox_mark_all">Mark all read</string>
     <string name="inbox_delete_cleared">Delete cleared</string>
