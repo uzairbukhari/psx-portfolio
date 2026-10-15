@@ -326,4 +326,13 @@
     <string name="settings_notifications_on_done">Notifications are on.</string>
     <string name="settings_notifications_off_done">Notifications are off.</string>
     <string name="settings_notifications_test_done">Test sent. It should arrive in a moment.</string>
+    <string name="biometric_enable_title">Turn on fingerprint unlock</string>
+    <string name="biometric_unlock_title">Unlock Sipwise</string>
+    <string name="biometric_cancel">Use password</string>
+    <string name="biometric_unlock_button">Unlock with fingerprint or face</string>
+    <string name="biometric_remember">Unlock with fingerprint or face next time. The key stays on this phone, protected by your biometrics.</string>
+    <string name="biometric_invalidated">Your fingerprint or face settings changed, so that unlock was turned off. Use your vault password.</string>
+    <string name="settings_security">Security</string>
+    <string name="settings_security_hint">Open the vault with your fingerprint or face. Your vault password still works and is the only way to set this up.</string>
+    <string name="settings_security_switch">Fingerprint or face unlock</string>
 </resources>

@@ -2,6 +2,7 @@ package app.sipwise.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -9,21 +10,25 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import app.sipwise.R
 import app.sipwise.designsystem.Spacing
+import app.sipwise.vault.BiometricState
 
 @Composable
 private fun ScreenColumn(content: @Composable () -> Unit) {
@@ -105,18 +110,40 @@ fun UnlockScreen(
     offline: Boolean,
     busy: Boolean,
     error: String?,
-    onUnlock: (String) -> Unit,
+    biometric: BiometricState,
+    onUnlock: (password: String, remember: Boolean) -> Unit,
+    onBiometric: () -> Unit,
     onForgot: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     var password by rememberSaveable { mutableStateOf("") }
+    var remember by rememberSaveable { mutableStateOf(false) }
+    var tried by rememberSaveable { mutableStateOf(false) }
+    // Offer the fingerprint prompt once on arrival; the password form stays as the fallback.
+    LaunchedEffect(biometric.enabled) {
+        if (biometric.enabled && !tried) {
+            tried = true
+            onBiometric()
+        }
+    }
     ScreenColumn {
         Text(stringResource(R.string.unlock_title), style = MaterialTheme.typography.headlineSmall)
         if (offline) Text(stringResource(R.string.unlock_offline), style = MaterialTheme.typography.bodyMedium)
+        if (biometric.enabled) {
+            Button(onClick = onBiometric, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.biometric_unlock_button))
+            }
+        }
         PasswordField(password, { password = it }, R.string.vault_password)
+        if (biometric.available && !biometric.enabled) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = remember, onCheckedChange = { remember = it })
+                Text(stringResource(R.string.biometric_remember), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
         ErrorText(error)
         Button(
-            onClick = { onUnlock(password) },
+            onClick = { onUnlock(password, remember) },
             enabled = !busy && password.isNotEmpty(),
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(if (busy) R.string.unlocking else R.string.unlock)) }

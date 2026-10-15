@@ -2,6 +2,7 @@ package app.sipwise
 
 import android.app.Application
 import app.sipwise.auth.GoogleSignIn
+import app.sipwise.data.BiometricVault
 import app.sipwise.data.Preferences
 import app.sipwise.data.SecureStorage
 import app.sipwise.data.SessionStore
@@ -19,6 +20,7 @@ class AppContainer(private val app: Application) {
     val sessions = SessionStore(SecureStorage(app))
     val google = GoogleSignIn(app)
     val preferences = Preferences(app)
+    val biometric = BiometricVault(app)
 
     /** Set by the auth screen model: called when the server rejects the token. */
     @Volatile var onUnauthorized: () -> Unit = {}

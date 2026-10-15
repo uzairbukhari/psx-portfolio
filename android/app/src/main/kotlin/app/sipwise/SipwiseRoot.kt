@@ -1,8 +1,10 @@
 package app.sipwise
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -36,12 +38,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -89,6 +93,7 @@ import app.sipwise.ui.TodayViewModel
 import app.sipwise.ui.UnlockScreen
 import app.sipwise.ui.VaultFailedScreen
 import app.sipwise.ui.VaultSetupScreen
+import app.sipwise.ui.findFragmentActivity
 import app.sipwise.vault.VaultUi
 import app.sipwise.vault.VaultViewModel
 import kotlinx.coroutines.launch
@@ -163,9 +168,37 @@ private fun VaultGate(
             if (recovering) {
                 RecoverScreen(busy, error, onRecover = vault::recover, onBack = { recovering = false })
             } else {
-                UnlockScreen(current.offline, busy, error, onUnlock = vault::unlock, onForgot = { recovering = true }, onSignOut = onSignOut)
+                val biometric by vault.biometric.collectAsStateWithLifecycle()
+                val activity = LocalContext.current.findFragmentActivity()
+                UnlockScreen(
+                    current.offline,
+                    busy,
+                    error,
+                    biometric,
+                    onUnlock = { password, remember -> vault.unlock(password, remember, activity) },
+                    onBiometric = { activity?.let(vault::unlockWithBiometric) },
+                    onForgot = { recovering = true },
+                    onSignOut = onSignOut,
+                )
             }
-        is VaultUi.Unlocked -> MainShell(current, user, onLock = vault::lock, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
+        is VaultUi.Unlocked ->
+            PrivacyCover {
+                MainShell(current, vault, user, onLock = vault::lock, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
+            }
+    }
+}
+
+/** Covers the portfolio the moment the app leaves the foreground, so the recents thumbnail never shows it. */
+@Composable
+private fun PrivacyCover(content: @Composable () -> Unit) {
+    val state by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
+    Box(Modifier.fillMaxSize()) {
+        content()
+        if (!state.isAtLeast(Lifecycle.State.RESUMED)) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+            }
+        }
     }
 }
 
@@ -217,6 +250,7 @@ private fun LedgerNotices(
 @Composable
 private fun MainShell(
     unlocked: VaultUi.Unlocked,
+    vault: VaultViewModel,
     user: MeResponse,
     onLock: () -> Unit,
     onSignOut: () -> Unit,
@@ -307,7 +341,7 @@ private fun MainShell(
                 val settings: SettingsViewModel =
                     viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger, unlocked.session) } })
                 val push: PushViewModel = viewModel()
-                MoreScreen(settings, push, user, onLock, onSignOut, onAccountDeleted)
+                MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted)
             }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker

@@ -40,13 +40,17 @@ import app.sipwise.designsystem.Spacing
 import app.sipwise.model.mediumDate
 import app.sipwise.network.MeResponse
 import app.sipwise.network.MobileSessionInfo
+import app.sipwise.session.VaultSession
 import app.sipwise.update.UpdateUi
 import app.sipwise.update.UpdateViewModel
+import app.sipwise.vault.VaultViewModel
 
 @Composable
 fun MoreScreen(
     settings: SettingsViewModel,
     push: PushViewModel,
+    vault: VaultViewModel,
+    session: VaultSession,
     user: MeResponse,
     onLock: () -> Unit,
     onSignOut: () -> Unit,
@@ -92,6 +96,7 @@ fun MoreScreen(
             }
             Text(stringResource(R.string.settings_tax_note), style = MaterialTheme.typography.bodySmall)
         }
+        SecurityCard(vault, session)
         NotificationsCard(push)
         DevicesCard(ui, settings)
         DataCard(settings)

@@ -135,7 +135,10 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 googleSignOut = { container.google.signOut() },
                 clearQueries = { },
                 clearPortfolioCache = { FileVaultCache.forContext(app, it).clear() },
-                clearPushPreference = { },
+                clearPushPreference = {
+                    container.preferences.setPushEnabled(false)
+                    email?.let { container.biometric.forget(it) }
+                },
             ),
         )
         FileVaultCache.purgeLegacy(app)
