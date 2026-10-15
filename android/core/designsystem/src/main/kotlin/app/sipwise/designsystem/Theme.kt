@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontFeatureSettings
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,7 +111,7 @@ private fun style(
         lineHeight = line.sp,
         fontWeight = weight,
         letterSpacing = spacing.sp,
-        fontFeatureSettings = if (tabular) FontFeatureSettings(TABULAR) else null,
+        fontFeatureSettings = if (tabular) TABULAR else null,
     )
 
 val SipwiseTypography =
