@@ -3,6 +3,8 @@
 // encrypted) and only then loads it back, so a failed save never changes what the screens show.
 import { replacePortfolio, portfolioAt, type PortfolioAccount } from '../../../lib/portfolio-account.ts';
 import { validate } from '../../../lib/portfolio.ts';
+import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
+import { setBudget } from '../../../mobile/src/data/sip.ts';
 import {
   addCompany,
   isIsoDate,
@@ -31,9 +33,33 @@ const num = (p: Params, key: string): number | null => {
 /** Applies [op] to one portfolio of [account] and returns the next account (not yet loaded or saved). */
 export function mutateAccount(account: PortfolioAccount, portfolioId: string, op: string, p: Params): PortfolioAccount {
   const current = portfolioAt(account, { id: portfolioId });
-  const next = apply(current, op, p);
+  // One plan covers every portfolio, so a buy may name a company the receiving portfolio does not have yet: add it
+  // with no target, like the Expo review sheet does.
+  const params = op === 'buys' ? { ...p, buys: reviewedBuys(p) } : p;
+  const base = op === 'buys' ? withMissingCompanies(current, account, params.buys as BuyDraft[]) : current;
+  const next = apply(base, op, params);
   validate(next);
   return replacePortfolio(account, next, { id: portfolioId });
+}
+
+/** Buys from the review sheet's typed rows (validated like the sheet does), or already-parsed drafts. */
+function reviewedBuys(p: Params): BuyDraft[] {
+  if (!Array.isArray(p.rows)) return (p.buys as BuyDraft[]) ?? [];
+  const parsed = parseReview(p.rows as ReviewRow[], num(p, 'feePct') ?? 0);
+  if (Object.keys(parsed.errors).length || !parsed.buys.length) {
+    throw new Error(parsed.buys.length || Object.keys(parsed.errors).length ? 'Fix the highlighted rows first.' : 'Include at least one buy.');
+  }
+  return parsed.buys;
+}
+
+function withMissingCompanies(current: Parameters<typeof recordBuys>[0], account: PortfolioAccount, buys: BuyDraft[]) {
+  const missing: typeof current.companies = [];
+  for (const b of buys) {
+    if (current.companies.some((c) => c.ticker === b.ticker) || missing.some((c) => c.ticker === b.ticker)) continue;
+    const found = account.portfolios.flatMap((x) => x.portfolio.companies).find((c) => c.ticker === b.ticker);
+    if (found) missing.push({ ...found, target: 0 });
+  }
+  return missing.length ? { ...current, companies: [...current.companies, ...missing] } : current;
 }
 
 function apply(portfolio: Parameters<typeof recordTrade>[0], op: string, p: Params) {
@@ -83,6 +109,11 @@ function apply(portfolio: Parameters<typeof recordTrade>[0], op: string, p: Para
       const paymentDate = str(p, 'paymentDate');
       if (!isIsoDate(paymentDate)) throw new Error('Enter the date as YYYY-MM-DD.');
       return markDividendReceived(portfolio, str(p, 'id'), { paymentDate, grossAmount: num(p, 'grossAmount'), taxWithheld: num(p, 'taxWithheld') });
+    }
+    case 'budget': {
+      const amount = num(p, 'amount');
+      if (amount === null) throw new Error('Enter the monthly budget.');
+      return setBudget(portfolio, str(p, 'month'), amount);
     }
     case 'buys':
       return recordBuys(portfolio, p.buys as BuyDraft[], str(p, 'month'), date || undefined, note);

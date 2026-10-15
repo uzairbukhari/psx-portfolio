@@ -18,7 +18,10 @@ import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } f
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
 import { mutateAccount } from './mutate.ts';
 import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-form.ts';
-import { currentMonth } from '../../../mobile/src/data/sip.ts';
+import { buildPlan, currentMonth, monthBuys, unifiedPlanSource } from '../../../mobile/src/data/sip.ts';
+import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
+import { parseNumber } from '../../../mobile/src/data/mutations.ts';
+import { targetTotals } from '../../../lib/targets.ts';
 import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
 
 export const ENGINE_API_VERSION = 1;
@@ -165,6 +168,47 @@ const handlers: Record<string, Handler> = {
     const data = JSON.parse(text(args, 'json')) as { eod?: number[][]; intraday?: number[][] };
     const points = sliceRange(parseEod(data.eod ?? []), parseIntraday(data.intraday ?? []), text(args, 'range') as HistoryRange);
     return { points, change: rangeChange(points) };
+  },
+
+  // The Plan tab (targets mode): one plan for the whole account, the month's buys and the review rows.
+  'plan.view': (args) => {
+    const account = requireAccount();
+    const now = currentMonth();
+    const month = typeof args.month === 'string' && args.month ? args.month : now;
+    const feePct = typeof args.feePct === 'string' ? (parseNumber(args.feePct) ?? 0) : 0;
+    const allowOld = args.allowOld === 'true';
+    const unified = account.portfolios.length > 1 ? unifiedPlanSource(account) : null;
+    const home = unified ? unified.home : account.portfolios[0];
+    const portfolio = unified ? unified.portfolio : dashboardPortfolio(account, home.id);
+    const { plan: result, error } = buildPlan(portfolio, month, feePct, allowOld);
+    const targeted = portfolio.companies.filter((c) => c.target > 0);
+    const budgetSet = portfolio.budgets[month] !== undefined;
+    const planErrors = (result?.errors ?? []).filter((e) => e !== 'Target weights must total 100%.');
+    const buys = result && budgetSet && !result.errors.length ? result.rows.filter((r) => r.shares > 0 && r.price !== null) : [];
+    return {
+      now,
+      month,
+      homeId: home.id,
+      readOnly: Boolean(home.locked) || month < now,
+      receivers: unified ? account.portfolios.filter((x) => !x.locked).map((x) => ({ id: x.id, name: x.name })) : [],
+      companyCount: portfolio.companies.length,
+      targetedCount: targeted.length,
+      targetState: targetTotals(targeted.map((c) => ({ ticker: c.ticker, target: c.target }))),
+      budgetSet,
+      budget: budgetSet ? portfolio.budgets[month] : null,
+      error,
+      planErrors,
+      plan: result,
+      buys,
+      bought: monthBuys(portfolio, month),
+    };
+  },
+
+  // The review sheet's live total and row problems for the typed shares and prices.
+  'buys.review': (args) => {
+    const rows = JSON.parse(text(args, 'rows')) as ReviewRow[];
+    const feePct = typeof args.feePct === 'string' ? (parseNumber(args.feePct) ?? 0) : 0;
+    return parseReview(rows, feePct);
   },
 
   // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.

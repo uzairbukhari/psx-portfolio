@@ -26,15 +26,15 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 19 | Per-portfolio breakdown (All) | `AccountOverview.tsx` | Pending |
 | 20 | Funds / plans / gold (read-only) | `MutualFunds`, `SavingsPlans`, `GoldSilver` | Pending |
 | 21 | Insights report sections | `Insights.tsx`, `lib/portfolio-reports.ts` | Pending |
-| 22 | Company page, chart ranges | `company/[ticker].tsx`, `lib/price-history.ts` | Pending |
-| 23 | Company ledger + dividends tab | same | Pending |
+| 22 | Company page, chart ranges | `company/[ticker].tsx`, `lib/price-history.ts` | Done |
+| 23 | Company ledger + dividends tab | same | Done (tap an editable entry to void it; correcting an entry pending) |
 | 24 | Add/edit/void transaction (5 kinds) | `transaction.tsx`, `data/mutations.ts`, `entry-form.ts` | Partial (add buy, sell, opening, dividend, split with Undo; edit and void pending) |
 | 25 | New company confirmed via PSX | transaction.tsx | Pending |
 | 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Partial (date picker on the entry form; month picker pending) |
-| 27 | Manual price | `quote.tsx` | Pending |
-| 28 | Mark dividend received | `received.tsx` | Pending |
+| 27 | Manual price | `quote.tsx` | Done |
+| 28 | Mark dividend received | `received.tsx` | Done |
 | 29 | Targets editor | `targets.tsx`, `lib/targets.ts` | Pending |
-| 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Pending |
+| 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Partial (targets mode: month, budget, suggested buys, review and record, fee and old-quote settings; Monthly Picks and the targets editor pending) |
 | 31 | Monthly Picks on device | `PicksView.tsx`, `lib/picks-run.ts` | Pending |
 | 32 | Refresh prices (queued job + poll) | `lib/import-refresh.ts` | Pending |
 | 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Partial (filters, search, month groups; sticky headers and edit pending) |

@@ -1,8 +1,6 @@
 package app.sipwise
 
 import android.app.Application
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -28,7 +26,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +58,8 @@ import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.LoadingScreen
 import app.sipwise.ui.MoreScreen
+import app.sipwise.ui.PlanScreen
+import app.sipwise.ui.PlanViewModel
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
 import app.sipwise.ui.SignInScreen
@@ -159,6 +158,8 @@ private fun MainShell(
         viewModel(factory = viewModelFactory { initializer { TodayViewModel(unlocked.ledger) } })
     val activity: ActivityViewModel =
         viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.ledger) } })
+    val plan: PlanViewModel =
+        viewModel(factory = viewModelFactory { initializer { PlanViewModel(unlocked.ledger) } })
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -174,6 +175,8 @@ private fun MainShell(
                             LedgerAction.PRICE -> context.getString(R.string.notice_price, notice.ticker)
                             LedgerAction.RECEIVED -> context.getString(R.string.notice_received, notice.ticker)
                             LedgerAction.VOID -> context.getString(R.string.notice_void, notice.ticker)
+                            LedgerAction.BUYS -> context.getString(R.string.notice_buys, notice.ticker)
+                            LedgerAction.BUDGET -> context.getString(R.string.notice_budget, notice.ticker)
                         },
                     actionLabel = context.getString(R.string.entry_undo),
                     duration = SnackbarDuration.Long,
@@ -226,7 +229,7 @@ private fun MainShell(
         NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
             composable<Today> { TodayScreen(today) }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
-            composable<Plan> { Placeholder(R.string.nav_plan) }
+            composable<Plan> { PlanScreen(plan) }
             composable<Activity> { ActivityScreen(activity) }
             composable<More> { MoreScreen(onLock, onSignOut) }
             composable<CompanyRoute> { backStack ->
@@ -255,10 +258,3 @@ private fun entryKindLabel(kind: EntryKind) =
         EntryKind.DIVIDEND -> R.string.entry_kind_dividend
         EntryKind.SPLIT -> R.string.entry_kind_split
     }
-
-@Composable
-private fun Placeholder(title: Int) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(stringResource(R.string.placeholder_title, stringResource(title)))
-    }
-}

@@ -127,6 +127,48 @@ test('the company view and history series match the Expo helpers', async () => {
   assert.deepEqual(series.value.change, roundTrip(rangeChange(expected)));
 });
 
+test('the plan view, review totals, budget and buys match the Expo plan code', async () => {
+  const { buildPlan, unifiedPlanSource, monthBuys } = await import('../mobile/src/data/sip.ts');
+  const { parseReview } = await import('../mobile/src/data/record-buys.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const reference = normalizeAccount(seed(), false);
+  const { portfolio } = unifiedPlanSource(reference);
+  const month = '2026-10';
+  const view = run('plan.view', { month, feePct: '0.5', allowOld: 'true' });
+  assert.equal(view.ok, true, view.error);
+  const expected = buildPlan(portfolio, month, 0.5, true);
+  assert.deepEqual(view.value.plan, roundTrip(expected.plan));
+  assert.deepEqual(view.value.bought, roundTrip(monthBuys(portfolio, month)));
+  const rows = [{ ticker: 'AAA', name: 'A', shares: '10', price: '5' }, { ticker: 'BBB', name: 'B', shares: '1.5', price: '5' }];
+  assert.deepEqual(run('buys.review', { rows: JSON.stringify(rows), feePct: '1' }).value, roundTrip(parseReview(rows, 1)));
+
+  const typed = [{ ticker: reference.portfolios[0].portfolio.companies[0].ticker, name: 'x', shares: '3', price: '10' }];
+  const viaRows = run('mutate', { portfolio: reference.portfolios[0].id, op: 'buys', params: JSON.stringify({ rows: typed, feePct: '1', month, note: 'SIP' }) });
+  assert.equal(viaRows.ok, true, viaRows.error);
+  const added = JSON.parse(viaRows.value.account).portfolios[0].portfolio.trades.at(-1);
+  assert.equal(added.shares, 3);
+  assert.equal(added.fees, 0.3);
+  const badRows = run('mutate', { portfolio: reference.portfolios[0].id, op: 'buys', params: JSON.stringify({ rows: [{ ...typed[0], shares: '1.5' }], month }) });
+  assert.match(badRows.error, /Fix the highlighted rows/);
+
+  const homeId = reference.portfolios[0].id;
+  const budget = run('mutate', { portfolio: homeId, op: 'budget', params: JSON.stringify({ month: '2026-11', amount: '12345' }) });
+  assert.equal(budget.ok, true, budget.error);
+  assert.equal(JSON.parse(budget.value.account).portfolios[0].portfolio.budgets['2026-11'], 12345);
+  assert.equal(run('mutate', { portfolio: homeId, op: 'budget', params: JSON.stringify({ month: '2026-11', amount: '' }) }).ok, false);
+
+  const other = reference.portfolios[1];
+  const foreign = reference.portfolios[0].portfolio.companies.find((c) => !other.portfolio.companies.some((x) => x.ticker === c.ticker));
+  if (foreign) {
+    const buys = [{ ticker: foreign.ticker, shares: 5, price: 10, fees: 1 }];
+    const rec = run('mutate', { portfolio: other.id, op: 'buys', params: JSON.stringify({ buys, month, note: 'SIP' }) });
+    assert.equal(rec.ok, true, rec.error);
+    const saved = JSON.parse(rec.value.account).portfolios[1].portfolio;
+    assert.equal(saved.companies.find((c) => c.ticker === foreign.ticker).target, 0);
+  }
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();

@@ -4,7 +4,6 @@
     <string name="nav_portfolio">Portfolio</string>
     <string name="nav_plan">Plan</string>
     <string name="nav_activity">Activity</string>
-    <string name="placeholder_title">%1$s</string>
 
     <string name="working">Working…</string>
     <string name="cancel">Cancel</string>
@@ -97,7 +96,7 @@
     <string name="month_of_budget">of %1$s</string>
     <string name="month_left">%1$s left</string>
     <string name="month_all_invested">All of this month’s budget is invested</string>
-    <string name="month_no_budget">No budget set for %1$s. Set one on the web or in the Expo app for now; planning arrives in a later update.</string>
+    <string name="month_no_budget">No budget set for %1$s. Set one in the Plan tab.</string>
     <plurals name="month_suggested">
         <item quantity="one">%1$d buy suggested</item>
         <item quantity="other">%1$d buys suggested</item>
@@ -197,4 +196,58 @@
     <string name="notice_price">Price saved for %1$s</string>
     <string name="notice_received">Dividend marked received for %1$s</string>
     <string name="notice_void">Entry voided for %1$s</string>
+    <string name="plan_prev">‹ %1$s</string>
+    <string name="plan_next">%1$s ›</string>
+    <string name="plan_this_month">This month</string>
+    <string name="plan_upcoming">Upcoming</string>
+    <string name="plan_past">Past month · read only</string>
+    <string name="plan_budget_not_set">Not set</string>
+    <string name="plan_bought">Bought</string>
+    <string name="plan_left">Left to invest</string>
+    <string name="plan_edit_budget">Edit %1$s budget</string>
+    <string name="plan_set_budget">Set %1$s’s budget</string>
+    <plurals name="plan_bought_title">
+        <item quantity="one">Bought in %1$s · %2$d buy</item>
+        <item quantity="other">Bought in %1$s · %2$d buys</item>
+    </plurals>
+    <plurals name="plan_shares">
+        <item quantity="one">%1$d share</item>
+        <item quantity="other">%1$d shares</item>
+    </plurals>
+    <string name="plan_no_targets_title">Choose your companies and targets</string>
+    <string name="plan_no_targets_body">Sipwise splits each month’s money toward the companies furthest below their target weight, in whole shares. Targets must add up to 100%, and any one company is capped at 20% of the portfolio.</string>
+    <string name="plan_no_companies">Add your first company by recording a purchase or importing your trades, then set its target here.</string>
+    <string name="plan_targets_total">Your targets add up to %1$d%%, not 100%%. Adjust them to get suggested buys.</string>
+    <string name="plan_set_budget_prompt">Set a budget for %1$s to see suggested buys.</string>
+    <string name="plan_complete">All of this month’s budget is invested.</string>
+    <string name="plan_suggested">Suggested buys</string>
+    <string name="plan_suggested_note">Whole shares at the latest saved prices. Invested %1$s, leftover cash %2$s.</string>
+    <string name="plan_record_in">Record buys in</string>
+    <string name="plan_record_in_note">One plan covers all your portfolios. Choose which portfolio receives these buys.</string>
+    <plurals name="plan_record_all">
+        <item quantity="one">Record %1$d buy…</item>
+        <item quantity="other">Record all %1$d buys…</item>
+    </plurals>
+    <string name="plan_row_weights">Now %1$s%% of %2$s%% target · price %3$s</string>
+    <string name="plan_price_missing">not saved</string>
+    <string name="plan_settings">Plan settings</string>
+    <string name="plan_fee">Fee estimate (%%)</string>
+    <string name="plan_fee_hint">Used to size whole-share buys and the estimated fees when you record.</string>
+    <string name="plan_old_quotes">Use older quotes</string>
+    <string name="plan_old_quotes_hint">Plan with the latest saved prices even when they are not from the last trading day.</string>
+    <string name="plan_budget_title">Budget for %1$s</string>
+    <string name="plan_budget_label">Budget for %1$s (PKR)</string>
+    <string name="plan_budget_note">Only %1$s changes. Each month keeps its own budget.</string>
+    <string name="plan_review_title">Review and record</string>
+    <string name="plan_review_note">Check each buy against your broker confirmation, change anything that differs, then record them together.</string>
+    <string name="plan_review_total">Total %1$s</string>
+    <string name="plan_review_breakdown">%1$s for shares plus %2$s estimated fees (%3$s%%). Dated today and counted toward %4$s.</string>
+    <string name="plan_review_included">Included</string>
+    <string name="plan_review_left_out">Left out</string>
+    <plurals name="plan_record_buys">
+        <item quantity="one">Record %1$d buy</item>
+        <item quantity="other">Record %1$d buys</item>
+    </plurals>
+    <string name="notice_buys">Buys recorded for %1$s</string>
+    <string name="notice_budget">Budget saved for %1$s</string>
 </resources>

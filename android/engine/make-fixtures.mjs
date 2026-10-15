@@ -13,6 +13,7 @@ const companyTicker = account.portfolios[0].portfolio.trades[0].ticker;
 for (const [file, name, args] of [
   ['holdings-view.json', 'holdings.view', { scope: 'all' }],
   ['today-view.json', 'today.view', { scope: 'all', month: '2026-10' }],
+  ['plan-view.json', 'plan.view', { month: '2026-10', feePct: '0', allowOld: 'true' }],
   ['company-view.json', 'company.view', { scope: 'all', ticker: companyTicker }],
   ['activity-view.json', 'activity.view', { scope: 'all', filter: 'all', query: '' }],
 ]) {
