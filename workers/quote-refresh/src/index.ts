@@ -17,6 +17,8 @@ interface Env {
   FACE_VALUE_AI_MONTHLY_CAP_USD?: string;
   CF_ANALYTICS_TOKEN?: string;
   CF_ACCOUNT_ID?: string;
+  /** Optional: Firebase service account JSON; switches on push to the native Android app. */
+  FCM_SERVICE_ACCOUNT_JSON?: string;
 }
 
 /**
@@ -80,6 +82,7 @@ export default {
             now: new Date(controller.scheduledTime),
             aiLabCapUsd: Number.isFinite(lab) && lab > 0 ? lab : null,
             faceValueCapUsd: Number.isFinite(face) && face > 0 ? face : 1,
+            fcmServiceAccount: env.FCM_SERVICE_ACCOUNT_JSON,
           });
           if (result.sent) console.log('Admin alert sent', result);
         })().catch((e) => console.error('Admin alerts failed', e)),

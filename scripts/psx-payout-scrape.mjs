@@ -11,7 +11,8 @@ import { scrapeExitCode } from './scrape-exit.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { fetchPsxPayoutsHtml } from '../lib/psx-fetch.ts';
 import { parsePayouts } from '../lib/psx-payouts.ts';
-import { announcementKey, buildGenericPush, newAnnouncements } from '../lib/dividend-push.ts';
+import { announcementKey, buildGenericPush, GENERIC_PUSH, newAnnouncements } from '../lib/dividend-push.ts';
+import { isFcmToken, sendFcm } from '../lib/fcm.ts';
 
 // D1 allows 100 bound parameters per statement; 10 per row.
 const ROWS_PER_STATEMENT = 9;
@@ -48,7 +49,14 @@ async function notifyPhones(rows, before) {
   if (!fresh.length) return;
   const sessions = await d1('SELECT DISTINCT push_token AS token FROM mobile_sessions WHERE revoked_at IS NULL AND push_token IS NOT NULL');
   const messages = buildGenericPush(fresh, sessions.map((row) => row.token));
-  console.log(`Push: ${fresh.length} new announcements, ${messages.length} notifications.`);
+  const fcmTokens = sessions.map((row) => row.token).filter(isFcmToken);
+  console.log(`Push: ${fresh.length} new announcements, ${messages.length} Expo and ${new Set(fcmTokens).size} FCM notifications.`);
+  if (fcmTokens.length) {
+    const fcm = await sendFcm(process.env.FCM_SERVICE_ACCOUNT_JSON, fcmTokens, GENERIC_PUSH);
+    if (fcm.error) console.log(`FCM: ${fcm.error}`);
+    // A token Google no longer knows belongs to an uninstalled app: forget it.
+    for (const token of fcm.unregistered) await d1('UPDATE mobile_sessions SET push_token=NULL WHERE push_token=?', [token]);
+  }
   for (let i = 0; i < messages.length; i += 100) {
     const batch = messages.slice(i, i + 100);
     const response = await fetch(EXPO_PUSH_URL, {

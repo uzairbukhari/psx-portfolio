@@ -1,3 +1,5 @@
+import { env } from 'cloudflare:workers';
+import { isFcmToken, sendFcm } from '@/lib/fcm';
 import { db, failure, identity } from '@/lib/server';
 import { UserError } from '@/lib/user-error';
 
@@ -20,14 +22,27 @@ export async function POST(req: Request) {
       .bind(email.toLowerCase())
       .all<{ token: string }>();
     if (!results.length) throw new UserError('No phone is registered for notifications yet. Turn them on in the app first.', 400);
+    const title = 'Sipwise test';
+    const body = 'Notifications are working. Dividend announcements for your companies will arrive like this.';
+    const fcmTokens = results.map((r) => r.token).filter(isFcmToken);
+    const expoRows = results.filter((r) => !isFcmToken(r.token));
+    let delivered = 0;
+    if (fcmTokens.length) {
+      const fcm = await sendFcm((env as { FCM_SERVICE_ACCOUNT_JSON?: string }).FCM_SERVICE_ACCOUNT_JSON, fcmTokens, { title, body, kind: 'test' });
+      for (const token of fcm.unregistered) await db().prepare('UPDATE mobile_sessions SET push_token=NULL WHERE push_token=?').bind(token).run();
+      if (fcm.unregistered.length) throw new UserError('This phone is no longer registered. Turn notifications off and on again in the app.', 502);
+      if (fcm.error) throw new UserError(`Notification failed: ${fcm.error}`, 502);
+      delivered += fcm.sent;
+    }
+    if (!expoRows.length) return Response.json({ sent: delivered }, { headers: { 'Cache-Control': 'no-store' } });
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(
-        results.map(({ token }) => ({
+        expoRows.map(({ token }) => ({
           to: token,
-          title: 'Sipwise test',
-          body: 'Notifications are working. Dividend announcements for your companies will arrive like this.',
+          title,
+          body,
           channelId: 'dividends',
           sound: 'default',
         })),
@@ -52,7 +67,7 @@ export async function POST(req: Request) {
       const bad = Object.values(receipts?.data ?? {}).find((t) => t.status === 'error');
       if (bad) throw new UserError(describeError(bad), 502);
     }
-    return Response.json({ sent: results.length }, { headers: { 'Cache-Control': 'no-store' } });
+    return Response.json({ sent: delivered + expoRows.length }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     return failure(e, undefined, req);
   }
