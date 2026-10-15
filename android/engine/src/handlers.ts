@@ -13,7 +13,8 @@ import {
 import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
 import { today } from '../../../lib/portfolio.ts';
-import { activityEntries } from '../../../mobile/src/data/derive.ts';
+import { activityEntries, companyDividends } from '../../../mobile/src/data/derive.ts';
+import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
 import { mutateAccount } from './mutate.ts';
 import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-form.ts';
@@ -124,6 +125,46 @@ const handlers: Record<string, Handler> = {
     const query = typeof args.query === 'string' ? args.query : '';
     const entries = filterActivity(activityEntries(dashboardPortfolio(requireAccount(), scope)), filter, query);
     return { count: entries.length, sections: groupByMonth(entries) };
+  },
+
+  // One company: position, expected and received dividends, and its ledger lines.
+  'company.view': (args) => {
+    const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
+    const ticker = text(args, 'ticker').toUpperCase();
+    const portfolio = dashboardPortfolio(requireAccount(), scope);
+    const { held, error } = safeHoldings(portfolio);
+    const h = held.find((x) => x.ticker === ticker);
+    if (!h) return { found: false, error };
+    const saved = portfolio.quotes[ticker];
+    return {
+      found: true,
+      ticker,
+      name: h.name,
+      sector: h.sector,
+      shares: h.shares,
+      average: h.average,
+      cost: h.cost,
+      value: h.value,
+      gain: h.gain,
+      gainPercent: h.gain === null || !h.cost ? null : (h.gain / h.cost) * 100,
+      realized: h.realized,
+      price: h.quote?.price ?? null,
+      priceDate: h.quote?.date ?? null,
+      priceManual: Boolean(h.quote?.manual),
+      hiddenQuoteDate: !h.quote && saved ? saved.date : null,
+      portfolios: requireAccount()
+        .portfolios.filter((x) => x.portfolio.companies.some((c) => c.ticker === ticker))
+        .map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked) })),
+      dividends: companyDividends(portfolio, ticker),
+      entries: activityEntries(portfolio, ticker),
+    };
+  },
+
+  // A price-history response cut to one chart range, with its change over the range.
+  'history.series': (args) => {
+    const data = JSON.parse(text(args, 'json')) as { eod?: number[][]; intraday?: number[][] };
+    const points = sliceRange(parseEod(data.eod ?? []), parseIntraday(data.intraday ?? []), text(args, 'range') as HistoryRange);
+    return { points, change: rangeChange(points) };
   },
 
   // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.

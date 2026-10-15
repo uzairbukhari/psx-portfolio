@@ -9,9 +9,11 @@ const dir = new URL('../core/model/src/test/resources/', import.meta.url);
 mkdirSync(dir, { recursive: true });
 const account = JSON.parse(JSON.stringify(buildTestAccount('2026-10-15', new Date('2026-10-15T08:00:00Z'))));
 call('account.load', JSON.stringify({ json: JSON.stringify(account) }));
+const companyTicker = account.portfolios[0].portfolio.trades[0].ticker;
 for (const [file, name, args] of [
   ['holdings-view.json', 'holdings.view', { scope: 'all' }],
   ['today-view.json', 'today.view', { scope: 'all', month: '2026-10' }],
+  ['company-view.json', 'company.view', { scope: 'all', ticker: companyTicker }],
   ['activity-view.json', 'activity.view', { scope: 'all', filter: 'all', query: '' }],
 ]) {
   const reply = JSON.parse(call(name, JSON.stringify(args)));

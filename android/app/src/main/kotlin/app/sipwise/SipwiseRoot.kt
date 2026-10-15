@@ -45,12 +45,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
+import app.sipwise.ledger.LedgerAction
 import app.sipwise.model.EntryKind
 import app.sipwise.session.ConflictException
 import app.sipwise.ui.ActivityScreen
 import app.sipwise.ui.ActivityViewModel
+import app.sipwise.ui.CompanyScreen
+import app.sipwise.ui.CompanyViewModel
 import app.sipwise.ui.EntryScreen
 import app.sipwise.ui.EntryViewModel
 import app.sipwise.ui.HoldingsScreen
@@ -82,6 +86,8 @@ import kotlinx.serialization.Serializable
 @Serializable object More
 
 @Serializable object AddEntry
+
+@Serializable data class CompanyRoute(val ticker: String)
 
 private data class TopLevel(val route: Any, val label: Int, val icon: ImageVector)
 
@@ -156,12 +162,19 @@ private fun MainShell(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val api = (context.applicationContext as SipwiseApp).container.api
     LaunchedEffect(unlocked.ledger) {
         unlocked.ledger.notices.collect { notice ->
             val kind = notice.kind?.let { context.getString(entryKindLabel(it)) } ?: ""
             val result =
                 snackbar.showSnackbar(
-                    message = context.getString(R.string.entry_recorded, kind, notice.ticker),
+                    message =
+                        when (notice.action) {
+                            LedgerAction.ENTRY -> context.getString(R.string.entry_recorded, kind, notice.ticker)
+                            LedgerAction.PRICE -> context.getString(R.string.notice_price, notice.ticker)
+                            LedgerAction.RECEIVED -> context.getString(R.string.notice_received, notice.ticker)
+                            LedgerAction.VOID -> context.getString(R.string.notice_void, notice.ticker)
+                        },
                     actionLabel = context.getString(R.string.entry_undo),
                     duration = SnackbarDuration.Long,
                 )
@@ -212,10 +225,19 @@ private fun MainShell(
     ) { padding ->
         NavHost(nav, startDestination = Today, modifier = Modifier.padding(padding)) {
             composable<Today> { TodayScreen(today) }
-            composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = {}) }
+            composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
             composable<Plan> { Placeholder(R.string.nav_plan) }
             composable<Activity> { ActivityScreen(activity) }
             composable<More> { MoreScreen(onLock, onSignOut) }
+            composable<CompanyRoute> { backStack ->
+                val ticker = backStack.toRoute<CompanyRoute>().ticker
+                val company: CompanyViewModel =
+                    viewModel(
+                        key = ticker,
+                        factory = viewModelFactory { initializer { CompanyViewModel(unlocked.ledger, api, ticker) } },
+                    )
+                CompanyScreen(company)
+            }
             composable<AddEntry> {
                 val form: EntryViewModel =
                     viewModel(factory = viewModelFactory { initializer { EntryViewModel(unlocked.ledger) } })

@@ -12,8 +12,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonObject
 
+/** What kind of change was saved, so the notice can say it in words. */
+enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID }
+
 /** Something the person just recorded, so the shell can say so and offer Undo. */
-data class LedgerNotice(val kind: EntryKind?, val ticker: String, val change: SavedChange)
+data class LedgerNotice(val kind: EntryKind?, val ticker: String, val change: SavedChange, val action: LedgerAction = LedgerAction.ENTRY)
 
 /**
  * The unlocked account as the screens see it: the calculation engine to read from, and one place to write through.
@@ -31,10 +34,11 @@ class Ledger(val engine: EngineClient, private val writer: LedgerWriter) {
         params: JsonObject,
         kind: EntryKind? = null,
         ticker: String = "",
+        action: LedgerAction = LedgerAction.ENTRY,
     ) {
         val change = writer.apply(portfolioId, op, params)
         _version.value += 1
-        _notices.tryEmit(LedgerNotice(kind, ticker, change))
+        _notices.tryEmit(LedgerNotice(kind, ticker, change, action))
     }
 
     suspend fun undo(change: SavedChange) {

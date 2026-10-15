@@ -101,6 +101,32 @@ test('the today and activity views match the Expo view-models', async () => {
   }
 });
 
+test('the company view and history series match the Expo helpers', async () => {
+  const { companyDividends, activityEntries } = await import('../mobile/src/data/derive.ts');
+  const { parseEod, parseIntraday, sliceRange, rangeChange } = await import('../lib/price-history.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const reference = normalizeAccount(seed(), false);
+  const portfolio = dashboardPortfolio(reference, ALL_PORTFOLIOS);
+  const { held } = safeHoldings(portfolio);
+  const h = held.find((x) => x.shares > 0);
+  const view = run('company.view', { scope: ALL_PORTFOLIOS, ticker: h.ticker.toLowerCase() });
+  assert.equal(view.ok, true, view.error);
+  assert.equal(view.value.found, true);
+  assert.equal(view.value.shares, h.shares);
+  assert.deepEqual(view.value.dividends, roundTrip(companyDividends(portfolio, h.ticker)));
+  assert.deepEqual(view.value.entries, roundTrip(activityEntries(portfolio, h.ticker)));
+  assert.equal(run('company.view', { scope: ALL_PORTFOLIOS, ticker: 'NOPE' }).value.found, false);
+
+  const day = 86400;
+  const eod = Array.from({ length: 40 }, (_, i) => [1_700_000_000 + i * day, 100 + i]);
+  const json = JSON.stringify({ eod, intraday: [] });
+  const series = run('history.series', { json, range: '1m' });
+  const expected = sliceRange(parseEod(eod), parseIntraday([]), '1m');
+  assert.deepEqual(series.value.points, roundTrip(expected));
+  assert.deepEqual(series.value.change, roundTrip(rangeChange(expected)));
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();
