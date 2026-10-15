@@ -91,21 +91,21 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 sessions.saveToken(result.token)
                 sessions.saveProfile(result.user)
                 _state.value = AuthState.SignedIn(result.user)
-            } catch (ignored: SignInCancelledException) {
-                _message.value = null
+            } catch (e: SignInCancelledException) {
+                // Google also reports a misconfigured OAuth client as a cancellation, so staging builds show it.
+                _message.value = if (BuildConfig.SIGN_IN_DETAIL) withCause(e) else null
             } catch (e: SignInFailedException) {
                 // Staging builds say why Google refused, so a setup mistake is visible without a debugger.
-                val cause = e.cause
-                _message.value =
-                    if (BuildConfig.SIGN_IN_DETAIL && cause != null) {
-                        "${e.message} (${cause.javaClass.simpleName}: ${cause.message})"
-                    } else {
-                        e.message
-                    }
+                _message.value = if (BuildConfig.SIGN_IN_DETAIL) withCause(e) else e.message
             } catch (e: ApiRequestException) {
                 _message.value = e.message
             }
         }
+    }
+
+    private fun withCause(e: Exception): String? {
+        val cause = e.cause ?: return e.message
+        return "${e.message} (${cause.javaClass.simpleName}: ${cause.message})"
     }
 
     /** User-initiated: also ends the server-side session. Offline, the revoke is queued and retried next launch. */
