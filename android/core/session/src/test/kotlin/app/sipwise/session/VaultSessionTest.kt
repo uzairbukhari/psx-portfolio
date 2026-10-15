@@ -14,14 +14,14 @@ import kotlin.test.assertTrue
 private const val PASSWORD = "correct horse battery staple"
 
 private class FakeRules : AccountRules {
-    override fun blank() = """{"portfolios":[]}"""
+    override suspend fun blank() = """{"portfolios":[]}"""
 
-    override fun normalize(accountJson: String): String {
+    override suspend fun normalize(accountJson: String): String {
         require(accountJson.startsWith("{")) { "Not an account." }
         return accountJson
     }
 
-    override fun assertWritable(
+    override suspend fun assertWritable(
         currentJson: String,
         nextJson: String,
     ) = check(!currentJson.contains("\"locked\"")) { "Locked." }

@@ -4,10 +4,10 @@ name: Android CI
 # vector (tests/fixtures/vault-vector.json) and, later, the bundled lib/ engine, so changes there run it too.
 on:
   pull_request:
-    paths: ['android/**', 'lib/**', 'tests/fixtures/vault-vector.json', '.github/workflows/android-*.yml']
+    paths: ['android/**', 'lib/**', 'mobile/src/data/**', 'tests/android-engine.test.mjs', 'tests/fixtures/vault-vector.json', '.github/workflows/android-*.yml']
   push:
     branches: [main]
-    paths: ['android/**', 'lib/**', 'tests/fixtures/vault-vector.json', '.github/workflows/android-*.yml']
+    paths: ['android/**', 'lib/**', 'mobile/src/data/**', 'tests/android-engine.test.mjs', 'tests/fixtures/vault-vector.json', '.github/workflows/android-*.yml']
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +31,12 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Engine parity (shared TypeScript the phone runs)
+        working-directory: .
+        run: node --test tests/android-engine.test.mjs
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}

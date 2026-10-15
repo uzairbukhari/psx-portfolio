@@ -28,13 +28,13 @@ fun isOffline(error: Throwable) = error is ApiRequestException && error.status =
  */
 interface AccountRules {
     /** The empty account a new vault starts with. */
-    fun blank(): String
+    suspend fun blank(): String
 
     /** Validates and normalises decrypted text. Throws [IllegalArgumentException] with a readable message. */
-    fun normalize(accountJson: String): String
+    suspend fun normalize(accountJson: String): String
 
     /** Rejects a change that would edit a locked portfolio. */
-    fun assertWritable(
+    suspend fun assertWritable(
         currentJson: String,
         nextJson: String,
     )
@@ -180,7 +180,7 @@ suspend fun openWithKey(
     }
 }
 
-private fun parseAccount(
+private suspend fun parseAccount(
     rules: AccountRules,
     text: String,
 ): String =
@@ -271,7 +271,7 @@ class VaultSession internal constructor(
             current.fill(0)
             key = null
             epoch++
-            account = rules.blank()
+            account = ""
             revision = 0
             listeners = lockListeners.toList()
             lockListeners.clear()

@@ -60,3 +60,7 @@ financial-data/
 /android/*.keystore
 *.jks
 *.keystore
+
+# Android engine bundle (built by android/engine/build.mjs)
+android/engine/node_modules/
+android/core/engine/src/main/assets/engine.js

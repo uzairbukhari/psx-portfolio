@@ -33,5 +33,6 @@ val hasAndroidSdk = listOf("ANDROID_HOME", "ANDROID_SDK_ROOT").any { !System.get
     file("local.properties").exists()
 if (hasAndroidSdk) {
     include(":core:designsystem")
+    include(":core:engine")
     include(":app")
 }
