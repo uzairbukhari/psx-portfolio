@@ -53,9 +53,10 @@ class UpdateManager(private val context: Context, private val http: OkHttpClient
             try {
                 http.newCall(Request.Builder().url(update.apkUrl).build()).execute().use { response ->
                     if (!response.isSuccessful) throw UpdateException("The download failed (${response.code}).")
-                    val total = response.body.contentLength().takeIf { it > 0 } ?: update.sizeBytes
+                    val body = response.body ?: throw UpdateException("The download was empty.")
+                    val total = body.contentLength().takeIf { it > 0 } ?: update.sizeBytes
                     var read = 0L
-                    response.body.byteStream().use { input ->
+                    body.byteStream().use { input ->
                         target.outputStream().use { out ->
                             val buffer = ByteArray(BUFFER)
                             while (true) {
@@ -107,7 +108,7 @@ class UpdateManager(private val context: Context, private val http: OkHttpClient
         try {
             http.newCall(Request.Builder().url(url).header("Accept", "application/vnd.github+json").build()).execute().use { response ->
                 if (!response.isSuccessful) throw UpdateException("Could not check for updates (${response.code}).")
-                return response.body.string()
+                return response.body?.string() ?: throw UpdateException("Could not check for updates.")
             }
         } catch (e: IOException) {
             throw UpdateException("Could not check for updates. Check your connection.", e)
