@@ -9,8 +9,8 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 2 | Session token, 401 sign-out, queued revoke | `token-store.ts`, `session-cleanup.ts` | Partial (token, profile, queued revoke done; WorkManager retry pending) |
 | 3 | Vault status/setup/recovery key/unlock/recover/erase | `VaultProvider.tsx`, `VaultScreens.tsx`, `lib/vault-client.ts` | Done (erase pending) |
 | 4 | Native Argon2id | `modules/sipwise-argon2` | Done |
-| 5 | Biometric vault unlock | `biometric-key*.ts` | Pending |
-| 6 | Privacy cover + 60 s relock | `app-active.ts`, `lock-policy.ts` | Partial (60 s relock + recents thumbnail off; cover pending) |
+| 5 | Biometric vault unlock | `biometric-key*.ts` | Done (Android Keystore key behind BiometricPrompt, dropped when biometrics change; opt-in on the unlock screen and in More) |
+| 6 | Privacy cover + 60 s relock | `app-active.ts`, `lock-policy.ts` | Done (60 s relock, recents thumbnail off, in-app cover as soon as the app leaves the foreground) |
 | 7 | Offline ciphertext cache | `file-cache.ts` | Done |
 | 8 | Account load + public overlay | `usePortfolio.ts`, `lib/portfolio-view.ts` | Done (prices, announcements, face values and company names overlay the ledger on the device, never saved) |
 | 9 | Revisioned save, conflict, undo | `usePortfolio.save`, Toast | Done |
@@ -28,7 +28,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 21 | Insights report sections | `Insights.tsx`, `lib/portfolio-reports.ts` | Pending |
 | 22 | Company page, chart ranges | `company/[ticker].tsx`, `lib/price-history.ts` | Done |
 | 23 | Company ledger + dividends tab | same | Done (tap an editable entry to void it; correcting an entry pending) |
-| 24 | Add/edit/void transaction (5 kinds) | `transaction.tsx`, `data/mutations.ts`, `entry-form.ts` | Partial (add buy, sell, opening, dividend, split with Undo; edit and void pending) |
+| 24 | Add/edit/void transaction (5 kinds) | `transaction.tsx`, `data/mutations.ts`, `entry-form.ts` | Done (add, edit, void with Undo for all five kinds) |
 | 25 | New company confirmed via PSX | transaction.tsx | Pending |
 | 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Partial (date picker on the entry form; month picker pending) |
 | 27 | Manual price | `quote.tsx` | Done |
@@ -37,16 +37,16 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 30 | Plan month, budget, suggested buys, record | `plan.tsx`, `data/sip.ts`, `ReviewBuysSheet.tsx` | Partial (targets mode: month, budget, suggested buys, review and record, fee and old-quote settings; Monthly Picks pending) |
 | 31 | Monthly Picks on device | `PicksView.tsx`, `lib/picks-run.ts` | Pending |
 | 32 | Refresh prices (queued job + poll) | `lib/import-refresh.ts` | Pending |
-| 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Partial (filters, search, month groups; sticky headers and edit pending) |
+| 33 | Activity ledger, search, filters, month groups | `activity.tsx`, `activity-view.ts` | Partial (filters, search, month groups, tap to edit or void; sticky headers pending) |
 | 34 | Inbox with filters and actions | `inbox.tsx`, `lib/notification-actions.ts` | Pending |
 | 35 | Auto dividends on load | `data/auto-dividends.ts`, `lib/dividend-sync.ts` | Done (fund payouts pending with funds) |
-| 36 | Push opt-in, token, test, tap routing | `push.ts`, `PushBridge.tsx` | Pending |
+| 36 | Push opt-in, token, test, tap routing | `push.ts`, `PushBridge.tsx` | Partial (opt-in, FCM token, test notification done; tap routing pending; needs google-services.json and the FCM server secret) |
 | 37 | Appearance setting | `ThemeProvider.tsx` | Done |
 | 38 | Signed-in devices | more.tsx | Done |
 | 39 | Tax status | more.tsx, `portfolio-account.ts` | Done |
 | 40 | AI usage | more.tsx | Pending |
-| 41 | Encrypted backup / readable export | `backup.ts`, `lib/vault-backup.ts` | Pending |
-| 42 | Lock now, sign out, delete account | more.tsx, `DeleteAccountSheet.tsx` | Partial (lock, sign out done; delete account in view model, UI pending) |
+| 41 | Encrypted backup / readable export | `backup.ts`, `lib/vault-backup.ts` | Done (encrypted backup and readable export through the share sheet) |
+| 42 | Lock now, sign out, delete account | more.tsx, `DeleteAccountSheet.tsx` | Done (lock, sign out, delete account) |
 | 43 | Manage portfolios | `portfolios.tsx` | Pending |
 | 44 | Usage analytics + opt-out | `analytics.ts`, `AnalyticsBridge.tsx`, `screens.ts` | Pending |
 | 45 | Haptics, reduce motion | `haptics.ts`, `motion.ts` | Pending |
@@ -54,4 +54,4 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 47 | Admin link to web Research desk | more.tsx | Pending |
 | 48 | Environment variants (dev/staging/prod) | `app.config.ts` | Pending |
 | 49 | Local data migration from RN | n/a | Pending |
-| 50 | Update available prompt | expo-updates OTA | Pending |
+| 50 | Update available prompt | expo-updates OTA | Done (in-app installer from GitHub Releases; see docs/android-release.md) |

@@ -306,3 +306,23 @@ test('ledger changes validate like the Expo screens and return the next account 
   assert.deepEqual(run('entry.totals', { kind: 'buy', shares: '10', price: '100', fees: '5' }).value, { gross: 1000, fees: 5, total: 1005, label: 'Total cost including fees' });
   assert.equal(run('entry.totals', { kind: 'buy', shares: '', price: '100' }).value, null);
 });
+
+test('portfolios can be added, renamed, locked and removed (only empty unlocked ones)', () => {
+  run('account.load', { json: JSON.stringify(seed()) });
+  const before = run('scope.list').value.portfolios;
+  const added = run('mutate.account', { op: 'portfolio.add', params: JSON.stringify({ id: 'new-one', name: '  Goal fund ' }) });
+  assert.equal(added.ok, true, added.error);
+  const account = JSON.parse(added.value.account);
+  assert.equal(account.portfolios.length, before.length + 1);
+  assert.equal(account.portfolios.at(-1).name, 'Goal fund');
+  run('account.load', { json: added.value.account });
+  const listed = run('scope.list').value.portfolios;
+  assert.equal(listed.find((x) => x.id === 'new-one').canDelete, true);
+  assert.ok(listed.some((x) => !x.canDelete), 'a portfolio with records cannot be deleted');
+  const renamed = JSON.parse(run('mutate.account', { op: 'portfolio.rename', params: JSON.stringify({ id: 'new-one', name: 'Renamed' }) }).value.account);
+  assert.equal(renamed.portfolios.at(-1).name, 'Renamed');
+  const locked = JSON.parse(run('mutate.account', { op: 'portfolio.lock', params: JSON.stringify({ id: 'new-one', locked: true }) }).value.account);
+  assert.equal(locked.portfolios.at(-1).locked, true);
+  const removed = JSON.parse(run('mutate.account', { op: 'portfolio.remove', params: JSON.stringify({ id: 'new-one' }) }).value.account);
+  assert.equal(removed.portfolios.length, before.length);
+});

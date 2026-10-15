@@ -81,6 +81,7 @@ data class ScopePortfolio(
     val name: String,
     val locked: Boolean = false,
     val contents: String = "",
+    val canDelete: Boolean = false,
 )
 
 @Serializable

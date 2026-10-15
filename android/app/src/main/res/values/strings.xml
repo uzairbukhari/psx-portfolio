@@ -335,4 +335,20 @@
     <string name="settings_security">Security</string>
     <string name="settings_security_hint">Open the vault with your fingerprint or face. Your vault password still works and is the only way to set this up.</string>
     <string name="settings_security_switch">Fingerprint or face unlock</string>
+    <string name="portfolios_title">Portfolios</string>
+    <string name="portfolios_hint">Manage broker accounts and investment goals under one login.</string>
+    <string name="portfolios_manage">Manage portfolios</string>
+    <string name="portfolios_create">Create portfolio</string>
+    <string name="portfolios_new_name">New portfolio name</string>
+    <string name="portfolios_placeholder">For example, AHL or Finqalab</string>
+    <string name="portfolios_save_name">Save name</string>
+    <string name="portfolios_cancel_rename">Cancel rename</string>
+    <string name="portfolios_rename">Rename</string>
+    <string name="portfolios_lock">Lock</string>
+    <string name="portfolios_unlock">Unlock</string>
+    <string name="portfolios_delete">Delete</string>
+    <string name="portfolios_delete_title">Delete empty portfolio?</string>
+    <string name="portfolios_locked">Locked</string>
+    <string name="portfolios_open">Open</string>
+    <string name="notice_portfolios">Portfolios updated.</string>
 </resources>

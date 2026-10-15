@@ -80,6 +80,8 @@ import app.sipwise.ui.LoadingScreen
 import app.sipwise.ui.MoreScreen
 import app.sipwise.ui.PlanScreen
 import app.sipwise.ui.PlanViewModel
+import app.sipwise.ui.PortfoliosScreen
+import app.sipwise.ui.PortfoliosViewModel
 import app.sipwise.ui.PushViewModel
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
@@ -113,6 +115,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class AddEntry(val entryId: String? = null, val ticker: String? = null)
 
 @Serializable object Targets
+
+@Serializable object Portfolios
 
 @Serializable data class CompanyRoute(val ticker: String)
 
@@ -225,6 +229,7 @@ private fun LedgerNotices(
                             LedgerAction.BUDGET -> context.getString(R.string.notice_budget, notice.ticker)
                             LedgerAction.TARGETS -> context.getString(R.string.notice_targets)
                             LedgerAction.TAX -> context.getString(R.string.notice_tax)
+                            LedgerAction.PORTFOLIOS -> context.getString(R.string.notice_portfolios)
                             LedgerAction.CORRECTION -> context.getString(R.string.notice_correction, notice.ticker)
                         },
                     actionLabel = context.getString(R.string.entry_undo),
@@ -300,7 +305,7 @@ private fun MainShell(
             }
         },
         floatingActionButton = {
-            if (!onAddScreen && !onCompany && entry?.destination?.hasRoute(More::class) != true) {
+            if (!onAddScreen && !onCompany && entry?.destination?.hasRoute(More::class) != true && entry?.destination?.hasRoute(Portfolios::class) != true) {
                 FloatingActionButton(onClick = { nav.navigate(AddEntry()) }) {
                     Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.entry_title))
                 }
@@ -331,6 +336,11 @@ private fun MainShell(
             composable<Today> { TodayScreen(today) }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
             composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }) }
+            composable<Portfolios> {
+                val portfolios: PortfoliosViewModel =
+                    viewModel(factory = viewModelFactory { initializer { PortfoliosViewModel(unlocked.ledger) } })
+                PortfoliosScreen(portfolios)
+            }
             composable<Targets> {
                 val targets: TargetsViewModel =
                     viewModel(factory = viewModelFactory { initializer { TargetsViewModel(unlocked.ledger) } })
@@ -341,7 +351,7 @@ private fun MainShell(
                 val settings: SettingsViewModel =
                     viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger, unlocked.session) } })
                 val push: PushViewModel = viewModel()
-                MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted)
+                MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted, onManagePortfolios = { nav.navigate(Portfolios) })
             }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker
@@ -373,6 +383,7 @@ private fun subScreenTitle(
     when {
         destination.hasRoute(CompanyRoute::class) -> entry?.toRoute<CompanyRoute>()?.ticker.orEmpty()
         destination.hasRoute(Targets::class) -> stringResource(R.string.targets_title)
+        destination.hasRoute(Portfolios::class) -> stringResource(R.string.portfolios_title)
         destination.hasRoute(AddEntry::class) ->
             stringResource(if (entry?.toRoute<AddEntry>()?.entryId != null) R.string.entry_edit_title else R.string.entry_title)
         else -> ""

@@ -9,12 +9,18 @@ import {
   dashboardPortfolio,
   normalizeAccount,
   accountTaxProfile,
+  hasFinancialRecords,
+  LEGACY_PORTFOLIO_ID,
+  portfolioName,
+  removePortfolio,
+  renamePortfolio,
   setAccountFilerStatus,
+  setPortfolioLocked,
   type PortfolioAccount,
 } from '../../../lib/portfolio-account.ts';
 import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
-import { today } from '../../../lib/portfolio.ts';
+import { blankPortfolio, today } from '../../../lib/portfolio.ts';
 import { contentsLabel, portfolioContents } from '../../../mobile/src/data/scope.ts';
 import { activityEntries, companyDividends, readOnlyReason } from '../../../mobile/src/data/derive.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
@@ -363,7 +369,14 @@ const handlers: Record<string, Handler> = {
 
   // The portfolio chooser: every portfolio with what it holds, in words.
   'scope.list': () => ({
-    portfolios: viewAccount().portfolios.map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked), contents: contentsLabel(portfolioContents(x.portfolio)) })),
+    portfolios: viewAccount().portfolios.map((x, _i, all) => ({
+      id: x.id,
+      name: x.name,
+      locked: Boolean(x.locked),
+      contents: contentsLabel(portfolioContents(x.portfolio)),
+      // Only an empty, unlocked portfolio can go, and never the last one.
+      canDelete: x.id !== LEGACY_PORTFOLIO_ID && !x.locked && !hasFinancialRecords(x.portfolio) && all.length > 1,
+    })),
   }),
 
   // Account-wide settings the Settings screen shows.
@@ -378,6 +391,16 @@ const handlers: Record<string, Handler> = {
       if (status !== 'filer' && status !== 'non-filer') throw new Error('Choose filer or non-filer.');
       return { account: JSON.stringify(setAccountFilerStatus(requireAccount(), status)) };
     }
+    const id = typeof params.id === 'string' ? params.id : '';
+    const account = requireAccount();
+    if (op === 'portfolio.add') {
+      if (!id) throw new Error('A new portfolio needs an id.');
+      const added = { id, name: portfolioName(String(params.name ?? '')), portfolio: { ...blankPortfolio(), taxProfile: accountTaxProfile(account) } };
+      return { account: JSON.stringify(normalizeAccount({ ...account, portfolios: [...account.portfolios, added] }, false)) };
+    }
+    if (op === 'portfolio.rename') return { account: JSON.stringify(renamePortfolio(account, id, String(params.name ?? ''))) };
+    if (op === 'portfolio.lock') return { account: JSON.stringify(setPortfolioLocked(account, id, params.locked === true)) };
+    if (op === 'portfolio.remove') return { account: JSON.stringify(removePortfolio(account, id)) };
     throw new Error(`Unknown account change: ${op}`);
   },
 

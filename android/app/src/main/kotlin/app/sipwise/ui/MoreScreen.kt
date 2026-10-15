@@ -55,6 +55,7 @@ fun MoreScreen(
     onLock: () -> Unit,
     onSignOut: () -> Unit,
     onAccountDeleted: () -> Unit,
+    onManagePortfolios: () -> Unit,
 ) {
     val ui by settings.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -95,6 +96,10 @@ fun MoreScreen(
                 )
             }
             Text(stringResource(R.string.settings_tax_note), style = MaterialTheme.typography.bodySmall)
+        }
+        SectionCard(R.string.portfolios_title) {
+            Text(stringResource(R.string.portfolios_hint), style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = onManagePortfolios) { Text(stringResource(R.string.portfolios_manage)) }
         }
         SecurityCard(vault, session)
         NotificationsCard(push)
