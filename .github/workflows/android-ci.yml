@@ -45,7 +45,7 @@ jobs:
       - name: Style and static analysis
         run: ./gradlew ktlintCheck detekt --continue
       - name: Android Lint (warnings are errors)
-        run: ./gradlew :app:lintStagingDebug :core:designsystem:lintDebug --continue
+        run: ./gradlew :app:lintStagingDebug :core:designsystem:lintDebug :core:engine:lintDebug --continue
       - name: Show lint findings
         if: failure()
         run: |
