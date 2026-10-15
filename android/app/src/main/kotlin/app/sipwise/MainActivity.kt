@@ -6,7 +6,10 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,7 +36,8 @@ class MainActivity : FragmentActivity() {
                     Appearance.DARK -> true
                 }
             SipwiseTheme(darkTheme = dark) {
-                SipwiseRoot()
+                // One themed surface under every screen, so text outside a Scaffold still follows light and dark.
+                Surface(Modifier.fillMaxSize()) { SipwiseRoot() }
             }
         }
     }
