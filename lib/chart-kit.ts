@@ -703,12 +703,17 @@ export function hBarOption(t: ChartTokens, c: HBarCfg): EChartsOption {
 export type DonutCfg = {
   slices: { name: string; value: number; color: string }[];
   valueFormat: (n: number) => string;
+  centerFormat?: (n: number) => string;
   centerTitle?: string;
   selectable?: boolean;
 };
 
 export function donutOption(t: ChartTokens, c: DonutCfg): EChartsOption {
   const total = c.slices.reduce((a, s) => a + s.value, 0);
+  const centerText = () => {
+    const v = (c.centerFormat ?? c.valueFormat)(total);
+    return c.centerTitle ? `{k|${c.centerTitle}}\n{v|${v}}` : `{v|${v}}`;
+  };
   return {
     animationDuration: 350,
     textStyle: { fontFamily: t.font, color: t.muted },
@@ -746,10 +751,7 @@ export function donutOption(t: ChartTokens, c: DonutCfg): EChartsOption {
         label: {
           show: true,
           position: 'center',
-          formatter: () =>
-            c.centerTitle
-              ? `{k|${c.centerTitle}}\n{v|${c.valueFormat(total)}}`
-              : `{v|${c.valueFormat(total)}}`,
+          formatter: centerText,
           rich: {
             k: { color: t.muted, fontSize: 11, lineHeight: 16 },
             v: { color: t.text, fontSize: 16, fontWeight: 700 },
@@ -759,8 +761,7 @@ export function donutOption(t: ChartTokens, c: DonutCfg): EChartsOption {
           scaleSize: 4,
           label: {
             show: true,
-            formatter: (p: { name: string; value: number; percent: number }) =>
-              `{k|${p.name}}\n{v|${p.percent.toFixed(1)}%}`,
+            formatter: centerText,
             rich: {
               k: { color: t.muted, fontSize: 11, lineHeight: 16 },
               v: { color: t.text, fontSize: 16, fontWeight: 700 },
