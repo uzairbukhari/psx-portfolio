@@ -67,6 +67,7 @@ android {
             resValue("string", "app_name", "Sipwise Staging")
             buildConfigField("String", "API_BASE_URL", "\"https://psx-portfolio-sip-staging.suzairbukhari.workers.dev\"")
             buildConfigField("boolean", "INCLUDE_PRERELEASES", "true")
+            buildConfigField("boolean", "SIGN_IN_DETAIL", "true")
         }
         create("production") {
             dimension = "env"
@@ -75,6 +76,7 @@ android {
             val api = providers.gradleProperty("apiBaseUrl").orElse("").get()
             buildConfigField("String", "API_BASE_URL", "\"$api\"")
             buildConfigField("boolean", "INCLUDE_PRERELEASES", "false")
+            buildConfigField("boolean", "SIGN_IN_DETAIL", "false")
         }
     }
 

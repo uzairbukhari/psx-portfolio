@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.sipwise.BuildConfig
 import app.sipwise.SipwiseApp
 import app.sipwise.data.FileVaultCache
 import app.sipwise.network.ApiRequestException
@@ -93,7 +94,14 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             } catch (ignored: SignInCancelledException) {
                 _message.value = null
             } catch (e: SignInFailedException) {
-                _message.value = e.message
+                // Staging builds say why Google refused, so a setup mistake is visible without a debugger.
+                val cause = e.cause
+                _message.value =
+                    if (BuildConfig.SIGN_IN_DETAIL && cause != null) {
+                        "${e.message} (${cause.javaClass.simpleName}: ${cause.message})"
+                    } else {
+                        e.message
+                    }
             } catch (e: ApiRequestException) {
                 _message.value = e.message
             }
