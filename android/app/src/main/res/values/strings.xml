@@ -41,7 +41,6 @@
 
     <string name="lock_now">Lock now</string>
     <string name="nav_more">More</string>
-    <string name="more_account">Account</string>
 
     <string name="holdings_empty">No holdings yet. Add your first purchase to see your portfolio here.</string>
     <string name="holdings_value">Portfolio value</string>
@@ -286,4 +285,18 @@
     <string name="nav_back">Back</string>
     <string name="scope_all">All portfolios</string>
     <string name="targets_title">Targets</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_system">System</string>
+    <string name="settings_appearance_light">Light</string>
+    <string name="settings_appearance_dark">Dark</string>
+    <string name="settings_appearance_note">System follows your phone’s light or dark setting.</string>
+    <string name="settings_tax">Tax status</string>
+    <string name="settings_tax_filer">Filer · 15%%</string>
+    <string name="settings_tax_non_filer">Non-filer · 30%%</string>
+    <string name="settings_tax_note">Used to estimate the tax on dividends. One status for all your portfolios.</string>
+    <string name="settings_devices">Signed-in devices</string>
+    <string name="settings_device_last_used">%1$s · last used %2$s</string>
+    <string name="settings_device_sign_out_title">Sign out this device?</string>
+    <string name="settings_admin">Admin</string>
+    <string name="notice_tax">Tax status saved</string>
 </resources>

@@ -88,3 +88,7 @@ data class ScopeList(val portfolios: List<ScopePortfolio>)
 
 /** The scope value that means every portfolio together. */
 const val ALL_PORTFOLIOS = "all"
+
+/** Account-wide settings (`settings.view`): the tax status is "filer", "non-filer" or empty when never chosen. */
+@Serializable
+data class SettingsView(val filerStatus: String = "")

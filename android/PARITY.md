@@ -41,9 +41,9 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 34 | Inbox with filters and actions | `inbox.tsx`, `lib/notification-actions.ts` | Pending |
 | 35 | Auto dividends on load | `data/auto-dividends.ts`, `lib/dividend-sync.ts` | Pending |
 | 36 | Push opt-in, token, test, tap routing | `push.ts`, `PushBridge.tsx` | Pending |
-| 37 | Appearance setting | `ThemeProvider.tsx` | Pending |
-| 38 | Signed-in devices | more.tsx | Pending |
-| 39 | Tax status | more.tsx, `portfolio-account.ts` | Pending |
+| 37 | Appearance setting | `ThemeProvider.tsx` | Done |
+| 38 | Signed-in devices | more.tsx | Done |
+| 39 | Tax status | more.tsx, `portfolio-account.ts` | Done |
 | 40 | AI usage | more.tsx | Pending |
 | 41 | Encrypted backup / readable export | `backup.ts`, `lib/vault-backup.ts` | Pending |
 | 42 | Lock now, sign out, delete account | more.tsx, `DeleteAccountSheet.tsx` | Partial (lock, sign out done; delete account in view model, UI pending) |

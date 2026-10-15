@@ -4,6 +4,8 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private const val NBSP = ' '
@@ -73,3 +75,11 @@ fun plural(
     one: String,
     many: String = "${one}s",
 ) = "$count ${if (count == 1) one else many}"
+
+/** "12 Oct 2026" for an ISO timestamp (`2026-10-12T08:00:00.000Z`) or date; the input when it cannot be read. */
+fun mediumDate(iso: String): String {
+    val date = iso.take(ISO_DATE_LENGTH)
+    return runCatching { LocalDate.parse(date).format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)) }.getOrDefault(iso)
+}
+
+private const val ISO_DATE_LENGTH = 10

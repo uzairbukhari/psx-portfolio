@@ -2,6 +2,7 @@ package app.sipwise
 
 import android.app.Application
 import app.sipwise.auth.GoogleSignIn
+import app.sipwise.data.Preferences
 import app.sipwise.data.SecureStorage
 import app.sipwise.data.SessionStore
 import app.sipwise.network.ApiClient
@@ -14,6 +15,7 @@ import kotlinx.serialization.json.JsonElement
 class AppContainer(app: Application) {
     val sessions = SessionStore(SecureStorage(app))
     val google = GoogleSignIn(app)
+    val preferences = Preferences(app)
 
     /** Set by the auth screen model: called when the server rejects the token. */
     @Volatile var onUnauthorized: () -> Unit = {}

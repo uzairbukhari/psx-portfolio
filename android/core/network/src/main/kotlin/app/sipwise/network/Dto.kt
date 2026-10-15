@@ -33,3 +33,15 @@ data class DeleteAccountRequest(
 data class DeleteAccountResponse(
     val deleted: Boolean = true,
 )
+
+@Serializable
+data class MobileSessionInfo(
+    val id: String,
+    val deviceName: String,
+    val platform: String = "",
+    val createdAt: String = "",
+    val lastSeenAt: String = "",
+)
+
+@Serializable
+data class MobileSessionsResponse(val sessions: List<MobileSessionInfo> = emptyList())

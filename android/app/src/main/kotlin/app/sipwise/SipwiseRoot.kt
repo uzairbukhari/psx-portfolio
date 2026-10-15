@@ -61,6 +61,7 @@ import app.sipwise.designsystem.Spacing
 import app.sipwise.ledger.LedgerAction
 import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.EntryKind
+import app.sipwise.network.MeResponse
 import app.sipwise.session.ConflictException
 import app.sipwise.ui.ActivityScreen
 import app.sipwise.ui.ActivityViewModel
@@ -77,6 +78,7 @@ import app.sipwise.ui.PlanViewModel
 import app.sipwise.ui.RecoverScreen
 import app.sipwise.ui.RecoveryKeyScreen
 import app.sipwise.ui.ScopeViewModel
+import app.sipwise.ui.SettingsViewModel
 import app.sipwise.ui.SignInScreen
 import app.sipwise.ui.TargetsScreen
 import app.sipwise.ui.TargetsViewModel
@@ -126,15 +128,16 @@ fun SipwiseRoot() {
     when (val current = state) {
         AuthState.Loading -> LoadingScreen()
         AuthState.SignedOut -> SignInScreen(message, onSignIn = auth::signIn)
-        is AuthState.SignedIn -> VaultGate(current.user.email, onSignOut = auth::signOut)
+        is AuthState.SignedIn -> VaultGate(current.user, onSignOut = auth::signOut)
     }
 }
 
 @Composable
 private fun VaultGate(
-    email: String,
+    user: MeResponse,
     onSignOut: () -> Unit,
 ) {
+    val email = user.email
     val app = LocalContext.current.applicationContext as Application
     val vault: VaultViewModel =
         viewModel(
@@ -159,7 +162,7 @@ private fun VaultGate(
             } else {
                 UnlockScreen(current.offline, busy, error, onUnlock = vault::unlock, onForgot = { recovering = true }, onSignOut = onSignOut)
             }
-        is VaultUi.Unlocked -> MainShell(current, onLock = vault::lock, onSignOut = onSignOut)
+        is VaultUi.Unlocked -> MainShell(current, user, onLock = vault::lock, onSignOut = onSignOut)
     }
 }
 
@@ -167,6 +170,7 @@ private fun VaultGate(
 @Composable
 private fun MainShell(
     unlocked: VaultUi.Unlocked,
+    user: MeResponse,
     onLock: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -200,6 +204,7 @@ private fun MainShell(
                             LedgerAction.BUYS -> context.getString(R.string.notice_buys, notice.ticker)
                             LedgerAction.BUDGET -> context.getString(R.string.notice_budget, notice.ticker)
                             LedgerAction.TARGETS -> context.getString(R.string.notice_targets)
+                            LedgerAction.TAX -> context.getString(R.string.notice_tax)
                             LedgerAction.CORRECTION -> context.getString(R.string.notice_correction, notice.ticker)
                         },
                     actionLabel = context.getString(R.string.entry_undo),
@@ -281,7 +286,11 @@ private fun MainShell(
                 TargetsScreen(targets, onDone = { nav.popBackStack() })
             }
             composable<Activity> { ActivityScreen(activity, onOpenEntry = { id -> nav.navigate(AddEntry(entryId = id)) }) }
-            composable<More> { MoreScreen(onLock, onSignOut) }
+            composable<More> {
+                val settings: SettingsViewModel =
+                    viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger) } })
+                MoreScreen(settings, user, onLock, onSignOut)
+            }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker
                 val company: CompanyViewModel =

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonObject
 
 /** What kind of change was saved, so the notice can say it in words. */
-enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET, TARGETS, CORRECTION }
+enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET, TARGETS, CORRECTION, TAX }
 
 /** Something the person just recorded, so the shell can say so and offer Undo. */
 data class LedgerNotice(val kind: EntryKind?, val ticker: String, val change: SavedChange, val action: LedgerAction = LedgerAction.ENTRY)
@@ -57,6 +57,18 @@ class Ledger(val engine: EngineClient, private val writer: LedgerWriter) {
         val change = writer.apply(portfolioId, op, params)
         _version.value += 1
         _notices.tryEmit(LedgerNotice(kind, ticker, change, action))
+    }
+
+    /** A change to the account as a whole, such as the tax status. */
+    suspend fun applyAccount(
+        op: String,
+        params: JsonObject,
+        label: String = "",
+        action: LedgerAction = LedgerAction.TAX,
+    ) {
+        val change = writer.applyAccount(op, params)
+        _version.value += 1
+        _notices.tryEmit(LedgerNotice(null, label, change, action))
     }
 
     suspend fun undo(change: SavedChange) {

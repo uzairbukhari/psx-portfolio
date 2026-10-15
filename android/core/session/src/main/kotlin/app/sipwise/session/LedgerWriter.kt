@@ -12,6 +12,7 @@ interface AccountStore {
     suspend fun save(
         next: String,
         expectedRevision: Int,
+        replaceAll: Boolean = false,
     ): Int
 }
 
@@ -23,11 +24,12 @@ fun VaultSession.asStore(): AccountStore =
         override suspend fun save(
             next: String,
             expectedRevision: Int,
-        ): Int = this@asStore.save(next, expectedRevision)
+            replaceAll: Boolean,
+        ): Int = this@asStore.save(next, expectedRevision, replaceAll)
     }
 
 /** What a successful change leaves behind, so the screen can offer Undo. */
-data class SavedChange(val revision: Int, val previousAccount: String)
+data class SavedChange(val revision: Int, val previousAccount: String, val replaceAll: Boolean = false)
 
 /**
  * Every ledger change goes through here: the shared TypeScript validates and builds the next account, the vault saves
@@ -45,16 +47,31 @@ class LedgerWriter(private val store: AccountStore, private val engine: EngineCl
         return commit(next)
     }
 
+    /**
+     * A change to the account as a whole (the tax status), written into every portfolio, locked ones too: it is a
+     * setting, not a ledger record, so it is saved as an explicit replace.
+     */
+    suspend fun applyAccount(
+        op: String,
+        params: JsonObject,
+    ): SavedChange {
+        val reply = engine.call("mutate.account", mapOf("op" to op, "params" to params.toString()))
+        val next = reply.jsonObject["account"]?.jsonPrimitive?.content ?: error("The engine returned no account.")
+        return commit(next, replaceAll = true)
+    }
+
     /** Puts the account back as it was before [change], failing with a conflict if something else saved in between. */
-    suspend fun undo(change: SavedChange): SavedChange = commit(change.previousAccount, expectedRevision = change.revision)
+    suspend fun undo(change: SavedChange): SavedChange =
+        commit(change.previousAccount, expectedRevision = change.revision, replaceAll = change.replaceAll)
 
     private suspend fun commit(
         next: String,
         expectedRevision: Int = store.revision,
+        replaceAll: Boolean = false,
     ): SavedChange {
         val previous = store.account
-        val revision = store.save(next, expectedRevision)
+        val revision = store.save(next, expectedRevision, replaceAll)
         engine.call("account.load", mapOf("json" to next))
-        return SavedChange(revision, previous)
+        return SavedChange(revision, previous, replaceAll)
     }
 }

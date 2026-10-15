@@ -8,6 +8,8 @@ import {
   assertAccountWritable,
   dashboardPortfolio,
   normalizeAccount,
+  accountTaxProfile,
+  setAccountFilerStatus,
   type PortfolioAccount,
 } from '../../../lib/portfolio-account.ts';
 import { openPositions, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
@@ -287,6 +289,21 @@ const handlers: Record<string, Handler> = {
   'scope.list': () => ({
     portfolios: requireAccount().portfolios.map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked), contents: contentsLabel(portfolioContents(x.portfolio)) })),
   }),
+
+  // Account-wide settings the Settings screen shows.
+  'settings.view': () => ({ filerStatus: accountTaxProfile(requireAccount())?.filerStatus ?? '' }),
+
+  // An account-level change (not tied to one portfolio). Returns the next account for the app to save.
+  'mutate.account': (args) => {
+    const params = typeof args.params === 'string' && args.params ? (JSON.parse(args.params) as Record<string, unknown>) : {};
+    const op = text(args, 'op');
+    if (op === 'tax') {
+      const status = params.filerStatus;
+      if (status !== 'filer' && status !== 'non-filer') throw new Error('Choose filer or non-filer.');
+      return { account: JSON.stringify(setAccountFilerStatus(requireAccount(), status)) };
+    }
+    throw new Error(`Unknown account change: ${op}`);
+  },
 
   // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.
   mutate: (args) => {

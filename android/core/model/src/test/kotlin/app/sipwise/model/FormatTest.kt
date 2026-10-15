@@ -47,4 +47,10 @@ class FormatTest {
         assertEquals("1 holding", plural(1, "holding"))
         assertEquals("2 holdings", plural(2, "holding"))
     }
+
+    @Test
+    fun `formats a timestamp as a medium date`() {
+        assertEquals("12 Oct 2026", mediumDate("2026-10-12T08:00:00.000Z"))
+        assertEquals("nonsense", mediumDate("nonsense"))
+    }
 }

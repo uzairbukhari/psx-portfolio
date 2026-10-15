@@ -226,6 +226,19 @@ test('scope.list names every portfolio and what it holds', async () => {
   assert.deepEqual(list.map((x) => x.contents), reference.portfolios.map((x) => contentsLabel(portfolioContents(x.portfolio))));
 });
 
+test('the tax status is read and changed for the whole account', () => {
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const before = run('settings.view').value.filerStatus;
+  const next = before === 'filer' ? 'non-filer' : 'filer';
+  const changed = run('mutate.account', { op: 'tax', params: JSON.stringify({ filerStatus: next }) });
+  assert.equal(changed.ok, true, changed.error);
+  const saved = JSON.parse(changed.value.account);
+  assert.ok(saved.portfolios.every((p) => p.portfolio.taxProfile.filerStatus === next));
+  assert.equal(run('mutate.account', { op: 'tax', params: JSON.stringify({ filerStatus: 'x' }) }).ok, false);
+  assert.equal(run('mutate.account', { op: 'nope' }).ok, false);
+});
+
 test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
   const { mutateAccount } = await import('../android/engine/src/mutate.ts');
   const account = seed();
