@@ -1,5 +1,6 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -28,6 +28,7 @@ import app.sipwise.model.ActivityFilter
 import app.sipwise.model.money
 import app.sipwise.model.shortDate
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActivityScreen(
     viewModel: ActivityViewModel,
