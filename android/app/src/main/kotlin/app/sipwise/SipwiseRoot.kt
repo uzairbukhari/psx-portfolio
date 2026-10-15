@@ -58,6 +58,7 @@ import androidx.navigation.toRoute
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
 import app.sipwise.designsystem.Spacing
+import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
 import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.EntryKind
@@ -168,6 +169,50 @@ private fun VaultGate(
     }
 }
 
+/** Shows the "Recorded ... Undo" snackbar for each change the ledger reports, and performs the undo. */
+@Composable
+private fun LedgerNotices(
+    ledger: Ledger,
+    snackbar: SnackbarHostState,
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    LaunchedEffect(ledger) {
+        ledger.notices.collect { notice ->
+            val kind = notice.kind?.let { context.getString(entryKindLabel(it)) } ?: ""
+            val result =
+                snackbar.showSnackbar(
+                    message =
+                        when (notice.action) {
+                            LedgerAction.ENTRY -> context.getString(R.string.entry_recorded, kind, notice.ticker)
+                            LedgerAction.PRICE -> context.getString(R.string.notice_price, notice.ticker)
+                            LedgerAction.RECEIVED -> context.getString(R.string.notice_received, notice.ticker)
+                            LedgerAction.VOID -> context.getString(R.string.notice_void, notice.ticker)
+                            LedgerAction.BUYS -> context.getString(R.string.notice_buys, notice.ticker)
+                            LedgerAction.BUDGET -> context.getString(R.string.notice_budget, notice.ticker)
+                            LedgerAction.TARGETS -> context.getString(R.string.notice_targets)
+                            LedgerAction.TAX -> context.getString(R.string.notice_tax)
+                            LedgerAction.CORRECTION -> context.getString(R.string.notice_correction, notice.ticker)
+                        },
+                    actionLabel = context.getString(R.string.entry_undo),
+                    duration = SnackbarDuration.Long,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                scope.launch {
+                    val message =
+                        try {
+                            ledger.undo(notice.change)
+                            context.getString(R.string.entry_undone)
+                        } catch (e: ConflictException) {
+                            e.message.orEmpty()
+                        }
+                    snackbar.showSnackbar(message)
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainShell(
@@ -193,40 +238,7 @@ private fun MainShell(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val api = (context.applicationContext as SipwiseApp).container.api
-    LaunchedEffect(unlocked.ledger) {
-        unlocked.ledger.notices.collect { notice ->
-            val kind = notice.kind?.let { context.getString(entryKindLabel(it)) } ?: ""
-            val result =
-                snackbar.showSnackbar(
-                    message =
-                        when (notice.action) {
-                            LedgerAction.ENTRY -> context.getString(R.string.entry_recorded, kind, notice.ticker)
-                            LedgerAction.PRICE -> context.getString(R.string.notice_price, notice.ticker)
-                            LedgerAction.RECEIVED -> context.getString(R.string.notice_received, notice.ticker)
-                            LedgerAction.VOID -> context.getString(R.string.notice_void, notice.ticker)
-                            LedgerAction.BUYS -> context.getString(R.string.notice_buys, notice.ticker)
-                            LedgerAction.BUDGET -> context.getString(R.string.notice_budget, notice.ticker)
-                            LedgerAction.TARGETS -> context.getString(R.string.notice_targets)
-                            LedgerAction.TAX -> context.getString(R.string.notice_tax)
-                            LedgerAction.CORRECTION -> context.getString(R.string.notice_correction, notice.ticker)
-                        },
-                    actionLabel = context.getString(R.string.entry_undo),
-                    duration = SnackbarDuration.Long,
-                )
-            if (result == SnackbarResult.ActionPerformed) {
-                scope.launch {
-                    val message =
-                        try {
-                            unlocked.ledger.undo(notice.change)
-                            context.getString(R.string.entry_undone)
-                        } catch (e: ConflictException) {
-                            e.message.orEmpty()
-                        }
-                    snackbar.showSnackbar(message)
-                }
-            }
-        }
-    }
+    LedgerNotices(unlocked.ledger, snackbar)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true

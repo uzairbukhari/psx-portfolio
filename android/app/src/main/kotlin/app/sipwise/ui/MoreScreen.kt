@@ -264,7 +264,6 @@ private fun DevicesCard(
 
 @Composable
 private fun UpdateCard(viewModel: UpdateViewModel = viewModel()) {
-
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
     Card {

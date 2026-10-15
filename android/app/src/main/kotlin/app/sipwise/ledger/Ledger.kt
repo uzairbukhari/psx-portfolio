@@ -99,26 +99,36 @@ class Ledger(
         lastPublicRefresh = now
         try {
             val wanted = ApiJson.decodeFromJsonElement(PublicWanted.serializer(), engine.call("public.wanted"))
-            if (wanted.tickers.isNotEmpty()) {
-                engine.call("public.reset")
-                for (part in wanted.tickers.chunked(MARKET_CHUNK)) {
-                    val reply = client.get("/api/public-data?tickers=${encode(part)}", JsonElement.serializer())
-                    engine.call("public.add", mapOf("json" to reply.toString()))
-                }
-            }
-            if (wanted.placeholders.isNotEmpty()) {
-                val found = mutableListOf<JsonElement>()
-                for (part in wanted.placeholders.chunked(LOOKUP_CHUNK)) {
-                    val reply = client.get("/api/companies?tickers=${encode(part)}", JsonObject.serializer())
-                    (reply["companies"] as? JsonArray)?.let { found += it }
-                }
-                engine.call("public.lookups", mapOf("json" to JsonArray(found).toString()))
-            }
+            if (wanted.tickers.isNotEmpty()) loadPrices(client, wanted.tickers)
+            if (wanted.placeholders.isNotEmpty()) loadLookups(client, wanted.placeholders)
             _version.value += 1
             syncDividends()
         } catch (ignored: ApiRequestException) {
             // Public data is optional; the ledger still shows what it has saved.
         }
+    }
+
+    private suspend fun loadPrices(
+        client: ApiClient,
+        tickers: List<String>,
+    ) {
+        engine.call("public.reset")
+        for (part in tickers.chunked(MARKET_CHUNK)) {
+            val reply = client.get("/api/public-data?tickers=${encode(part)}", JsonElement.serializer())
+            engine.call("public.add", mapOf("json" to reply.toString()))
+        }
+    }
+
+    private suspend fun loadLookups(
+        client: ApiClient,
+        tickers: List<String>,
+    ) {
+        val found = mutableListOf<JsonElement>()
+        for (part in tickers.chunked(LOOKUP_CHUNK)) {
+            val reply = client.get("/api/companies?tickers=${encode(part)}", JsonObject.serializer())
+            (reply["companies"] as? JsonArray)?.let { found += it }
+        }
+        engine.call("public.lookups", mapOf("json" to JsonArray(found).toString()))
     }
 
     private suspend fun syncDividends() {
