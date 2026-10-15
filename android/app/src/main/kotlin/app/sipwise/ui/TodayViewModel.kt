@@ -2,9 +2,9 @@ package app.sipwise.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sipwise.ledger.Ledger
 import app.sipwise.model.TodayView
 import app.sipwise.network.ApiJson
-import app.sipwise.session.EngineClient
 import app.sipwise.session.EngineException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,12 +18,12 @@ data class TodayUi(
 )
 
 /** The Today screen: every figure comes from the shared TypeScript; this only holds what is expanded. */
-class TodayViewModel(private val engine: EngineClient) : ViewModel() {
+class TodayViewModel(private val ledger: Ledger) : ViewModel() {
     private val _ui = MutableStateFlow(TodayUi())
     val ui: StateFlow<TodayUi> = _ui.asStateFlow()
 
     init {
-        load()
+        viewModelScope.launch { ledger.version.collect { load() } }
     }
 
     fun toggleReturn() {
@@ -33,7 +33,7 @@ class TodayViewModel(private val engine: EngineClient) : ViewModel() {
     fun load() {
         viewModelScope.launch {
             try {
-                val reply = engine.call("today.view", emptyMap())
+                val reply = ledger.engine.call("today.view", emptyMap())
                 _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(TodayView.serializer(), reply), error = null)
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)

@@ -111,4 +111,28 @@
     <string name="filter_split">Splits</string>
     <string name="activity_search">Search activity</string>
     <string name="activity_empty">Nothing matches.</string>
+
+    <string name="entry_title">Add entry</string>
+    <string name="entry_kind_buy">Buy</string>
+    <string name="entry_kind_sell">Sell</string>
+    <string name="entry_kind_opening">Opening balance</string>
+    <string name="entry_kind_dividend">Dividend</string>
+    <string name="entry_kind_split">Split</string>
+    <string name="entry_company">Company</string>
+    <string name="entry_date">Date (YYYY-MM-DD)</string>
+    <string name="entry_pick_date">Pick</string>
+    <string name="entry_date_ok">OK</string>
+    <string name="entry_cancel">Cancel</string>
+    <string name="entry_shares">Shares</string>
+    <string name="entry_price">Price per share</string>
+    <string name="entry_fees">Fees</string>
+    <string name="entry_per_share">Dividend per share</string>
+    <string name="entry_old_shares">Old shares</string>
+    <string name="entry_new_shares">New shares</string>
+    <string name="entry_note">Note (optional)</string>
+    <string name="entry_save">Save</string>
+    <string name="entry_saving">Saving…</string>
+    <string name="entry_recorded">%1$s recorded for %2$s</string>
+    <string name="entry_undo">Undo</string>
+    <string name="entry_undone">Undone. Your portfolio is back as it was.</string>
 </resources>

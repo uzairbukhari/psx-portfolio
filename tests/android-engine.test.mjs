@@ -100,3 +100,37 @@ test('the today and activity views match the Expo view-models', async () => {
     }
   }
 });
+
+test('ledger changes validate like the Expo screens and return the next account without loading it', async () => {
+  const { mutateAccount } = await import('../android/engine/src/mutate.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const portfolioId = account.portfolios[0].id;
+  const ticker = account.portfolios[0].portfolio.companies[0].ticker;
+  const before = run('holdings.view', { scope: portfolioId }).value;
+
+  const bad = run('mutate', { portfolio: portfolioId, op: 'trade', params: JSON.stringify({ ticker, kind: 'buy', date: '2026-10-01', shares: '1.5', price: '10' }) });
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /whole number of shares/);
+
+  const params = { ticker, kind: 'buy', date: '2026-10-01', shares: '10', price: '100', fees: '5', month: '2026-10', note: 'x' };
+  const good = run('mutate', { portfolio: portfolioId, op: 'trade', params: JSON.stringify(params) });
+  assert.equal(good.ok, true, good.error);
+  const next = JSON.parse(good.value.account);
+  const reference = mutateAccount(normalizeAccount(seed(), false), portfolioId, 'trade', params);
+  assert.equal(next.portfolios[0].portfolio.trades.length, reference.portfolios[0].portfolio.trades.length);
+  assert.equal(next.portfolios[0].portfolio.trades.length, account.portfolios[0].portfolio.trades.length + 1);
+  // The engine still shows the old ledger until the app saves and reloads.
+  assert.deepEqual(run('holdings.view', { scope: portfolioId }).value, before);
+  assert.equal(run('account.load', { json: good.value.account }).ok, true);
+
+  const price = run('mutate', { portfolio: portfolioId, op: 'price', params: JSON.stringify({ ticker, price: '123.45', date: today() }) });
+  assert.equal(price.ok, true, price.error);
+  const unknown = run('mutate', { portfolio: portfolioId, op: 'nope' });
+  assert.equal(unknown.ok, false);
+
+  const options = run('entry.options', { query: '' });
+  assert.equal(options.value.portfolios.length, account.portfolios.length);
+  assert.deepEqual(run('entry.totals', { kind: 'buy', shares: '10', price: '100', fees: '5' }).value, { gross: 1000, fees: 5, total: 1005, label: 'Total cost including fees' });
+  assert.equal(run('entry.totals', { kind: 'buy', shares: '', price: '100' }).value, null);
+});

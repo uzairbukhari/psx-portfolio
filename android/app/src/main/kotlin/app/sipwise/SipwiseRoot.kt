@@ -5,20 +5,28 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material.icons.outlined.Timeline
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,8 +47,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
+import app.sipwise.model.EntryKind
+import app.sipwise.session.ConflictException
 import app.sipwise.ui.ActivityScreen
 import app.sipwise.ui.ActivityViewModel
+import app.sipwise.ui.EntryScreen
+import app.sipwise.ui.EntryViewModel
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
 import app.sipwise.ui.LoadingScreen
@@ -55,6 +67,7 @@ import app.sipwise.ui.VaultFailedScreen
 import app.sipwise.ui.VaultSetupScreen
 import app.sipwise.vault.VaultUi
 import app.sipwise.vault.VaultViewModel
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 /** Type-safe top-level routes. The four destinations match the Expo app's tabs. */
@@ -67,6 +80,8 @@ import kotlinx.serialization.Serializable
 @Serializable object Activity
 
 @Serializable object More
+
+@Serializable object AddEntry
 
 private data class TopLevel(val route: Any, val label: Int, val icon: ImageVector)
 
@@ -133,14 +148,49 @@ private fun MainShell(
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val holdings: HoldingsViewModel =
-        viewModel(factory = viewModelFactory { initializer { HoldingsViewModel(unlocked.engine) } })
+        viewModel(factory = viewModelFactory { initializer { HoldingsViewModel(unlocked.ledger) } })
     val today: TodayViewModel =
-        viewModel(factory = viewModelFactory { initializer { TodayViewModel(unlocked.engine) } })
+        viewModel(factory = viewModelFactory { initializer { TodayViewModel(unlocked.ledger) } })
     val activity: ActivityViewModel =
-        viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.engine) } })
+        viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.ledger) } })
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    LaunchedEffect(unlocked.ledger) {
+        unlocked.ledger.notices.collect { notice ->
+            val kind = notice.kind?.let { context.getString(entryKindLabel(it)) } ?: ""
+            val result =
+                snackbar.showSnackbar(
+                    message = context.getString(R.string.entry_recorded, kind, notice.ticker),
+                    actionLabel = context.getString(R.string.entry_undo),
+                    duration = SnackbarDuration.Long,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                scope.launch {
+                    val message =
+                        try {
+                            unlocked.ledger.undo(notice.change)
+                            context.getString(R.string.entry_undone)
+                        } catch (e: ConflictException) {
+                            e.message.orEmpty()
+                        }
+                    snackbar.showSnackbar(message)
+                }
+            }
+        }
+    }
+    val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            if (!onAddScreen && entry?.destination?.hasRoute(More::class) != true) {
+                FloatingActionButton(onClick = { nav.navigate(AddEntry) }) {
+                    Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.entry_title))
+                }
+            }
+        },
         bottomBar = {
-            NavigationBar {
+            if (!onAddScreen) NavigationBar {
                 for (item in topLevel) {
                     NavigationBarItem(
                         selected = entry?.destination?.hasRoute(item.route::class) == true,
@@ -164,9 +214,23 @@ private fun MainShell(
             composable<Plan> { Placeholder(R.string.nav_plan) }
             composable<Activity> { ActivityScreen(activity) }
             composable<More> { MoreScreen(onLock, onSignOut) }
+            composable<AddEntry> {
+                val form: EntryViewModel =
+                    viewModel(factory = viewModelFactory { initializer { EntryViewModel(unlocked.ledger) } })
+                EntryScreen(form, onDone = { nav.popBackStack() })
+            }
         }
     }
 }
+
+private fun entryKindLabel(kind: EntryKind) =
+    when (kind) {
+        EntryKind.BUY -> R.string.entry_kind_buy
+        EntryKind.SELL -> R.string.entry_kind_sell
+        EntryKind.OPENING -> R.string.entry_kind_opening
+        EntryKind.DIVIDEND -> R.string.entry_kind_dividend
+        EntryKind.SPLIT -> R.string.entry_kind_split
+    }
 
 @Composable
 private fun Placeholder(title: Int) {

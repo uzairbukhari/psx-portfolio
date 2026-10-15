@@ -13,7 +13,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 6 | Privacy cover + 60 s relock | `app-active.ts`, `lock-policy.ts` | Partial (60 s relock + recents thumbnail off; cover pending) |
 | 7 | Offline ciphertext cache | `file-cache.ts` | Done |
 | 8 | Account load + public overlay | `usePortfolio.ts`, `lib/portfolio-view.ts` | Pending |
-| 9 | Revisioned save, conflict, undo | `usePortfolio.save`, Toast | Partial (save/conflict in `VaultSession`; Undo UI pending) |
+| 9 | Revisioned save, conflict, undo | `usePortfolio.save`, Toast | Done |
 | 10 | Portfolio selection (All / one), chooser sheet | `PortfolioSelection.tsx`, `PortfolioChooser.tsx` | Pending |
 | 11 | Today hero, return breakdown | `(tabs)/index.tsx`, `data/today.ts` | Partial (headline, return breakdown; net-worth overview pending) |
 | 12 | Next actions | `data/today.ts#nextActions` | Partial (shown; tapping an action pending) |
@@ -28,9 +28,9 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 21 | Insights report sections | `Insights.tsx`, `lib/portfolio-reports.ts` | Pending |
 | 22 | Company page, chart ranges | `company/[ticker].tsx`, `lib/price-history.ts` | Pending |
 | 23 | Company ledger + dividends tab | same | Pending |
-| 24 | Add/edit/void transaction (5 kinds) | `transaction.tsx`, `data/mutations.ts`, `entry-form.ts` | Pending |
+| 24 | Add/edit/void transaction (5 kinds) | `transaction.tsx`, `data/mutations.ts`, `entry-form.ts` | Partial (add buy, sell, opening, dividend, split with Undo; edit and void pending) |
 | 25 | New company confirmed via PSX | transaction.tsx | Pending |
-| 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Pending |
+| 26 | Date and month pickers | `DatePicker.tsx`, `MonthPicker.tsx` | Partial (date picker on the entry form; month picker pending) |
 | 27 | Manual price | `quote.tsx` | Pending |
 | 28 | Mark dividend received | `received.tsx` | Pending |
 | 29 | Targets editor | `targets.tsx`, `lib/targets.ts` | Pending |

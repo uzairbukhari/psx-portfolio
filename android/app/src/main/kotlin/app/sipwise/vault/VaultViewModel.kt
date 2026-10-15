@@ -7,14 +7,17 @@ import app.sipwise.SipwiseApp
 import app.sipwise.data.FileVaultCache
 import app.sipwise.engine.EngineUnavailableException
 import app.sipwise.engine.JsEngineBridge
+import app.sipwise.ledger.Ledger
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineAccountRules
 import app.sipwise.session.EngineClient
+import app.sipwise.session.LedgerWriter
 import app.sipwise.session.PreparedVault
 import app.sipwise.session.UnlockSecret
 import app.sipwise.session.VaultSession
 import app.sipwise.session.VaultStatus
+import app.sipwise.session.asStore
 import app.sipwise.session.loadVaultStatus
 import app.sipwise.session.prepareVault
 import app.sipwise.session.recoverWithKey
@@ -38,7 +41,7 @@ sealed interface VaultUi {
 
     data class Locked(val offline: Boolean) : VaultUi
 
-    data class Unlocked(val session: VaultSession, val engine: EngineClient) : VaultUi
+    data class Unlocked(val session: VaultSession, val ledger: Ledger) : VaultUi
 }
 
 /** One signed-in account's vault: set up, unlock, recover, lock. Mirrors VaultProvider.tsx. */
@@ -148,7 +151,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         val engine = engine()
         engine.call("account.load", mapOf("json" to session.account))
         session.onLock { dropEngine() }
-        _ui.value = VaultUi.Unlocked(session, engine)
+        _ui.value = VaultUi.Unlocked(session, Ledger(engine, LedgerWriter(session.asStore(), engine)))
     }
 
     private fun dropEngine() {

@@ -15,6 +15,8 @@ import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type H
 import { today } from '../../../lib/portfolio.ts';
 import { activityEntries } from '../../../mobile/src/data/derive.ts';
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
+import { mutateAccount } from './mutate.ts';
+import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-form.ts';
 import { currentMonth } from '../../../mobile/src/data/sip.ts';
 import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
 
@@ -122,6 +124,35 @@ const handlers: Record<string, Handler> = {
     const query = typeof args.query === 'string' ? args.query : '';
     const entries = filterActivity(activityEntries(dashboardPortfolio(requireAccount(), scope)), filter, query);
     return { count: entries.length, sections: groupByMonth(entries) };
+  },
+
+  // A ledger change. Returns the next account as JSON for the app to save; the loaded account stays untouched.
+  mutate: (args) => {
+    const params = typeof args.params === 'string' && args.params ? (JSON.parse(args.params) as Record<string, unknown>) : {};
+    const next = mutateAccount(requireAccount(), text(args, 'portfolio'), text(args, 'op'), params);
+    return { account: JSON.stringify(next) };
+  },
+
+  // What the entry form offers: writable portfolios, companies to pick from, and today's date.
+  'entry.options': (args) => {
+    const account = requireAccount();
+    const query = typeof args.query === 'string' ? args.query : '';
+    return {
+      today: today(),
+      month: currentMonth(),
+      portfolios: account.portfolios.map((p) => ({
+        id: p.id,
+        name: p.name,
+        locked: Boolean(p.locked),
+        companies: filterCompanies(p.portfolio.companies, query).map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })),
+      })),
+    };
+  },
+
+  // Live totals under the form: "Total cost including fees" and so on.
+  'entry.totals': (args) => {
+    const n = (key: string) => (typeof args[key] === 'string' && args[key] !== '' ? Number(args[key]) : null);
+    return tradeTotals(text(args, 'kind') as 'buy' | 'sell' | 'opening', n('shares'), n('price'), n('fees'));
   },
 };
 
