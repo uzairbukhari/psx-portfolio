@@ -38,7 +38,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import app.sipwise.BuildConfig
 import app.sipwise.R
 import app.sipwise.data.Appearance
@@ -69,6 +68,7 @@ fun MoreScreen(
     onSignOut: () -> Unit,
     onAccountDeleted: () -> Unit,
     onManagePortfolios: () -> Unit,
+    updates: UpdateViewModel,
 ) {
     val ui by settings.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -115,7 +115,7 @@ fun MoreScreen(
         DevicesCard(ui, settings)
         DataCard(settings)
         DeleteCard(user, ui, settings, onAccountDeleted)
-        UpdateCard()
+        UpdateCard(updates, includePrereleases = user.role == "super_admin")
         Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lock_now)) }
         OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sign_out)) }
     }
@@ -267,7 +267,10 @@ private fun DevicesCard(
 }
 
 @Composable
-private fun UpdateCard(viewModel: UpdateViewModel = viewModel()) {
+private fun UpdateCard(
+    viewModel: UpdateViewModel,
+    includePrereleases: Boolean,
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
     SipwiseCard(Modifier.fillMaxWidth()) {
@@ -278,7 +281,7 @@ private fun UpdateCard(viewModel: UpdateViewModel = viewModel()) {
                 UpdateUi.Idle, UpdateUi.UpToDate, is UpdateUi.Failed -> {
                     if (current is UpdateUi.UpToDate) Text(stringResource(R.string.update_up_to_date))
                     if (current is UpdateUi.Failed) Text(current.message, color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = viewModel::check) { Text(stringResource(R.string.update_check)) }
+                    OutlinedButton(onClick = { viewModel.check(includePrereleases) }) { Text(stringResource(R.string.update_check)) }
                 }
                 UpdateUi.Checking -> Text(stringResource(R.string.update_checking))
                 is UpdateUi.Available -> {
