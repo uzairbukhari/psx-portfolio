@@ -76,7 +76,8 @@ android {
             val api = providers.gradleProperty("apiBaseUrl").orElse("").get()
             buildConfigField("String", "API_BASE_URL", "\"$api\"")
             buildConfigField("boolean", "INCLUDE_PRERELEASES", "false")
-            buildConfigField("boolean", "SIGN_IN_DETAIL", "false")
+            // Temporarily on while the production Google sign-in client is being set up; switch back to false afterwards.
+            buildConfigField("boolean", "SIGN_IN_DETAIL", "true")
         }
     }
 
