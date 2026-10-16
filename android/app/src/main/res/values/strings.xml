@@ -508,7 +508,7 @@
     <string name="today_move_gainer">Top gainer</string>
     <string name="today_move_loser">Top loser</string>
     <string name="today_move_none">None today</string>
-    <string name="today_move_partial">Based on %1$d of %2$d holdings with a previous close.</string>
+    <string name="today_move_partial">Holdings with a previous close: %1$d / %2$d</string>
     <string name="today_value_title">Value over time</string>
     <string name="today_upcoming_title">Upcoming dividends</string>
     <string name="today_upcoming_closure">Book closure %1$s</string>
