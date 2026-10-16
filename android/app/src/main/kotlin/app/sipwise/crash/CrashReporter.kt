@@ -162,6 +162,8 @@ class CrashReporter(private val context: Context) {
     /** Every kept report, newest first, in full; null when nothing has gone wrong since the reports were cleared. */
     fun fullText(): String? = files().takeIf { it.isNotEmpty() }?.joinToString("\n\n=====\n\n") { it.readText() }
 
+    fun count(): Int = files().size
+
     /** The same reports without their stack frames: one short block each, newest first. */
     fun preview(): String? =
         files().takeIf { it.isNotEmpty() }?.joinToString("\n\n") { file ->

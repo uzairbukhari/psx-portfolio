@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,9 +52,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -270,9 +274,26 @@ private fun VaultGate(
             }
         is VaultUi.Unlocked ->
             PrivacyCover {
-                MainShell(current, vault, user, onLock = { vault.lock() }, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
+                SessionViewModels(vault.sessionStore) {
+                    MainShell(current, vault, user, onLock = { vault.lock() }, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
+                }
             }
     }
+}
+
+/** Gives every screen of one unlocked session the view models of that unlock only (see [VaultViewModel.sessionStore]). */
+@Composable
+private fun SessionViewModels(
+    store: ViewModelStore,
+    content: @Composable () -> Unit,
+) {
+    val owner =
+        remember(store) {
+            object : ViewModelStoreOwner {
+                override val viewModelStore = store
+            }
+        }
+    CompositionLocalProvider(LocalViewModelStoreOwner provides owner) { content() }
 }
 
 /** Covers the portfolio the moment the app leaves the foreground, so the recents thumbnail never shows it. */

@@ -1,5 +1,8 @@
 package app.sipwise.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,7 +76,6 @@ fun MoreScreen(
 ) {
     val ui by settings.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    LaunchedEffect(settings) { settings.shares.collect { ShareFiles.share(context, it.title, it.text) } }
     DisposableEffect(Unit) { onDispose { ShareFiles.clear(context) } }
     val appearance by settings.appearance.collectAsStateWithLifecycle()
     Column(
@@ -115,7 +117,6 @@ fun MoreScreen(
         AnalyticsCard()
         UsageCard()
         DevicesCard(ui, settings)
-        DataCard(settings)
         DeleteCard(user, ui, settings, onAccountDeleted)
         UpdateCard(updates, includePrereleases = user.role == "super_admin")
         Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lock_now)) }
@@ -162,34 +163,38 @@ internal fun SectionCard(
     }
 }
 
-/** The newest crash report, so a crash can be read and sent instead of described from memory. Shown only after a crash. */
+/** Recent crash reports, folded away until opened, so a crash can be copied and pasted instead of described. Shown only after one. */
 @Composable
 private fun CrashCard() {
     val context = LocalContext.current
     val crashes = (context.applicationContext as SipwiseApp).container.crashes
     var report by remember { mutableStateOf(crashes.preview()) }
+    var open by remember { mutableStateOf(false) }
+    var copied by remember { mutableStateOf(false) }
     val text = report ?: return
     SectionCard(R.string.settings_crash_title) {
         Text(stringResource(R.string.settings_crash_note), style = MaterialTheme.typography.bodySmall)
-        Text(text, style = MaterialTheme.typography.bodySmall)
+        TextButton(onClick = { open = !open }) {
+            val count = crashes.count()
+            Text(pluralStringResource(R.plurals.settings_crash_count, count, count))
+            Text(" · " + stringResource(if (open) R.string.settings_crash_hide else R.string.settings_crash_show))
+        }
+        if (open) Text(text, style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Button(
+                onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Sipwise crash report", crashes.fullText().orEmpty()))
+                    copied = true
+                },
+            ) { Text(stringResource(if (copied) R.string.settings_crash_copied else R.string.settings_crash_copy)) }
             OutlinedButton(onClick = { ShareFiles.share(context, "sipwise-crash.txt", crashes.fullText().orEmpty()) }) { Text(stringResource(R.string.settings_crash_share)) }
-            OutlinedButton(
+            TextButton(
                 onClick = {
                     crashes.clear()
                     report = null
                 },
             ) { Text(stringResource(R.string.settings_crash_clear)) }
-        }
-    }
-}
-
-@Composable
-private fun DataCard(settings: SettingsViewModel) {
-    SectionCard(R.string.settings_data) {
-        Text(stringResource(R.string.settings_backup_note), style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = settings::exportEncrypted, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.settings_backup_encrypted))
         }
     }
 }
@@ -305,13 +310,13 @@ private fun UpdateCard(
                 UpdateUi.Idle, UpdateUi.UpToDate, is UpdateUi.Failed -> {
                     if (current is UpdateUi.UpToDate) Text(stringResource(R.string.update_up_to_date))
                     if (current is UpdateUi.Failed) Text(current.message, color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = { viewModel.check(includePrereleases) }) { Text(stringResource(R.string.update_check)) }
+                    OutlinedButton(onClick = { viewModel.check(includePrereleases) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.update_check)) }
                 }
                 UpdateUi.Checking -> Text(stringResource(R.string.update_checking))
                 is UpdateUi.Available -> {
                     Text(stringResource(R.string.update_available, current.update.version))
                     if (current.update.notes.isNotBlank()) Text(current.update.notes, style = MaterialTheme.typography.bodySmall)
-                    Button(onClick = { viewModel.install(current.update) }) { Text(stringResource(R.string.update_install)) }
+                    Button(onClick = { viewModel.install(current.update) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.update_install)) }
                 }
                 is UpdateUi.Downloading -> {
                     Text(stringResource(R.string.update_downloading))
@@ -319,7 +324,7 @@ private fun UpdateCard(
                 }
                 is UpdateUi.NeedsPermission -> {
                     Text(stringResource(R.string.update_permission))
-                    Button(onClick = { context.startActivity(viewModel.permissionIntent()) }) { Text(stringResource(R.string.update_open_settings)) }
+                    Button(onClick = { context.startActivity(viewModel.permissionIntent()) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.update_open_settings)) }
                 }
             }
         }
