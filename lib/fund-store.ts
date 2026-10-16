@@ -51,7 +51,7 @@ export async function readFundCatalog(
       .all<CatalogRow>(),
     db
       .prepare(
-        'SELECT n.mufap_id,n.date,n.nav,n.offer,n.repurchase,n.fetched_at FROM fund_navs n JOIN (SELECT mufap_id, MAX(date) AS d FROM fund_navs GROUP BY mufap_id) m ON m.mufap_id=n.mufap_id AND m.d=n.date',
+        'SELECT n.mufap_id,n.date,n.nav,n.offer,n.repurchase,n.fetched_at FROM tracked_funds t JOIN fund_navs n ON n.mufap_id=t.mufap_id AND n.date=(SELECT MAX(date) FROM fund_navs WHERE mufap_id=t.mufap_id)',
       )
       .all<NavRow>(),
   ]);
