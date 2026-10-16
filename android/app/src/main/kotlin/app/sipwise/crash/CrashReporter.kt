@@ -4,6 +4,8 @@ import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
 import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.core.content.edit
 import app.sipwise.BuildConfig
 import app.sipwise.analytics.Analytics
 import app.sipwise.network.Events
@@ -24,7 +26,8 @@ private const val MAX_TRACE_LINES = 40
 private const val KB_PER_MB = 1024
 
 /** Only the endings that point at a fault; a normal exit, a swipe away or a permission change is not a crash. */
-private val SYSTEM_EXITS =
+@RequiresApi(Build.VERSION_CODES.R)
+private fun systemExits() =
     setOf(
         ApplicationExitInfo.REASON_CRASH_NATIVE,
         ApplicationExitInfo.REASON_ANR,
@@ -54,7 +57,7 @@ class CrashReporter(private val context: Context) {
             previous?.uncaughtException(thread, error)
         }
         EngineFailures.sink = { where, error -> handled(where, error) }
-        Thread { runCatching { recordSystemExits() } }.start()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Thread { runCatching { recordSystemExits() } }.start()
     }
 
     /** A failure the app survived (a screen that could not read its data, the engine stopping); kept so it can be read in More. */
@@ -74,13 +77,13 @@ class CrashReporter(private val context: Context) {
      * Android's own record of how the last runs of the app ended. A Java crash is already written above; this adds the ones
      * that leave no exception behind (native crash, out of memory, the system stopping a stuck app), with Android's wording.
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun recordSystemExits() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val seen = state.getLong(LAST_EXIT, 0L)
         val exits = manager.getHistoricalProcessExitReasons(context.packageName, 0, EXIT_LOOKBACK).filter { it.timestamp > seen }
         for (exit in exits.sortedBy { it.timestamp }) {
-            if (exit.reason !in SYSTEM_EXITS) continue
+            if (exit.reason !in systemExits()) continue
             dir.mkdirs()
             val trace = if (exit.reason == ApplicationExitInfo.REASON_CRASH_NATIVE) exit.traceInputStream?.bufferedReader()?.useLines { it.take(MAX_TRACE_LINES).toList() }.orEmpty() else emptyList()
             val text =
@@ -96,10 +99,11 @@ class CrashReporter(private val context: Context) {
                 }
             File(dir, "crash-${exit.timestamp}-exit.txt").writeText(text)
         }
-        exits.maxOfOrNull { it.timestamp }?.let { state.edit().putLong(LAST_EXIT, it).apply() }
+        exits.maxOfOrNull { it.timestamp }?.let { state.edit { putLong(LAST_EXIT, it) } }
         prune()
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun exitName(reason: Int) =
         when (reason) {
             ApplicationExitInfo.REASON_CRASH_NATIVE -> "native crash"
