@@ -96,7 +96,12 @@ jobs:
             merge_ref "$EXTRA_REF" FETCH_HEAD || { echo "::error::$EXTRA_REF conflicts with staging."; exit 1; }
           fi
 
-          git push origin staging
+          # A reset recreates staging from main, so the old tip is not an ancestor; replace it, but only if nobody pushed since.
+          if [ "$RESET" = "true" ]; then
+            git push --force-with-lease=staging origin staging
+          else
+            git push origin staging
+          fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   check:
