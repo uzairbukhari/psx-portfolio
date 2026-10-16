@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonNull
 
 data class TodayUi(
@@ -81,6 +82,8 @@ class TodayViewModel(
                 if (view.hasStocks && !view.firstUse) loadHistory()
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
+            } catch (e: SerializationException) {
+                _ui.value = _ui.value.copy(error = e.javaClass.simpleName)
             }
         }
     }
@@ -103,8 +106,8 @@ class TodayViewModel(
                         _ui.value = _ui.value.copy(move = null, track = null, historyFailed = false)
                         return@launch
                     }
-                    val move = ledger.view("today.move", mapOf("histories" to closes))
-                    val track = ledger.view("track.view", mapOf("range" to _ui.value.range.key, "histories" to closes))
+                    val move = ledger.view("today.move", mapOf("histories" to closes.recent))
+                    val track = ledger.view("track.view", mapOf("range" to _ui.value.range.key, "histories" to closes.full))
                     _ui.value =
                         _ui.value.copy(
                             move = ApiJson.decodeFromJsonElement(DayMove.serializer(), move),
@@ -114,6 +117,8 @@ class TodayViewModel(
                 } catch (ignored: EngineException) {
                     _ui.value = _ui.value.copy(historyFailed = true)
                 } catch (ignored: ApiRequestException) {
+                    _ui.value = _ui.value.copy(historyFailed = true)
+                } catch (ignored: SerializationException) {
                     _ui.value = _ui.value.copy(historyFailed = true)
                 }
             }
@@ -130,6 +135,8 @@ class TodayViewModel(
                     assets = ApiJson.decodeFromJsonElement(AssetsView.serializer(), assets),
                 )
         } catch (ignored: EngineException) {
+            _ui.value = _ui.value.copy(overview = null, assets = AssetsView())
+        } catch (ignored: SerializationException) {
             _ui.value = _ui.value.copy(overview = null, assets = AssetsView())
         }
     }

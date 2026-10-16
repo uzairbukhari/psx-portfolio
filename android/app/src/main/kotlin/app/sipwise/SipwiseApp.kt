@@ -3,6 +3,7 @@ package app.sipwise
 import android.app.Application
 import app.sipwise.analytics.Analytics
 import app.sipwise.auth.GoogleSignIn
+import app.sipwise.crash.CrashReporter
 import app.sipwise.data.BiometricVault
 import app.sipwise.data.Preferences
 import app.sipwise.data.SecureStorage
@@ -37,6 +38,7 @@ class AppContainer(private val app: Application) {
     val vaultTransport: VaultTransport = ApiVaultTransport(api)
     val push = PushRegistrar(app, api)
     val analytics = Analytics(api, preferences)
+    val crashes = CrashReporter(app)
 
     /** A link or notification tap waiting for the unlocked app to open it. Cleared once handled. */
     val pendingLink = MutableStateFlow<DeepLinkTarget?>(null)
@@ -66,6 +68,7 @@ class SipwiseApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.crashes.install()
         ensureNotificationChannel(this)
     }
 }

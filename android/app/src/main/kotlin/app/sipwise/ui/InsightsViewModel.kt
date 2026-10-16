@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerializationException
 
 data class InsightsUi(
     val report: InsightsView? = null,
@@ -46,6 +47,8 @@ class InsightsViewModel(
             _ui.value = _ui.value.copy(report = report, error = null)
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)
+        } catch (e: SerializationException) {
+            _ui.value = _ui.value.copy(error = e.javaClass.simpleName)
         }
         loadTrack()
     }
@@ -70,13 +73,15 @@ class InsightsViewModel(
                         _ui.value = _ui.value.copy(trackEmpty = true, track = null, trackLoading = false)
                         return@launch
                     }
-                    val args = mapOf("range" to _ui.value.range.key, "histories" to closes)
+                    val args = mapOf("range" to _ui.value.range.key, "histories" to closes.full)
                     val track = ApiJson.decodeFromJsonElement(TrackView.serializer(), ledger.view("track.view", args))
                     _ui.value = _ui.value.copy(track = track, trackEmpty = false, trackLoading = false)
                 } catch (e: EngineException) {
                     _ui.value = _ui.value.copy(trackLoading = false, trackError = e.message)
                 } catch (e: ApiRequestException) {
                     _ui.value = _ui.value.copy(trackLoading = false, trackError = e.message)
+                } catch (e: SerializationException) {
+                    _ui.value = _ui.value.copy(trackLoading = false, trackError = e.javaClass.simpleName)
                 }
             }
     }

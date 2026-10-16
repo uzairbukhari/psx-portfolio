@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.BuildConfig
 import app.sipwise.R
+import app.sipwise.SipwiseApp
 import app.sipwise.data.Appearance
 import app.sipwise.data.ShareFiles
 import app.sipwise.designsystem.BrandColors
@@ -114,6 +115,7 @@ fun MoreScreen(
         UsageCard()
         DevicesCard(ui, settings)
         DataCard(settings)
+        CrashCard()
         DeleteCard(user, ui, settings, onAccountDeleted)
         UpdateCard(updates, includePrereleases = user.role == "super_admin")
         Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lock_now)) }
@@ -159,6 +161,30 @@ internal fun SectionCard(
         }
     }
 }
+
+/** The newest crash report, so a crash can be read and sent instead of described from memory. Shown only after a crash. */
+@Composable
+private fun CrashCard() {
+    val context = LocalContext.current
+    val crashes = (context.applicationContext as SipwiseApp).container.crashes
+    var report by remember { mutableStateOf(crashes.latest()) }
+    val text = report ?: return
+    SectionCard(R.string.settings_crash_title) {
+        Text(stringResource(R.string.settings_crash_note), style = MaterialTheme.typography.bodySmall)
+        Text(text.lineSequence().take(CRASH_PREVIEW_LINES).joinToString("\n"), style = MaterialTheme.typography.bodySmall, maxLines = CRASH_PREVIEW_LINES)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            OutlinedButton(onClick = { ShareFiles.share(context, "sipwise-crash.txt", text) }) { Text(stringResource(R.string.settings_crash_share)) }
+            OutlinedButton(
+                onClick = {
+                    crashes.clear()
+                    report = null
+                },
+            ) { Text(stringResource(R.string.settings_crash_clear)) }
+        }
+    }
+}
+
+private const val CRASH_PREVIEW_LINES = 6
 
 @Composable
 private fun DataCard(settings: SettingsViewModel) {

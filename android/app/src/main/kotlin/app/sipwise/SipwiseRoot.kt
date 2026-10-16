@@ -391,8 +391,16 @@ private fun MainShell(
         link?.let { nav.navigate(routeFor(it)) { launchSingleTop = true } }
         container.pendingLink.value = null
     }
-    LaunchedEffect(Unit) { analytics.track(Events.APP_OPENED) }
-    LaunchedEffect(entry?.destination?.route) { screenName(entry?.destination)?.let { analytics.track(Events.SCREEN_VIEWED, "screen" to it) } }
+    LaunchedEffect(Unit) {
+        analytics.track(Events.APP_OPENED)
+        container.crashes.reportPending(analytics)
+    }
+    LaunchedEffect(entry?.destination?.route) {
+        screenName(entry?.destination)?.let {
+            container.crashes.screen = it
+            analytics.track(Events.SCREEN_VIEWED, "screen" to it)
+        }
+    }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
