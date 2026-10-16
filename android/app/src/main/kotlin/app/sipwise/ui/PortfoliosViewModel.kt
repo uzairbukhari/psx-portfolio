@@ -7,11 +7,11 @@ import app.sipwise.ledger.LedgerAction
 import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.ScopeList
 import app.sipwise.model.ScopePortfolio
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +39,7 @@ class PortfoliosViewModel(private val ledger: Ledger) : ViewModel() {
 
     private suspend fun load() {
         try {
-            val list = ApiJson.decodeFromJsonElement(ScopeList.serializer(), ledger.engine.call("scope.list")).portfolios
+            val list = decodeView(ScopeList.serializer(), ledger.engine.call("scope.list")).portfolios
             _ui.value = _ui.value.copy(portfolios = list)
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)

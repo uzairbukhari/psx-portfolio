@@ -1,6 +1,7 @@
 package app.sipwise.session
 
 import app.sipwise.network.ApiJson
+import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -32,6 +33,34 @@ class EngineDiedException(
     cause: Throwable? = null,
 ) : EngineException(message, cause)
 
+/** Where failures the app survives are noted so they can be read later (More > Crash report). Set once by the app. */
+object EngineFailures {
+    @Volatile var sink: (where: String, error: Throwable) -> Unit = { _, _ -> }
+
+    fun report(
+        where: String,
+        error: Throwable,
+    ) {
+        runCatching { sink(where, error) }
+    }
+}
+
+/**
+ * Reads an engine reply into [serializer]'s type. A reply the screen cannot read becomes an [EngineException] (the
+ * screens already handle those) instead of an uncaught decoding error that would close the app.
+ */
+fun <T> decodeView(
+    serializer: DeserializationStrategy<T>,
+    element: JsonElement,
+): T =
+    try {
+        ApiJson.decodeFromJsonElement(serializer, element)
+    } catch (e: IllegalArgumentException) {
+        val name = serializer.descriptor.serialName.substringAfterLast('.')
+        EngineFailures.report("decode:$name", e)
+        throw EngineException("This screen could not read its data ($name). Please report it from More.", e)
+    }
+
 /** Typed access to the engine's `{ ok, value | error }` replies (android/engine/src/handlers.ts). */
 class EngineClient(
     private val bridge: EngineBridge,
@@ -46,7 +75,11 @@ class EngineClient(
             try {
                 bridge.call(name, argsJson)
             } catch (e: EngineDiedException) {
+                EngineFailures.report("engine-died:$name", e)
                 onDied()
+                throw e
+            } catch (e: EngineException) {
+                EngineFailures.report("engine:$name", e)
                 throw e
             }
         val reply = ApiJson.parseToJsonElement(raw).jsonObject

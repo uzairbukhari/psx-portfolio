@@ -68,7 +68,9 @@ data class TreemapCell(
     val y: Float,
     val width: Float,
     val height: Float,
-)
+) {
+    fun isFinite() = x.isFinite() && y.isFinite() && width.isFinite() && height.isFinite()
+}
 
 /**
  * Slice-and-dice treemap: weights in the order given (largest first reads best), split into two halves of near-equal
@@ -79,7 +81,7 @@ fun treemap(
     width: Float,
     height: Float,
 ): List<TreemapCell> {
-    val items = weights.mapIndexed { i, w -> i to w }.filter { it.second > 0 }
+    val items = weights.mapIndexed { i, w -> i to w }.filter { it.second > 0 && it.second.isFinite() }
     val out = mutableListOf<TreemapCell>()
     layout(items, 0f, 0f, width, height, out)
     return out

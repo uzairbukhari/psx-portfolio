@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import app.sipwise.ledger.Ledger
 import app.sipwise.model.ActivityFilter
 import app.sipwise.model.ActivityView
-import app.sipwise.network.ApiJson
 import app.sipwise.session.EngineException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +47,7 @@ class ActivityViewModel(private val ledger: Ledger) : ViewModel() {
                 val current = _ui.value
                 try {
                     val reply = ledger.view("activity.view", mapOf("filter" to current.filter.wire, "query" to current.query))
-                    _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(ActivityView.serializer(), reply), error = null)
+                    _ui.value = _ui.value.copy(view = decodeView(ActivityView.serializer(), reply), error = null)
                 } catch (e: EngineException) {
                     _ui.value = _ui.value.copy(error = e.message)
                 }

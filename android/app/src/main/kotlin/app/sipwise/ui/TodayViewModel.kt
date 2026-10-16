@@ -10,9 +10,9 @@ import app.sipwise.model.TodayView
 import app.sipwise.model.TrackRange
 import app.sipwise.model.TrackView
 import app.sipwise.network.ApiClient
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.EngineException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,7 +76,7 @@ class TodayViewModel(
         viewModelScope.launch {
             try {
                 val reply = ledger.view("today.view")
-                val view = ApiJson.decodeFromJsonElement(TodayView.serializer(), reply)
+                val view = decodeView(TodayView.serializer(), reply)
                 _ui.value = _ui.value.copy(view = view, error = null)
                 if (view.hasAssets) loadAssets() else _ui.value = _ui.value.copy(overview = null, assets = AssetsView())
                 if (view.hasStocks && !view.firstUse) loadHistory()
@@ -110,8 +110,8 @@ class TodayViewModel(
                     val track = ledger.view("track.view", mapOf("range" to _ui.value.range.key, "histories" to closes.full))
                     _ui.value =
                         _ui.value.copy(
-                            move = ApiJson.decodeFromJsonElement(DayMove.serializer(), move),
-                            track = ApiJson.decodeFromJsonElement(TrackView.serializer(), track),
+                            move = decodeView(DayMove.serializer(), move),
+                            track = decodeView(TrackView.serializer(), track),
                             historyFailed = false,
                         )
                 } catch (ignored: EngineException) {
@@ -131,8 +131,8 @@ class TodayViewModel(
             val assets = ledger.view("assets.view")
             _ui.value =
                 _ui.value.copy(
-                    overview = if (overview is JsonNull) null else ApiJson.decodeFromJsonElement(AccountOverview.serializer(), overview),
-                    assets = ApiJson.decodeFromJsonElement(AssetsView.serializer(), assets),
+                    overview = if (overview is JsonNull) null else decodeView(AccountOverview.serializer(), overview),
+                    assets = decodeView(AssetsView.serializer(), assets),
                 )
         } catch (ignored: EngineException) {
             _ui.value = _ui.value.copy(overview = null, assets = AssetsView())

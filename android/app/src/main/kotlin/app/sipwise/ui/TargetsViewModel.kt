@@ -14,6 +14,7 @@ import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,7 +45,7 @@ class TargetsViewModel(private val ledger: Ledger) : ViewModel() {
     init {
         viewModelScope.launch {
             try {
-                val view = ApiJson.decodeFromJsonElement(TargetsView.serializer(), ledger.engine.call("targets.view"))
+                val view = decodeView(TargetsView.serializer(), ledger.engine.call("targets.view"))
                 _ui.value = _ui.value.copy(view = view, rows = view.rows)
                 evaluate()
             } catch (e: EngineException) {
@@ -62,7 +63,7 @@ class TargetsViewModel(private val ledger: Ledger) : ViewModel() {
         val rows = _ui.value.rows
         try {
             val args = mapOf("rows" to ApiJson.encodeToString(ListSerializer(TargetDraft.serializer()), rows))
-            val eval = ApiJson.decodeFromJsonElement(TargetsEval.serializer(), ledger.engine.call("targets.eval", args))
+            val eval = decodeView(TargetsEval.serializer(), ledger.engine.call("targets.eval", args))
             _ui.value = _ui.value.copy(eval = eval)
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)
@@ -91,7 +92,7 @@ class TargetsViewModel(private val ledger: Ledger) : ViewModel() {
             val rows = _ui.value.rows
             try {
                 val reply = ledger.engine.call("targets.even", mapOf("count" to rows.size.toString()))
-                val weights = ApiJson.decodeFromJsonElement(ListSerializer(Double.serializer()), reply)
+                val weights = decodeView(ListSerializer(Double.serializer()), reply)
                 set(rows.mapIndexed { i, r -> r.copy(weight = weights[i].toString().removeSuffix(".0")) })
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
@@ -110,7 +111,7 @@ class TargetsViewModel(private val ledger: Ledger) : ViewModel() {
             val taken = ApiJson.encodeToString(ListSerializer(String.serializer()), _ui.value.rows.map { it.ticker })
             try {
                 val reply = ledger.engine.call("targets.search", mapOf("taken" to taken, "query" to query))
-                _ui.value = _ui.value.copy(search = ApiJson.decodeFromJsonElement(CompanySearch.serializer(), reply))
+                _ui.value = _ui.value.copy(search = decodeView(CompanySearch.serializer(), reply))
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
             }

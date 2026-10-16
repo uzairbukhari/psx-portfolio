@@ -30,7 +30,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URLEncoder
 
@@ -122,7 +121,7 @@ class Ledger(
     }
 
     /** Whether the PSX is open right now, by the shared market calendar. */
-    suspend fun marketOpen(): Boolean = engine.call("market.open").jsonObject["open"]?.jsonPrimitive?.booleanOrNull ?: false
+    suspend fun marketOpen(): Boolean = (engine.call("market.open") as? JsonObject)?.get("open")?.jsonPrimitive?.booleanOrNull ?: false
 
     /**
      * The manual "Refresh prices": asks the server to fetch fresh PSX prices for what this ledger holds or targets, follows

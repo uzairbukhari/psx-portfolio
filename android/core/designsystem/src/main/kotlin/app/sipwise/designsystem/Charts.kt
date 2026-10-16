@@ -604,6 +604,7 @@ fun Treemap(
     ) {
         val total = sorted.sumOf { it.weight }.takeIf { it > 0 } ?: 1.0
         for (cell in treemap(sorted.map { it.weight }, size.width, size.height)) {
+            if (!cell.isFinite()) continue
             val item = sorted[cell.index]
             val change = item.change
             val tone =

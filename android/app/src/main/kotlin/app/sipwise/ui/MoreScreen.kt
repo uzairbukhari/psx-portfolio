@@ -81,6 +81,7 @@ fun MoreScreen(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         AccountCard(user)
+        CrashCard()
         ui.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         SectionCard(R.string.settings_appearance) {
             val labels = Appearance.entries.associateWith { stringResource(appearanceLabel(it)) }
@@ -115,7 +116,6 @@ fun MoreScreen(
         UsageCard()
         DevicesCard(ui, settings)
         DataCard(settings)
-        CrashCard()
         DeleteCard(user, ui, settings, onAccountDeleted)
         UpdateCard(updates, includePrereleases = user.role == "super_admin")
         Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lock_now)) }

@@ -3,7 +3,7 @@ package app.sipwise.ui
 import app.sipwise.ledger.Ledger
 import app.sipwise.model.TrackBatches
 import app.sipwise.network.ApiClient
-import app.sipwise.network.ApiJson
+import app.sipwise.session.decodeView
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -29,7 +29,7 @@ class TrackHistories(
 
     /** The closes as JSON for the engine, or null when the scope has nothing traded. */
     suspend fun load(force: Boolean = false): HistoryData? {
-        val batches = ApiJson.decodeFromJsonElement(TrackBatches.serializer(), ledger.view("track.batches"))
+        val batches = decodeView(TrackBatches.serializer(), ledger.view("track.batches"))
         if (batches.empty) return null
         val key = batches.batches.joinToString("|") { it.joinToString(",") }
         if (force || key != cachedKey) {

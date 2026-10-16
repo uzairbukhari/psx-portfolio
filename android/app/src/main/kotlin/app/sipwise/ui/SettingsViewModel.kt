@@ -20,6 +20,7 @@ import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
 import app.sipwise.session.VaultSession
+import app.sipwise.session.decodeView
 import app.sipwise.session.encryptedBackupShare
 import app.sipwise.vault.VaultException
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -68,7 +69,7 @@ class SettingsViewModel(
 
     private suspend fun loadSettings() {
         try {
-            val view = ApiJson.decodeFromJsonElement(SettingsView.serializer(), ledger.engine.call("settings.view"))
+            val view = decodeView(SettingsView.serializer(), ledger.engine.call("settings.view"))
             _ui.value = _ui.value.copy(filerStatus = view.filerStatus)
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)

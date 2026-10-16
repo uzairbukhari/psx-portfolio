@@ -7,11 +7,11 @@ import app.sipwise.model.InboxCounts
 import app.sipwise.model.InboxFilter
 import app.sipwise.model.InboxItem
 import app.sipwise.model.InboxView
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +39,7 @@ class InboxViewModel(private val ledger: Ledger) : ViewModel() {
 
     private suspend fun load() {
         try {
-            val view = ApiJson.decodeFromJsonElement(InboxView.serializer(), ledger.view("inbox.view", mapOf("filter" to _ui.value.filter.key)))
+            val view = decodeView(InboxView.serializer(), ledger.view("inbox.view", mapOf("filter" to _ui.value.filter.key)))
             _ui.value = _ui.value.copy(counts = view.counts, items = view.items)
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)
