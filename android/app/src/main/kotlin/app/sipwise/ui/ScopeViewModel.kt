@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import app.sipwise.ledger.Ledger
 import app.sipwise.model.ScopeList
 import app.sipwise.model.ScopePortfolio
-import app.sipwise.network.ApiJson
 import app.sipwise.session.EngineException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,7 +24,7 @@ class ScopeViewModel(private val ledger: Ledger) : ViewModel() {
 
     private suspend fun load() {
         try {
-            _portfolios.value = ApiJson.decodeFromJsonElement(ScopeList.serializer(), ledger.engine.call("scope.list")).portfolios
+            _portfolios.value = decodeView(ScopeList.serializer(), ledger.engine.call("scope.list")).portfolios
         } catch (ignored: EngineException) {
             // The screens report their own errors; the chooser simply stays as it was.
         }

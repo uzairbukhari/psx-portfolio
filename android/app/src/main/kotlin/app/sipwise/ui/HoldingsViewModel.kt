@@ -8,9 +8,9 @@ import app.sipwise.model.AssetsView
 import app.sipwise.model.HoldingSort
 import app.sipwise.model.HoldingsView
 import app.sipwise.model.MarketSummaryBody
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.EngineException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,7 +90,7 @@ class HoldingsViewModel(private val ledger: Ledger) : ViewModel() {
             val args = buildMap { put("sort", current.sort.wire).also { current.sector?.let { s -> put("sector", s) } } }
             try {
                 val reply = ledger.view("holdings.view", args)
-                _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(HoldingsView.serializer(), reply), error = null)
+                _ui.value = _ui.value.copy(view = decodeView(HoldingsView.serializer(), reply), error = null)
                 loadExtras()
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
@@ -105,8 +105,8 @@ class HoldingsViewModel(private val ledger: Ledger) : ViewModel() {
             val assets = ledger.view("assets.view")
             _ui.value =
                 _ui.value.copy(
-                    overview = if (overview is JsonNull) null else ApiJson.decodeFromJsonElement(AccountOverview.serializer(), overview),
-                    assets = ApiJson.decodeFromJsonElement(AssetsView.serializer(), assets),
+                    overview = if (overview is JsonNull) null else decodeView(AccountOverview.serializer(), overview),
+                    assets = decodeView(AssetsView.serializer(), assets),
                 )
         } catch (ignored: EngineException) {
             _ui.value = _ui.value.copy(overview = null, assets = AssetsView())

@@ -10,11 +10,11 @@ import app.sipwise.model.HistoryRange
 import app.sipwise.model.HistorySeries
 import app.sipwise.model.splitEntryId
 import app.sipwise.network.ApiClient
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,7 +62,7 @@ class CompanyViewModel(
     private suspend fun load() {
         try {
             val reply = ledger.view("company.view", mapOf("ticker" to ticker))
-            _ui.value = _ui.value.copy(view = ApiJson.decodeFromJsonElement(CompanyView.serializer(), reply))
+            _ui.value = _ui.value.copy(view = decodeView(CompanyView.serializer(), reply))
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)
         }
@@ -86,7 +86,7 @@ class CompanyViewModel(
         val raw = rawHistory ?: return
         try {
             val reply = ledger.engine.call("history.series", mapOf("json" to raw, "range" to _ui.value.range.wire))
-            _ui.value = _ui.value.copy(series = ApiJson.decodeFromJsonElement(HistorySeries.serializer(), reply))
+            _ui.value = _ui.value.copy(series = decodeView(HistorySeries.serializer(), reply))
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(historyError = e.message)
         }

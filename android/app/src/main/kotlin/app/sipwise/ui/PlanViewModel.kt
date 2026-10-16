@@ -14,6 +14,7 @@ import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,7 +62,7 @@ class PlanViewModel(private val ledger: Ledger) : ViewModel() {
                 val args = mutableMapOf("feePct" to current.fee, "allowOld" to current.allowOld.toString())
                 current.month?.let { args["month"] = it }
                 try {
-                    val view = ApiJson.decodeFromJsonElement(PlanView.serializer(), ledger.engine.call("plan.view", args))
+                    val view = decodeView(PlanView.serializer(), ledger.engine.call("plan.view", args))
                     _ui.value = _ui.value.copy(view = view, month = view.month, error = null)
                 } catch (e: EngineException) {
                     _ui.value = _ui.value.copy(error = e.message)
@@ -136,7 +137,7 @@ class PlanViewModel(private val ledger: Ledger) : ViewModel() {
             val included = review.rows.filter { it.ticker !in review.excluded }
             try {
                 val args = mapOf("rows" to ApiJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(ReviewRow.serializer()), included), "feePct" to _ui.value.fee)
-                val result = ApiJson.decodeFromJsonElement(ReviewResult.serializer(), ledger.engine.call("buys.review", args))
+                val result = decodeView(ReviewResult.serializer(), ledger.engine.call("buys.review", args))
                 _ui.value.review?.let { _ui.value = _ui.value.copy(review = it.copy(result = result)) }
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)

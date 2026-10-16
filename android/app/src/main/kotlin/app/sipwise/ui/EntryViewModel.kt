@@ -13,11 +13,11 @@ import app.sipwise.model.EntryTotals
 import app.sipwise.model.entryOperation
 import app.sipwise.model.isValidSymbol
 import app.sipwise.model.voidKind
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,9 +56,9 @@ class EntryViewModel(
     init {
         viewModelScope.launch {
             try {
-                val options = ApiJson.decodeFromJsonElement(EntryOptions.serializer(), ledger.engine.call("entry.options"))
+                val options = decodeView(EntryOptions.serializer(), ledger.engine.call("entry.options"))
                 if (editId != null) {
-                    val detail = ApiJson.decodeFromJsonElement(EntryDetail.serializer(), ledger.engine.call("entry.get", mapOf("id" to editId)))
+                    val detail = decodeView(EntryDetail.serializer(), ledger.engine.call("entry.get", mapOf("id" to editId)))
                     _ui.value =
                         if (detail.found) {
                             _ui.value.copy(options = options, editing = true, readOnly = detail.readOnly, form = detail.toForm())
@@ -103,7 +103,7 @@ class EntryViewModel(
         viewModelScope.launch {
             val args = mapOf("kind" to form.kind.wire, "shares" to form.shares, "price" to form.price, "fees" to form.fees)
             val reply = runCatching { ledger.engine.call("entry.totals", args) }.getOrNull()
-            val totals = if (reply == null || reply is JsonNull) null else ApiJson.decodeFromJsonElement(EntryTotals.serializer(), reply)
+            val totals = if (reply == null || reply is JsonNull) null else decodeView(EntryTotals.serializer(), reply)
             _ui.value = _ui.value.copy(totals = totals)
         }
     }

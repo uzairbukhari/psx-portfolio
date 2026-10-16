@@ -10,13 +10,13 @@ import app.sipwise.model.PicksStale
 import app.sipwise.model.PicksStep
 import app.sipwise.model.PicksView
 import app.sipwise.network.ApiClient
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.network.FactsRefreshRequest
 import app.sipwise.network.FactsRefreshResponse
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,7 +70,7 @@ class PicksViewModel(
         loadJob =
             viewModelScope.launch {
                 try {
-                    val view = ApiJson.decodeFromJsonElement(PicksView.serializer(), ledger.engine.call("picks.view", mapOf("month" to month)))
+                    val view = decodeView(PicksView.serializer(), ledger.engine.call("picks.view", mapOf("month" to month)))
                     _ui.value = _ui.value.copy(view = view)
                 } catch (e: EngineException) {
                     _ui.value = _ui.value.copy(error = e.message)
@@ -167,7 +167,7 @@ class PicksViewModel(
 
     /** Reads the public analysis, and when company data is stale asks for a scrape and waits for it (up to the limit). */
     private suspend fun gather(shortlist: List<String>): String {
-        val config = ApiJson.decodeFromJsonElement(PicksConfig.serializer(), ledger.engine.call("picks.config"))
+        val config = decodeView(PicksConfig.serializer(), ledger.engine.call("picks.config"))
         step(PicksStep.GATHERING, 0, shortlist.size)
         var analysis = analysisFor(shortlist)
         val first = staleOf(analysis, emptyList())
@@ -202,7 +202,7 @@ class PicksViewModel(
     ): PicksStale {
         val args = mutableMapOf("json" to analysis)
         if (asked.isNotEmpty()) args["stale"] = buildJsonArray { asked.forEach { add(JsonPrimitive(it)) } }.toString()
-        return ApiJson.decodeFromJsonElement(PicksStale.serializer(), ledger.engine.call("picks.stale", args))
+        return decodeView(PicksStale.serializer(), ledger.engine.call("picks.stale", args))
     }
 
     private fun step(

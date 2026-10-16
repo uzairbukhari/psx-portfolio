@@ -7,9 +7,9 @@ import app.sipwise.model.InsightsView
 import app.sipwise.model.TrackRange
 import app.sipwise.model.TrackView
 import app.sipwise.network.ApiClient
-import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.EngineException
+import app.sipwise.session.decodeView
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,7 +43,7 @@ class InsightsViewModel(
 
     private suspend fun load() {
         try {
-            val report = ApiJson.decodeFromJsonElement(InsightsView.serializer(), ledger.view("insights.view"))
+            val report = decodeView(InsightsView.serializer(), ledger.view("insights.view"))
             _ui.value = _ui.value.copy(report = report, error = null)
         } catch (e: EngineException) {
             _ui.value = _ui.value.copy(error = e.message)
@@ -74,7 +74,7 @@ class InsightsViewModel(
                         return@launch
                     }
                     val args = mapOf("range" to _ui.value.range.key, "histories" to closes.full)
-                    val track = ApiJson.decodeFromJsonElement(TrackView.serializer(), ledger.view("track.view", args))
+                    val track = decodeView(TrackView.serializer(), ledger.view("track.view", args))
                     _ui.value = _ui.value.copy(track = track, trackEmpty = false, trackLoading = false)
                 } catch (e: EngineException) {
                     _ui.value = _ui.value.copy(trackLoading = false, trackError = e.message)
