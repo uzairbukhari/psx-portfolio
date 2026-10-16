@@ -290,7 +290,7 @@ private fun DevicesCard(
 private fun UpdateCard(viewModel: UpdateViewModel = viewModel()) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    Card {
+    SipwiseCard {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.update_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.update_version_installed, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)
