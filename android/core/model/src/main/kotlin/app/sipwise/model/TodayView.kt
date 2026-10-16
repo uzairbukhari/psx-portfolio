@@ -51,6 +51,8 @@ data class TodayView(
     val openCount: Int,
     val error: String? = null,
     val firstUse: Boolean = false,
+    val hasStocks: Boolean = true,
+    val hasAssets: Boolean = false,
     val breakdown: ReturnBreakdown? = null,
     val progress: MonthProgress,
     val actions: List<NextAction> = emptyList(),

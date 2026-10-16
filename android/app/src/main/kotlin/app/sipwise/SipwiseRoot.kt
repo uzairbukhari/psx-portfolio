@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -47,6 +48,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -399,7 +401,7 @@ private fun MainShell(
             when {
                 top != null ->
                     TopAppBar(
-                        title = { Text(stringResource(top.label), style = MaterialTheme.typography.headlineSmall) },
+                        title = { Text(stringResource(top.label), style = MaterialTheme.typography.headlineSmall, maxLines = 1, softWrap = false) },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                         actions = {
                             if (top.route != More && top.route != Plan) ScopeChooser(scopes)
@@ -453,6 +455,13 @@ private fun MainShell(
                     onOpenCompany = { nav.navigate(CompanyRoute(it)) },
                     onOpenTargets = { nav.navigate(Targets) },
                     onAddEntry = { nav.navigate(AddEntry()) },
+                    onOpenPortfolio = {
+                        nav.navigate(Portfolio) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                     onOpenPlan = {
                         nav.navigate(Plan) {
                             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -562,6 +571,8 @@ private fun subScreenTitle(
         else -> ""
     }
 
+private val SCOPE_CHIP_MAX = 128.dp
+
 @Composable
 private fun ScopeChooser(scopes: ScopeViewModel) {
     val list by scopes.portfolios.collectAsStateWithLifecycle()
@@ -570,7 +581,11 @@ private fun ScopeChooser(scopes: ScopeViewModel) {
     var open by remember { mutableStateOf(false) }
     val label = list.firstOrNull { it.id == selected }?.name ?: stringResource(R.string.scope_all)
     Box {
-        AssistChip(onClick = { open = true }, label = { Text(label) }, modifier = Modifier.padding(end = Spacing.sm))
+        AssistChip(
+            onClick = { open = true },
+            label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = SCOPE_CHIP_MAX)) },
+            modifier = Modifier.padding(end = Spacing.sm),
+        )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.scope_all)) },

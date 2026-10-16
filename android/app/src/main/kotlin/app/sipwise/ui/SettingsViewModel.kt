@@ -8,7 +8,6 @@ import app.sipwise.SipwiseApp
 import app.sipwise.data.Appearance
 import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
-import app.sipwise.model.ReadableExport
 import app.sipwise.model.SettingsView
 import app.sipwise.network.ApiJson
 import app.sipwise.network.ApiRequestException
@@ -106,19 +105,6 @@ class SettingsViewModel(
             } catch (e: VaultException) {
                 _ui.value = _ui.value.copy(error = e.message)
             } catch (e: ApiRequestException) {
-                _ui.value = _ui.value.copy(error = e.message)
-            }
-        }
-    }
-
-    /** The readable copy is NOT encrypted; the screen asks for confirmation before calling this. */
-    fun exportReadable() {
-        viewModelScope.launch {
-            _ui.value = _ui.value.copy(error = null)
-            try {
-                val out = ApiJson.decodeFromJsonElement(ReadableExport.serializer(), ledger.engine.call("backup.readable"))
-                if (out.ok) _shares.emit(ShareRequest(out.title, out.text)) else _ui.value = _ui.value.copy(error = out.reason)
-            } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
             }
         }

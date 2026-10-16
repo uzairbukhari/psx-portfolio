@@ -362,13 +362,17 @@ const handlers: Record<string, Handler> = {
     const { held, error } = safeHoldings(portfolio);
     const summary = totals(held);
     const open = openPositions(held);
+    const hasStocks = portfolio.companies.length > 0 || portfolio.trades.length > 0 || (portfolio.dividends ?? []).length > 0;
+    const hasAssets = scopeParts(args).some((part) => (part.portfolio.assets ?? []).length > 0);
     return {
       now,
       month,
       summary,
       openCount: open.length,
       error,
-      firstUse: portfolio.companies.length === 0 && portfolio.trades.length === 0 && !(portfolio.dividends ?? []).length,
+      hasStocks,
+      hasAssets,
+      firstUse: !hasStocks && !hasAssets,
       breakdown: returnBreakdown(portfolio, summary.gain),
       progress: monthProgress(portfolio, month),
       actions: nextActions(portfolio, held, month, now),

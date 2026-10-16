@@ -59,6 +59,7 @@ import kotlinx.coroutines.delay
 private const val MARKET_POLL_MS = 60_000L
 private const val MARKET_IDLE_POLL_MS = 600_000L
 
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun HoldingsScreen(
     viewModel: HoldingsViewModel,
@@ -86,7 +87,8 @@ fun HoldingsScreen(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         val market = ui.market
-        if (market?.index != null) item { MarketCard(market, ui.marketOpen) }
+        val hasStocks = view.rows.isNotEmpty() || view.soldOut.isNotEmpty()
+        if (hasStocks && market?.index != null) item { MarketCard(market, ui.marketOpen) }
         val overview = ui.overview
         if (overview == null) {
             item { SummaryCard(view.summary) }
@@ -99,17 +101,19 @@ fun HoldingsScreen(
         }
         if (view.rows.isEmpty() && ui.assets.isEmpty) item { EmptyState(stringResource(R.string.nav_portfolio), stringResource(R.string.holdings_empty)) }
         if (view.rows.size >= MIN_TREEMAP) item { AllocationCard(view.rows, onOpenCompany) }
-        item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(ui.priceMessage ?: stringResource(R.string.holdings_prices_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                TextButton(onClick = viewModel::refreshPrices, enabled = !ui.pricing) {
-                    Text(stringResource(if (ui.pricing) R.string.holdings_refreshing else R.string.holdings_refresh_prices))
+        if (hasStocks) {
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(ui.priceMessage ?: stringResource(R.string.holdings_prices_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = viewModel::refreshPrices, enabled = !ui.pricing) {
+                        Text(stringResource(if (ui.pricing) R.string.holdings_refreshing else R.string.holdings_refresh_prices))
+                    }
                 }
             }
+            item { OutlinedButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.insights_open)) } }
+            item { SortRow(ui.sort, viewModel::setSort) }
+            if (view.sectors.size > 1) item { SectorRow(view.sectors, ui.sector, viewModel::setSector) }
         }
-        item { OutlinedButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.insights_open)) } }
-        item { SortRow(ui.sort, viewModel::setSort) }
-        if (view.sectors.size > 1) item { SectorRow(view.sectors, ui.sector, viewModel::setSector) }
         items(view.rows, key = { it.ticker }) { HoldingItem(it, onOpenCompany) }
         if (!ui.assets.isEmpty) {
             item {
@@ -148,18 +152,25 @@ private fun SummaryCard(summary: PortfolioSummary) {
 }
 
 private const val MIN_TREEMAP = 3
+private const val TREEMAP_TILES = 8
+private const val OTHERS_ID = "others"
+private val TREEMAP_HEIGHT = 230.dp
 
 @Composable
 private fun AllocationCard(
     rows: List<HoldingRow>,
     onOpen: (String) -> Unit,
 ) {
-    val items = rows.filter { (it.value ?: 0.0) > 0 }.sortedByDescending { it.value }.map { TreemapItem(it.ticker, it.ticker, it.value ?: 0.0, it.gainPercent) }
+    val ranked = rows.filter { (it.value ?: 0.0) > 0 }.sortedByDescending { it.value }
+    val top = ranked.take(TREEMAP_TILES).map { TreemapItem(it.ticker, it.ticker, it.value ?: 0.0, it.gainPercent) }
+    val rest = ranked.drop(TREEMAP_TILES)
+    val others = if (rest.isEmpty()) emptyList() else listOf(TreemapItem(OTHERS_ID, stringResource(R.string.holdings_allocation_others, rest.size), rest.sumOf { it.value ?: 0.0 }, null))
+    val items = top + others
     if (items.size < MIN_TREEMAP) return
     SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Overline(stringResource(R.string.holdings_allocation))
-            Treemap(items, stringResource(R.string.holdings_allocation_description), onClick = onOpen)
+            Treemap(items, stringResource(R.string.holdings_allocation_description), height = TREEMAP_HEIGHT, onClick = { if (it != OTHERS_ID) onOpen(it) })
         }
     }
 }

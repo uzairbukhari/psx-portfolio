@@ -41,6 +41,7 @@ import app.sipwise.designsystem.ProgressRing
 import app.sipwise.designsystem.ScreenSkeleton
 import app.sipwise.designsystem.SipwiseCard
 import app.sipwise.designsystem.SipwiseNumbers
+import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
 import app.sipwise.designsystem.TargetBar
@@ -252,8 +253,11 @@ private fun SuggestionItem(row: PlanRow) {
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(if (row.shares > 0) pluralStringResource(R.plurals.plan_shares, row.shares.toInt(), row.shares.toInt()) else "—", style = MaterialTheme.typography.titleSmall)
-                    MoneyText(if (row.amount > 0) money(row.amount) else row.reason, style = SipwiseNumbers.tiny, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (row.amount > 0) MoneyText(money(row.amount), style = SipwiseNumbers.tiny, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+            if (row.amount <= 0 && row.reason.isNotEmpty()) {
+                Text(row.reason, style = MaterialTheme.typography.bodySmall, color = SipwiseTheme.colors.warn)
             }
             Text(
                 stringResource(
