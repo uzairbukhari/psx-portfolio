@@ -534,7 +534,7 @@ private fun MainShell(
             composable<Activity> { ActivityScreen(activity, onOpenEntry = { id -> nav.navigate(AddEntry(entryId = id)) }) }
             composable<More> {
                 val settings: SettingsViewModel =
-                    viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger, unlocked.session) } })
+                    viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger) } })
                 val push: PushViewModel = viewModel()
                 MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted, onManagePortfolios = { nav.navigate(Portfolios) }, updates = updates)
             }

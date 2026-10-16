@@ -16,7 +16,6 @@ import app.sipwise.network.MobileSessionsResponse
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
-import app.sipwise.session.VaultSession
 import app.sipwise.session.decodeView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,13 +35,10 @@ data class SettingsUi(
     val deleting: Boolean = false,
 )
 
-/** A file to hand to the share sheet. */
-
 /** The Settings (More) screen: appearance, tax status and signed-in devices. */
 class SettingsViewModel(
     app: Application,
     private val ledger: Ledger,
-    private val session: VaultSession,
 ) : AndroidViewModel(app) {
     private val container = (app as SipwiseApp).container
     private val _ui = MutableStateFlow(SettingsUi())
