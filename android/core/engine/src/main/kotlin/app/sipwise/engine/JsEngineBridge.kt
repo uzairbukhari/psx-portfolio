@@ -2,9 +2,13 @@ package app.sipwise.engine
 
 import android.content.Context
 import androidx.javascriptengine.IsolateStartupParameters
+import androidx.javascriptengine.IsolateTerminatedException
+import androidx.javascriptengine.JavaScriptException
 import androidx.javascriptengine.JavaScriptIsolate
 import androidx.javascriptengine.JavaScriptSandbox
 import app.sipwise.session.EngineBridge
+import app.sipwise.session.EngineDiedException
+import app.sipwise.session.EngineException
 import kotlinx.coroutines.guava.await
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.Closeable
@@ -29,12 +33,21 @@ class JsEngineBridge private constructor(
     ): String {
         // A JSON string literal is a valid JavaScript string literal, so it escapes any text safely.
         val script = "sipwiseCall(${JsonPrimitive(name)}, ${JsonPrimitive(argsJson)})"
-        return isolate.evaluateJavaScriptAsync(script).await()
+        return try {
+            isolate.evaluateJavaScriptAsync(script).await()
+        } catch (e: IsolateTerminatedException) {
+            throw EngineDiedException("The calculation engine stopped while the app was in the background. Unlock again to continue.", e)
+        } catch (e: JavaScriptException) {
+            throw EngineException(e.message ?: "The calculation engine failed.", e)
+        } catch (e: IllegalStateException) {
+            // The isolate was closed by a lock while this call was waiting.
+            throw EngineDiedException("The vault was locked. Unlock again to continue.", e)
+        }
     }
 
     override fun close() {
-        isolate.close()
-        sandbox.close()
+        runCatching { isolate.close() }
+        runCatching { sandbox.close() }
     }
 
     companion object {

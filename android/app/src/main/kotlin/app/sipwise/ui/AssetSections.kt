@@ -15,9 +15,12 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import app.sipwise.R
+import app.sipwise.designsystem.DeltaPill
+import app.sipwise.designsystem.ListRow
+import app.sipwise.designsystem.MoneyText
 import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.AssetsView
@@ -26,7 +29,6 @@ import app.sipwise.model.MetalRow
 import app.sipwise.model.PlanAssetRow
 import app.sipwise.model.money
 import app.sipwise.model.moneyShort
-import app.sipwise.model.plural
 import app.sipwise.model.shortDate
 import app.sipwise.model.signedMoney
 
@@ -42,7 +44,7 @@ fun AssetSections(
     year: Int,
 ) {
     if (assets.funds.isNotEmpty()) {
-        Section(R.string.assets_funds, assets.funds.size, assets.funds.takeIf { rows -> rows.none { it.value == null } }?.sumOf { it.value ?: 0.0 }) {
+        Section(R.string.assets_funds, assets.funds.size, assets.funds.takeIf { rows -> rows.none { it.value == null } }?.sumOf { it.value ?: 0.0 }, card = false) {
             FundGroups(assets.funds, year)
         }
     }
@@ -63,6 +65,7 @@ private fun Section(
     title: Int,
     count: Int,
     total: Double?,
+    card: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -70,7 +73,7 @@ private fun Section(
             Text(stringResource(R.string.assets_section_header, stringResource(title), count), style = MaterialTheme.typography.titleMedium)
             total?.let { Text(moneyShort(it), style = MaterialTheme.typography.titleMedium) }
         }
-        SipwiseCard(Modifier.fillMaxWidth()) { Column { content() } }
+        if (card) SipwiseCard(Modifier.fillMaxWidth()) { Column { content() } } else content()
     }
 }
 
@@ -122,7 +125,7 @@ private fun Facts(vararg facts: Pair<String, String>) {
     }
 }
 
-/** Funds grouped by the company that manages them (largest first), each group with its own total. */
+/** Funds grouped by the company that manages them (largest first): a quiet label per manager, then one card of simple rows. */
 @Composable
 private fun FundGroups(
     funds: List<FundRow>,
@@ -130,34 +133,19 @@ private fun FundGroups(
 ) {
     val unknown = stringResource(R.string.assets_amc_unknown)
     val groups = funds.groupBy { it.amc.ifBlank { unknown } }.entries.sortedByDescending { (_, rows) -> rows.sumOf { it.value ?: 0.0 } }
-    groups.forEachIndexed { index, (amc, rows) ->
-        if (index > 0) HorizontalDivider()
-        FundGroupHeader(amc, rows)
-        rows.forEach { FundItem(it, year) }
-    }
-}
-
-@Composable
-private fun FundGroupHeader(
-    amc: String,
-    rows: List<FundRow>,
-) {
-    val value = rows.sumOf { it.value ?: 0.0 }
-    val gain = rows.takeIf { list -> list.none { it.gain == null } }?.sumOf { it.gain ?: 0.0 }
-    Row(
-        Modifier.fillMaxWidth().padding(start = Spacing.md, end = Spacing.md, top = Spacing.md),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(amc, style = MaterialTheme.typography.titleSmall)
-            Text(plural(rows.size, "fund"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(moneyShort(value), style = MaterialTheme.typography.titleSmall)
-            gain?.let {
-                val tone = if (it >= 0) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss
-                Text(signedMoney(it), color = tone, style = MaterialTheme.typography.bodySmall)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+        groups.forEach { (amc, rows) ->
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.xs), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(amc, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Text(moneyShort(rows.sumOf { it.value ?: 0.0 }), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                SipwiseCard(Modifier.fillMaxWidth()) {
+                    rows.forEachIndexed { index, fund ->
+                        FundItem(fund, year)
+                        if (index < rows.lastIndex) HorizontalDivider(Modifier.padding(horizontal = Spacing.lg))
+                    }
+                }
             }
         }
     }
@@ -170,31 +158,24 @@ private fun FundItem(
 ) {
     val value = fund.value?.let { moneyShort(it) } ?: DASH
     val price = fund.price
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm).semantics(mergeDescendants = true) { contentDescription = "${fund.name}, $value" },
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text(fund.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text(value, style = MaterialTheme.typography.titleSmall)
+    val units = stringResource(R.string.assets_fund_units, trimmed(fund.units))
+    val detail =
+        when {
+            price == null -> stringResource(R.string.assets_no_price)
+            price.stale -> stringResource(if (price.source == "manual") R.string.assets_price_manual_old else R.string.assets_price_mufap_old, shortDate(price.date, year))
+            else -> listOf(units, stringResource(R.string.assets_fund_price, "%.2f".format(java.util.Locale.ROOT, price.nav))).joinToString(" · ")
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            val units = stringResource(R.string.assets_fund_units, trimmed(fund.units))
-            val at = price?.let { stringResource(R.string.assets_fund_price, "%.2f".format(java.util.Locale.ROOT, it.nav)) }
-            Text(listOfNotNull(units, at).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            fund.gain?.let {
-                val tone = if (it >= 0) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss
-                Text(signedMoney(it), color = tone, style = MaterialTheme.typography.bodySmall)
+    ListRow(
+        title = fund.name,
+        modifier = Modifier.padding(horizontal = Spacing.lg).semantics(mergeDescendants = true) { contentDescription = "${fund.name}, $value" },
+        subtitle = detail,
+        trailing = {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                MoneyText(value, style = SipwiseNumbers.small)
+                fund.gain?.let { DeltaPill(signedMoney(it), positive = it >= 0) }
             }
-        }
-        val note =
-            when {
-                price == null -> stringResource(R.string.assets_no_price)
-                price.source == "manual" -> stringResource(if (price.stale) R.string.assets_price_manual_old else R.string.assets_price_manual, shortDate(price.date, year))
-                else -> stringResource(if (price.stale) R.string.assets_price_mufap_old else R.string.assets_price_mufap, shortDate(price.date, year))
-            }
-        Text(note, style = MaterialTheme.typography.labelSmall, color = if (price == null || price.stale) SipwiseTheme.colors.warn else MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+        },
+    )
 }
 
 @Composable

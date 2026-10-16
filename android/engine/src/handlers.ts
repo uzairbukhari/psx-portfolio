@@ -175,6 +175,43 @@ function changeInbox(account: PortfolioAccount, params: Record<string, unknown>)
   };
 }
 
+/** Payouts still expected: soonest book closure first, at most three. Amounts are what the ledger already calculated. */
+function upcomingDividends(portfolio: ReturnType<typeof dashboardPortfolio>) {
+  return (portfolio.dividends ?? [])
+    .filter((d) => !d.voided && (d.status ?? 'expected') === 'expected')
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 3)
+    .map((d) => ({ ticker: d.ticker, bookClosure: d.date, amount: d.netAmount ?? d.grossAmount ?? null, paymentDate: d.paymentDate ?? null }));
+}
+
+const PKT_OFFSET_SECONDS = 5 * 3600;
+const pktDay = (seconds: number) => new Date((seconds + PKT_OFFSET_SECONDS) * 1000).toISOString().slice(0, 10);
+
+/** Day gain or loss over the holdings that have both a price and a previous close, plus the biggest mover each way. */
+function dayMove(held: Holding[], histories: Record<string, number[][]>) {
+  const rows: { ticker: string; change: number; percent: number; value: number }[] = [];
+  let open = 0;
+  for (const h of held) {
+    if (h.shares <= 0) continue;
+    open += 1;
+    const price = h.quote?.price;
+    const closes = histories[h.ticker] ? parseEod(histories[h.ticker]) : [];
+    const day = h.quote?.date ?? '';
+    const before = closes.filter((point) => (day ? pktDay(point[0]) < day : true));
+    const previous = before.length ? before[before.length - 1][1] : null;
+    if (!price || !previous) continue;
+    rows.push({ ticker: h.ticker, change: h.shares * (price - previous), percent: ((price - previous) / previous) * 100, value: h.shares * price });
+  }
+  if (rows.length === 0) return { available: false, counted: 0, of: open };
+  const amount = rows.reduce((sum, r) => sum + r.change, 0);
+  const base = rows.reduce((sum, r) => sum + r.value - r.change, 0);
+  const byPercent = [...rows].sort((a, b) => b.percent - a.percent);
+  const gainer = byPercent[0].percent > 0 ? byPercent[0] : null;
+  const loser = byPercent[byPercent.length - 1].percent < 0 ? byPercent[byPercent.length - 1] : null;
+  const pick = (r: { ticker: string; change: number; percent: number } | null) => (r ? { ticker: r.ticker, change: r.change, percent: r.percent } : null);
+  return { available: true, counted: rows.length, of: open, amount, percent: base > 0 ? (amount / base) * 100 : 0, gainer: pick(gainer), loser: pick(loser) };
+}
+
 const handlers: Record<string, Handler> = {
   'engine.version': () => ENGINE_API_VERSION,
 
@@ -381,7 +418,15 @@ const handlers: Record<string, Handler> = {
       breakdown: returnBreakdown(portfolio, summary.gain),
       progress: monthProgress(portfolio, month),
       actions: nextActions(portfolio, held, month, now, 3, { planSource: planPortfolio(account, scope), dividends: false }),
+      upcoming: upcomingDividends(portfolio),
     };
+  },
+
+  // How much the holdings moved on the last trading day, from each price against the close before it.
+  'today.move': (args) => {
+    const portfolio = dashboardPortfolio(viewAccount(), typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS);
+    const histories = JSON.parse(text(args, 'histories')) as Record<string, number[][]>;
+    return dayMove(safeHoldings(portfolio).held, histories);
   },
 
   // The Activity ledger: filtered, searched and grouped by month, newest first.

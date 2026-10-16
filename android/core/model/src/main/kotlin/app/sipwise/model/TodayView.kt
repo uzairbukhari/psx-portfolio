@@ -56,6 +56,31 @@ data class TodayView(
     val breakdown: ReturnBreakdown? = null,
     val progress: MonthProgress,
     val actions: List<NextAction> = emptyList(),
+    val upcoming: List<UpcomingDividend> = emptyList(),
+)
+
+/** An expected payout: the company, its book-closure date and the amount the ledger calculated (null when it could not). */
+@Serializable
+data class UpcomingDividend(
+    val ticker: String,
+    val bookClosure: String,
+    val amount: Double? = null,
+    val paymentDate: String? = null,
+)
+
+@Serializable
+data class Mover(val ticker: String, val change: Double, val percent: Double)
+
+/** The last trading day's move over the holdings that have a price and a previous close. */
+@Serializable
+data class DayMove(
+    val available: Boolean,
+    val counted: Int = 0,
+    val of: Int = 0,
+    val amount: Double = 0.0,
+    val percent: Double = 0.0,
+    val gainer: Mover? = null,
+    val loser: Mover? = null,
 )
 
 /** "October 2026" for a `YYYY-MM` month key, or "October" without the year. */

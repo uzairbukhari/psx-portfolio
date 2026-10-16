@@ -106,7 +106,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
 
     private suspend fun engine(): EngineClient {
         val bridge = engineBridge ?: JsEngineBridge.create(getApplication()).also { engineBridge = it }
-        return EngineClient(bridge)
+        return EngineClient(bridge, onDied = ::lock)
     }
 
     private fun run(block: suspend () -> Unit) {

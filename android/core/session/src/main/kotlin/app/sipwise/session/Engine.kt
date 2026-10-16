@@ -21,16 +21,35 @@ interface EngineBridge {
     fun close()
 }
 
-class EngineException(message: String) : Exception(message)
+open class EngineException(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
+
+/** The sandbox process or isolate is gone (Android reclaims it while the app is in the background); the vault must be opened again. */
+class EngineDiedException(
+    message: String,
+    cause: Throwable? = null,
+) : EngineException(message, cause)
 
 /** Typed access to the engine's `{ ok, value | error }` replies (android/engine/src/handlers.ts). */
-class EngineClient(private val bridge: EngineBridge) {
+class EngineClient(
+    private val bridge: EngineBridge,
+    private val onDied: () -> Unit = {},
+) {
     suspend fun call(
         name: String,
         args: Map<String, String> = emptyMap(),
     ): JsonElement {
         val argsJson = JsonObject(args.mapValues { JsonPrimitive(it.value) }).toString()
-        val reply = ApiJson.parseToJsonElement(bridge.call(name, argsJson)).jsonObject
+        val raw =
+            try {
+                bridge.call(name, argsJson)
+            } catch (e: EngineDiedException) {
+                onDied()
+                throw e
+            }
+        val reply = ApiJson.parseToJsonElement(raw).jsonObject
         if (reply["ok"]?.jsonPrimitive?.booleanOrNull != true) {
             throw EngineException(reply["error"]?.jsonPrimitive?.contentOrNull ?: "The calculation engine failed.")
         }

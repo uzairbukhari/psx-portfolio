@@ -443,3 +443,27 @@ test('insights and track record views work from the shared report and performanc
   assert.ok(['chart', 'empty'].includes(view.value.value.kind));
   assert.ok(['chart', 'unavailable'].includes(view.value.benchmark.kind));
 });
+
+test("today's move uses each price against the close before it, and upcoming dividends list expected payouts", () => {
+  const account = seed();
+  assert.equal(run('account.load', { json: JSON.stringify(account) }).ok, true);
+  const reference = normalizeAccount(seed(), false);
+  const portfolio = dashboardPortfolio(reference, ALL_PORTFOLIOS);
+  const { held } = safeHoldings(portfolio);
+  const open = openPositions(held).filter((h) => h.quote);
+  assert.ok(open.length > 0);
+  const histories = {};
+  for (const h of open) {
+    const [y, m, d] = h.quote.date.split('-').map(Number);
+    const before = Date.UTC(y, m - 1, d - 1) / 1000;
+    histories[h.ticker] = [[before, h.quote.price / 2]];
+  }
+  const move = run('today.move', { scope: 'all', histories: JSON.stringify(histories) }).value;
+  assert.equal(move.available, true);
+  assert.ok(move.amount > 0 && move.percent > 0);
+  assert.equal(move.loser, null);
+  assert.ok(move.gainer.percent > 0);
+  assert.equal(run('today.move', { scope: 'all', histories: '{}' }).value.available, false);
+  const view = run('today.view', { scope: 'all', month: '2026-10' }).value;
+  assert.ok(Array.isArray(view.upcoming) && view.upcoming.length <= 3);
+});

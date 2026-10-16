@@ -71,8 +71,8 @@ class SessionCleanupTest {
     @Test
     fun lockPolicyMatchesTheExpoApp() {
         assertFalse(shouldLockVault(null, 1_000_000))
-        assertFalse(shouldLockVault(0, 59_999))
-        assertTrue(shouldLockVault(0, 60_000))
+        assertFalse(shouldLockVault(0, 299_999))
+        assertTrue(shouldLockVault(0, 300_000))
         assertTrue(coversVault(unlocked = true, appActive = false))
         assertFalse(coversVault(unlocked = false, appActive = false))
         assertFalse(coversVault(unlocked = true, appActive = true))
