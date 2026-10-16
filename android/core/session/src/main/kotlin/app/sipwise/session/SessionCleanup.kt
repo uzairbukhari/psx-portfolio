@@ -98,7 +98,7 @@ fun isLegacyPlaintextCacheName(name: String) = Regex("^portfolio-.*\\.json$").ma
  * How long the app may sit in the background before the vault locks. Longer than the optional biometric grace: the
  * document picker, share sheet and Google flows briefly background the app.
  */
-const val VAULT_LOCK_GRACE_MS = 60_000L
+const val VAULT_LOCK_GRACE_MS = 300_000L
 
 fun shouldLockVault(
     backgroundedAt: Long?,

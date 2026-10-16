@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.sipwise.ledger.Ledger
 import app.sipwise.model.InsightsView
-import app.sipwise.model.TrackBatches
 import app.sipwise.model.TrackRange
 import app.sipwise.model.TrackView
 import app.sipwise.network.ApiClient
@@ -16,12 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import java.net.URLEncoder
 
 data class InsightsUi(
     val report: InsightsView? = null,
@@ -40,8 +33,7 @@ class InsightsViewModel(
 ) : ViewModel() {
     private val _ui = MutableStateFlow(InsightsUi())
     val ui: StateFlow<InsightsUi> = _ui.asStateFlow()
-    private var histories: String? = null
-    private var historiesKey: String? = null
+    private val histories = TrackHistories(ledger, api)
     private var trackJob: Job? = null
 
     init {
@@ -64,27 +56,21 @@ class InsightsViewModel(
     }
 
     fun retry() {
-        historiesKey = null
-        loadTrack()
+        loadTrack(force = true)
     }
 
-    private fun loadTrack() {
+    private fun loadTrack(force: Boolean = false) {
         trackJob?.cancel()
         trackJob =
             viewModelScope.launch {
                 _ui.value = _ui.value.copy(trackLoading = true, trackError = null)
                 try {
-                    val batches = ApiJson.decodeFromJsonElement(TrackBatches.serializer(), ledger.view("track.batches"))
-                    if (batches.empty) {
+                    val closes = histories.load(force)
+                    if (closes == null) {
                         _ui.value = _ui.value.copy(trackEmpty = true, track = null, trackLoading = false)
                         return@launch
                     }
-                    val key = batches.batches.joinToString("|") { it.joinToString(",") }
-                    if (key != historiesKey) {
-                        histories = fetchHistories(batches.batches)
-                        historiesKey = key
-                    }
-                    val args = mapOf("range" to _ui.value.range.key, "histories" to histories.orEmpty())
+                    val args = mapOf("range" to _ui.value.range.key, "histories" to closes)
                     val track = ApiJson.decodeFromJsonElement(TrackView.serializer(), ledger.view("track.view", args))
                     _ui.value = _ui.value.copy(track = track, trackEmpty = false, trackLoading = false)
                 } catch (e: EngineException) {
@@ -93,19 +79,5 @@ class InsightsViewModel(
                     _ui.value = _ui.value.copy(trackLoading = false, trackError = e.message)
                 }
             }
-    }
-
-    /** One request per batch of tickers; keeps only each company's daily closes. */
-    private suspend fun fetchHistories(batches: List<List<String>>): String {
-        val merged = mutableMapOf<String, JsonElement>()
-        for (batch in batches) {
-            val reply = api.get("/api/price-history?tickers=${URLEncoder.encode(batch.joinToString(","), "UTF-8")}", JsonObject.serializer())
-            val all = reply["histories"] as? JsonObject ?: continue
-            for ((ticker, history) in all) {
-                val eod = (history as? JsonObject)?.get("eod") as? JsonArray
-                if (eod != null) merged[ticker] = eod
-            }
-        }
-        return buildJsonObject { merged.forEach { (ticker, eod) -> put(ticker, eod) } }.toString()
     }
 }

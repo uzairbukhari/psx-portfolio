@@ -504,6 +504,15 @@
     <string name="settings_data">Data</string>
     <string name="settings_backup_note">The encrypted backup is useless without your vault password or recovery key, so it is safe to keep anywhere.</string>
     <string name="holdings_allocation_others">Others · %1$d</string>
+    <string name="today_move_title">Today\'s move</string>
+    <string name="today_move_gainer">Top gainer</string>
+    <string name="today_move_loser">Top loser</string>
+    <string name="today_move_none">None today</string>
+    <string name="today_move_partial">Based on %1$d of %2$d holdings with a previous close.</string>
+    <string name="today_value_title">Value over time</string>
+    <string name="today_upcoming_title">Upcoming dividends</string>
+    <string name="today_upcoming_closure">Book closure %1$s</string>
+    <string name="today_upcoming_unknown">Amount not known yet</string>
     <string name="today_assets_title">What you hold</string>
     <string name="settings_backup_encrypted">Share encrypted backup</string>
     <string name="settings_backup_too_large">Your backup is too large to share from the phone. Use Settings > Backup on the website.</string>
@@ -583,9 +592,7 @@
     <string name="assets_cost_unknown">Cost not known</string>
     <string name="assets_entry_cost_unknown">cost unknown</string>
     <string name="assets_no_price">No price yet, so the value is unknown.</string>
-    <string name="assets_price_mufap">Price from MUFAP on %1$s.</string>
     <string name="assets_price_mufap_old">Price from MUFAP on %1$s (old).</string>
-    <string name="assets_price_manual">Price from your entry on %1$s.</string>
     <string name="assets_price_manual_old">Price from your entry on %1$s (old).</string>
     <string name="assets_plan_statement">Value from your statement of %1$s.</string>
     <string name="assets_plan_estimate">Estimated from your statement of %1$s.</string>

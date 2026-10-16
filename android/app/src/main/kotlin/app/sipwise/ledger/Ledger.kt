@@ -16,6 +16,7 @@ import app.sipwise.network.QuotesResponse
 import app.sipwise.network.followQuoteJob
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineClient
+import app.sipwise.session.EngineException
 import app.sipwise.session.LedgerWriter
 import app.sipwise.session.SavedChange
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -163,6 +164,8 @@ class Ledger(
             syncDividends()
         } catch (ignored: ApiRequestException) {
             // Public data is optional; the ledger still shows what it has saved.
+        } catch (ignored: EngineException) {
+            // The engine can be gone after a long time in the background; the vault locks itself and asks again.
         }
     }
 

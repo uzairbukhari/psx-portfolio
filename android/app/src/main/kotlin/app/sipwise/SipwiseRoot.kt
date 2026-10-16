@@ -364,10 +364,11 @@ private fun MainShell(
 ) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
+    val api = (LocalContext.current.applicationContext as SipwiseApp).container.api
     val holdings: HoldingsViewModel =
         viewModel(factory = viewModelFactory { initializer { HoldingsViewModel(unlocked.ledger) } })
     val today: TodayViewModel =
-        viewModel(factory = viewModelFactory { initializer { TodayViewModel(unlocked.ledger) } })
+        viewModel(factory = viewModelFactory { initializer { TodayViewModel(unlocked.ledger, api) } })
     val activity: ActivityViewModel =
         viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.ledger) } })
     val plan: PlanViewModel =
@@ -380,7 +381,6 @@ private fun MainShell(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val api = (context.applicationContext as SipwiseApp).container.api
     LedgerNotices(unlocked.ledger, snackbar)
     val updates: UpdateViewModel = viewModel()
     UpdatePrompt(updates, includePrereleases = user.role == "super_admin")

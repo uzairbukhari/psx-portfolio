@@ -1,10 +1,12 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -23,9 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.AreaChart
 import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.ChartSeries
 import app.sipwise.designsystem.DeltaPill
 import app.sipwise.designsystem.EmptyState
 import app.sipwise.designsystem.IconTile
@@ -35,17 +40,23 @@ import app.sipwise.designsystem.NightSlab
 import app.sipwise.designsystem.Overline
 import app.sipwise.designsystem.ProgressRing
 import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SegmentedControl
 import app.sipwise.designsystem.SipwiseCard
 import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
+import app.sipwise.designsystem.SkeletonBlock
 import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.ClassTotal
+import app.sipwise.model.DayMove
 import app.sipwise.model.MonthProgress
+import app.sipwise.model.Mover
 import app.sipwise.model.NextAction
 import app.sipwise.model.PortfolioSummary
 import app.sipwise.model.ReturnBreakdown
 import app.sipwise.model.TodayView
+import app.sipwise.model.TrackRange
+import app.sipwise.model.UpcomingDividend
 import app.sipwise.model.moneyShort
 import app.sipwise.model.monthTitle
 import app.sipwise.model.plural
@@ -87,7 +98,13 @@ fun TodayScreen(
         }
         view.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         item { HeroCard(view.summary, view.openCount, view.breakdown, ui.showReturn, viewModel::toggleReturn) }
+        ui.move?.takeIf { it.available }?.let { move -> item { MoveCard(move, onOpenCompany) } }
+        if (ui.track?.value?.isChart == true || (ui.track == null && !ui.historyFailed)) item { ValueCard(ui, viewModel) }
         item { MonthCard(view.progress) }
+        if (view.upcoming.isNotEmpty()) {
+            item { Text(stringResource(R.string.today_upcoming_title), style = MaterialTheme.typography.titleMedium) }
+            item { UpcomingCard(view.upcoming, onOpenCompany) }
+        }
         if (view.actions.isNotEmpty()) {
             item { Text(stringResource(R.string.actions_title), style = MaterialTheme.typography.titleMedium) }
             item {
@@ -186,6 +203,124 @@ private fun HeroCard(
         if (showReturn && breakdown != null) ReturnLines(breakdown)
         TextButton(onClick = onToggle) {
             Text(stringResource(if (showReturn) R.string.today_hide_return else R.string.today_see_return), color = BrandColors.sky)
+        }
+    }
+}
+
+/** What the holdings gained or lost on the last trading day, with the biggest mover each way. */
+@Composable
+private fun MoveCard(
+    move: DayMove,
+    onOpenCompany: (String) -> Unit,
+) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.today_move_title))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                MoneyText(signedMoney(move.amount), style = SipwiseNumbers.large, color = moveTone(move.amount))
+                DeltaPill(signedPercent(move.percent), positive = move.amount >= 0)
+            }
+            if (move.gainer != null || move.loser != null) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                    MoverTile(R.string.today_move_gainer, move.gainer, onOpenCompany, Modifier.weight(1f))
+                    MoverTile(R.string.today_move_loser, move.loser, onOpenCompany, Modifier.weight(1f))
+                }
+            }
+            if (move.counted < move.of) {
+                Text(
+                    stringResource(R.string.today_move_partial, move.counted, move.of),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun moveTone(amount: Double) = if (amount >= 0) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss
+
+@Composable
+private fun MoverTile(
+    label: Int,
+    mover: Mover?,
+    onOpen: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.let { if (mover != null) it.clickable { onOpen(mover.ticker) } else it }, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(stringResource(label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (mover == null) {
+            Text(stringResource(R.string.today_move_none), style = MaterialTheme.typography.bodyMedium)
+        } else {
+            Text(mover.ticker, style = MaterialTheme.typography.titleSmall)
+            DeltaPill(signedPercent(mover.percent), positive = mover.percent >= 0)
+        }
+    }
+}
+
+/** The portfolio's value over the last month, six months or year, from the same history the Insights chart uses. */
+@Composable
+private fun ValueCard(
+    ui: TodayUi,
+    viewModel: TodayViewModel,
+) {
+    val track = ui.track
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.today_value_title))
+            if (track == null) {
+                SkeletonBlock(Modifier.fillMaxWidth().height(VALUE_CHART_HEIGHT))
+            } else {
+                Text(track.value.summary, style = MaterialTheme.typography.bodyMedium)
+                AreaChart(
+                    series = listOf(ChartSeries(track.value.value, MaterialTheme.colorScheme.primary, fill = true)),
+                    description = track.value.spoken,
+                    height = VALUE_CHART_HEIGHT,
+                    xLabel = ::dayLabel,
+                    scrubDetail = { _, ys -> ys.filterNotNull().joinToString(" / ") { moneyShort(it) } },
+                )
+            }
+            val ranges = listOf(TrackRange.MONTH, TrackRange.HALF, TrackRange.YEAR)
+            val labels = ranges.associateWith { stringResource(rangeLabel(it)) }
+            SegmentedControl(ranges, ui.range, label = { labels.getValue(it) }, onSelect = viewModel::setRange)
+        }
+    }
+}
+
+private val VALUE_CHART_HEIGHT = 170.dp
+
+private fun rangeLabel(range: TrackRange) =
+    when (range) {
+        TrackRange.MONTH -> R.string.insights_range_1m
+        TrackRange.HALF -> R.string.insights_range_6m
+        else -> R.string.insights_range_1y
+    }
+
+/** The next payouts the ledger expects: when the book closes and what it should pay. */
+@Composable
+private fun UpcomingCard(
+    items: List<UpcomingDividend>,
+    onOpenCompany: (String) -> Unit,
+) {
+    val year = java.time.LocalDate.now().year
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        items.forEachIndexed { index, item ->
+            ListRow(
+                title = item.ticker,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+                subtitle = stringResource(R.string.today_upcoming_closure, shortDate(item.bookClosure, year)),
+                onClick = { onOpenCompany(item.ticker) },
+                leading = { IconTile(Icons.Outlined.Payments, SipwiseTheme.colors.gain) },
+                trailing = {
+                    val amount = item.amount
+                    if (amount != null) {
+                        MoneyText(moneyShort(amount), style = SipwiseNumbers.small)
+                    } else {
+                        Text(stringResource(R.string.today_upcoming_unknown), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+            )
+            if (index < items.lastIndex) HorizontalDivider(Modifier.padding(horizontal = Spacing.lg))
         }
     }
 }
