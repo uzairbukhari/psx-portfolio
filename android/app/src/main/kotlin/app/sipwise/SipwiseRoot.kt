@@ -2,16 +2,13 @@ package app.sipwise
 
 import android.app.Application
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Home
@@ -43,11 +40,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -82,11 +82,11 @@ import app.sipwise.network.MeResponse
 import app.sipwise.session.ConflictException
 import app.sipwise.ui.ActivityScreen
 import app.sipwise.ui.ActivityViewModel
+import app.sipwise.ui.BrandSplash
 import app.sipwise.ui.CompanyScreen
 import app.sipwise.ui.CompanyViewModel
 import app.sipwise.ui.EntryScreen
 import app.sipwise.ui.EntryViewModel
-import app.sipwise.ui.BrandSplash
 import app.sipwise.ui.EraseVaultScreen
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
@@ -467,7 +467,7 @@ private fun MainShell(
             composable<Insights> {
                 val insights: InsightsViewModel =
                     viewModel(factory = viewModelFactory { initializer { InsightsViewModel(unlocked.ledger, api) } })
-                InsightsScreen(insights)
+                InsightsScreen(insights, onOpenCompany = { nav.navigate(CompanyRoute(it)) })
             }
             composable<Inbox> { InboxScreen(inbox, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
             composable<Picks> { backStack ->

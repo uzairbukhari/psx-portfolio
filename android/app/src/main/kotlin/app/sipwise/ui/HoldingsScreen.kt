@@ -2,15 +2,14 @@ package app.sipwise.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -25,14 +24,27 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.DeltaPill
+import app.sipwise.designsystem.EmptyState
+import app.sipwise.designsystem.MoneyText
+import app.sipwise.designsystem.NightSlab
+import app.sipwise.designsystem.Overline
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SegmentedControl
+import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
+import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
+import app.sipwise.designsystem.TickerTile
+import app.sipwise.designsystem.Treemap
+import app.sipwise.designsystem.TreemapItem
 import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.HoldingRow
 import app.sipwise.model.HoldingSort
@@ -66,12 +78,12 @@ fun HoldingsScreen(
         }
     }
     if (view == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
     LazyColumn(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         val market = ui.market
         if (market?.index != null) item { MarketCard(market, ui.marketOpen) }
@@ -85,7 +97,8 @@ fun HoldingsScreen(
             }
             if (isAll) item { PortfolioBreakdown(overview, viewModel::openPortfolio) }
         }
-        if (view.rows.isEmpty() && ui.assets.isEmpty) item { Text(stringResource(R.string.holdings_empty), style = MaterialTheme.typography.bodyLarge) }
+        if (view.rows.isEmpty() && ui.assets.isEmpty) item { EmptyState(stringResource(R.string.nav_portfolio), stringResource(R.string.holdings_empty)) }
+        if (view.rows.size >= MIN_TREEMAP) item { AllocationCard(view.rows, onOpenCompany) }
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(ui.priceMessage ?: stringResource(R.string.holdings_prices_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
@@ -121,22 +134,32 @@ fun HoldingsScreen(
 
 @Composable
 private fun SummaryCard(summary: PortfolioSummary) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(stringResource(R.string.holdings_value), style = MaterialTheme.typography.labelLarge)
-            Text(moneyShort(summary.value), style = MaterialTheme.typography.headlineMedium)
-            val gain = summary.gain
-            if (gain != null) {
-                val color = if (gain >= 0) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss
-                Text(
-                    "${signedMoney(gain)} (${signedPercent(summary.gainPercent)})",
-                    color = color,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            } else if (summary.incomplete.isNotEmpty()) {
-                Text(stringResource(R.string.holdings_incomplete), style = MaterialTheme.typography.bodyMedium)
-            }
-            Text(plural(summary.heldCount, "holding"), style = MaterialTheme.typography.bodySmall)
+    NightSlab(Modifier.fillMaxWidth()) {
+        Overline(stringResource(R.string.holdings_value), color = SlabColors.muted)
+        MoneyText(moneyShort(summary.value), style = SipwiseNumbers.hero, color = SlabColors.ink)
+        val gain = summary.gain
+        if (gain != null) {
+            DeltaPill("${signedMoney(gain)} (${signedPercent(summary.gainPercent)})", positive = gain >= 0, onSlab = true)
+        } else if (summary.incomplete.isNotEmpty()) {
+            Text(stringResource(R.string.holdings_incomplete), style = MaterialTheme.typography.bodyMedium, color = SlabColors.muted)
+        }
+        Text(plural(summary.heldCount, "holding"), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
+    }
+}
+
+private const val MIN_TREEMAP = 3
+
+@Composable
+private fun AllocationCard(
+    rows: List<HoldingRow>,
+    onOpen: (String) -> Unit,
+) {
+    val items = rows.filter { (it.value ?: 0.0) > 0 }.sortedByDescending { it.value }.map { TreemapItem(it.ticker, it.ticker, it.value ?: 0.0, it.gainPercent) }
+    if (items.size < MIN_TREEMAP) return
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.holdings_allocation))
+            Treemap(items, stringResource(R.string.holdings_allocation_description), onClick = onOpen)
         }
     }
 }
@@ -146,15 +169,8 @@ private fun SortRow(
     selected: HoldingSort,
     onSelect: (HoldingSort) -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        items(HoldingSort.entries) { sort ->
-            FilterChip(
-                selected = sort == selected,
-                onClick = { onSelect(sort) },
-                label = { Text(stringResource(sortLabel(sort))) },
-            )
-        }
-    }
+    val labels = HoldingSort.entries.associateWith { stringResource(sortLabel(it)) }
+    SegmentedControl(HoldingSort.entries.toList(), selected, label = { labels.getValue(it) }, onSelect = onSelect)
 }
 
 private fun sortLabel(sort: HoldingSort) =
@@ -185,38 +201,30 @@ private fun HoldingItem(
     onOpen: (String) -> Unit,
 ) {
     val description = "${row.ticker}, ${row.name}, ${moneyShort(row.value)}, ${signedPercent(row.gainPercent)}"
-    Card(
+    SipwiseCard(
         onClick = { onOpen(row.ticker) },
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = description },
     ) {
-        Column(Modifier.padding(Spacing.lg)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(row.ticker, style = MaterialTheme.typography.titleMedium)
-                Text(moneyShort(row.value), style = MaterialTheme.typography.titleMedium)
+        Row(Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            TickerTile(row.ticker, sector = row.sector.ifEmpty { null })
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(row.ticker, style = MaterialTheme.typography.titleSmall)
+                Text(row.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                val priceLine =
+                    if (row.price != null) {
+                        pluralStringResource(R.plurals.holding_priced, row.shares.toInt(), row.shares.toLong(), shortDate(row.priceDate))
+                    } else {
+                        pluralStringResource(R.plurals.holding_no_price, row.shares.toInt(), row.shares.toLong())
+                    }
+                Text(priceLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (row.stale) Text(stringResource(R.string.holding_stale), style = MaterialTheme.typography.labelSmall, color = SipwiseTheme.colors.warn)
+                if (row.expectedDividend) Text(stringResource(R.string.holding_dividend_expected), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(row.name, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                MoneyText(moneyShort(row.value), style = SipwiseNumbers.medium)
                 val gain = row.gain
-                if (gain != null) {
-                    val color = if (gain >= 0) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss
-                    Text(
-                        "${signedMoney(gain)} ${signedPercent(row.gainPercent)}",
-                        color = color,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.End,
-                    )
-                }
+                if (gain != null) DeltaPill(signedPercent(row.gainPercent), positive = gain >= 0)
             }
-            HorizontalDivider(Modifier.padding(vertical = Spacing.sm))
-            val priceLine =
-                if (row.price != null) {
-                    pluralStringResource(R.plurals.holding_priced, row.shares.toInt(), row.shares.toLong(), shortDate(row.priceDate))
-                } else {
-                    pluralStringResource(R.plurals.holding_no_price, row.shares.toInt(), row.shares.toLong())
-                }
-            Text(priceLine, style = MaterialTheme.typography.bodySmall)
-            if (row.stale) Text(stringResource(R.string.holding_stale), style = MaterialTheme.typography.labelSmall, color = SipwiseTheme.colors.warn)
-            if (row.expectedDividend) Text(stringResource(R.string.holding_dividend_expected), style = MaterialTheme.typography.labelSmall)
         }
     }
 }

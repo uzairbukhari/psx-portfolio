@@ -2,6 +2,7 @@ package app.sipwise.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,11 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -34,7 +32,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.ListRow
+import app.sipwise.designsystem.MoneyText
+import app.sipwise.designsystem.NightSlab
+import app.sipwise.designsystem.Overline
+import app.sipwise.designsystem.ProgressRing
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SipwiseNumbers
+import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
+import app.sipwise.designsystem.TargetBar
+import app.sipwise.designsystem.TickerTile
 import app.sipwise.model.MonthBuy
 import app.sipwise.model.PlanRow
 import app.sipwise.model.PlanView
@@ -54,11 +64,11 @@ fun PlanScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
     LazyColumn(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
+        contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item { BudgetCard(view, onShift = viewModel::shift, onEdit = { viewModel.editBudget(true) }) }
@@ -86,66 +96,71 @@ private fun BudgetCard(
     onShift: (Int) -> Unit,
     onEdit: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { onShift(-1) }) { Text(stringResource(R.string.plan_prev, monthTitle(shiftMonth(view.month, -1)))) }
-                TextButton(onClick = { onShift(1) }) { Text(stringResource(R.string.plan_next, monthTitle(shiftMonth(view.month, 1)))) }
-            }
-            Text(monthTitle(view.month), style = MaterialTheme.typography.titleLarge)
-            Text(
-                stringResource(
-                    when {
-                        view.month == view.now -> R.string.plan_this_month
-                        view.month > view.now -> R.string.plan_upcoming
-                        else -> R.string.plan_past
-                    },
-                ),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                if (view.budgetSet) moneyShort(view.plan?.budget ?: view.budget) else stringResource(R.string.plan_budget_not_set),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            val plan = view.plan
+    NightSlab(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { onShift(-1) }) { Text(stringResource(R.string.plan_prev, monthTitle(shiftMonth(view.month, -1))), color = BrandColors.sky) }
+            TextButton(onClick = { onShift(1) }) { Text(stringResource(R.string.plan_next, monthTitle(shiftMonth(view.month, 1))), color = BrandColors.sky) }
+        }
+        val plan = view.plan
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
             if (plan != null && view.budgetSet && plan.budget > 0) {
-                LinearProgressIndicator(progress = { (plan.already / plan.budget).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                ProgressRing((plan.already / plan.budget).toFloat().coerceIn(0f, 1f), centerText = "${(plan.already / plan.budget * PERCENT).toInt()}%")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
-                Column {
-                    Text(stringResource(R.string.plan_bought), style = MaterialTheme.typography.labelMedium)
-                    Text(moneyShort(plan?.already ?: 0.0), style = MaterialTheme.typography.titleMedium)
-                }
-                if (view.budgetSet) {
-                    Column {
-                        Text(stringResource(R.string.plan_left), style = MaterialTheme.typography.labelMedium)
-                        Text(moneyShort(plan?.remaining ?: 0.0), style = MaterialTheme.typography.titleMedium)
-                    }
-                }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Overline(monthTitle(view.month), color = SlabColors.muted)
+                MoneyText(
+                    if (view.budgetSet) moneyShort(plan?.budget ?: view.budget) else stringResource(R.string.plan_budget_not_set),
+                    style = SipwiseNumbers.large,
+                    color = SlabColors.ink,
+                )
+                Text(
+                    stringResource(
+                        when {
+                            view.month == view.now -> R.string.plan_this_month
+                            view.month > view.now -> R.string.plan_upcoming
+                            else -> R.string.plan_past
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SlabColors.muted,
+                )
             }
-            val monthName = monthTitle(view.month, false)
-            val label = if (view.budgetSet) stringResource(R.string.plan_edit_budget, monthName) else stringResource(R.string.plan_set_budget, monthName)
+        }
+        HorizontalDivider(color = SlabColors.track)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
+            Column {
+                Text(stringResource(R.string.plan_bought), style = MaterialTheme.typography.labelMedium, color = SlabColors.muted)
+                MoneyText(moneyShort(plan?.already ?: 0.0), style = SipwiseNumbers.medium, color = SlabColors.ink)
+            }
             if (view.budgetSet) {
-                OutlinedButton(onClick = onEdit, enabled = !view.readOnly) { Text(label) }
-            } else {
-                Button(onClick = onEdit, enabled = !view.readOnly) { Text(label) }
+                Column {
+                    Text(stringResource(R.string.plan_left), style = MaterialTheme.typography.labelMedium, color = SlabColors.muted)
+                    MoneyText(moneyShort(plan?.remaining ?: 0.0), style = SipwiseNumbers.medium, color = SlabColors.ink)
+                }
             }
+        }
+        val monthName = monthTitle(view.month, false)
+        val label = if (view.budgetSet) stringResource(R.string.plan_edit_budget, monthName) else stringResource(R.string.plan_set_budget, monthName)
+        if (view.budgetSet) {
+            GhostButton(label, onClick = onEdit, enabled = !view.readOnly)
+        } else {
+            BrandButton(label, onClick = onEdit, enabled = !view.readOnly)
         }
     }
 }
 
+private const val PERCENT = 100
+
 @Composable
 private fun BoughtItem(buy: MonthBuy) {
-    Column {
-        ListItem(
-            headlineContent = { Text(buy.ticker) },
-            supportingContent = {
-                val price = buy.price?.let { " @ ${money(it)}" }.orEmpty()
-                Text("${pluralStringResource(R.plurals.plan_shares, buy.shares.toInt(), buy.shares.toInt())}$price · ${shortDate(buy.date)}")
-            },
-            trailingContent = { Text(money(buy.amount)) },
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        ListRow(
+            title = buy.ticker,
+            subtitle = "${pluralStringResource(R.plurals.plan_shares, buy.shares.toInt(), buy.shares.toInt())}${buy.price?.let { " @ ${money(it)}" }.orEmpty()} · ${shortDate(buy.date)}",
+            modifier = Modifier.padding(horizontal = Spacing.lg),
+            leading = { TickerTile(buy.ticker) },
+            trailing = { MoneyText(money(buy.amount), style = SipwiseNumbers.small) },
         )
-        HorizontalDivider()
     }
 }
 
@@ -154,12 +169,12 @@ private fun NoTargets(
     view: PlanView,
     onEditTargets: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.plan_no_targets_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.plan_no_targets_body), style = MaterialTheme.typography.bodyMedium)
             if (view.companyCount == 0) Text(stringResource(R.string.plan_no_companies), style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onEditTargets, enabled = !view.readOnly && view.companyCount > 0) { Text(stringResource(R.string.plan_set_targets)) }
+            BrandButton(stringResource(R.string.plan_set_targets), onClick = onEditTargets, enabled = !view.readOnly && view.companyCount > 0)
         }
     }
 }
@@ -183,9 +198,7 @@ private fun PlanBody(
             plan.rows.forEach { SuggestionItem(it) }
             if (view.buys.isNotEmpty() && !view.readOnly) {
                 ReceiverChooser(view, ui, viewModel)
-                Button(onClick = viewModel::openReview, modifier = Modifier.fillMaxWidth()) {
-                    Text(pluralStringResource(R.plurals.plan_record_all, view.buys.size, view.buys.size))
-                }
+                BrandButton(pluralStringResource(R.plurals.plan_record_all, view.buys.size, view.buys.size), onClick = viewModel::openReview)
             }
         }
     }
@@ -229,36 +242,31 @@ private fun ReceiverChooser(
 
 @Composable
 private fun SuggestionItem(row: PlanRow) {
-    Column {
-        ListItem(
-            headlineContent = { Text(row.ticker) },
-            supportingContent = {
-                Column {
-                    Text(row.name, maxLines = 1)
-                    Text(
-                        stringResource(
-                            R.string.plan_row_weights,
-                            "%.1f".format(row.currentWeight),
-                            "%.0f".format(row.target),
-                            row.price?.let { money(it) } ?: stringResource(R.string.plan_price_missing),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    val target = row.target
-                    LinearProgressIndicator(
-                        progress = { if (target > 0) (row.currentWeight / target).toFloat().coerceIn(0f, 1f) else 0f },
-                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
-                    )
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                TickerTile(row.ticker)
+                Column(Modifier.weight(1f)) {
+                    Text(row.ticker, style = MaterialTheme.typography.titleSmall)
+                    Text(row.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-            },
-            trailingContent = {
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(if (row.shares > 0) pluralStringResource(R.plurals.plan_shares, row.shares.toInt(), row.shares.toInt()) else "—")
-                    Text(if (row.amount > 0) money(row.amount) else row.reason, style = MaterialTheme.typography.bodySmall)
+                    Text(if (row.shares > 0) pluralStringResource(R.plurals.plan_shares, row.shares.toInt(), row.shares.toInt()) else "—", style = MaterialTheme.typography.titleSmall)
+                    MoneyText(if (row.amount > 0) money(row.amount) else row.reason, style = SipwiseNumbers.tiny, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            },
-        )
-        HorizontalDivider()
+            }
+            Text(
+                stringResource(
+                    R.string.plan_row_weights,
+                    "%.1f".format(row.currentWeight),
+                    "%.0f".format(row.target),
+                    row.price?.let { money(it) } ?: stringResource(R.string.plan_price_missing),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TargetBar(row.currentWeight, row.target)
+        }
     }
 }
 
@@ -267,7 +275,7 @@ private fun PlanSettings(
     ui: PlanUi,
     viewModel: PlanViewModel,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.plan_settings), style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(

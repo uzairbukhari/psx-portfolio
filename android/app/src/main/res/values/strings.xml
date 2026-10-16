@@ -21,6 +21,10 @@
     <string name="vault_password_again">Type it again</string>
     <string name="vault_password_mismatch">The passwords do not match.</string>
     <string name="vault_create">Create vault</string>
+    <string name="overview_mix_description">Asset mix. Tap a segment to focus it.</string>
+    <string name="holdings_allocation">Allocation</string>
+    <string name="holdings_allocation_description">Allocation by company. Size is value, green is a gain, red is a loss.</string>
+    <string name="company_avg_tag">avg</string>
     <string name="vault_continue">Continue</string>
     <string name="vault_check_length">At least 15 characters</string>
     <string name="vault_check_obvious">Not your email or a common word</string>
@@ -44,7 +48,6 @@
     <string name="recovery_body">This key is the only way back in if you forget your password. Write it down or store it in a password manager. It is shown once and Sipwise cannot recover it.</string>
     <string name="recovery_saved">I saved my recovery key</string>
 
-    <string name="unlock_title">Unlock your portfolio</string>
     <string name="unlock_offline">You are offline. Your last saved portfolio will open.</string>
     <string name="unlock">Unlock</string>
     <string name="unlocking">Unlocking…</string>
@@ -193,7 +196,6 @@
     <string name="company_unrealised">Unrealised gain</string>
     <string name="company_realised">Realised gain</string>
     <string name="company_cost_unknown">Cost is not known. Edit the opening entry to add its cost.</string>
-    <string name="company_price_chart">Price</string>
     <string name="company_change_up">Up %1$s (%2$s) over %3$s</string>
     <string name="company_change_down">Down %1$s (%2$s) over %3$s</string>
     <string name="company_change_flat">Unchanged over %1$s</string>
@@ -410,7 +412,6 @@
     <string name="insights_income_note">Realised gain is sales at average cost, after fees. Only dividends marked received count; expected ones do not.</string>
     <string name="insights_value_vs_in">Value vs money in</string>
     <string name="insights_history_error">Could not load price history. Your saved numbers above are unaffected.</string>
-    <string name="insights_history_loading">Loading price history…</string>
     <string name="insights_range_1m">1M</string>
     <string name="insights_range_6m">6M</string>
     <string name="insights_range_1y">1Y</string>

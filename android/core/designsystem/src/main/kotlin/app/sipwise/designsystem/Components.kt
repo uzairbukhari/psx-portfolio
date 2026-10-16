@@ -136,6 +136,7 @@ fun NightSlab(
                     drawRect(Brush.radialGradient(listOf(SlabColors.glowMint, Color.Transparent), Offset(size.width, 0f), size.width * GLOW_RADIUS))
                 }.border(1.dp, Color.White.copy(alpha = SLAB_EDGE_ALPHA), shape)
                 .padding(Spacing.lg + 2.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             content = content,
         )
     }

@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +29,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SipwiseCard
 import app.sipwise.designsystem.Spacing
+import app.sipwise.designsystem.TickerTile
 import app.sipwise.model.PickRow
 import app.sipwise.model.PicksProgress
 import app.sipwise.model.PicksStep
@@ -46,11 +48,11 @@ fun PicksScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
     val readOnly = view.readOnly
-    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         item { Text(stringResource(R.string.picks_experimental), style = MaterialTheme.typography.bodySmall) }
         item { Text(stringResource(R.string.picks_how), style = MaterialTheme.typography.bodySmall) }
         if (readOnly) item { Text(stringResource(R.string.picks_read_only, monthTitle(view.month)), color = MaterialTheme.colorScheme.tertiary) }
@@ -89,7 +91,7 @@ private fun InputsCard(
 ) {
     val selected = ui.selected
     val shown = view.companies.filter { ui.query.isBlank() || it.ticker.contains(ui.query.trim(), true) || it.name.contains(ui.query.trim(), true) }
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.picks_companies, selected.size, view.max), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.picks_counts, view.counts.saved, view.counts.held, view.counts.shortlisted), style = MaterialTheme.typography.bodySmall)
@@ -147,7 +149,7 @@ private fun ProgressCard(progress: PicksProgress) {
             PicksStep.ALLOCATING -> R.string.picks_step_allocating
             PicksStep.SAVED -> R.string.picks_step_saved
         }
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.picks_progress, stringResource(label), progress.percent), style = MaterialTheme.typography.titleSmall)
             LinearProgressIndicator(progress = { progress.percent / PERCENT_FULL }, modifier = Modifier.fillMaxWidth())
@@ -162,7 +164,7 @@ private const val PERCENT_FULL = 100f
 
 @Composable
 private fun OutlookCard(text: String) {
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(stringResource(R.string.picks_outlook), style = MaterialTheme.typography.titleSmall)
             Text(text)
@@ -177,9 +179,10 @@ private fun PickCard(
     onRecordOne: (ticker: String, shares: String, price: String) -> Unit,
 ) {
     val links = LocalUriHandler.current
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
+                TickerTile(row.ticker)
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.picks_row_title, row.ticker, row.allocationPct.toInt()), style = MaterialTheme.typography.titleMedium)
                     Text(row.name, style = MaterialTheme.typography.bodySmall)

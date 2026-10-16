@@ -1,7 +1,5 @@
 package app.sipwise.ui
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,12 +13,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,26 +23,37 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.AreaChart
+import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.ChartReference
+import app.sipwise.designsystem.ChartSeries
+import app.sipwise.designsystem.DeltaPill
+import app.sipwise.designsystem.ListRow
+import app.sipwise.designsystem.MoneyText
+import app.sipwise.designsystem.NightSlab
+import app.sipwise.designsystem.Overline
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SegmentedControl
+import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
+import app.sipwise.designsystem.SkeletonBlock
+import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
+import app.sipwise.designsystem.StatTile
+import app.sipwise.designsystem.TickerTile
 import app.sipwise.model.ActivityEntry
 import app.sipwise.model.CompanyView
 import app.sipwise.model.DividendRow
 import app.sipwise.model.HistoryRange
-import app.sipwise.model.HistorySeries
 import app.sipwise.model.money
 import app.sipwise.model.moneyShort
 import app.sipwise.model.shortDate
@@ -64,7 +69,7 @@ fun CompanyScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
     if (!view.found) {
@@ -76,41 +81,28 @@ fun CompanyScreen(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item {
-            Text(view.name, style = MaterialTheme.typography.headlineSmall)
-            Text(stringResource(R.string.company_subtitle, view.ticker, view.sector), style = MaterialTheme.typography.bodyMedium)
-        }
-        item { PriceCard(view, onSetPrice = { viewModel.open(CompanyDialog.Price) }) }
-        item { PositionCard(view) }
-        item {
-            Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.company_add, view.ticker)) }
-        }
-        item { ChartCard(ui, viewModel) }
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                item {
-                    FilterChip(
-                        selected = ui.tab == CompanyTab.LEDGER,
-                        onClick = { viewModel.setTab(CompanyTab.LEDGER) },
-                        label = { Text(stringResource(R.string.company_tab_ledger)) },
-                    )
-                }
-                item {
-                    val expected = view.dividends.count { it.expected }
-                    FilterChip(
-                        selected = ui.tab == CompanyTab.DIVIDENDS,
-                        onClick = { viewModel.setTab(CompanyTab.DIVIDENDS) },
-                        label = {
-                            Text(
-                                if (expected > 0) {
-                                    pluralStringResource(R.plurals.company_tab_dividends_expected, expected, expected)
-                                } else {
-                                    stringResource(R.string.company_tab_dividends)
-                                },
-                            )
-                        },
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                TickerTile(view.ticker, sector = view.sector.ifEmpty { null }, size = 48.dp)
+                Column {
+                    Text(view.name, style = MaterialTheme.typography.titleLarge, maxLines = 2)
+                    Text(stringResource(R.string.company_subtitle, view.ticker, view.sector), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+        item { HeroCard(view, ui, viewModel, onSetPrice = { viewModel.open(CompanyDialog.Price) }) }
+        item { PositionCard(view) }
+        item { BrandButton(stringResource(R.string.company_add, view.ticker), onClick = onAdd) }
+        item {
+            val expected = view.dividends.count { it.expected }
+            val dividendLabel =
+                if (expected > 0) pluralStringResource(R.plurals.company_tab_dividends_expected, expected, expected) else stringResource(R.string.company_tab_dividends)
+            val ledgerLabel = stringResource(R.string.company_tab_ledger)
+            SegmentedControl(
+                CompanyTab.entries.toList(),
+                ui.tab,
+                label = { if (it == CompanyTab.LEDGER) ledgerLabel else dividendLabel },
+                onSelect = viewModel::setTab,
+            )
         }
         if (ui.tab == CompanyTab.DIVIDENDS) {
             if (view.dividends.isEmpty()) item { Text(stringResource(R.string.company_no_dividends)) }
@@ -128,35 +120,10 @@ fun CompanyScreen(
 }
 
 @Composable
-private fun PriceCard(
-    view: CompanyView,
-    onSetPrice: () -> Unit,
-) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(stringResource(R.string.company_last_price), style = MaterialTheme.typography.labelLarge)
-            val price = view.price
-            if (price != null) {
-                Text(money(price), style = MaterialTheme.typography.headlineMedium)
-                val date = shortDate(view.priceDate)
-                Text(
-                    if (view.priceManual) stringResource(R.string.company_price_manual, date) else stringResource(R.string.company_price_asof, date),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            } else {
-                Text(stringResource(R.string.company_no_price), style = MaterialTheme.typography.titleMedium)
-                view.hiddenQuoteDate?.let { Text(stringResource(R.string.company_price_hidden, shortDate(it)), style = MaterialTheme.typography.bodySmall) }
-            }
-            OutlinedButton(onClick = onSetPrice) { Text(stringResource(R.string.company_set_price)) }
-        }
-    }
-}
-
-@Composable
 private fun PositionCard(view: CompanyView) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(stringResource(R.string.company_position), style = MaterialTheme.typography.labelLarge)
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.company_position))
             if (view.shares == 0.0) Text(stringResource(R.string.company_sold_out), style = MaterialTheme.typography.bodyMedium)
             StatRow(R.string.company_shares to shares(view.shares), R.string.company_average to money(view.average))
             StatRow(R.string.company_cost to moneyShort(view.cost), R.string.company_value to moneyShort(view.value))
@@ -179,104 +146,81 @@ private fun StatRow(
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
         for ((label, value) in listOf(left, right)) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(label), style = MaterialTheme.typography.labelMedium)
-                Text(value, style = MaterialTheme.typography.titleMedium)
-            }
+            StatTile(stringResource(label), value, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun ChartCard(
+private fun HeroCard(
+    view: CompanyView,
     ui: CompanyUi,
     viewModel: CompanyViewModel,
+    onSetPrice: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(stringResource(R.string.company_price_chart), style = MaterialTheme.typography.labelLarge)
-            val series = ui.series
-            val spoken = stringResource(rangeSpoken(ui.range))
-            val change = series?.change
-            if (change != null) {
-                val text =
-                    when {
-                        change.change == 0.0 -> stringResource(R.string.company_change_flat, spoken)
-                        change.change > 0 -> stringResource(R.string.company_change_up, money(change.change), signedPercent(change.percent), spoken)
-                        else -> stringResource(R.string.company_change_down, money(-change.change), signedPercent(change.percent), spoken)
-                    }
-                Text(text, style = MaterialTheme.typography.titleSmall)
-            }
-            when {
-                ui.historyLoading -> LoadingBlock()
-                ui.historyError != null ->
-                    Column {
-                        Text(ui.historyError.orEmpty(), color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = viewModel::loadHistory) { Text(stringResource(R.string.retry)) }
-                    }
-                series == null || series.points.size < 2 -> Text(stringResource(R.string.company_no_history))
-                else -> LineChart(series, spoken)
-            }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                items(HistoryRange.entries) { range ->
-                    FilterChip(
-                        selected = range == ui.range,
-                        onClick = { viewModel.setRange(range) },
-                        label = { Text(stringResource(rangeShort(range))) },
-                    )
+    NightSlab(Modifier.fillMaxWidth()) {
+        Overline(stringResource(R.string.company_last_price), color = SlabColors.muted)
+        val price = view.price
+        if (price != null) {
+            MoneyText(money(price), style = SipwiseNumbers.hero, color = SlabColors.ink)
+            val date = shortDate(view.priceDate)
+            Text(
+                if (view.priceManual) stringResource(R.string.company_price_manual, date) else stringResource(R.string.company_price_asof, date),
+                style = MaterialTheme.typography.bodySmall,
+                color = SlabColors.muted,
+            )
+        } else {
+            Text(stringResource(R.string.company_no_price), style = MaterialTheme.typography.titleMedium, color = SlabColors.ink)
+            view.hiddenQuoteDate?.let { Text(stringResource(R.string.company_price_hidden, shortDate(it)), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted) }
+        }
+        val series = ui.series
+        val spoken = stringResource(rangeSpoken(ui.range))
+        val change = series?.change
+        if (change != null) {
+            val text =
+                when {
+                    change.change == 0.0 -> stringResource(R.string.company_change_flat, spoken)
+                    change.change > 0 -> stringResource(R.string.company_change_up, money(change.change), signedPercent(change.percent), spoken)
+                    else -> stringResource(R.string.company_change_down, money(-change.change), signedPercent(change.percent), spoken)
                 }
+            DeltaPill(text, positive = if (change.change == 0.0) null else change.change > 0, onSlab = true)
+        }
+        when {
+            ui.historyLoading -> SkeletonBlock(Modifier.fillMaxWidth().height(CHART_HEIGHT))
+            ui.historyError != null ->
+                Column {
+                    Text(ui.historyError.orEmpty(), color = SlabColors.loss)
+                    TextButton(onClick = viewModel::loadHistory) { Text(stringResource(R.string.retry), color = BrandColors.sky) }
+                }
+            series == null || series.points.size < 2 -> Text(stringResource(R.string.company_no_history), color = SlabColors.muted)
+            else -> {
+                val rising = (series.change?.change ?: 0.0) >= 0
+                AreaChart(
+                    series = listOf(ChartSeries(series.points, if (rising) SlabColors.gain else SlabColors.loss, fill = true)),
+                    description = stringResource(R.string.company_chart_description, spoken),
+                    height = CHART_HEIGHT,
+                    onSlab = true,
+                    xLabel = timeLabel(ui.range),
+                    scrubDetail = { _, ys -> ys.firstOrNull()?.let(::money).orEmpty() },
+                    references = view.average?.takeIf { view.shares > 0 }?.let { listOf(ChartReference(it, stringResource(R.string.company_avg_tag), BrandColors.sky)) }.orEmpty(),
+                )
             }
         }
+        val ranges = HistoryRange.entries.toList()
+        val labels = ranges.associateWith { stringResource(rangeShort(it)) }
+        SegmentedControl(ranges, ui.range, label = { labels.getValue(it) }, onSelect = viewModel::setRange, onSlab = true)
+        TextButton(onClick = onSetPrice) { Text(stringResource(R.string.company_set_price), color = BrandColors.sky) }
     }
 }
 
-@Composable
-private fun LoadingBlock() {
-    Column(Modifier.fillMaxWidth().height(CHART_HEIGHT)) { LoadingScreen() }
-}
-
-private val CHART_HEIGHT = 150.dp
-
-@Composable
-private fun LineChart(
-    series: HistorySeries,
-    spokenRange: String,
-) {
-    val points = series.points
-    val rising = (series.change?.change ?: 0.0) >= 0
-    val color: Color = if (rising) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss
-    val description = stringResource(R.string.company_chart_description, spokenRange)
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(CHART_HEIGHT)
-            .semantics { contentDescription = description },
-    ) {
-        val xs = points.map { it[0] }
-        val ys = points.map { it[1] }
-        val minX = xs.min()
-        val spanX = (xs.max() - minX).takeIf { it > 0 } ?: 1.0
-        val minY = ys.min()
-        val spanY = (ys.max() - minY).takeIf { it > 0 } ?: 1.0
-        val path = Path()
-        points.forEachIndexed { i, p ->
-            val x = ((p[0] - minX) / spanX * size.width).toFloat()
-            val y = size.height - ((p[1] - minY) / spanY * size.height).toFloat()
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, color, style = Stroke(width = 2.dp.toPx()))
-        drawLine(color.copy(alpha = AXIS_ALPHA), Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-    }
-}
-
-private const val AXIS_ALPHA = 0.3f
+private val CHART_HEIGHT = 170.dp
 
 @Composable
 private fun DividendItem(
     row: DividendRow,
     onReceive: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             val perShare = row.perShare?.let { stringResource(R.string.company_per_share, money(it)) }.orEmpty()
             Text(
@@ -306,14 +250,14 @@ private fun EntryItem(
     entry: ActivityEntry,
     onOpen: () -> Unit,
 ) {
-    Column {
-        ListItem(
-            headlineContent = { Text(entry.title) },
-            supportingContent = { Text("${shortDate(entry.date)} · ${entry.detail}") },
-            trailingContent = { entry.amount?.let { Text(money(it)) } },
-            modifier = if (entry.editable) Modifier.clickable(onClick = onOpen) else Modifier,
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        ListRow(
+            title = entry.title,
+            subtitle = "${shortDate(entry.date)} · ${entry.detail}",
+            onClick = if (entry.editable) onOpen else null,
+            modifier = Modifier.padding(horizontal = Spacing.lg),
+            trailing = { entry.amount?.let { MoneyText(money(it), style = SipwiseNumbers.small) } },
         )
-        HorizontalDivider()
     }
 }
 

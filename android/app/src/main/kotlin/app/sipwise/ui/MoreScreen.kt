@@ -1,16 +1,19 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -28,15 +31,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.sipwise.BuildConfig
 import app.sipwise.R
 import app.sipwise.data.Appearance
 import app.sipwise.data.ShareFiles
+import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.NightSlab
+import app.sipwise.designsystem.Overline
+import app.sipwise.designsystem.SegmentedControl
+import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.mediumDate
 import app.sipwise.network.MeResponse
@@ -70,15 +82,8 @@ fun MoreScreen(
         AccountCard(user)
         ui.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         SectionCard(R.string.settings_appearance) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                for (option in Appearance.entries) {
-                    FilterChip(
-                        selected = option == appearance,
-                        onClick = { settings.setAppearance(option) },
-                        label = { Text(stringResource(appearanceLabel(option))) },
-                    )
-                }
-            }
+            val labels = Appearance.entries.associateWith { stringResource(appearanceLabel(it)) }
+            SegmentedControl(Appearance.entries.toList(), appearance, label = { labels.getValue(it) }, onSelect = settings::setAppearance)
             Text(stringResource(R.string.settings_appearance_note), style = MaterialTheme.typography.bodySmall)
         }
         SectionCard(R.string.settings_tax) {
@@ -128,11 +133,16 @@ private fun appearanceLabel(option: Appearance) =
 
 @Composable
 private fun AccountCard(user: MeResponse) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(user.name ?: user.email, style = MaterialTheme.typography.titleMedium)
-            if (user.name != null) Text(user.email, style = MaterialTheme.typography.bodyMedium)
-            if (user.role == "super_admin") Text(stringResource(R.string.settings_admin), style = MaterialTheme.typography.labelMedium)
+    NightSlab(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(Modifier.size(52.dp).clip(CircleShape).background(BrandColors.button), contentAlignment = Alignment.Center) {
+                Text((user.name ?: user.email).take(1).uppercase(), style = MaterialTheme.typography.titleLarge, color = Color.White)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(user.name ?: user.email, style = MaterialTheme.typography.titleMedium, color = SlabColors.ink)
+                if (user.name != null) Text(user.email, style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
+                if (user.role == "super_admin") Overline(stringResource(R.string.settings_admin), color = BrandColors.sky)
+            }
         }
     }
 }
@@ -142,9 +152,9 @@ internal fun SectionCard(
     title: Int,
     content: @Composable () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+            Overline(stringResource(title))
             content()
         }
     }

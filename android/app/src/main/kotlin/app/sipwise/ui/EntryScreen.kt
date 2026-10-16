@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.ScreenSkeleton
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.EntryForm
 import app.sipwise.model.EntryKind
@@ -52,7 +53,7 @@ fun EntryScreen(
     LaunchedEffect(ui.saved) { if (ui.saved) onDone() }
     val options = ui.options
     if (options == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
     val form = ui.form

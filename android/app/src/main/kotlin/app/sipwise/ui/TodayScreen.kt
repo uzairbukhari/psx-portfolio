@@ -1,27 +1,44 @@
 package app.sipwise.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.DeltaPill
+import app.sipwise.designsystem.EmptyState
+import app.sipwise.designsystem.IconTile
+import app.sipwise.designsystem.ListRow
+import app.sipwise.designsystem.MoneyText
+import app.sipwise.designsystem.NightSlab
+import app.sipwise.designsystem.Overline
+import app.sipwise.designsystem.ProgressRing
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
+import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.MonthProgress
 import app.sipwise.model.NextAction
@@ -45,7 +62,7 @@ fun TodayScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
     if (view.firstUse && !ui.skippedWelcome) {
@@ -53,7 +70,7 @@ fun TodayScreen(
         return
     }
     LazyColumn(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
+        contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         if (view.firstUse) {
@@ -87,47 +104,51 @@ private fun HeroCard(
     showReturn: Boolean,
     onToggle: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            val incomplete = summary.incomplete.isNotEmpty()
-            Text(
-                stringResource(if (incomplete) R.string.today_hero_incomplete else R.string.today_hero_label),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            summary.oldestQuoteDate?.let { Text(shortDate(it), style = MaterialTheme.typography.bodySmall) }
-            Text(moneyShort(summary.value), style = MaterialTheme.typography.displaySmall)
-            val gain = summary.gain
-            if (gain == null) {
-                Text(stringResource(R.string.today_gain_unknown), style = MaterialTheme.typography.bodyMedium)
-            } else {
-                Text(
-                    "${signedMoney(gain)} (${signedPercent(summary.gainPercent)})",
-                    color = gainColor(gain),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(stringResource(R.string.today_gain_label), style = MaterialTheme.typography.bodySmall)
-            }
-            HorizontalDivider()
-            LabelledValue(stringResource(R.string.today_cost), summary.cost?.let(::moneyShort) ?: stringResource(R.string.today_not_known))
-            LabelledValue(stringResource(R.string.today_holdings), plural(openCount, "company", "companies"))
-            if (showReturn && breakdown != null) ReturnLines(breakdown)
-            TextButton(onClick = onToggle) {
-                Text(stringResource(if (showReturn) R.string.today_hide_return else R.string.today_see_return))
+    NightSlab(Modifier.fillMaxWidth()) {
+        val incomplete = summary.incomplete.isNotEmpty()
+        Overline(stringResource(if (incomplete) R.string.today_hero_incomplete else R.string.today_hero_label), color = SlabColors.muted)
+        summary.oldestQuoteDate?.let { Text(shortDate(it), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted) }
+        MoneyText(moneyShort(summary.value), style = SipwiseNumbers.hero, color = SlabColors.ink)
+        val gain = summary.gain
+        if (gain == null) {
+            Text(stringResource(R.string.today_gain_unknown), style = MaterialTheme.typography.bodyMedium, color = SlabColors.muted)
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                DeltaPill("${signedMoney(gain)} (${signedPercent(summary.gainPercent)})", positive = gain >= 0, onSlab = true)
+                Text(stringResource(R.string.today_gain_label), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
             }
         }
+        HorizontalDivider(color = SlabColors.track)
+        SlabLine(stringResource(R.string.today_cost), summary.cost?.let(::moneyShort) ?: stringResource(R.string.today_not_known))
+        SlabLine(stringResource(R.string.today_holdings), plural(openCount, "company", "companies"))
+        if (showReturn && breakdown != null) ReturnLines(breakdown)
+        TextButton(onClick = onToggle) {
+            Text(stringResource(if (showReturn) R.string.today_hide_return else R.string.today_see_return), color = BrandColors.sky)
+        }
+    }
+}
+
+@Composable
+private fun SlabLine(
+    label: String,
+    value: String,
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = SlabColors.muted)
+        MoneyText(value, style = SipwiseNumbers.small, color = SlabColors.ink)
     }
 }
 
 @Composable
 private fun ReturnLines(b: ReturnBreakdown) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        HorizontalDivider()
+        HorizontalDivider(color = SlabColors.track)
         ReturnLine(stringResource(R.string.return_unrealised), b.unrealised, colored = true)
         ReturnLine(stringResource(R.string.return_realised), b.realised, colored = true)
         ReturnLine(stringResource(R.string.return_dividends), b.dividendsReceived, colored = false)
         ReturnLine(stringResource(R.string.return_total), b.totalBeforeTax, colored = true)
-        b.afterTax?.let { Text(stringResource(R.string.return_after_tax, signedMoney(it)), style = MaterialTheme.typography.bodySmall) }
-        Text(stringResource(R.string.return_note), style = MaterialTheme.typography.bodySmall)
+        b.afterTax?.let { Text(stringResource(R.string.return_after_tax, signedMoney(it)), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted) }
+        Text(stringResource(R.string.return_note), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
     }
 }
 
@@ -138,53 +159,48 @@ private fun ReturnLine(
     colored: Boolean,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = SlabColors.muted, modifier = Modifier.weight(1f))
         when {
-            value == null -> Text(stringResource(R.string.today_not_known), style = MaterialTheme.typography.bodyMedium)
-            colored -> Text(signedMoney(value), color = gainColor(value), style = MaterialTheme.typography.bodyMedium)
-            else -> Text(moneyShort(value), style = MaterialTheme.typography.bodyMedium)
+            value == null -> MoneyText(stringResource(R.string.today_not_known), style = SipwiseNumbers.small, color = SlabColors.muted)
+            colored -> MoneyText(signedMoney(value), style = SipwiseNumbers.small, color = if (value >= 0) SlabColors.gain else SlabColors.loss)
+            else -> MoneyText(moneyShort(value), style = SipwiseNumbers.small, color = SlabColors.ink)
         }
-    }
-}
-
-@Composable
-private fun gainColor(value: Double) = if (value >= 0) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss
-
-@Composable
-private fun LabelledValue(
-    label: String,
-    value: String,
-) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.titleSmall)
     }
 }
 
 @Composable
 private fun MonthCard(progress: MonthProgress) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(stringResource(R.string.month_title, monthTitle(progress.month)), style = MaterialTheme.typography.labelLarge)
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
             if (progress.budgetSet) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(moneyShort(progress.bought), style = MaterialTheme.typography.titleLarge)
+                ProgressRing(progress.fraction.toFloat().coerceIn(0f, 1f), centerText = "${(progress.fraction * PERCENT).toInt()}%")
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Overline(stringResource(R.string.month_title, monthTitle(progress.month)))
+                if (progress.budgetSet) {
+                    MoneyText(moneyShort(progress.bought), style = SipwiseNumbers.large)
                     Text(stringResource(R.string.month_of_budget, moneyShort(progress.budget)), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (progress.remaining > 0) stringResource(R.string.month_left, moneyShort(progress.remaining)) else stringResource(R.string.month_all_invested),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (progress.suggested > 0) {
+                        Text(
+                            pluralStringResource(R.plurals.month_suggested, progress.suggested, progress.suggested),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                } else {
+                    Text(stringResource(R.string.month_no_budget, monthTitle(progress.month, withYear = false)), style = MaterialTheme.typography.bodyMedium)
                 }
-                LinearProgressIndicator(progress = { progress.fraction.toFloat() }, modifier = Modifier.fillMaxWidth())
-                Text(
-                    if (progress.remaining > 0) stringResource(R.string.month_left, moneyShort(progress.remaining)) else stringResource(R.string.month_all_invested),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                if (progress.suggested > 0) {
-                    Text(pluralStringResource(R.plurals.month_suggested, progress.suggested, progress.suggested), style = MaterialTheme.typography.labelLarge)
-                }
-            } else {
-                Text(stringResource(R.string.month_no_budget, monthTitle(progress.month, withYear = false)), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
 }
+
+private const val PERCENT = 100
 
 @Composable
 private fun ActionsCard(
@@ -192,21 +208,36 @@ private fun ActionsCard(
     pricing: Boolean,
     onAction: (NextAction) -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column {
-            actions.forEachIndexed { index, action ->
-                ListItem(
-                    headlineContent = { Text(action.title) },
-                    supportingContent = {
-                        Text(if (action.key == "prices" && pricing) stringResource(R.string.holdings_refreshing) else action.detail)
-                    },
-                    modifier = Modifier.clickable { onAction(action) },
-                )
-                if (index < actions.lastIndex) HorizontalDivider()
-            }
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        actions.forEachIndexed { index, action ->
+            ListRow(
+                title = action.title,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+                subtitle = if (action.key == "prices" && pricing) stringResource(R.string.holdings_refreshing) else action.detail,
+                onClick = { onAction(action) },
+                leading = { IconTile(actionIcon(action.key), actionTint(action.key)) },
+            )
+            if (index < actions.lastIndex) HorizontalDivider(Modifier.padding(horizontal = Spacing.lg))
         }
     }
 }
+
+private fun actionIcon(key: String) =
+    when (key) {
+        "dividend" -> Icons.Outlined.Payments
+        "prices" -> Icons.Outlined.Refresh
+        "targets" -> Icons.Outlined.Flag
+        else -> Icons.Outlined.Timeline
+    }
+
+@Composable
+private fun actionTint(key: String) =
+    when (key) {
+        "dividend" -> SipwiseTheme.colors.gain
+        "prices" -> SipwiseTheme.colors.assetFunds
+        "targets" -> SipwiseTheme.colors.assetGold
+        else -> MaterialTheme.colorScheme.primary
+    }
 
 /** First-use welcome: add a first holding or skip, like the Expo app. */
 @Composable
@@ -215,24 +246,23 @@ private fun WelcomeCard(
     onSkip: () -> Unit,
 ) {
     Column(Modifier.padding(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        Text(stringResource(R.string.welcome_title), style = MaterialTheme.typography.headlineMedium)
-        Text(stringResource(R.string.welcome_subtitle), style = MaterialTheme.typography.bodyLarge)
-        Text(stringResource(R.string.welcome_start), style = MaterialTheme.typography.labelLarge)
-        Card(Modifier.fillMaxWidth()) {
-            Column {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.welcome_add_title)) },
-                    supportingContent = { Text(stringResource(R.string.welcome_add_detail)) },
-                    modifier = Modifier.clickable(onClick = onAdd),
-                )
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.welcome_skip_title)) },
-                    supportingContent = { Text(stringResource(R.string.welcome_skip_detail)) },
-                    modifier = Modifier.clickable(onClick = onSkip),
-                )
-            }
+        EmptyState(stringResource(R.string.welcome_title), stringResource(R.string.welcome_subtitle))
+        Overline(stringResource(R.string.welcome_start))
+        SipwiseCard(Modifier.fillMaxWidth()) {
+            ListRow(
+                title = stringResource(R.string.welcome_add_title),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+                subtitle = stringResource(R.string.welcome_add_detail),
+                onClick = onAdd,
+            )
+            HorizontalDivider(Modifier.padding(horizontal = Spacing.lg))
+            ListRow(
+                title = stringResource(R.string.welcome_skip_title),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+                subtitle = stringResource(R.string.welcome_skip_detail),
+                onClick = onSkip,
+            )
         }
-        Text(stringResource(R.string.welcome_note), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.welcome_note), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
     }
 }

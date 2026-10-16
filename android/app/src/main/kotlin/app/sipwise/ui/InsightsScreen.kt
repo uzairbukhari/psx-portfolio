@@ -1,15 +1,15 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,12 +18,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
-import app.sipwise.designsystem.SipwiseTheme
+import app.sipwise.designsystem.AreaChart
+import app.sipwise.designsystem.BarRow
+import app.sipwise.designsystem.ChartSeries
+import app.sipwise.designsystem.DeltaPill
+import app.sipwise.designsystem.DivergingBars
+import app.sipwise.designsystem.MoneyText
+import app.sipwise.designsystem.MonthBar
+import app.sipwise.designsystem.MonthBars
+import app.sipwise.designsystem.NightSlab
+import app.sipwise.designsystem.Overline
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SegmentedControl
+import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SipwiseNumbers
+import app.sipwise.designsystem.SkeletonBlock
+import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
+import app.sipwise.designsystem.TargetBar
 import app.sipwise.model.InsightsView
 import app.sipwise.model.TrackRange
 import app.sipwise.model.TrackView
@@ -33,14 +51,17 @@ import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
 
 @Composable
-fun InsightsScreen(viewModel: InsightsViewModel) {
+fun InsightsScreen(
+    viewModel: InsightsViewModel,
+    onOpenCompany: (String) -> Unit,
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val report = ui.report
     if (report == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
-    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    LazyColumn(contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         item { SummaryHero(report) }
         item { TrackSection(ui, viewModel) }
         if (report.companyAllocation.isNotEmpty()) {
@@ -50,10 +71,14 @@ fun InsightsScreen(viewModel: InsightsViewModel) {
             item { BarsCard(R.string.insights_sectors, R.string.insights_sectors_note, report.sectorAllocation.map { Triple(it.label, it.weight, it.weight) }) }
         }
         if (report.targets.isNotEmpty()) item { TargetsCard(report) }
-        if (report.performance.isNotEmpty()) item { GainCard(report) }
+        if (report.performance.isNotEmpty()) item { GainCard(report, onOpenCompany) }
         if (report.monthly.isNotEmpty()) {
-            val top = report.monthly.maxOf { it.invested }.coerceAtLeast(1.0)
-            item { BarsCard(R.string.insights_monthly, R.string.insights_monthly_note, report.monthly.map { Triple(it.month, it.invested / top * PERCENT, it.invested) }, money = true) }
+            item {
+                InsightCard(R.string.insights_monthly) {
+                    MonthBars(report.monthly.map { MonthBar(it.month.takeLast(MONTH_LABEL), it.invested) }, stringResource(R.string.insights_monthly))
+                    Text(stringResource(R.string.insights_monthly_note), style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
         item { IncomeCard(report) }
         ui.track?.takeIf { it.benchmark.isChart }?.let { item { BenchmarkCard(it) } }
@@ -61,23 +86,16 @@ fun InsightsScreen(viewModel: InsightsViewModel) {
 }
 
 private const val PERCENT = 100.0
-
-@Composable
-private fun gainColor(gain: Double?) =
-    when {
-        gain == null -> MaterialTheme.colorScheme.onSurface
-        gain >= 0 -> SipwiseTheme.colors.gain
-        else -> SipwiseTheme.colors.loss
-    }
+private const val MONTH_LABEL = 2
 
 @Composable
 private fun InsightCard(
     title: Int,
     content: @Composable () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+            Overline(stringResource(title))
             content()
         }
     }
@@ -86,20 +104,27 @@ private fun InsightCard(
 @Composable
 private fun SummaryHero(report: InsightsView) {
     val s = report.summary
-    InsightCard(R.string.insights_summary) {
-        Text(moneyShort(s.pricedValue), style = MaterialTheme.typography.headlineMedium)
-        Text(stringResource(R.string.insights_priced_value), style = MaterialTheme.typography.bodySmall)
+    NightSlab(Modifier.fillMaxWidth()) {
+        Overline(stringResource(R.string.insights_summary), color = SlabColors.muted)
+        MoneyText(moneyShort(s.pricedValue), style = SipwiseNumbers.hero, color = SlabColors.ink)
+        Text(stringResource(R.string.insights_priced_value), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
         val gain = s.totalGain
-        Text(
-            if (gain == null) stringResource(R.string.insights_gain_unknown) else stringResource(R.string.insights_gain, signedMoney(gain), signedPercent(s.totalGainPercent)),
-            color = gainColor(gain),
-        )
+        if (gain == null) {
+            Text(stringResource(R.string.insights_gain_unknown), color = SlabColors.muted)
+        } else {
+            DeltaPill(stringResource(R.string.insights_gain, signedMoney(gain), signedPercent(s.totalGainPercent)), positive = gain >= 0, onSlab = true)
+        }
         val total = s.grandTotalReturn
-        Text(if (total == null) stringResource(R.string.insights_return_unknown) else stringResource(R.string.insights_total_return, signedMoney(total)))
-        Text(stringResource(R.string.insights_return_note), style = MaterialTheme.typography.bodySmall)
-        Text(pluralStringResource(R.plurals.insights_coverage, s.quotesHeld, s.quotesPriced, s.quotesHeld), style = MaterialTheme.typography.bodySmall)
-        s.topThreeWeight?.let { Text(stringResource(R.string.insights_top_three, it.toInt()), style = MaterialTheme.typography.bodySmall) }
-        s.largestSector?.let { Text(stringResource(R.string.insights_largest_sector, it.name, it.weight.toInt()), style = MaterialTheme.typography.bodySmall) }
+        Text(
+            if (total == null) stringResource(R.string.insights_return_unknown) else stringResource(R.string.insights_total_return, signedMoney(total)),
+            color = SlabColors.ink,
+        )
+        Text(stringResource(R.string.insights_return_note), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
+        Text(pluralStringResource(R.plurals.insights_coverage, s.quotesHeld, s.quotesPriced, s.quotesHeld), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
+        s.topThreeWeight?.let { Text(stringResource(R.string.insights_top_three, it.toInt()), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted) }
+        s.largestSector?.let {
+            Text(stringResource(R.string.insights_largest_sector, it.name, it.weight.toInt()), style = MaterialTheme.typography.bodySmall, color = SlabColors.muted)
+        }
     }
 }
 
@@ -127,26 +152,27 @@ private fun TargetsCard(report: InsightsView) {
     InsightCard(R.string.insights_targets) {
         for (t in report.targets) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(t.ticker)
-                Text(stringResource(R.string.insights_actual_target, t.actual, t.target))
+                Text(t.ticker, style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.insights_actual_target, t.actual, t.target), style = MaterialTheme.typography.bodySmall)
             }
+            TargetBar(t.actual, t.target)
         }
         Text(stringResource(R.string.insights_targets_note), style = MaterialTheme.typography.bodySmall)
     }
 }
 
 @Composable
-private fun GainCard(report: InsightsView) {
+private fun GainCard(
+    report: InsightsView,
+    onOpen: (String) -> Unit,
+) {
     InsightCard(R.string.insights_gain_by_company) {
-        for (g in report.performance) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(g.ticker)
-                Text(
-                    "${signedMoney(g.gain)} (${signedPercent(g.gainPercent)})",
-                    color = if (g.gain >= 0) SipwiseTheme.colors.gain else SipwiseTheme.colors.loss,
-                )
-            }
-        }
+        DivergingBars(
+            rows = report.performance.map { BarRow(it.ticker, it.ticker, it.gain) },
+            valueLabel = { signedMoney(it) },
+            description = stringResource(R.string.insights_gain_by_company),
+            onClick = onOpen,
+        )
         Text(stringResource(R.string.insights_gain_note), style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -175,18 +201,17 @@ private fun TrackSection(
                 Text(stringResource(R.string.insights_history_error), color = MaterialTheme.colorScheme.error)
                 TextButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
             }
-            track == null -> Text(stringResource(R.string.insights_history_loading))
+            track == null -> SkeletonBlock(Modifier.fillMaxWidth().height(TRACK_HEIGHT))
             !track.value.isChart -> Text(track.value.reason)
             else -> ValueChartBody(track)
         }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            items(TrackRange.entries) { range ->
-                FilterChip(selected = ui.range == range, onClick = { viewModel.setRange(range) }, label = { Text(stringResource(rangeLabel(range))) })
-            }
-        }
+        val labels = TrackRange.entries.associateWith { stringResource(rangeLabel(it)) }
+        SegmentedControl(TrackRange.entries.toList(), ui.range, label = { labels.getValue(it) }, onSelect = viewModel::setRange)
         track?.let { ReturnLine(it) }
     }
 }
+
+private val TRACK_HEIGHT = 180.dp
 
 private fun rangeLabel(range: TrackRange) =
     when (range) {
@@ -199,13 +224,17 @@ private fun rangeLabel(range: TrackRange) =
 @Composable
 private fun ValueChartBody(track: TrackView) {
     val chart = track.value
-    Text(chart.summary)
-    MultiLineChart(
-        lines = listOf(ChartLine(chart.value, MaterialTheme.colorScheme.primary), ChartLine(chart.moneyIn, MaterialTheme.colorScheme.outline, dashed = true)),
+    val scheme = MaterialTheme.colorScheme
+    Text(chart.summary, style = MaterialTheme.typography.bodyMedium)
+    AreaChart(
+        series = listOf(ChartSeries(chart.value, scheme.primary, fill = true), ChartSeries(chart.moneyIn, scheme.outline, dashed = true)),
         description = chart.spoken,
+        height = TRACK_HEIGHT,
+        xLabel = ::dayLabel,
+        scrubDetail = { _, ys -> ys.filterNotNull().joinToString(" / ") { moneyShort(it) } },
     )
-    LegendRow(MaterialTheme.colorScheme.primary, stringResource(R.string.insights_legend_value))
-    LegendRow(MaterialTheme.colorScheme.outline, stringResource(R.string.insights_legend_money_in))
+    LegendRow(scheme.primary, stringResource(R.string.insights_legend_value))
+    LegendRow(scheme.outline, stringResource(R.string.insights_legend_money_in))
     chart.notes.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
 }
 
@@ -223,9 +252,12 @@ private fun BenchmarkCard(track: TrackView) {
     val b = track.benchmark
     InsightCard(R.string.insights_benchmark) {
         Text(b.summary)
-        MultiLineChart(
-            lines = listOf(ChartLine(b.portfolio, MaterialTheme.colorScheme.primary), ChartLine(b.benchmark, MaterialTheme.colorScheme.tertiary, dashed = true)),
+        AreaChart(
+            series = listOf(ChartSeries(b.portfolio, MaterialTheme.colorScheme.primary), ChartSeries(b.benchmark, MaterialTheme.colorScheme.tertiary, dashed = true)),
             description = b.spoken,
+            height = TRACK_HEIGHT,
+            xLabel = ::dayLabel,
+            scrubDetail = { _, ys -> ys.filterNotNull().joinToString(" / ") { String.format(java.util.Locale.ROOT, "%.1f", it) } },
         )
         LegendRow(MaterialTheme.colorScheme.primary, stringResource(R.string.insights_legend_portfolio))
         LegendRow(MaterialTheme.colorScheme.tertiary, b.legend)
@@ -242,3 +274,17 @@ private fun BenchmarkCard(track: TrackView) {
         b.notes.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
 }
+
+/** A colour swatch followed by what the line means. */
+@Composable
+private fun LegendRow(
+    color: Color,
+    text: String,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.size(LEGEND_SIZE)) { drawCircle(color) }
+        Text(text, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+private val LEGEND_SIZE = 10.dp
