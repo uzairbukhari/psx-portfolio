@@ -3,7 +3,6 @@ package app.sipwise.vault
 import android.app.Application
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
 import app.sipwise.R
 import app.sipwise.SipwiseApp
@@ -77,10 +76,10 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
     private var engineBridge: JsEngineBridge? = null
 
     /**
-     * The view models of the screens in the current unlock. A fresh store per unlock (cleared on lock) so no screen keeps
-     * a ledger whose engine the lock has closed, while still surviving a rotation or a fold of the phone.
+     * Counts unlocks. Screens key their view models with it, so a view model made in an earlier unlock (whose ledger holds
+     * an engine the lock has since closed) is never reused after the next unlock.
      */
-    var sessionStore = ViewModelStore()
+    var unlockGeneration = 0
         private set
     private var status: VaultStatus.Locked? = null
     private var prepared: PreparedVault? = null
@@ -261,14 +260,12 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         val engine = engine()
         engine.call("account.load", mapOf("json" to session.account))
         session.onLock { dropEngine() }
-        sessionStore.clear()
-        sessionStore = ViewModelStore()
+        unlockGeneration++
         _stage.value = UnlockStage.LOADING
         _ui.value = VaultUi.Unlocked(session, Ledger(engine, LedgerWriter(session.asStore(), engine), container.api))
     }
 
     private fun dropEngine() {
-        sessionStore.clear()
         engineBridge?.close()
         engineBridge = null
     }

@@ -33,7 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,12 +51,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -274,26 +270,9 @@ private fun VaultGate(
             }
         is VaultUi.Unlocked ->
             PrivacyCover {
-                SessionViewModels(vault.sessionStore) {
-                    MainShell(current, vault, user, onLock = { vault.lock() }, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
-                }
+                MainShell(current, vault, user, onLock = { vault.lock() }, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
             }
     }
-}
-
-/** Gives every screen of one unlocked session the view models of that unlock only (see [VaultViewModel.sessionStore]). */
-@Composable
-private fun SessionViewModels(
-    store: ViewModelStore,
-    content: @Composable () -> Unit,
-) {
-    val owner =
-        remember(store) {
-            object : ViewModelStoreOwner {
-                override val viewModelStore = store
-            }
-        }
-    CompositionLocalProvider(LocalViewModelStoreOwner provides owner) { content() }
 }
 
 /** Covers the portfolio the moment the app leaves the foreground, so the recents thumbnail never shows it. */
@@ -384,21 +363,22 @@ private fun MainShell(
     onAccountDeleted: () -> Unit,
 ) {
     val nav = rememberNavController()
+    val gen = vault.unlockGeneration
     val entry by nav.currentBackStackEntryAsState()
     val api = (LocalContext.current.applicationContext as SipwiseApp).container.api
     val holdings: HoldingsViewModel =
-        viewModel(factory = viewModelFactory { initializer { HoldingsViewModel(unlocked.ledger) } })
+        viewModel(key = "HoldingsViewModel-$gen", factory = viewModelFactory { initializer { HoldingsViewModel(unlocked.ledger) } })
     val today: TodayViewModel =
-        viewModel(factory = viewModelFactory { initializer { TodayViewModel(unlocked.ledger, api) } })
+        viewModel(key = "TodayViewModel-$gen", factory = viewModelFactory { initializer { TodayViewModel(unlocked.ledger, api) } })
     val activity: ActivityViewModel =
-        viewModel(factory = viewModelFactory { initializer { ActivityViewModel(unlocked.ledger) } })
+        viewModel(key = "ActivityViewModel-$gen", factory = viewModelFactory { initializer { ActivityViewModel(unlocked.ledger) } })
     val plan: PlanViewModel =
-        viewModel(factory = viewModelFactory { initializer { PlanViewModel(unlocked.ledger) } })
+        viewModel(key = "PlanViewModel-$gen", factory = viewModelFactory { initializer { PlanViewModel(unlocked.ledger) } })
     val inbox: InboxViewModel =
-        viewModel(factory = viewModelFactory { initializer { InboxViewModel(unlocked.ledger) } })
+        viewModel(key = "InboxViewModel-$gen", factory = viewModelFactory { initializer { InboxViewModel(unlocked.ledger) } })
     val inboxUi by inbox.ui.collectAsStateWithLifecycle()
     val scopes: ScopeViewModel =
-        viewModel(factory = viewModelFactory { initializer { ScopeViewModel(unlocked.ledger) } })
+        viewModel(key = "ScopeViewModel-$gen", factory = viewModelFactory { initializer { ScopeViewModel(unlocked.ledger) } })
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -508,14 +488,14 @@ private fun MainShell(
             composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
             composable<Insights> {
                 val insights: InsightsViewModel =
-                    viewModel(factory = viewModelFactory { initializer { InsightsViewModel(unlocked.ledger, api) } })
+                    viewModel(key = "InsightsViewModel-$gen", factory = viewModelFactory { initializer { InsightsViewModel(unlocked.ledger, api) } })
                 InsightsScreen(insights, onOpenCompany = { nav.navigate(CompanyRoute(it)) })
             }
             composable<Inbox> { InboxScreen(inbox, onOpenCompany = { nav.navigate(CompanyRoute(it)) }) }
             composable<Picks> { backStack ->
                 val month = backStack.toRoute<Picks>().month
                 val picks: PicksViewModel =
-                    viewModel(key = "picks-$month", factory = viewModelFactory { initializer { PicksViewModel(unlocked.ledger, api, month) } })
+                    viewModel(key = "picks-$month-$gen", factory = viewModelFactory { initializer { PicksViewModel(unlocked.ledger, api, month) } })
                 PicksScreen(
                     picks,
                     onRecordOne = { ticker, shares, price -> nav.navigate(AddEntry(ticker = ticker, shares = shares, price = price, month = month)) },
@@ -523,18 +503,18 @@ private fun MainShell(
             }
             composable<Portfolios> {
                 val portfolios: PortfoliosViewModel =
-                    viewModel(factory = viewModelFactory { initializer { PortfoliosViewModel(unlocked.ledger) } })
+                    viewModel(key = "PortfoliosViewModel-$gen", factory = viewModelFactory { initializer { PortfoliosViewModel(unlocked.ledger) } })
                 PortfoliosScreen(portfolios)
             }
             composable<Targets> {
                 val targets: TargetsViewModel =
-                    viewModel(factory = viewModelFactory { initializer { TargetsViewModel(unlocked.ledger) } })
+                    viewModel(key = "TargetsViewModel-$gen", factory = viewModelFactory { initializer { TargetsViewModel(unlocked.ledger) } })
                 TargetsScreen(targets, onDone = { nav.popBackStack() })
             }
             composable<Activity> { ActivityScreen(activity, onOpenEntry = { id -> nav.navigate(AddEntry(entryId = id)) }) }
             composable<More> {
                 val settings: SettingsViewModel =
-                    viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger) } })
+                    viewModel(key = "SettingsViewModel-$gen", factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger) } })
                 val push: PushViewModel = viewModel()
                 MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted, onManagePortfolios = { nav.navigate(Portfolios) }, updates = updates)
             }
@@ -542,7 +522,7 @@ private fun MainShell(
                 val ticker = backStack.toRoute<CompanyRoute>().ticker
                 val company: CompanyViewModel =
                     viewModel(
-                        key = ticker,
+                        key = "$ticker-$gen",
                         factory = viewModelFactory { initializer { CompanyViewModel(unlocked.ledger, api, ticker) } },
                     )
                 CompanyScreen(company, onOpenEntry = { id -> nav.navigate(AddEntry(entryId = id)) }, onAdd = { nav.navigate(AddEntry(ticker = ticker)) })
@@ -551,7 +531,7 @@ private fun MainShell(
                 val route = it.toRoute<AddEntry>()
                 val form: EntryViewModel =
                     viewModel(
-                        key = "${route.entryId}/${route.ticker}/${route.shares}/${route.price}/${route.month}",
+                        key = "${route.entryId}/${route.ticker}/${route.shares}/${route.price}/${route.month}-$gen",
                         factory =
                             viewModelFactory {
                                 initializer {
