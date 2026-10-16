@@ -108,6 +108,11 @@ function requireAccount(): PortfolioAccount {
 }
 
 /** The portfolios the chosen scope covers: every one, or the one picked. */
+/** The portfolio whose targets and budget drive the monthly plan for this scope (the combined view has none of its own). */
+function planPortfolio(account: PortfolioAccount, scope: string) {
+  return scope === ALL_PORTFOLIOS && account.portfolios.length > 1 ? unifiedPlanSource(account).portfolio : dashboardPortfolio(account, scope);
+}
+
 function scopeParts(args: Args) {
   const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;
   const account = viewAccount();
@@ -362,16 +367,20 @@ const handlers: Record<string, Handler> = {
     const { held, error } = safeHoldings(portfolio);
     const summary = totals(held);
     const open = openPositions(held);
+    const hasStocks = portfolio.companies.length > 0 || portfolio.trades.length > 0 || (portfolio.dividends ?? []).length > 0;
+    const hasAssets = scopeParts(args).some((part) => (part.portfolio.assets ?? []).length > 0);
     return {
       now,
       month,
       summary,
       openCount: open.length,
       error,
-      firstUse: portfolio.companies.length === 0 && portfolio.trades.length === 0 && !(portfolio.dividends ?? []).length,
+      hasStocks,
+      hasAssets,
+      firstUse: !hasStocks && !hasAssets,
       breakdown: returnBreakdown(portfolio, summary.gain),
       progress: monthProgress(portfolio, month),
-      actions: nextActions(portfolio, held, month, now),
+      actions: nextActions(portfolio, held, month, now, 3, { planSource: planPortfolio(account, scope), dividends: false }),
     };
   },
 

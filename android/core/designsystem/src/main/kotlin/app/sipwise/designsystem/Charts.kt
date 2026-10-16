@@ -616,7 +616,7 @@ fun Treemap(
             val box = Size((cell.width - gap * 2).coerceAtLeast(1f), (cell.height - gap * 2).coerceAtLeast(1f))
             drawRoundRect(tone.copy(alpha = strength), topLeft, box, CornerRadius(10.dp.toPx()))
             val pad = 8.dp.toPx()
-            if (box.width > 36.dp.toPx() && box.height > 30.dp.toPx()) {
+            if (box.width > 30.dp.toPx() && box.height > 26.dp.toPx()) {
                 drawText(measurer, item.label, Offset(topLeft.x + pad, topLeft.y + pad - 2.dp.toPx()), titleStyle)
                 drawText(measurer, "%.1f%%".format(java.util.Locale.ROOT, item.weight / total * 100), Offset(topLeft.x + pad, topLeft.y + pad + 12.dp.toPx()), subStyle)
                 if (change != null && box.height > 58.dp.toPx()) {

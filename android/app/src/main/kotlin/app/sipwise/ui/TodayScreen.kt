@@ -40,10 +40,12 @@ import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
+import app.sipwise.model.ClassTotal
 import app.sipwise.model.MonthProgress
 import app.sipwise.model.NextAction
 import app.sipwise.model.PortfolioSummary
 import app.sipwise.model.ReturnBreakdown
+import app.sipwise.model.TodayView
 import app.sipwise.model.moneyShort
 import app.sipwise.model.monthTitle
 import app.sipwise.model.plural
@@ -51,6 +53,7 @@ import app.sipwise.model.shortDate
 import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
 
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel,
@@ -58,6 +61,7 @@ fun TodayScreen(
     onOpenTargets: () -> Unit,
     onOpenPlan: () -> Unit,
     onAddEntry: () -> Unit,
+    onOpenPortfolio: () -> Unit,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
@@ -67,6 +71,10 @@ fun TodayScreen(
     }
     if (view.firstUse && !ui.skippedWelcome) {
         WelcomeCard(onAdd = onAddEntry, onSkip = viewModel::skipWelcome)
+        return
+    }
+    if (!view.hasStocks) {
+        AssetsToday(view, ui, onOpenPortfolio) { action -> if (action.key == "prices") viewModel.refreshPrices() else onOpenPlan() }
         return
     }
     LazyColumn(
@@ -92,6 +100,60 @@ fun TodayScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Today for a portfolio without stocks: net worth and what it holds (funds, savings plans, gold, silver). */
+@Composable
+private fun AssetsToday(
+    view: TodayView,
+    ui: TodayUi,
+    onOpenPortfolio: () -> Unit,
+    onAction: (NextAction) -> Unit,
+) {
+    val overview = ui.overview
+    if (overview == null) {
+        ScreenSkeleton()
+        return
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        item { NetWorthCard(overview, overview.portfolios.singleOrNull()?.name) }
+        if (overview.total.incomplete.isNotEmpty()) {
+            item { Text(overview.total.incomplete.joinToString(" "), color = SipwiseTheme.colors.warn, style = MaterialTheme.typography.bodyMedium) }
+        }
+        item { Text(stringResource(R.string.today_assets_title), style = MaterialTheme.typography.titleMedium) }
+        item { ClassesCard(overview.classes, onOpenPortfolio) }
+        if (view.actions.isNotEmpty()) {
+            item { Text(stringResource(R.string.actions_title), style = MaterialTheme.typography.titleMedium) }
+            item { ActionsCard(view.actions, ui.pricing, onAction) }
+        }
+    }
+}
+
+@Composable
+private fun ClassesCard(
+    classes: List<ClassTotal>,
+    onOpen: () -> Unit,
+) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        classes.forEachIndexed { index, item ->
+            ListRow(
+                title = item.label,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+                subtitle = plural(item.count, "holding"),
+                onClick = onOpen,
+                trailing = {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        MoneyText(moneyShort(item.value), style = SipwiseNumbers.small)
+                        item.gain?.let { DeltaPill(signedMoney(it), positive = it >= 0) }
+                    }
+                },
+            )
+            if (index < classes.lastIndex) HorizontalDivider(Modifier.padding(horizontal = Spacing.lg))
         }
     }
 }

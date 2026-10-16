@@ -45,7 +45,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 38 | Signed-in devices | more.tsx | Done |
 | 39 | Tax status | more.tsx, `portfolio-account.ts` | Done |
 | 40 | AI usage | more.tsx | Done (this month's spend and tokens when the server has a figure) |
-| 41 | Encrypted backup / readable export | `backup.ts`, `lib/vault-backup.ts` | Done (encrypted backup and readable export through the share sheet) |
+| 41 | Encrypted backup | `backup.ts`, `lib/vault-backup.ts` | Done (encrypted backup through the share sheet; the unencrypted readable copy was removed) |
 | 42 | Lock now, sign out, delete account | more.tsx, `DeleteAccountSheet.tsx` | Done (lock, sign out, delete account) |
 | 43 | Manage portfolios | `portfolios.tsx` | Done (add, rename, lock or unlock, delete empty, each with Undo) |
 | 44 | Usage analytics + opt-out | `analytics.ts`, `AnalyticsBridge.tsx`, `screens.ts` | Done (catalog events only, batches to /api/events, per-device switch in More, account_state once per session) |

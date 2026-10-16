@@ -162,31 +162,11 @@ internal fun SectionCard(
 
 @Composable
 private fun DataCard(settings: SettingsViewModel) {
-    var confirmReadable by remember { mutableStateOf(false) }
     SectionCard(R.string.settings_data) {
         Text(stringResource(R.string.settings_backup_note), style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = settings::exportEncrypted, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.settings_backup_encrypted))
         }
-        OutlinedButton(onClick = { confirmReadable = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.settings_backup_readable))
-        }
-    }
-    if (confirmReadable) {
-        AlertDialog(
-            onDismissRequest = { confirmReadable = false },
-            title = { Text(stringResource(R.string.settings_readable_title)) },
-            text = { Text(stringResource(R.string.settings_readable_body)) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        confirmReadable = false
-                        settings.exportReadable()
-                    },
-                ) { Text(stringResource(R.string.settings_readable_confirm)) }
-            },
-            dismissButton = { TextButton(onClick = { confirmReadable = false }) { Text(stringResource(R.string.entry_cancel)) } },
-        )
     }
 }
 
@@ -290,7 +270,7 @@ private fun DevicesCard(
 private fun UpdateCard(viewModel: UpdateViewModel = viewModel()) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    SipwiseCard {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.update_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.update_version_installed, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)
