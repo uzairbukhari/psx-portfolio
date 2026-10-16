@@ -430,6 +430,10 @@
     <string name="insights_benchmark">Compared with the KSE-100</string>
     <string name="insights_yours">Yours</string>
     <string name="insights_index">KSE-100</string>
+    <string name="settings_crash_title">Crash report</string>
+    <string name="settings_crash_note">The app closed unexpectedly. This report has the error and where it happened, no holdings or amounts. Share it so the cause can be fixed.</string>
+    <string name="settings_crash_share">Share report</string>
+    <string name="settings_crash_clear">Clear</string>
     <string name="settings_analytics">Usage stats</string>
     <string name="settings_analytics_hint">Share anonymous usage stats: which screens and features are used, never your holdings, amounts or notes. This setting is for this phone only.</string>
     <string name="settings_analytics_switch">Share anonymous usage stats</string>

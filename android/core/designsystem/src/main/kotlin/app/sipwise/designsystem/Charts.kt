@@ -194,6 +194,7 @@ private fun DrawScope.drawSeries(
 ) {
     clipRect(left = 0f, top = 0f, right = plot.left + (plot.right - plot.left) * progress + 1f, bottom = size.height) {
         for (line in series) {
+            if (line.points.size < 2) continue
             val pts = line.points.map { Offset(plot.x(it[0]), plot.y(it[1])) }
             val path = if (line.stepped) stepped(pts) else smooth(pts)
             if (line.fill) {
@@ -286,7 +287,7 @@ fun AreaChart(
     val minX = all.minOf { it[0] }
     val spanX = (all.maxOf { it[0] } - minX).takeIf { it > 0 } ?: 1.0
     val (lo, hi) = paddedRange(all.map { it[1] } + references.map { it.y })
-    val xs = series.first().points.map { it[0] }
+    val xs = series.firstOrNull { it.points.isNotEmpty() }?.points?.map { it[0] }.orEmpty()
     val axisWidth = if (showAxes) 40.dp else 0.dp
     Canvas(
         modifier
@@ -352,10 +353,11 @@ fun AreaChart(
         val head = series.firstOrNull { it.fill }
         val frac = scrub
         if (frac == null && head != null && progress.value >= 1f) {
-            val last = head.points.last()
-            val c = Offset(plot.x(last[0]), plot.y(last[1]))
-            drawCircle(head.color.copy(alpha = DOT_HALO_ALPHA), 9.dp.toPx(), c)
-            drawCircle(head.color, 4.dp.toPx(), c)
+            head.points.lastOrNull()?.let { last ->
+                val c = Offset(plot.x(last[0]), plot.y(last[1]))
+                drawCircle(head.color.copy(alpha = DOT_HALO_ALPHA), 9.dp.toPx(), c)
+                drawCircle(head.color, 4.dp.toPx(), c)
+            }
         }
         if (frac != null) {
             val dataX = plot.minX + plot.spanX * frac

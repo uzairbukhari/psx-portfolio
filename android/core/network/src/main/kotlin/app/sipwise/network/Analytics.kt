@@ -17,6 +17,7 @@ data class EventsBatch(
 /** The events the phone sends. The server drops anything outside its catalog, so this list mirrors the ones it knows. */
 object Events {
     const val APP_OPENED = "app_opened"
+    const val CLIENT_ERROR = "client_error"
     const val SCREEN_VIEWED = "screen_viewed"
     const val ENTRY_ADDED = "entry_added"
     const val ENTRY_EDITED = "entry_edited"
