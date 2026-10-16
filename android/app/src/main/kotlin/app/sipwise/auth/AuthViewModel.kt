@@ -2,7 +2,9 @@ package app.sipwise.auth
 
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.sipwise.BuildConfig
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.security.MessageDigest
 
 sealed interface AuthState {
     data object Loading : AuthState
@@ -103,9 +106,24 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun withCause(e: Exception): String? {
-        val cause = e.cause ?: return e.message
-        return "${e.message} (${cause.javaClass.simpleName}: ${cause.message})"
+    /** Everything needed to match a Google sign-in failure to its OAuth client: the error chain and this build's identity. */
+    private fun withCause(e: Exception): String {
+        val chain = generateSequence<Throwable>(e) { it.cause }.joinToString("\n") { "${it.javaClass.simpleName}: ${it.message}" }
+        Log.e(TAG, "Google sign-in failed", e)
+        val app = getApplication<Application>()
+        return "$chain\npackage: ${app.packageName}\nsigned with SHA-1: ${signingSha1(app)}\n" +
+            "web client: ${BuildConfig.GOOGLE_WEB_CLIENT_ID}\nandroid: ${Build.VERSION.RELEASE} (${Build.VERSION.SDK_INT}), ${Build.MODEL}"
+    }
+
+    private fun signingSha1(app: Application): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return "unknown (needs Android 9)"
+        return try {
+            val info = app.packageManager.getPackageInfo(app.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            val signer = info.signingInfo?.apkContentsSigners?.firstOrNull()
+            signer?.let { MessageDigest.getInstance("SHA-1").digest(it.toByteArray()).joinToString(":") { b -> "%02X".format(b) } } ?: "unknown"
+        } catch (ignored: PackageManager.NameNotFoundException) {
+            "unknown"
+        }
     }
 
     /** User-initiated: also ends the server-side session. Offline, the revoke is queued and retried next launch. */
@@ -157,6 +175,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
+        const val TAG = "SipwiseAuth"
         const val HTTP_UNAUTHORIZED = 401
     }
 }
