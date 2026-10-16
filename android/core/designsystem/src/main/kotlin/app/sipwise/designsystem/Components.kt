@@ -515,4 +515,3 @@ fun ScreenSkeleton(modifier: Modifier = Modifier) {
         SkeletonBlock(Modifier.fillMaxWidth().height(140.dp), RoundedCornerShape(24.dp))
     }
 }
-
