@@ -243,6 +243,7 @@ private fun DrawScope.drawScrub(
  * Lines and areas on one scale: a faint grid with real labels, the last point emphasised, an optional reference line
  * and markers, a draw-in animation and a press-and-drag crosshair with a value bubble and haptic ticks.
  */
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun AreaChart(
     series: List<ChartSeries>,
@@ -603,7 +604,12 @@ fun Treemap(
         for (cell in treemap(sorted.map { it.weight }, size.width, size.height)) {
             val item = sorted[cell.index]
             val change = item.change
-            val tone = if (change == null) scheme.outline else if (change >= 0) colors.gain else colors.loss
+            val tone =
+                when {
+                    change == null -> scheme.outline
+                    change >= 0 -> colors.gain
+                    else -> colors.loss
+                }
             val strength = if (change == null) TREEMAP_BASE else TREEMAP_BASE + TREEMAP_SPAN * min(abs(change) / CHANGE_FULL, 1.0).toFloat()
             val gap = TILE_GAP.dp.toPx()
             val topLeft = Offset(cell.x + gap, cell.y + gap)

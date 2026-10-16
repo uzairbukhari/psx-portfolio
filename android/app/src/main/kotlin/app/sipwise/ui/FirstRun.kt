@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package app.sipwise.ui
 
 import android.app.Activity

@@ -354,10 +354,15 @@ fun UnlockScreen(
                     busy = busy,
                 )
                 if (biometric.enabled) {
-                    LinkText(stringResource(R.string.biometric_unlock_button), onClick = {
+                    LinkText(
+                        stringResource(R.string.biometric_unlock_button),
+                        onClick = {
                             usePassword = false
                             onBiometric()
-                        }, enabled = !busy, modifier = Modifier.align(Alignment.CenterHorizontally))
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
                 }
             }
         }
@@ -373,14 +378,23 @@ fun UnlockScreen(
                     Icon(Icons.Outlined.Lock, contentDescription = null, tint = BrandColors.sky, modifier = Modifier.size(20.dp))
                     Text(stringResource(R.string.unlock_help_title), style = MaterialTheme.typography.titleLarge, color = FirstRunInk.text)
                 }
-                BrandButton(stringResource(R.string.unlock_help_recover), onClick = {
+                BrandButton(
+                    stringResource(R.string.unlock_help_recover),
+                    onClick = {
                         help = false
                         onForgot()
-                    }, enabled = !busy && !offline)
-                GhostButton(stringResource(R.string.erase_link), onClick = {
+                    },
+                    enabled = !busy && !offline,
+                )
+                GhostButton(
+                    stringResource(R.string.erase_link),
+                    onClick = {
                         help = false
                         onErase()
-                    }, enabled = !busy && !offline, danger = true)
+                    },
+                    enabled = !busy && !offline,
+                    danger = true,
+                )
             }
         }
     }

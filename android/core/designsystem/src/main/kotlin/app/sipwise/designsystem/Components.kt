@@ -385,6 +385,7 @@ fun StepsMark(
         val scale = minOf(size.width / MARK_W, size.height / MARK_H)
         val dx = (size.width - MARK_W * scale) / 2
         val dy = (size.height - MARK_H * scale) / 2
+
         fun p(
             x: Float,
             y: Float,

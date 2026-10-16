@@ -101,7 +101,12 @@ fun BrandSplash(animated: Boolean = true) {
                 StepsMark(Modifier.size(74.dp), reveal = reveal.value, dot = dot.value)
             }
             Spacer(Modifier.height(Spacing.xl))
-            Box(Modifier.graphicsLayer { alpha = words.value; translationY = (1f - words.value) * SPLASH_RISE }) {
+            Box(
+                Modifier.graphicsLayer {
+                    alpha = words.value
+                    translationY = (1f - words.value) * SPLASH_RISE
+                },
+            ) {
                 Wordmark(size = 30)
             }
             Spacer(Modifier.height(Spacing.sm))
@@ -158,6 +163,7 @@ fun SignInScreen(
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height * 0.62f
+
             fun glow(
                 color: Color,
                 x: Float,

@@ -8,7 +8,7 @@ import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Pure chart maths (no Compose), so scales, ticks and the treemap layout are unit tested on the JVM. */
+// Pure chart maths (no Compose), so scales, ticks and the treemap layout are unit tested on the JVM.
 
 /** Round tick values inside [min, max], about [count] of them (1, 2, 2.5, 5 times a power of ten). */
 fun niceTicks(
@@ -141,15 +141,24 @@ fun valueAt(
     points: List<List<Double>>,
     x: Double,
 ): Double? {
-    if (points.isEmpty()) return null
-    if (x <= points.first()[0]) return points.first()[1]
-    if (x >= points.last()[0]) return points.last()[1]
+    val first = points.firstOrNull() ?: return null
+    val last = points.last()
+    return when {
+        x <= first[0] -> first[1]
+        x >= last[0] -> last[1]
+        else -> interpolate(points, x)
+    }
+}
+
+private fun interpolate(
+    points: List<List<Double>>,
+    x: Double,
+): Double {
     val i = nearestIndex(points.map { it[0] }, x)
     val a = if (points[i][0] <= x) i else max(i - 1, 0)
     val b = minOf(a + 1, points.size - 1)
     val span = points[b][0] - points[a][0]
-    if (span <= 0) return points[a][1]
-    return points[a][1] + (points[b][1] - points[a][1]) * ((x - points[a][0]) / span)
+    return if (span <= 0) points[a][1] else points[a][1] + (points[b][1] - points[a][1]) * ((x - points[a][0]) / span)
 }
 
 /** Value range padded by [pad] of its span on both sides (a flat series gets a symmetric band). */
