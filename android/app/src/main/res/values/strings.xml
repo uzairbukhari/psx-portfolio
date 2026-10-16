@@ -432,6 +432,14 @@
     <string name="insights_index">KSE-100</string>
     <string name="settings_crash_title">Crash report</string>
     <string name="settings_crash_note">The app closed unexpectedly. This report has the error and where it happened, no holdings or amounts. Share it so the cause can be fixed.</string>
+    <plurals name="settings_crash_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <string name="settings_crash_show">Show</string>
+    <string name="settings_crash_hide">Hide</string>
+    <string name="settings_crash_copy">Copy</string>
+    <string name="settings_crash_copied">Copied</string>
     <string name="settings_crash_share">Share report</string>
     <string name="settings_crash_clear">Clear</string>
     <string name="settings_analytics">Usage stats</string>
@@ -505,8 +513,6 @@
     <string name="settings_device_sign_out_title">Sign out this device?</string>
     <string name="settings_admin">Admin</string>
     <string name="notice_tax">Tax status saved</string>
-    <string name="settings_data">Data</string>
-    <string name="settings_backup_note">The encrypted backup is useless without your vault password or recovery key, so it is safe to keep anywhere.</string>
     <string name="holdings_allocation_others">Others · %1$d</string>
     <string name="today_move_title">Today\'s move</string>
     <string name="today_move_gainer">Top gainer</string>
@@ -518,8 +524,6 @@
     <string name="today_upcoming_closure">Book closure %1$s</string>
     <string name="today_upcoming_unknown">Amount not known yet</string>
     <string name="today_assets_title">What you hold</string>
-    <string name="settings_backup_encrypted">Share encrypted backup</string>
-    <string name="settings_backup_too_large">Your backup is too large to share from the phone. Use Settings > Backup on the website.</string>
     <string name="settings_delete_title">Delete account</string>
     <string name="settings_delete_note">Permanently delete your account and everything stored for it on Sipwise.</string>
     <string name="settings_delete_button">Delete account…</string>
