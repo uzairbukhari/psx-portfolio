@@ -23,7 +23,8 @@ sealed interface UpdateUi {
     /** The person must allow installs from this app first. */
     data class NeedsPermission(val update: AvailableUpdate) : UpdateUi
 
-    data class Failed(val message: String) : UpdateUi
+    /** [fromInstall] is true when the failure came from installing, which the pop-up reports; a failed check stays on the card. */
+    data class Failed(val message: String, val fromInstall: Boolean = false) : UpdateUi
 }
 
 class UpdateViewModel(app: Application) : AndroidViewModel(app) {
@@ -31,14 +32,47 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow<UpdateUi>(UpdateUi.Idle)
     val ui: StateFlow<UpdateUi> = _ui.asStateFlow()
 
+    private val _declined = MutableStateFlow<String?>(null)
+
+    /** The version the person said "Not now" to this session, so the pop-up does not return until the next launch. */
+    val declined: StateFlow<String?> = _declined.asStateFlow()
+    private var checking = false
+    private var lastCheck = 0L
+
     fun permissionIntent() = manager.permissionIntent()
 
-    fun check() {
+    fun decline(version: String) {
+        _declined.value = version
+    }
+
+    fun acknowledge() {
+        if (_ui.value is UpdateUi.Failed) _ui.value = UpdateUi.Idle
+    }
+
+    /** The launch and resume check: silent unless a newer promoted release exists, and at most once every half hour. */
+    fun quietCheck(includePrereleases: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val idle = _ui.value is UpdateUi.Idle || _ui.value is UpdateUi.UpToDate
+        if (checking || !idle || now - lastCheck < QUIET_CHECK_MS) return
+        checking = true
+        lastCheck = now
+        viewModelScope.launch {
+            try {
+                manager.check(includePrereleases)?.let { _ui.value = UpdateUi.Available(it) }
+            } catch (ignored: UpdateException) {
+                // A failed background check says nothing; the card's button reports errors.
+            } finally {
+                checking = false
+            }
+        }
+    }
+
+    fun check(includePrereleases: Boolean = false) {
         viewModelScope.launch {
             _ui.value = UpdateUi.Checking
             _ui.value =
                 try {
-                    manager.check()?.let { UpdateUi.Available(it) } ?: UpdateUi.UpToDate
+                    manager.check(includePrereleases)?.let { UpdateUi.Available(it) } ?: UpdateUi.UpToDate
                 } catch (e: UpdateException) {
                     UpdateUi.Failed(e.message.orEmpty())
                 }
@@ -57,8 +91,12 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
                 manager.install(file)
                 _ui.value = UpdateUi.Idle
             } catch (e: UpdateException) {
-                _ui.value = UpdateUi.Failed(e.message.orEmpty())
+                _ui.value = UpdateUi.Failed(e.message.orEmpty(), fromInstall = true)
             }
         }
+    }
+
+    private companion object {
+        const val QUIET_CHECK_MS = 30 * 60 * 1000L
     }
 }

@@ -115,9 +115,11 @@ import app.sipwise.ui.TargetsViewModel
 import app.sipwise.ui.TodayScreen
 import app.sipwise.ui.TodayViewModel
 import app.sipwise.ui.UnlockScreen
+import app.sipwise.ui.UpdatePrompt
 import app.sipwise.ui.VaultFailedScreen
 import app.sipwise.ui.VaultSetupScreen
 import app.sipwise.ui.findFragmentActivity
+import app.sipwise.update.UpdateViewModel
 import app.sipwise.vault.VaultUi
 import app.sipwise.vault.VaultViewModel
 import kotlinx.coroutines.launch
@@ -380,6 +382,8 @@ private fun MainShell(
     val context = LocalContext.current
     val api = (context.applicationContext as SipwiseApp).container.api
     LedgerNotices(unlocked.ledger, snackbar)
+    val updates: UpdateViewModel = viewModel()
+    UpdatePrompt(updates, includePrereleases = user.role == "super_admin")
     val container = (context.applicationContext as SipwiseApp).container
     val analytics = container.analytics
     val link by container.pendingLink.collectAsStateWithLifecycle()
@@ -503,7 +507,7 @@ private fun MainShell(
                 val settings: SettingsViewModel =
                     viewModel(factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger, unlocked.session) } })
                 val push: PushViewModel = viewModel()
-                MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted, onManagePortfolios = { nav.navigate(Portfolios) })
+                MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted, onManagePortfolios = { nav.navigate(Portfolios) }, updates = updates)
             }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker

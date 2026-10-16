@@ -29,11 +29,12 @@ class UpdateException(message: String, cause: Throwable? = null) : Exception(mes
 class UpdateManager(private val context: Context, private val http: OkHttpClient = OkHttpClient()) {
     private val apkPrefix = if (BuildConfig.INCLUDE_PRERELEASES) "sipwise-staging" else "sipwise"
 
-    suspend fun check(): AvailableUpdate? =
+    /** [includePrereleases] lets one signed-in account (the owner) test builds before they are promoted. */
+    suspend fun check(includePrereleases: Boolean = false): AvailableUpdate? =
         withContext(Dispatchers.IO) {
             val body = fetchText("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases?per_page=20")
             val releases = ApiJson.decodeFromString(ListSerializer(GithubRelease.serializer()), body)
-            findUpdate(releases, BuildConfig.VERSION_NAME, BuildConfig.TAG_PREFIX, apkPrefix, BuildConfig.INCLUDE_PRERELEASES)
+            findUpdate(releases, BuildConfig.VERSION_NAME, BuildConfig.TAG_PREFIX, apkPrefix, BuildConfig.INCLUDE_PRERELEASES || includePrereleases)
         }
 
     /** Downloads the APK and returns it only if its hash matches the release's SHA256SUMS. */

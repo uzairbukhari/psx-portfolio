@@ -95,6 +95,12 @@
     <string name="update_downloading">Downloading…</string>
     <string name="update_permission">To install updates, allow Sipwise to install apps in the next screen, then come back and tap Install again.</string>
     <string name="update_open_settings">Open settings</string>
+    <string name="update_prompt_title">Update available</string>
+    <string name="update_prompt_body">Sipwise %1$s is ready to install. You have %2$s.</string>
+    <string name="update_prompt_install">Update now</string>
+    <string name="update_prompt_later">Not now</string>
+    <string name="update_prompt_failed">Update failed</string>
+    <string name="update_prompt_ok">OK</string>
 
     <string name="today_hero_label">Market value of holdings</string>
     <string name="today_hero_incomplete">Market value · incomplete</string>
