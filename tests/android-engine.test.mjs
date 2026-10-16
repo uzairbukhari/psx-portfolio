@@ -6,6 +6,7 @@ import { dashboardPortfolio, normalizeAccount, ALL_PORTFOLIOS } from '../lib/por
 import { openPositions, safeHoldings, totals } from '../mobile/src/data/derive.ts';
 import { filterBySector, sectorsOf, sortHoldings } from '../mobile/src/data/holdings-view.ts';
 import { call, ENGINE_API_VERSION } from '../android/engine/src/handlers.ts';
+import { unifiedPlanSource } from '../mobile/src/data/sip.ts';
 
 // Built once: the seed stamps some fields with the current time.
 const BASE = JSON.parse(JSON.stringify(buildTestAccount(today())));
@@ -90,7 +91,9 @@ test('the today and activity views match the Expo view-models', async () => {
     assert.equal(view.ok, true, view.error);
     assert.deepEqual(view.value.breakdown, roundTrip(returnBreakdown(portfolio, summary.gain)));
     assert.deepEqual(view.value.progress, roundTrip(monthProgress(portfolio, '2026-10')));
-    assert.deepEqual(view.value.actions, roundTrip(nextActions(portfolio, held, '2026-10', today())));
+    const planSource = scope === ALL_PORTFOLIOS && reference.portfolios.length > 1 ? unifiedPlanSource(reference).portfolio : portfolio;
+    assert.deepEqual(view.value.actions, roundTrip(nextActions(portfolio, held, '2026-10', today(), 3, { planSource, dividends: false })));
+    assert.equal(view.value.actions.some((a) => a.key === 'dividend'), false);
     for (const filter of ['all', 'buy', 'sell', 'dividend', 'split']) {
       for (const query of ['', 'a']) {
         const act = run('activity.view', { scope, filter, query });

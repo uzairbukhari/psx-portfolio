@@ -93,15 +93,29 @@ export function stalePriceTickers(held: Holding[], now: string): string[] {
 }
 
 /** At most three things that need the user, in priority order, each one tap from its fix. */
-export function nextActions(p: Portfolio, held: Holding[], month: string, now: string, limit = 3): NextAction[] {
+/**
+ * `planSource` is the portfolio the monthly plan lives in (targets and budgets are per portfolio, so the combined
+ * view has none of its own); `dividends: false` leaves expected dividends to the inbox, where each has its own entry.
+ */
+export function nextActions(
+  p: Portfolio,
+  held: Holding[],
+  month: string,
+  now: string,
+  limit = 3,
+  options: { planSource?: Portfolio; dividends?: boolean } = {},
+): NextAction[] {
   const out: NextAction[] = [];
+  const plan = options.planSource ?? p;
   let expected: { id: string; ticker: string }[] = [];
-  try {
-    expected = taxSummary(p)
-      .dividends.filter((d) => d.status === 'expected')
-      .map((d) => ({ id: d.id, ticker: d.ticker }));
-  } catch {
-    // a broken ledger shows its own error elsewhere
+  if (options.dividends !== false) {
+    try {
+      expected = taxSummary(p)
+        .dividends.filter((d) => d.status === 'expected')
+        .map((d) => ({ id: d.id, ticker: d.ticker }));
+    } catch {
+      // a broken ledger shows its own error elsewhere
+    }
   }
   if (expected.length)
     out.push({
@@ -119,12 +133,12 @@ export function nextActions(p: Portfolio, held: Holding[], month: string, now: s
       detail: stale.length > 3 ? `${stale.slice(0, 3).join(', ')} and more are older than the last trading day.` : `${stale.join(', ')} ${stale.length === 1 ? 'is' : 'are'} older than the last trading day.`,
       tickers: stale,
     });
-  const targeted = p.companies.some((c) => c.target > 0);
-  if (!targeted && p.companies.length)
+  const targeted = plan.companies.some((c) => c.target > 0);
+  if (!targeted && plan.companies.length)
     out.push({ key: 'targets', title: 'Set your targets', detail: 'Choose the companies your monthly SIP buys and their weights.' });
-  else if (targeted && p.budgets[month] === undefined) out.push({ key: 'budget', title: 'Set this month’s budget', detail: 'Then Sipwise suggests whole-share buys toward your targets.' });
+  else if (targeted && plan.budgets[month] === undefined) out.push({ key: 'budget', title: 'Set this month’s budget', detail: 'Then Sipwise suggests whole-share buys toward your targets.' });
   else if (targeted) {
-    const progress = monthProgress(p, month);
+    const progress = monthProgress(plan, month);
     if (progress.suggested > 0)
       out.push({ key: 'plan', title: `${progress.suggested} ${progress.suggested === 1 ? 'buy' : 'buys'} suggested this month`, detail: 'Review them in Plan and record them in one step.' });
   }
