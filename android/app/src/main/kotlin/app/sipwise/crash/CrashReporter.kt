@@ -24,6 +24,7 @@ private const val LAST_EXIT = "last_exit"
 private const val EXIT_LOOKBACK = 5
 private const val MAX_TRACE_LINES = 40
 private const val KB_PER_MB = 1024
+private const val PREVIEW_LINES = 6
 
 /** Only the endings that point at a fault; a normal exit, a swipe away or a permission change is not a crash. */
 @RequiresApi(Build.VERSION_CODES.R)
@@ -158,8 +159,14 @@ class CrashReporter(private val context: Context) {
         dir.listFiles { file -> file.name.startsWith("crash-") }?.sortedByDescending { it.name }?.drop(KEEP_REPORTS)?.forEach { it.delete() }
     }
 
-    /** The newest report, or null when the app has not crashed since the reports were cleared. */
-    fun latest(): String? = files().firstOrNull()?.readText()
+    /** Every kept report, newest first, in full; null when nothing has gone wrong since the reports were cleared. */
+    fun fullText(): String? = files().takeIf { it.isNotEmpty() }?.joinToString("\n\n=====\n\n") { it.readText() }
+
+    /** The same reports without their stack frames: one short block each, newest first. */
+    fun preview(): String? =
+        files().takeIf { it.isNotEmpty() }?.joinToString("\n\n") { file ->
+            file.readLines().filter { it.isNotBlank() && !it.startsWith("    ") }.take(PREVIEW_LINES).joinToString("\n")
+        }
 
     private fun files(): List<File> = dir.listFiles { file -> file.name.startsWith("crash-") }?.sortedByDescending { it.name }.orEmpty()
 

@@ -75,7 +75,8 @@ class EngineClient(
             try {
                 bridge.call(name, argsJson)
             } catch (e: EngineDiedException) {
-                EngineFailures.report("engine-died:$name", e)
+                // A call that finds the isolate already closed is the aftermath of the lock or the death that closed it, not the cause.
+                if (e.cause !is IllegalStateException) EngineFailures.report("engine-died:$name", e)
                 onDied()
                 throw e
             } catch (e: EngineException) {

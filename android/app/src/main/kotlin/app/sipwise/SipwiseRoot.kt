@@ -270,7 +270,7 @@ private fun VaultGate(
             }
         is VaultUi.Unlocked ->
             PrivacyCover {
-                MainShell(current, vault, user, onLock = vault::lock, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
+                MainShell(current, vault, user, onLock = { vault.lock() }, onSignOut = onSignOut, onAccountDeleted = onAccountDeleted)
             }
     }
 }
