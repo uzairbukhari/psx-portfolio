@@ -21,10 +21,16 @@ interface EngineBridge {
     fun close()
 }
 
-open class EngineException(message: String) : Exception(message)
+open class EngineException(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
 
 /** The sandbox process or isolate is gone (Android reclaims it while the app is in the background); the vault must be opened again. */
-class EngineDiedException(message: String) : EngineException(message)
+class EngineDiedException(
+    message: String,
+    cause: Throwable? = null,
+) : EngineException(message, cause)
 
 /** Typed access to the engine's `{ ok, value | error }` replies (android/engine/src/handlers.ts). */
 class EngineClient(

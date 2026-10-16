@@ -36,12 +36,12 @@ class JsEngineBridge private constructor(
         return try {
             isolate.evaluateJavaScriptAsync(script).await()
         } catch (e: IsolateTerminatedException) {
-            throw EngineDiedException("The calculation engine stopped while the app was in the background. Unlock again to continue.")
+            throw EngineDiedException("The calculation engine stopped while the app was in the background. Unlock again to continue.", e)
         } catch (e: JavaScriptException) {
-            throw EngineException(e.message ?: "The calculation engine failed.")
+            throw EngineException(e.message ?: "The calculation engine failed.", e)
         } catch (e: IllegalStateException) {
             // The isolate was closed by a lock while this call was waiting.
-            throw EngineDiedException("The vault was locked. Unlock again to continue.")
+            throw EngineDiedException("The vault was locked. Unlock again to continue.", e)
         }
     }
 
