@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,6 +28,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SipwiseCard
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.TargetDraft
 
@@ -41,7 +42,7 @@ fun TargetsScreen(
     LaunchedEffect(ui.saved) { if (ui.saved) onDone() }
     val view = ui.view
     if (view == null) {
-        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else LoadingScreen()
+        if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
     val totals = ui.eval?.totals
@@ -52,7 +53,7 @@ fun TargetsScreen(
         item { Text(stringResource(R.string.targets_intro, view.cap, view.cap, view.cap), style = MaterialTheme.typography.bodyMedium) }
         if (totals != null) {
             item {
-                Card(Modifier.fillMaxWidth()) {
+                SipwiseCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                         Text(stringResource(R.string.targets_total, totals.total.toInt()), style = MaterialTheme.typography.titleMedium)
                         Text(
@@ -97,7 +98,7 @@ private fun TargetCard(
     status: String,
     viewModel: TargetsViewModel,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
@@ -146,7 +147,7 @@ private fun AddCompany(
         OutlinedButton(onClick = { viewModel.openAdd(true) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.targets_add)) }
         return
     }
-    Card(Modifier.fillMaxWidth()) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             OutlinedTextField(
                 value = ui.query,

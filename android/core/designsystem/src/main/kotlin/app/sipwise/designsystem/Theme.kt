@@ -97,11 +97,19 @@ private fun Palette.darkScheme() =
 
 /** Tabular figures so digits never shift as a value changes. */
 private const val TABULAR = "tnum"
-private val InterFamily =
+private val GeistFamily =
     FontFamily(
-        Font(R.font.inter_regular, FontWeight.Normal),
-        Font(R.font.inter_medium, FontWeight.Medium),
-        Font(R.font.inter_semibold, FontWeight.SemiBold),
+        Font(R.font.geist_regular, FontWeight.Normal),
+        Font(R.font.geist_medium, FontWeight.Medium),
+        Font(R.font.geist_semibold, FontWeight.SemiBold),
+    )
+
+/** Geist Mono carries every money figure and percentage, so numbers read like a ledger. */
+val GeistMonoFamily =
+    FontFamily(
+        Font(R.font.geist_mono_medium, FontWeight.Normal),
+        Font(R.font.geist_mono_medium, FontWeight.Medium),
+        Font(R.font.geist_mono_semibold, FontWeight.SemiBold),
     )
 
 private fun style(
@@ -109,42 +117,49 @@ private fun style(
     line: Int,
     weight: FontWeight,
     spacing: Double = 0.0,
-    tabular: Boolean = false,
+    mono: Boolean = false,
 ) =
     TextStyle(
-        fontFamily = InterFamily,
+        fontFamily = if (mono) GeistMonoFamily else GeistFamily,
         fontSize = size.sp,
         lineHeight = line.sp,
         fontWeight = weight,
         letterSpacing = spacing.sp,
-        fontFeatureSettings = if (tabular) TABULAR else null,
+        fontFeatureSettings = if (mono) TABULAR else null,
     )
 
 val SipwiseTypography =
     Typography(
-        displayMedium = style(40, 48, FontWeight.SemiBold, -0.5, tabular = true),
-        displaySmall = style(32, 40, FontWeight.SemiBold, -0.25, tabular = true),
-        headlineSmall = style(24, 32, FontWeight.SemiBold),
-        titleLarge = style(20, 28, FontWeight.SemiBold),
-        titleMedium = style(16, 24, FontWeight.Medium, 0.1),
+        displayMedium = style(40, 44, FontWeight.SemiBold, -1.2, mono = true),
+        displaySmall = style(32, 36, FontWeight.SemiBold, -1.0, mono = true),
+        headlineMedium = style(28, 34, FontWeight.SemiBold, -0.3),
+        headlineSmall = style(22, 28, FontWeight.SemiBold, -0.2),
+        titleLarge = style(20, 26, FontWeight.SemiBold, -0.1),
+        titleMedium = style(15, 20, FontWeight.SemiBold),
+        titleSmall = style(14, 20, FontWeight.SemiBold),
         bodyLarge = style(16, 24, FontWeight.Normal),
         bodyMedium = style(14, 20, FontWeight.Normal),
-        labelLarge = style(14, 20, FontWeight.Medium, 0.1),
-        labelMedium = style(12, 16, FontWeight.Medium, 0.4),
+        bodySmall = style(12, 17, FontWeight.Normal),
+        labelLarge = style(13, 18, FontWeight.SemiBold, 0.1),
+        labelMedium = style(11, 14, FontWeight.SemiBold, 1.0),
+        labelSmall = style(10, 14, FontWeight.SemiBold, 0.8),
     )
 
-/** Row values and other figures: medium weight, tabular. */
+/** Money, percentages and other figures: Geist Mono, tabular. */
 object SipwiseNumbers {
-    val large = style(20, 28, FontWeight.Medium, tabular = true)
-    val medium = style(16, 24, FontWeight.Medium, tabular = true)
+    val hero = style(34, 38, FontWeight.SemiBold, -1.4, mono = true)
+    val large = style(26, 32, FontWeight.SemiBold, -1.0, mono = true)
+    val medium = style(17, 24, FontWeight.SemiBold, -0.4, mono = true)
+    val small = style(13, 18, FontWeight.Medium, -0.2, mono = true)
+    val tiny = style(11, 14, FontWeight.Medium, -0.1, mono = true)
 }
 
 val SipwiseShapes =
     Shapes(
-        extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-        small = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-        medium = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-        large = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        small = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        medium = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        large = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
         extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
     )
 

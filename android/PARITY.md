@@ -55,3 +55,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 48 | Environment variants (dev/staging/prod) | `app.config.ts` | Done (staging and production flavours with their own application ids, app names, API URLs and link schemes) |
 | 49 | Local data migration from RN | n/a | Skipped (deviation from plan section 7.2: the Android app starts from the server vault; nothing local needs carrying over because everything is in the encrypted vault) |
 | 50 | Update available prompt | expo-updates OTA | Done (in-app installer from GitHub Releases; see docs/android-release.md) |
+
+## UI design
+
+The native app has its own "Sipwise, after dark" look (plan `plans/android-ui-redesign.md`): night hero slabs, Geist type, a floating bar with a central add button, a custom Canvas chart kit and always-dark splash, sign-in and vault screens. It does not need to match the Expo app visually; features and numbers stay the same. Not yet built from that plan: the Plan screen's month staircase and streak (needs a streak field from the shared plan view), and the Today value chart (needs a value history handler).

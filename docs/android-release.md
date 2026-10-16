@@ -38,4 +38,4 @@ Never commit the keystores, `google-services.json` or the service account file.
 
 ## Fonts
 
-Inter (regular, medium, semibold) is bundled in `android/core/designsystem/src/main/res/font/` from the `@expo-google-fonts/inter` npm package. The font is licensed under the SIL Open Font License 1.1 (`docs/INTER-LICENSE.txt`).
+Geist (regular, medium, semibold) and Geist Mono (medium, semibold, used for every money figure) are bundled in `android/core/designsystem/src/main/res/font/`. The fonts are licensed under the SIL Open Font License 1.1 (`docs/GEIST-LICENSE.txt`).

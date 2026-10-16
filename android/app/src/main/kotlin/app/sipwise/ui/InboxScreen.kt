@@ -13,7 +13,6 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -29,6 +28,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.EmptyState
+import app.sipwise.designsystem.SipwiseCard
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.InboxFilter
 import app.sipwise.model.InboxItem
@@ -52,7 +53,7 @@ fun InboxScreen(
     onOpenCompany: (String) -> Unit,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
-    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         item { FilterRow(ui, viewModel) }
         ui.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
         if (ui.items.isNotEmpty()) item { BulkRow(ui, viewModel) }
@@ -126,10 +127,7 @@ private fun Empty(filter: InboxFilter) {
             InboxFilter.CLEARED -> R.string.inbox_empty_cleared_title to R.string.inbox_empty_cleared
             InboxFilter.ALL -> R.string.inbox_empty_all_title to R.string.inbox_empty_all
         }
-    Column(Modifier.fillMaxWidth().padding(Spacing.xl), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(body), style = MaterialTheme.typography.bodyMedium)
-    }
+    EmptyState(stringResource(title), stringResource(body))
 }
 
 @Composable
@@ -140,7 +138,7 @@ private fun Notification(
     onOpenCompany: (String) -> Unit,
 ) {
     val colors = if (item.unread) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else CardDefaults.cardColors()
-    Card(Modifier.fillMaxWidth(), colors = colors) {
+    SipwiseCard(Modifier.fillMaxWidth(), colors = colors) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(item.title, style = MaterialTheme.typography.titleSmall)
             if (item.body.isNotEmpty()) Text(item.body, style = MaterialTheme.typography.bodyMedium, maxLines = BODY_LINES)

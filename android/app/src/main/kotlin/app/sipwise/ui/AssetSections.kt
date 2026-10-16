@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.sipwise.R
+import app.sipwise.designsystem.SipwiseCard
 import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.AssetsView
@@ -68,7 +68,7 @@ private fun Section(
             Text(stringResource(R.string.assets_section_header, stringResource(title), count), style = MaterialTheme.typography.titleMedium)
             total?.let { Text(moneyShort(it), style = MaterialTheme.typography.titleMedium) }
         }
-        Card(Modifier.fillMaxWidth()) { Column { content() } }
+        SipwiseCard(Modifier.fillMaxWidth()) { Column { content() } }
     }
 }
 

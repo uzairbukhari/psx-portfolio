@@ -1,7 +1,6 @@
 package app.sipwise.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,8 +10,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -23,7 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.EmptyState
+import app.sipwise.designsystem.ListRow
+import app.sipwise.designsystem.MoneyText
+import app.sipwise.designsystem.ScreenSkeleton
+import app.sipwise.designsystem.SipwiseCard
+import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.Spacing
+import app.sipwise.designsystem.TickerTile
 import app.sipwise.model.ActivityFilter
 import app.sipwise.model.money
 import app.sipwise.model.shortDate
@@ -54,9 +58,9 @@ fun ActivityScreen(
         }
         val view = ui.view
         if (view == null) {
-            if (ui.error != null) Text(ui.error.orEmpty()) else LoadingScreen()
+            if (ui.error != null) Text(ui.error.orEmpty()) else ScreenSkeleton()
         } else if (view.count == 0) {
-            Text(stringResource(R.string.activity_empty), style = MaterialTheme.typography.bodyLarge)
+            EmptyState(stringResource(R.string.nav_activity), stringResource(R.string.activity_empty))
         } else {
             LazyColumn(contentPadding = PaddingValues(bottom = Spacing.xl)) {
                 for (section in view.sections) {
@@ -66,14 +70,16 @@ fun ActivityScreen(
                         }
                     }
                     items(section.data, key = { it.id }) { entry ->
-                        ListItem(
-                            overlineContent = { Text(shortDate(entry.date)) },
-                            headlineContent = { Text("${entry.ticker} · ${entry.title}") },
-                            supportingContent = { Text(entry.detail) },
-                            trailingContent = { entry.amount?.let { Text(money(it)) } },
-                            modifier = if (entry.editable) Modifier.clickable { onOpenEntry(entry.id) } else Modifier,
-                        )
-                        HorizontalDivider()
+                        SipwiseCard(Modifier.fillMaxWidth().padding(bottom = Spacing.sm)) {
+                            ListRow(
+                                title = "${entry.ticker} · ${entry.title}",
+                                subtitle = "${shortDate(entry.date)} · ${entry.detail}",
+                                onClick = if (entry.editable) ({ onOpenEntry(entry.id) }) else null,
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
+                                leading = { TickerTile(entry.ticker) },
+                                trailing = { entry.amount?.let { MoneyText(money(it), style = SipwiseNumbers.small) } },
+                            )
+                        }
                     }
                 }
             }
