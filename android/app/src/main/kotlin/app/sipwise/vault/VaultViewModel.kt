@@ -49,6 +49,9 @@ sealed interface VaultUi {
     data class Unlocked(val session: VaultSession, val ledger: Ledger) : VaultUi
 }
 
+/** Where an unlock is, so the unlock screen can narrate the few seconds the key derivation takes. */
+enum class UnlockStage { CHECKING, OPENING, LOADING }
+
 /** Whether this phone can do fingerprint unlock and whether it is switched on for this vault. */
 data class BiometricState(val available: Boolean = false, val enabled: Boolean = false)
 
@@ -62,6 +65,9 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _stage = MutableStateFlow<UnlockStage?>(null)
+    val stage: StateFlow<UnlockStage?> = _stage.asStateFlow()
 
     private val _biometric = MutableStateFlow(BiometricState())
     val biometric: StateFlow<BiometricState> = _biometric.asStateFlow()
@@ -119,6 +125,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
                 _error.value = e.message
             } finally {
                 _busy.value = false
+                _stage.value = null
             }
         }
     }
@@ -154,6 +161,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         activity: FragmentActivity? = null,
     ) = run {
         val locked = checkNotNull(status) { "Nothing to unlock." }
+        _stage.value = UnlockStage.CHECKING
         val engine = engine()
         val session = unlockVault(container.vaultTransport, EngineAccountRules(engine), locked, UnlockSecret.Password(password), cache)
         container.analytics.track(Events.VAULT_UNLOCKED, "method" to "password")
@@ -179,6 +187,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         run {
             val locked = checkNotNull(status) { "Nothing to unlock." }
             val key = recallKey(activity, locked) ?: return@run
+            _stage.value = UnlockStage.CHECKING
             try {
                 open(openWithKey(container.vaultTransport, EngineAccountRules(engine()), locked, key, cache))
                 container.analytics.track(Events.VAULT_UNLOCKED, "method" to "biometric")
@@ -221,6 +230,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         newPassword: String,
     ) = run {
         val locked = checkNotNull(status) { "Nothing to recover." }
+        _stage.value = UnlockStage.CHECKING
         val engine = engine()
         val session = recoverWithKey(container.vaultTransport, EngineAccountRules(engine), locked, recoveryKey, newPassword, cache)
         open(session)
@@ -238,9 +248,11 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         }
 
     private suspend fun open(session: VaultSession) {
+        _stage.value = UnlockStage.OPENING
         val engine = engine()
         engine.call("account.load", mapOf("json" to session.account))
         session.onLock { dropEngine() }
+        _stage.value = UnlockStage.LOADING
         _ui.value = VaultUi.Unlocked(session, Ledger(engine, LedgerWriter(session.asStore(), engine), container.api))
     }
 

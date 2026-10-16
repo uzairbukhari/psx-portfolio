@@ -5,10 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -18,12 +23,9 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -31,6 +33,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +67,9 @@ import androidx.navigation.toRoute
 import app.sipwise.analytics.Analytics
 import app.sipwise.auth.AuthState
 import app.sipwise.auth.AuthViewModel
+import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.FloatingNavBar
+import app.sipwise.designsystem.NavItemSpec
 import app.sipwise.designsystem.Spacing
 import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
@@ -80,6 +86,7 @@ import app.sipwise.ui.CompanyScreen
 import app.sipwise.ui.CompanyViewModel
 import app.sipwise.ui.EntryScreen
 import app.sipwise.ui.EntryViewModel
+import app.sipwise.ui.BrandSplash
 import app.sipwise.ui.EraseVaultScreen
 import app.sipwise.ui.HoldingsScreen
 import app.sipwise.ui.HoldingsViewModel
@@ -88,7 +95,6 @@ import app.sipwise.ui.InboxScreen
 import app.sipwise.ui.InboxViewModel
 import app.sipwise.ui.InsightsScreen
 import app.sipwise.ui.InsightsViewModel
-import app.sipwise.ui.LoadingScreen
 import app.sipwise.ui.MoreScreen
 import app.sipwise.ui.PicksScreen
 import app.sipwise.ui.PicksViewModel
@@ -178,6 +184,14 @@ private fun screenName(destination: NavDestination?): String? =
 
 private data class TopLevel(val route: Any, val label: Int, val icon: ImageVector)
 
+private val barItems =
+    listOf(
+        TopLevel(Today, R.string.nav_today, Icons.Outlined.Home),
+        TopLevel(Portfolio, R.string.nav_portfolio, Icons.Outlined.PieChart),
+        TopLevel(Plan, R.string.nav_plan, Icons.Outlined.Timeline),
+        TopLevel(Activity, R.string.nav_activity, Icons.Outlined.List),
+    )
+
 private val topLevel =
     listOf(
         TopLevel(Today, R.string.nav_today, Icons.Outlined.Home),
@@ -195,7 +209,7 @@ fun SipwiseRoot() {
     val analytics = (LocalContext.current.applicationContext as SipwiseApp).container.analytics
     LaunchedEffect(state) { analytics.setSignedIn(state is AuthState.SignedIn) }
     when (val current = state) {
-        AuthState.Loading -> LoadingScreen()
+        AuthState.Loading -> BrandSplash()
         AuthState.SignedOut -> SignInScreen(message, onSignIn = auth::signIn)
         is AuthState.SignedIn -> VaultGate(current.user, onSignOut = auth::signOut, onAccountDeleted = auth::accountDeleted)
     }
@@ -222,9 +236,9 @@ private fun VaultGate(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vault.onBackgrounded(System.currentTimeMillis()) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { vault.onForegrounded(System.currentTimeMillis()) }
     when (val current = ui) {
-        VaultUi.Checking -> LoadingScreen()
+        VaultUi.Checking -> BrandSplash(animated = false)
         is VaultUi.Failed -> VaultFailedScreen(current.message, onRetry = vault::refresh, onSignOut = onSignOut)
-        VaultUi.NeedsSetup -> VaultSetupScreen(busy, error, onCreate = vault::startSetup)
+        VaultUi.NeedsSetup -> VaultSetupScreen(email, busy, error, onCreate = vault::startSetup)
         is VaultUi.ConfirmRecovery ->
             RecoveryKeyScreen(current.recoveryKey, busy, error, onSaved = vault::confirmRecoverySaved, onCancel = vault::cancelSetup)
         is VaultUi.Locked ->
@@ -235,9 +249,12 @@ private fun VaultGate(
             } else {
                 val biometric by vault.biometric.collectAsStateWithLifecycle()
                 val activity = LocalContext.current.findFragmentActivity()
+                val stage by vault.stage.collectAsStateWithLifecycle()
                 UnlockScreen(
+                    email,
                     current.offline,
                     busy,
+                    stage,
                     error,
                     biometric,
                     onUnlock = { password, remember -> vault.unlock(password, remember, activity) },
@@ -260,11 +277,7 @@ private fun PrivacyCover(content: @Composable () -> Unit) {
     val state by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
         content()
-        if (!state.isAtLeast(Lifecycle.State.RESUMED)) {
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
-            }
-        }
+        if (!state.isAtLeast(Lifecycle.State.RESUMED)) BrandSplash(animated = false)
     }
 }
 
@@ -386,15 +399,18 @@ private fun MainShell(
             when {
                 top != null ->
                     TopAppBar(
-                        title = { Text(stringResource(top.label)) },
+                        title = { Text(stringResource(top.label), style = MaterialTheme.typography.headlineSmall) },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                         actions = {
                             if (top.route != More && top.route != Plan) ScopeChooser(scopes)
                             InboxBell(inboxUi.counts.unread) { nav.navigate(Inbox) }
+                            if (top.route != More) AvatarButton(user) { nav.navigate(More) { launchSingleTop = true } }
                         },
                     )
                 destination != null ->
                     TopAppBar(
                         title = { Text(subScreenTitle(destination, entry)) },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                         navigationIcon = {
                             IconButton(onClick = { nav.popBackStack() }) {
                                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.nav_back))
@@ -403,18 +419,13 @@ private fun MainShell(
                     )
             }
         },
-        floatingActionButton = {
-            if (!onAddScreen && !noAddButton) {
-                FloatingActionButton(onClick = { nav.navigate(AddEntry()) }) {
-                    Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.entry_title))
-                }
-            }
-        },
         bottomBar = {
             if (!onAddScreen) {
-                NavigationBar {
-                    for (item in topLevel) {
-                        NavigationBarItem(
+                val specs =
+                    barItems.map { item ->
+                        NavItemSpec(
+                            label = stringResource(item.label),
+                            icon = item.icon,
                             selected = entry?.destination?.hasRoute(item.route::class) == true,
                             onClick = {
                                 nav.navigate(item.route) {
@@ -423,11 +434,15 @@ private fun MainShell(
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(item.icon, contentDescription = null) },
-                            label = { Text(stringResource(item.label)) },
                         )
                     }
-                }
+                FloatingNavBar(
+                    left = specs.take(2),
+                    right = specs.drop(2),
+                    addDescription = stringResource(R.string.entry_title),
+                    onAdd = { nav.navigate(AddEntry()) },
+                    showAdd = !noAddButton,
+                )
             }
         },
     ) { padding ->
@@ -512,6 +527,21 @@ private fun MainShell(
                 EntryScreen(form, onDone = { nav.popBackStack() })
             }
         }
+    }
+}
+
+/** The account button in the top bar: your initial on a brand gradient, opens More. */
+@Composable
+private fun AvatarButton(
+    user: MeResponse,
+    onClick: () -> Unit,
+) {
+    val initial = (user.name ?: user.email).firstOrNull()?.uppercaseChar()?.toString().orEmpty()
+    Box(
+        Modifier.padding(end = Spacing.sm).size(32.dp).clip(CircleShape).background(BrandColors.button).clickable(onClickLabel = stringResource(R.string.nav_more), onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(initial, style = MaterialTheme.typography.labelLarge, color = Color.White)
     }
 }
 

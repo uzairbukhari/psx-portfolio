@@ -21,6 +21,23 @@
     <string name="vault_password_again">Type it again</string>
     <string name="vault_password_mismatch">The passwords do not match.</string>
     <string name="vault_create">Create vault</string>
+    <string name="vault_continue">Continue</string>
+    <string name="vault_check_length">At least 15 characters</string>
+    <string name="vault_check_obvious">Not your email or a common word</string>
+    <string name="vault_confirm_title">Type it once more</string>
+    <string name="vault_confirm_body">So we know it is what you meant. Sipwise cannot reset it for you.</string>
+    <string name="recovery_copy">Copy key</string>
+    <string name="recovery_copied">Copied</string>
+    <string name="recovery_share">Save to password manager</string>
+    <string name="recovery_warning">Anyone with this key can open your portfolio. Keep it off screenshots and shared notes.</string>
+    <string name="recovery_confirm">I have stored it somewhere safe</string>
+    <string name="unlock_welcome">Welcome back</string>
+    <string name="unlock_stage_checking">Checking your password…</string>
+    <string name="unlock_stage_opening">Opening your vault…</string>
+    <string name="unlock_stage_loading">Loading your portfolio…</string>
+    <string name="unlock_use_password">Use password instead</string>
+    <string name="unlock_help_title">Cannot get in?</string>
+    <string name="unlock_help_recover">Reset with my recovery key</string>
     <string name="vault_failed_title">Could not open your vault</string>
 
     <string name="recovery_title">Save your recovery key</string>
