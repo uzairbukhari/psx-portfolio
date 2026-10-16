@@ -167,13 +167,13 @@ internal fun SectionCard(
 private fun CrashCard() {
     val context = LocalContext.current
     val crashes = (context.applicationContext as SipwiseApp).container.crashes
-    var report by remember { mutableStateOf(crashes.latest()) }
+    var report by remember { mutableStateOf(crashes.preview()) }
     val text = report ?: return
     SectionCard(R.string.settings_crash_title) {
         Text(stringResource(R.string.settings_crash_note), style = MaterialTheme.typography.bodySmall)
-        Text(text.lineSequence().take(CRASH_PREVIEW_LINES).joinToString("\n"), style = MaterialTheme.typography.bodySmall, maxLines = CRASH_PREVIEW_LINES)
+        Text(text, style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            OutlinedButton(onClick = { ShareFiles.share(context, "sipwise-crash.txt", text) }) { Text(stringResource(R.string.settings_crash_share)) }
+            OutlinedButton(onClick = { ShareFiles.share(context, "sipwise-crash.txt", crashes.fullText().orEmpty()) }) { Text(stringResource(R.string.settings_crash_share)) }
             OutlinedButton(
                 onClick = {
                     crashes.clear()
@@ -183,8 +183,6 @@ private fun CrashCard() {
         }
     }
 }
-
-private const val CRASH_PREVIEW_LINES = 6
 
 @Composable
 private fun DataCard(settings: SettingsViewModel) {

@@ -16,6 +16,7 @@ import app.sipwise.network.Events
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineAccountRules
 import app.sipwise.session.EngineClient
+import app.sipwise.session.EngineFailures
 import app.sipwise.session.LedgerWriter
 import app.sipwise.session.PreparedVault
 import app.sipwise.session.UnlockSecret
@@ -106,7 +107,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
 
     private suspend fun engine(): EngineClient {
         val bridge = engineBridge ?: JsEngineBridge.create(getApplication()).also { engineBridge = it }
-        return EngineClient(bridge, onDied = ::lock)
+        return EngineClient(bridge, onDied = { lock("engine-stopped") })
     }
 
     private fun run(block: suspend () -> Unit) {
@@ -261,7 +262,8 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
         engineBridge = null
     }
 
-    fun lock() {
+    fun lock(reason: String = "button") {
+        if (reason != "button") EngineFailures.report("lock:$reason", IllegalStateException("Vault locked: $reason"))
         val current = _ui.value
         if (current is VaultUi.Unlocked) current.session.lock()
         dropEngine()
@@ -274,7 +276,7 @@ class VaultViewModel(app: Application, private val email: String) : AndroidViewM
 
     /** Returning from the background after the grace period locks the vault. */
     fun onForegrounded(now: Long) {
-        if (shouldLockVault(backgroundedAt, now)) lock()
+        if (shouldLockVault(backgroundedAt, now)) lock("after-background")
         backgroundedAt = null
     }
 
