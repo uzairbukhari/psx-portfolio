@@ -1,0 +1,31 @@
+name: Foreign currency rates
+
+# Stores the day's USD, AED and SAR rates in the shared D1 `fx_rates` table (public data only). The interbank rate
+# comes from a free API and the open-market rate from a public page; Cloudflare itself never fetches them.
+on:
+  schedule:
+    # 10:30 and 16:30 PKT, Monday to Saturday.
+    - cron: '30 5,11 * * 1-6'
+  workflow_dispatch:
+
+concurrency:
+  group: fx-rates
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment: prod
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh fx_rates
+        run: node scripts/fx-rates-scrape.mjs
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

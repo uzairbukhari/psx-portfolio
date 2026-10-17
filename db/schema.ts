@@ -532,6 +532,34 @@ export const metalRates = sqliteTable(
   (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] })],
 );
 
+// Shared foreign currency rates (rupees per one unit of USD, AED or SAR). Public data only; written by scripts/fx-rates-scrape.mjs.
+export const fxRates = sqliteTable(
+  'fx_rates',
+  {
+    currency: text('currency').notNull(),
+    kind: text('kind').notNull(),
+    date: text('date').notNull(),
+    pkrPerUnit: real('pkr_per_unit').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    sourceLabel: text('source_label'),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.currency, t.kind, t.date] }), index('fx_rates_date_idx').on(t.date)],
+);
+
+// The same rates packed one row per currency, kind and year (JSON text of [date, rate] pairs), so the whole history is a few rows to read.
+export const fxRateHistory = sqliteTable(
+  'fx_rate_history',
+  {
+    currency: text('currency').notNull(),
+    kind: text('kind').notNull(),
+    year: text('year').notNull(),
+    closes: text('closes').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.currency, t.kind, t.year] })],
+);
+
 // Shared mutual fund directory and daily prices from MUFAP. Public data only; written by scripts/mufap-nav-scrape.mjs.
 export const fundCatalog = sqliteTable('fund_catalog', {
   mufapId: text('mufap_id').primaryKey(),
