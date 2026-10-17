@@ -23,6 +23,7 @@ const classColor = (t: ChartTokens, k: AssetClassKey) =>
     silver: t.neutral,
     plans: t.cat[2],
     funds: t.cat[6],
+    currency: t.cat[5],
   })[k];
 
 const CLASS_COLORS: Record<AssetClassKey, string> = {
@@ -31,6 +32,7 @@ const CLASS_COLORS: Record<AssetClassKey, string> = {
   silver: 'var(--chart-neutral)',
   plans: 'var(--cat-3)',
   funds: 'var(--cat-7)',
+  currency: 'var(--cat-6)',
 };
 const SECTOR_COLORS = [
   'var(--cat-1)',

@@ -15,6 +15,7 @@ import { PortfolioBreakdown } from '@/ui/AccountOverview';
 import { NetWorthCard } from '@/ui/NetWorthCard';
 import { HoldingRow } from '@/ui/HoldingRow';
 import { AppBar } from '@/ui/AppBar';
+import { ForeignCurrency } from '@/ui/ForeignCurrency';
 import { GoldSilver } from '@/ui/GoldSilver';
 import { SavingsPlans } from '@/ui/SavingsPlans';
 import { Icon } from '@/ui/Icon';
@@ -51,7 +52,7 @@ export default function Portfolio() {
   const openCompany = useCallback((ticker: string) => router.push({ pathname: '/company/[ticker]', params: { ticker } }), []);
 
   const scope = useScope();
-  const { metals: ownedMetals, plans: ownedPlans, funds: ownedFunds, metal, fundNavs, overview, hasAssets } = scope;
+  const { metals: ownedMetals, plans: ownedPlans, funds: ownedFunds, currencies: ownedCurrencies, metal, fundNavs, fx, overview, hasAssets } = scope;
   const bar = <AppBar title="Portfolio" />;
   const switcher = <Segmented label="Portfolio view" value={segment} onChange={setSegment} options={[{ key: 'holdings', label: 'Holdings' }, { key: 'insights', label: 'Insights' }]} />;
 
@@ -166,6 +167,7 @@ export default function Portfolio() {
 
           <MutualFunds owned={ownedFunds} navs={fundNavs.navs} navsError={fundNavs.error} />
           <SavingsPlans owned={ownedPlans} />
+          <ForeignCurrency owned={ownedCurrencies} rates={fx.rates} ratesError={fx.error} />
           <GoldSilver owned={ownedMetals} rates={metal.rates} ratesError={metal.error} />
 
           {open.length === 0 && !hasAssets ? (

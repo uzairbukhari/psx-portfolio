@@ -24,7 +24,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 17 | Net worth card + donut | `NetWorthCard.tsx`, `lib/account-overview.ts` | Done (net worth, asset mix donut and legend at the top of Holdings; incomplete-valuation notice) |
 | 18 | Holdings list, sort, sector filter, include sold | `portfolio.tsx`, `holdings-view.ts` | Done (sort, sector, sold-out; the portfolio chooser is in the top bar) |
 | 19 | Per-portfolio breakdown (All) | `AccountOverview.tsx` | Done (per-portfolio breakdown in the All view; tap opens that portfolio) |
-| 20 | Funds / plans / gold (read-only) | `MutualFunds`, `SavingsPlans`, `GoldSilver` | Done (mutual funds, savings plans, gold and silver, read-only, with public rates and fund prices) |
+| 20 | Funds / plans / gold / currency (read-only) | `MutualFunds`, `SavingsPlans`, `GoldSilver`, `ForeignCurrency` | Done (foreign currency in USD, AED and SAR valued from `/api/public-data/fx`; mutual funds, savings plans, gold and silver, read-only, with public rates and fund prices) |
 | 21 | Insights report sections | `Insights.tsx`, `lib/portfolio-reports.ts` | Done (summary, allocation, sectors, actual vs target, gain by company, recent buying, income and realised) |
 | 22 | Company page, chart ranges | `company/[ticker].tsx`, `lib/price-history.ts` | Done |
 | 23 | Company ledger + dividends tab | same | Done (tap an editable entry to void it; correcting an entry pending) |

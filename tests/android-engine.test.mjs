@@ -467,3 +467,26 @@ test("today's move uses each price against the close before it, and upcoming div
   const view = run('today.view', { scope: 'all', month: '2026-10' }).value;
   assert.ok(Array.isArray(view.upcoming) && view.upcoming.length <= 3);
 });
+
+test('foreign currency holdings are valued from the public rates and requested only when held', () => {
+  const account = seed();
+  const today10 = today();
+  account.portfolios[0].portfolio.assets = [
+    ...(account.portfolios[0].portfolio.assets ?? []),
+    { id: 'usd-cash', kind: 'currency', name: 'Dollars', currency: 'USD', note: '', entries: [{ id: 'e1', date: '2026-01-01', type: 'buy', units: 100, pkr: 28000, note: '' }] },
+  ];
+  run('account.load', { json: JSON.stringify(account) });
+  assert.equal(run('rates.wanted').value.fx, true);
+  run('rates.set', { fx: JSON.stringify([{ date: today10, currency: 'USD', kind: 'open_market', pkrPerUnit: 282, sourceUrl: 'x', fetchedAt: 'x' }]) });
+  const view = run('assets.view', { scope: 'all' });
+  assert.equal(view.ok, true, view.error);
+  const row = view.value.currencies.find((c) => c.id === 'usd-cash');
+  assert.equal(row.value, 28200);
+  assert.equal(row.gain, 200);
+  assert.equal(row.rate.kind, 'open_market');
+  const overview = run('overview.view', { scope: 'all' });
+  assert.ok(overview.value.classes.some((c) => c.key === 'currency' && c.value === 28200));
+  run('account.load', { json: JSON.stringify(seed()) });
+  assert.equal(run('rates.wanted').value.fx, false);
+});
+

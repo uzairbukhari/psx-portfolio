@@ -108,7 +108,7 @@ export default function Today() {
   const gain = net ? net.total.gain : totals.gain;
   const gainPercent = net ? net.total.gainPercent : totals.gainPercent;
   const cost = net ? net.total.cost : totals.cost;
-  const holdingsLabel = contentsLabel({ stocks: open.length, plans: scope.plans.length, funds: scope.funds.length, metals: scope.metals.length });
+  const holdingsLabel = contentsLabel({ stocks: open.length, plans: scope.plans.length, funds: scope.funds.length, metals: scope.metals.length, currencies: scope.currencies.length });
 
   return (
     <Screen onRefresh={() => void p.refetch()} refreshing={p.isRefetching} fab>

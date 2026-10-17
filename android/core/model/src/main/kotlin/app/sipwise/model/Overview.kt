@@ -2,7 +2,7 @@ package app.sipwise.model
 
 import kotlinx.serialization.Serializable
 
-/** One asset class in the net-worth mix ("stocks", "gold", "silver", "plans" or "funds"). */
+/** One asset class in the net-worth mix ("stocks", "gold", "silver", "plans", "funds" or "currency"). */
 @Serializable
 data class ClassTotal(
     val key: String,
@@ -140,6 +140,24 @@ data class FundRow(
 )
 
 @Serializable
+data class FxRateInfo(val pkrPerUnit: Double = 0.0, val kind: String = "", val date: String = "", val stale: Boolean = false)
+
+@Serializable
+data class CurrencyRow(
+    val id: String,
+    val name: String,
+    val currency: String = "",
+    val heldAt: String = "",
+    val portfolio: String = "",
+    val units: Double = 0.0,
+    val value: Double? = null,
+    val gain: Double? = null,
+    val cost: Double? = null,
+    val realized: Double? = null,
+    val rate: FxRateInfo? = null,
+)
+
+@Serializable
 data class PlanAssetRow(
     val id: String,
     val name: String,
@@ -156,16 +174,17 @@ data class PlanAssetRow(
     val dueAmount: Double = 0.0,
 )
 
-/** Gold and silver, savings plans and mutual funds in the chosen scope (`assets.view`). */
+/** Gold and silver, savings plans, mutual funds and foreign currency in the chosen scope (`assets.view`). */
 @Serializable
 data class AssetsView(
     val metals: List<MetalRow> = emptyList(),
     val funds: List<FundRow> = emptyList(),
     val plans: List<PlanAssetRow> = emptyList(),
+    val currencies: List<CurrencyRow> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = metals.isEmpty() && funds.isEmpty() && plans.isEmpty()
+    val isEmpty: Boolean get() = metals.isEmpty() && funds.isEmpty() && plans.isEmpty() && currencies.isEmpty()
 }
 
 /** Which public price lists the ledger needs (`rates.wanted`), so a phone without gold or funds never asks for them. */
 @Serializable
-data class RatesWanted(val metals: Boolean = false, val funds: Boolean = false)
+data class RatesWanted(val metals: Boolean = false, val funds: Boolean = false, val fx: Boolean = false)

@@ -191,10 +191,10 @@ class Ledger(
         engine.call("public.lookups", mapOf("json" to JsonArray(found).toString()))
     }
 
-    /** Public gold and silver rates and fund prices, only for the kinds this ledger holds. They carry no parameters. */
+    /** Public gold, silver and currency rates and fund prices, only for the kinds this ledger holds. They carry no parameters. */
     private suspend fun loadRates(client: ApiClient) {
         val wanted = ApiJson.decodeFromJsonElement(RatesWanted.serializer(), engine.call("rates.wanted"))
-        if (!wanted.metals && !wanted.funds) return
+        if (!wanted.metals && !wanted.funds && !wanted.fx) return
         val args = mutableMapOf<String, String>()
         if (wanted.metals) {
             val reply = client.get("/api/public-data/metals", JsonObject.serializer())
@@ -204,6 +204,10 @@ class Ledger(
             val reply = client.get("/api/public-data/funds", JsonObject.serializer())
             val latest = (reply["funds"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.get("latest") }.filter { it !is JsonNull }
             args["navs"] = JsonArray(latest).toString()
+        }
+        if (wanted.fx) {
+            val reply = client.get("/api/public-data/fx", JsonObject.serializer())
+            args["fx"] = (reply["rates"] ?: JsonArray(emptyList())).toString()
         }
         engine.call("rates.set", args)
     }

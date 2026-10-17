@@ -1,5 +1,6 @@
 // Pure ledger-entry builders (no React): the dashboard needs them at first paint, while the Activity view
 // (app/ledger-timeline.tsx) is loaded on demand.
+import { currencyPosition } from './currency.ts';
 import { describePieces, metalPosition, type Asset } from './assets.ts';
 import { fundPosition } from './funds.ts';
 import {
@@ -37,7 +38,7 @@ export type LedgerEntry = {
   /** An announced dividend that is not yet confirmed as received. */
   expected?: boolean;
   /** Set on gold, savings plan and fund entries: the kind of asset, shown as a chip beside its name. */
-  assetKind?: 'Gold' | 'Silver' | 'Plan' | 'Fund';
+  assetKind?: 'Gold' | 'Silver' | 'Plan' | 'Fund' | 'Currency';
   /** Gain on this sale worked out with the asset's own rules; undefined means "look it up in the stock ledger". */
   realizedGain?: number | null;
   /** True for money taken out of a savings plan: it is cash back, not a sale with a profit. */
@@ -279,6 +280,35 @@ export function buildAssetEntries(
               toggleVoid: () => page.toggleVoid(asset, x.id),
             });
           }
+      } else if (asset.kind === 'currency') {
+        const gains = new Map(
+          currencyPosition(asset).history.map((h) => [h.id, h.realizedGain]),
+        );
+        for (const e of asset.entries) {
+          out.push({
+            key: key(e.id),
+            date: e.date,
+            ticker: asset.name,
+            type: e.type,
+            label:
+              e.type === 'opening'
+                ? 'Opening'
+                : e.type === 'sell'
+                  ? 'Sale'
+                  : 'Purchase',
+            detail: `${Math.round(e.units * 10000) / 10000} ${asset.currency}${where}`,
+            fees: null,
+            amount: e.pkr,
+            inflow: e.type === 'sell',
+            voided: !!e.voided,
+            assetKind: 'Currency',
+            realizedGain:
+              e.type === 'sell' ? (gains.get(e.id) ?? null) : undefined,
+            correct: () =>
+              page ? page.correct(asset, e.id) : onOpenAssets(),
+            toggleVoid: page ? () => page.toggleVoid(asset, e.id) : undefined,
+          });
+        }
       } else {
         const gains = new Map(
           fundPosition(asset).history.map((h) => [h.id, h.realizedGain]),

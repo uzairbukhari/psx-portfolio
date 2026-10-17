@@ -24,6 +24,7 @@ import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.Spacing
 import app.sipwise.model.AssetsView
+import app.sipwise.model.CurrencyRow
 import app.sipwise.model.FundRow
 import app.sipwise.model.MetalRow
 import app.sipwise.model.PlanAssetRow
@@ -51,6 +52,11 @@ fun AssetSections(
     if (assets.plans.isNotEmpty()) {
         Section(R.string.assets_plans, assets.plans.size, assets.plans.sumOf { it.value }) {
             assets.plans.forEach { PlanItem(it, year) }
+        }
+    }
+    if (assets.currencies.isNotEmpty()) {
+        Section(R.string.assets_currencies, assets.currencies.size, assets.currencies.takeIf { rows -> rows.none { it.value == null } }?.sumOf { it.value ?: 0.0 }) {
+            assets.currencies.forEach { CurrencyItem(it, year) }
         }
     }
     if (assets.metals.isNotEmpty()) {
@@ -176,6 +182,29 @@ private fun FundItem(
             }
         },
     )
+}
+
+@Composable
+private fun CurrencyItem(
+    row: CurrencyRow,
+    year: Int,
+) {
+    val value = row.value?.let { moneyShort(it) } ?: DASH
+    val rate = row.rate
+    val detail =
+        when {
+            rate == null -> stringResource(R.string.assets_no_price)
+            else ->
+                stringResource(
+                    if (rate.kind == "interbank") R.string.assets_fx_interbank else R.string.assets_fx_open_market,
+                    "%.2f".format(java.util.Locale.ROOT, rate.pkrPerUnit),
+                    shortDate(rate.date, year),
+                )
+        }
+    Item("${row.name}, $value") {
+        Head(row.name, "${trimmed(row.units)} ${row.currency}", row.portfolio, value, row.gain)
+        Text(detail, style = MaterialTheme.typography.bodySmall)
+    }
 }
 
 @Composable

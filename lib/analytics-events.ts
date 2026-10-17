@@ -47,7 +47,7 @@ export const EVENT_CATALOG = {
   picks_run_completed: {},
   picks_run_failed: {},
   // Other assets
-  asset_added: { class: ['gold', 'silver', 'fund', 'plan'] },
+  asset_added: { class: ['gold', 'silver', 'fund', 'plan', 'currency'] },
   plan_contribution_confirmed: {},
   plan_contribution_skipped: {},
   // Portfolios
