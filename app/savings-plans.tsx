@@ -390,7 +390,16 @@ export default function SavingsPlansSection({
             moved by the market yet.
           </p>
         )}
+        {v.partlyUnpriced && (
+          <p className="notice error">
+            Your statement or a payment is older than the oldest unit price
+            Pak-Qatar publishes, so that part is shown unchanged. Enter a recent
+            statement value to bring the plan up to date.
+          </p>
+        )}
         <p className="report-source">
+          {v.priceDate &&
+            `Priced with the sub-fund unit price of ${dateText(v.priceDate)}. `}
           {v.source === 'statement' &&
             `Value from your statement of ${dateText(v.statementDate!)}.`}
           {v.source === 'estimate' &&

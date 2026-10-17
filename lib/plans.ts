@@ -89,6 +89,11 @@ export type PlanValue = {
   source: 'statement' | 'estimate' | 'paid-in';
   /** Date of the statement value used, if any. */
   statementDate: string | null;
+  /** Date of the sub-fund unit price the value was moved by; null when no price was used. */
+  priceDate: string | null;
+  /** True when a price exists but some money (the statement or a payment) is older than the oldest stored price, so
+   * that part could not be moved and is shown unchanged. */
+  partlyUnpriced: boolean;
   contributed: number;
   redeemed: number;
   /** Net money still in: paid in minus redeemed. */
@@ -122,8 +127,10 @@ export function planValue(
     : [];
   const latest = navOn(navs, asOf);
   /** Moves an amount from `date` to `asOf` by the sub-fund's unit price; unchanged when no price is known at `date`. */
+  let partlyUnpriced = false;
   const byNav = (amount: number, date: string) => {
     const then = navOn(navs, date);
+    if (latest && !then) partlyUnpriced = true;
     return latest && then ? amount * (latest.nav / then.nav) : amount;
   };
   const entries = live(plan.entries).filter((e) => e.date <= asOf);
@@ -194,6 +201,8 @@ export function planValue(
     value,
     source,
     statementDate: last?.date ?? null,
+    priceDate: latest && !plan.closed ? latest.date : null,
+    partlyUnpriced,
     contributed,
     redeemed,
     cost,

@@ -289,4 +289,9 @@ test('a sub-fund price moves the plan value between statements and after later p
   assert.equal(v.source, 'estimate');
   assert.equal(v.value, 106050 + 10294.12); // 101000 x 105/100 + 10000 x 105/102
   assert.equal(planValue(plan, '2026-03-01', []).value, 111000); // no price: unchanged
+  assert.equal(v.priceDate, '2026-03-01');
+  assert.equal(v.partlyUnpriced, false);
+  // A statement older than the oldest stored price cannot be moved: flagged, not silently frozen.
+  const old = planValue(plan, '2026-03-01', navs.slice(1));
+  assert.equal(old.partlyUnpriced, true);
 });
