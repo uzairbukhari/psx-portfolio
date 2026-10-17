@@ -1,0 +1,18 @@
+name: FX probe (temporary)
+on:
+  pull_request:
+    paths: ['.github/workflows/fx-probe-tmp.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe open-market sources
+        run: |
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+          for u in https://www.forex.pk/ https://forex.pk/ https://www.forex.pk/open-market-rates.asp https://www.forex.pk/open-market-rate.asp https://www.forex.pk/open_market_rates.asp https://www.forex.pk/rates https://www.forex.pk/currency-rates https://www.forex.com.pk/ https://www.ecap.org.pk/ https://www.sbp.org.pk/ecodata/rates/m2m/M2M-Current.asp https://www.sbp.org.pk/ecodata/index2.asp https://www.exchangerate.pk/ https://www.currencyrates.pk/ https://www.kbl.com.pk/ ; do
+            code=$(curl -sL -m 25 -A "$UA" -o /tmp/p.html -w '%{http_code} %{size_download} %{url_effective}' "$u" || echo fail)
+            echo "== $u -> $code"
+            sed 's/<[^>]*>/ /g' /tmp/p.html 2>/dev/null | tr -s ' \n\t' ' ' | grep -oiE '(US ?Dollar|USD|UAE Dirham|AED|Saudi Riyal|SAR).{0,60}' | head -4
+            grep -oiE 'href="[^"]*(open|rate)[^"]*"' /tmp/p.html 2>/dev/null | head -8
+          done
