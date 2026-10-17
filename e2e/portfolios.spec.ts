@@ -44,3 +44,9 @@ test('Empty portfolio is locked and shows an empty state', async ({ app }) => {
   await expect(app.getByText('Start your portfolio')).toBeVisible();
   await expect(app.getByText(/This portfolio is locked/)).toBeVisible();
 });
+
+test('a holding page opens straight from its link, even on the All view', async ({ app }) => {
+  await app.goto('/currency/usd-cash');
+  await expect(app.getByRole('heading', { name: 'Dollars at home' })).toBeVisible({ timeout: 60_000 });
+  await expect(app.getByText('Rate and your trades')).toBeVisible();
+});
