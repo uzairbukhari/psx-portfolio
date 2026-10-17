@@ -118,6 +118,7 @@ const NAME_PATTERNS: Record<CurrencyCode, RegExp> = {
 };
 
 /**
+ * The page is https://www.forex.pk/open_market_rates.asp (underscores; the hyphenated address answers 404).
  * Reads the open-market table of a rates page (buying then selling, in rupees) from its text. Each currency must
  * have a buying rate that is not above its selling rate and within 3% of the interbank rate, or the whole page is
  * rejected, so a redesigned page fails loudly instead of storing a wrong rate. Returns the buying rate.
