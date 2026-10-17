@@ -42,6 +42,19 @@ export function buildPublicFixtureSql(today: string, mode: FixtureMode = 'all', 
   sql.push(row('fund_payouts', ins, { mufap_id: moneyMarket.mufapId, payout_date: daysAgo(today, 60), per_unit: 1.2, ex_nav: 100, fetched_at: at }));
   sql.push(row('fund_payouts', ins, { mufap_id: moneyMarket.mufapId, payout_date: daysAgo(today, 5), per_unit: 1.1, ex_nav: 101, fetched_at: at }));
 
+  // Foreign currency: interbank for the last 30 days and open market for the last 5, as the pages show. Also written in
+  // 'gaps' mode (INSERT OR IGNORE, so real scraped rows win) because staging does not run the fx scraper.
+  const FX_BASE = { USD: 282, AED: 76.8, SAR: 75.2 } as const;
+  for (const currency of ['USD', 'AED', 'SAR'] as const) {
+    for (let i = 0; i < 30; i++)
+      sql.push(row('fx_rates', ins, { currency, kind: 'interbank', date: daysAgo(today, i), pkr_per_unit: Math.round(FX_BASE[currency] * (1 + Math.sin(i / 5) * 0.004) * 10000) / 10000, source_url: 'https://example.test/fx', source_label: 'Test fixture', fetched_at: at }));
+    for (let i = 0; i < 5; i++)
+      sql.push(row('fx_rates', ins, { currency, kind: 'open_market', date: daysAgo(today, i), pkr_per_unit: Math.round(FX_BASE[currency] * 0.997 * 10000) / 10000, source_url: 'https://example.test/fx', source_label: 'Test fixture', fetched_at: at }));
+    const year = today.slice(0, 4);
+    const closes = Array.from({ length: 30 }, (_, k) => 29 - k).map((i) => [daysAgo(today, i), Math.round(FX_BASE[currency] * (1 + Math.sin(i / 5) * 0.004) * 10000) / 10000]).filter(([day]) => String(day).startsWith(year));
+    sql.push(row('fx_rate_history', ins, { currency, kind: 'interbank', year, closes: JSON.stringify(closes), updated_at: at }));
+  }
+
   // The test account is a super admin so the Research desk and AI Lab can be tested.
   sql.push(row('user_roles', 'INSERT OR REPLACE', { email: TEST_ACCOUNT_EMAIL, role: 'super_admin', created_at: at }));
   if (mode === 'gaps') return sql;
@@ -56,18 +69,6 @@ export function buildPublicFixtureSql(today: string, mode: FixtureMode = 'all', 
     for (const [metal, tola] of [['gold', TEST_METAL_RATES.goldPerTola24k], ['silver', TEST_METAL_RATES.silverPerTola]] as const)
       for (const [kind, factor] of [['local', 1], ['international', 0.985]] as const)
         sql.push(row('metal_rates', ins, { date: daysAgo(today, i), metal, kind, pkr_per_tola: Math.round(tola * wobble * factor), source_url: 'https://example.test/metal-rates', source_label: 'Test fixture', fetched_at: at }));
-  }
-
-  // Foreign currency: interbank for the last 30 days and open market for the last 5, as the pages show.
-  const FX_BASE = { USD: 282, AED: 76.8, SAR: 75.2 } as const;
-  for (const currency of ['USD', 'AED', 'SAR'] as const) {
-    for (let i = 0; i < 30; i++)
-      sql.push(row('fx_rates', ins, { currency, kind: 'interbank', date: daysAgo(today, i), pkr_per_unit: Math.round(FX_BASE[currency] * (1 + Math.sin(i / 5) * 0.004) * 10000) / 10000, source_url: 'https://example.test/fx', source_label: 'Test fixture', fetched_at: at }));
-    for (let i = 0; i < 5; i++)
-      sql.push(row('fx_rates', ins, { currency, kind: 'open_market', date: daysAgo(today, i), pkr_per_unit: Math.round(FX_BASE[currency] * 0.997 * 10000) / 10000, source_url: 'https://example.test/fx', source_label: 'Test fixture', fetched_at: at }));
-    const year = today.slice(0, 4);
-    const closes = Array.from({ length: 30 }, (_, k) => 29 - k).map((i) => [daysAgo(today, i), Math.round(FX_BASE[currency] * (1 + Math.sin(i / 5) * 0.004) * 10000) / 10000]).filter(([day]) => String(day).startsWith(year));
-    sql.push(row('fx_rate_history', ins, { currency, kind: 'interbank', year, closes: JSON.stringify(closes), updated_at: at }));
   }
 
   for (const [index, c] of TEST_COMPANIES.entries()) {

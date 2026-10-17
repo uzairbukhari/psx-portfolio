@@ -125,7 +125,7 @@ test('public fixtures build for every shared table, deterministically, and the g
   for (const table of ['security_catalog', 'quote_refreshes', 'price_history', 'company_facts', 'fund_catalog', 'fund_navs', 'fund_payouts', 'metal_rates', 'plan_navs', 'dividend_announcements', 'ipo_offers', 'user_roles'])
     assert.ok(all.some((s) => s.includes(`INTO ${table} `)), table);
   const gaps = buildPublicFixtureSql('2026-10-12', 'gaps', now);
-  assert.ok(gaps.every((s) => /INTO (fund_catalog|tracked_funds|fund_navs|fund_payouts|user_roles) /.test(s)));
+  assert.ok(gaps.every((s) => /INTO (fund_catalog|tracked_funds|fund_navs|fund_payouts|user_roles|fx_rates|fx_rate_history) /.test(s)));
   assert.ok(gaps.filter((s) => s.startsWith('INSERT OR REPLACE')).every((s) => s.includes('user_roles')), 'gaps never overwrite scraped rows');
 });
 
