@@ -24,6 +24,16 @@ test('Savings & Gold: gold, savings plans and mutual funds each open', async ({ 
   await app.getByRole('button', { name: /Gold and Silver/ }).click();
   for (const name of ['Wedding gold', '24k bar', 'Silver coins']) await expect(app.getByText(name).first()).toBeVisible();
 
+  await expect(app.getByRole('button', { name: /Foreign currency/ })).toContainText('2 held');
+  await app.getByRole('button', { name: /Foreign currency/ }).click();
+  for (const name of ['Dollars at home', 'Dirhams in the bank']) await expect(app.getByText(name).first()).toBeVisible();
+  await app.getByRole('button', { name: /Dollars at home/ }).click();
+  await expect(app).toHaveURL(/\/currency\//);
+  await expect(app.getByRole('heading', { name: 'Dollars at home' })).toBeVisible();
+  await expect(app.getByText('Rate and your trades')).toBeVisible();
+  await expect(app.getByText('Held over time')).toBeVisible();
+  await app.goBack();
+
   await app.getByRole('button', { name: /Savings plans/ }).click();
   await expect(app.getByText('Mahana Bachat').first()).toBeVisible();
   expect(await pageText(app)).toContain('Old savings plan');

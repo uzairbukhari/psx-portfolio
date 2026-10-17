@@ -6,6 +6,7 @@ import { blankPortfolio, type Company, type Dividend, type Portfolio, type Trade
 import type { PortfolioAccount } from '../portfolio-account.ts';
 import type { FundAsset } from '../funds.ts';
 import type { MetalAsset } from '../assets.ts';
+import type { CurrencyAsset } from '../currency.ts';
 import type { PlanAsset } from '../plans.ts';
 import { TEST_COMPANIES, TEST_FUNDS, priceOf } from './universe.ts';
 
@@ -263,7 +264,20 @@ function savings(today: string, now: Date): Portfolio {
   };
 
   void now;
-  return { ...blankPortfolio(), assets: [gold, bar, silver, plan, closedPlan, reinvest, cash, closedFund] };
+  const dollars: CurrencyAsset = {
+    id: 'usd-cash', kind: 'currency', name: 'Dollars at home', currency: 'USD', heldAt: 'cash', note: 'Fictional.',
+    entries: [
+      { id: 'fx1', date: d(300), type: 'opening', units: 200, pkr: null, note: 'Already owned, cost unknown.' },
+      { id: 'fx2', date: d(180), type: 'buy', units: 500, pkr: 138500, note: 'Bought from an exchange company.' },
+      { id: 'fx3', date: d(60), type: 'sell', units: 150, pkr: 42300, note: 'Sold some back.' },
+      { id: 'fx4', date: d(40), type: 'buy', units: 100, pkr: 28000, note: 'Voided purchase.', voided: true },
+    ],
+  };
+  const dirhams: CurrencyAsset = {
+    id: 'aed-bank', kind: 'currency', name: 'Dirhams in the bank', currency: 'AED', heldAt: 'bank', note: '',
+    entries: [{ id: 'fx5', date: d(100), type: 'buy', units: 1000, pkr: 76000, note: 'Fictional.' }],
+  };
+  return { ...blankPortfolio(), assets: [gold, bar, silver, plan, closedPlan, reinvest, cash, closedFund, dollars, dirhams] };
 }
 
 export function buildTestAccount(today: string, now: Date = new Date()): PortfolioAccount {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reportMode, fundReport, metalReport, rateHistory } from '../lib/asset-reports.ts';
+import { reportMode, fundReport, metalReport, rateHistory, currencyReport } from '../lib/asset-reports.ts';
 
 const fund = (id, entries) => ({ id, kind: 'fund', name: id, mufapId: id, amc: '', fundName: id, category: '', note: '', entries, manualNavs: [{ id: 'm', date: '2026-10-01', nav: 120 }], rules: [] });
 const buy = (id, date, units, amount) => ({ id, date, type: 'buy', units, amount, note: '' });
@@ -58,4 +58,29 @@ test('plan report: savings-only mode and paid in against value', () => {
   assert.deepEqual(r.series.map((s) => [s.month, s.paidIn]), [['2026-08', 50000], ['2026-09', 60000], ['2026-10', 60000]]);
   assert.equal(r.value, 62000);
   assert.equal(r.gain, 2000);
+});
+
+test('currency report: monthly rupees bought and sold, units held, gain', () => {
+  const usd = { id: 'u', kind: 'currency', name: 'Dollars', currency: 'USD', note: '', entries: [
+    { id: '1', date: '2026-08-05', type: 'buy', units: 100, pkr: 28000, note: '' },
+    { id: '2', date: '2026-10-02', type: 'buy', units: 100, pkr: 28400, note: '' },
+    { id: '3', date: '2026-10-03', type: 'sell', units: 50, pkr: 14500, note: '' },
+    { id: '4', date: '2026-10-04', type: 'buy', units: 999, pkr: 1, note: '', voided: true },
+  ] };
+  const aed = { ...usd, id: 'a', currency: 'AED' };
+  const rates = [{ date: '2026-10-05', currency: 'USD', kind: 'open_market', pkrPerUnit: 285, sourceUrl: '' }];
+  assert.equal(reportMode({ trades: [], assets: [usd] }), 'currency');
+  assert.equal(reportMode({ trades: [], assets: [usd, gold([])] }), 'stocks');
+  const r = currencyReport([usd, aed], 'USD', rates, '2026-10-05');
+  assert.deepEqual(r.months, [
+    { month: '2026-08', bought: 28000, sold: 0 },
+    { month: '2026-10', bought: 28400, sold: 14500 },
+  ]);
+  assert.deepEqual(r.held.map((h) => h.units), [100, 200, 150]);
+  assert.equal(r.units, 150);
+  assert.equal(r.cost, 42300);
+  assert.equal(r.value, 42750);
+  assert.equal(r.gain, 450);
+  assert.equal(r.realized, 400);
+  assert.equal(r.averageRate, 282);
 });

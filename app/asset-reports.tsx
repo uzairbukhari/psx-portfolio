@@ -8,6 +8,7 @@ import {
   fundReport,
   planReport,
   metalReport,
+  currencyReport,
   type MonthPoint,
   type ReportMode,
 } from '@/lib/asset-reports';
@@ -15,6 +16,12 @@ import type { Metal, MetalRateRow } from '@/lib/metal-rates';
 import type { FundNavRow } from '@/lib/mufap';
 import type { PlanNavRow } from '@/lib/plans';
 import type { Asset } from '@/lib/assets';
+import {
+  CURRENCY_NAMES,
+  SUPPORTED_CURRENCIES,
+  type CurrencyCode,
+  type FxRatesResponse,
+} from '@/lib/fx-rates';
 import { ChartInfo } from './chart-info';
 import PortfolioReports from './portfolio-reports';
 
@@ -577,18 +584,153 @@ function MetalReports({
   );
 }
 
+const NO_FX: FxRatesResponse = { rates: [], history: [] };
+
+function CurrencyReports({
+  portfolio,
+  currency,
+  fx,
+}: {
+  portfolio: Portfolio;
+  currency: CurrencyCode;
+  fx: FxRatesResponse;
+}) {
+  const asOf = today();
+  const report = currencyReport(portfolio.assets ?? [], currency, fx.rates, asOf);
+  const name = CURRENCY_NAMES[currency];
+  const interbank = fx.history.filter(
+    (h) => h.currency === currency && h.kind === 'interbank',
+  );
+  const history = interbank.length >= 2 ? interbank : fx.history.filter((h) => h.currency === currency && h.kind === 'open_market');
+  const avg = report.averageRate;
+  const cats = report.months.map((m) => monthLabel(m.month));
+  return (
+    <>
+      <div className="reports-intro">
+        <div className="reports-intro-header">
+          <p className="eyebrow">{currency} REPORTS</p>
+          <p>
+            Your {name.toLowerCase()} purchases and sales in rupees, and the rate
+            over time against what you paid on average.
+          </p>
+        </div>
+        <div className="reports-hero-stats">
+          <Stat
+            label="Held"
+            value={`${Math.round(report.units * 100) / 100} ${currency}`}
+            note={report.rate ? `Rate ${money(report.rate)}` : 'No rate loaded yet'}
+          />
+          <Stat
+            label="Current value"
+            value={report.value === null ? '—' : moneyShort(report.value)}
+            note="Units × today's rate"
+          />
+          <Stat
+            label="Average cost"
+            value={avg === null ? '—' : money(avg)}
+            note={avg === null ? 'Needs a cost on every purchase' : `Rupees per ${currency}`}
+          />
+          <Stat
+            label="Unrealised gain / loss"
+            value={report.gain === null ? '—' : signed(report.gain)}
+            note="Value less remaining cost"
+            tone={report.gain === null ? '' : report.gain >= 0 ? 'pos' : 'neg'}
+          />
+        </div>
+      </div>
+      <div className="reports-grid" style={{ marginBottom: 20 }}>
+        <section className="panel report-panel report-panel--wide">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">{currency} RATE</p>
+              <h3>
+                Rate history against your average cost
+                <ChartInfo text="The saved rate in rupees over time, with a dashed line at your average cost per unit. Above the line, your holding is in profit." />
+              </h3>
+            </div>
+          </div>
+          {history.length > 1 ? (
+            <EChart
+              className="report-chart report-chart--medium"
+              label={`${currency} rate in rupees, ${history.length} days. Latest ${money(history.at(-1)!.rate)}.`}
+              build={(t) =>
+                timeSeriesOption(t, {
+                  name: `${currency} rate`,
+                  data: history.map((p) => ({ x: p.date, y: p.rate })),
+                  area: true,
+                  valueFormat: money,
+                  axisFormat: compact,
+                  zoom: true,
+                  dateLabel: (x, _long, tip) =>
+                    tip ? dayLabel(String(x)) : monthLabel(String(x).slice(0, 7)),
+                  refLines:
+                    avg !== null
+                      ? [{ y: avg, color: t.warn, label: `Your average cost ${money(avg)}` }]
+                      : undefined,
+                })
+              }
+            />
+          ) : (
+            <Empty>Not enough rate history yet.</Empty>
+          )}
+          <p className="report-source">
+            Source: saved {currency} rates · dashed line is your average cost per {currency}
+          </p>
+        </section>
+        <section className="panel report-panel report-panel--wide">
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">BOUGHT AND SOLD</p>
+              <h3>
+                Rupees paid and received each month
+                <ChartInfo text="Rupees you paid for purchases and received from sales, by month. Opening balances are not counted." />
+              </h3>
+            </div>
+          </div>
+          {report.months.length ? (
+            <EChart
+              className="report-chart"
+              label={`Rupees paid and received for ${currency} by month. Bought ${moneyShort(report.bought)}, sold ${moneyShort(report.sold)}.`}
+              build={(t) =>
+                barOption(t, {
+                  cats,
+                  stack: false,
+                  legend: true,
+                  valueFormat: money,
+                  axisFormat: compact,
+                  series: [
+                    { name: 'Bought', data: report.months.map((m) => m.bought), color: t.cat[0] },
+                    { name: 'Sold', data: report.months.map((m) => m.sold), color: t.cat[2] },
+                  ],
+                })
+              }
+            />
+          ) : (
+            <Empty>No purchases or sales recorded yet.</Empty>
+          )}
+          <p className="report-source">
+            Source: non-voided {currency} purchases and sales · opening balances excluded
+          </p>
+        </section>
+      </div>
+    </>
+  );
+}
+
 export default function AssetReports({
   portfolio,
   mode,
   metalRates,
   fundNavs,
   planNavs,
+  fx = NO_FX,
 }: {
   portfolio: Portfolio;
   mode: Exclude<ReportMode, 'stocks'>;
   metalRates: MetalRateRow[];
   fundNavs: FundNavRow[];
   planNavs: PlanNavRow[];
+  fx?: FxRatesResponse;
 }) {
   const metals = (['gold', 'silver'] as const).filter((m) =>
     portfolio.assets?.some((a) => a.kind === 'metal' && a.metal === m),
@@ -607,6 +749,14 @@ export default function AssetReports({
         label: 'Savings plan',
         node: <PlanReports portfolio={portfolio} navs={planNavs} />,
       });
+  } else if (mode === 'currency') {
+    for (const c of SUPPORTED_CURRENCIES)
+      if (portfolio.assets?.some((a) => a.kind === 'currency' && a.currency === c))
+        classes.push({
+          key: c,
+          label: c,
+          node: <CurrencyReports portfolio={portfolio} currency={c} fx={fx} />,
+        });
   } else {
     for (const m of metals)
       classes.push({
@@ -647,16 +797,17 @@ export function AllReports({
   metalRates,
   fundNavs,
   planNavs,
+  fx = NO_FX,
 }: {
   portfolio: Portfolio;
   assets: Asset[];
   metalRates: MetalRateRow[];
   fundNavs: FundNavRow[];
   planNavs: PlanNavRow[];
+  fx?: FxRatesResponse;
 }) {
-  const [view, setView] = useState<'all' | 'stocks' | 'metals' | 'funds'>(
-    'all',
-  );
+  type Kind = 'stocks' | 'metals' | 'funds' | 'currency';
+  const [view, setView] = useState<'all' | Kind>('all');
   const merged: Portfolio = { ...portfolio, assets };
   const has = {
     stocks:
@@ -664,27 +815,34 @@ export function AllReports({
       !!portfolio.dividends?.some((d) => !d.voided),
     metals: assets.some((a) => a.kind === 'metal'),
     funds: assets.some((a) => a.kind === 'fund' || a.kind === 'plan'),
+    currency: assets.some((a) => a.kind === 'currency'),
   };
-  const kinds = (['stocks', 'metals', 'funds'] as const).filter((k) => has[k]);
+  const kinds = (['stocks', 'metals', 'funds', 'currency'] as const).filter(
+    (k) => has[k],
+  );
   const labels = {
     all: 'All',
     stocks: 'Stocks',
     metals: 'Metals',
     funds: 'Mutual Funds',
+    currency: 'Foreign currency',
   };
-  const show = (k: 'stocks' | 'metals' | 'funds') =>
+  const show = (k: Kind) =>
     kinds.length === 1 || view === 'all' || view === k;
-  const section = (k: 'stocks' | 'metals' | 'funds') =>
+  const section = (k: Kind) =>
     !has[k] || !show(k) ? null : k === 'stocks' ? (
       <PortfolioReports key={k} portfolio={merged} />
     ) : (
       <AssetReports
         key={k}
         portfolio={merged}
-        mode={k === 'metals' ? 'metal' : 'savings'}
+        mode={
+          k === 'metals' ? 'metal' : k === 'currency' ? 'currency' : 'savings'
+        }
         metalRates={metalRates}
         fundNavs={fundNavs}
         planNavs={planNavs}
+        fx={fx}
       />
     );
   if (!kinds.length) return <PortfolioReports portfolio={portfolio} />;
@@ -711,6 +869,7 @@ export function AllReports({
       {section('stocks')}
       {section('metals')}
       {section('funds')}
+      {section('currency')}
     </div>
   );
 }

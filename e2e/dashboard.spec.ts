@@ -5,7 +5,7 @@ test('All view totals every asset class across the four portfolios', async ({ ap
   await expect(app.getByText('4 portfolios')).toBeVisible();
   // The asset-mix donut is a canvas; its classes are listed beside it with the position count.
   const mix = app.getByRole('region', { name: 'Asset mix' });
-  for (const label of ['Stocks', 'Gold', 'Silver', 'Savings plans', 'Mutual funds']) await expect(mix.getByText(label).first()).toBeVisible();
+  for (const label of ['Stocks', 'Gold', 'Silver', 'Savings plans', 'Mutual funds', 'Foreign currency']) await expect(mix.getByText(label).first()).toBeVisible();
   await expect(app.getByText('Stocks by sector')).toBeVisible();
   for (const sector of ['Bank', 'Oil & Gas', 'Fertilizer', 'Cement', 'Technology']) await expect(app.getByText(sector, { exact: true }).first()).toBeVisible();
   const text = await pageText(app);

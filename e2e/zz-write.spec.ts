@@ -38,3 +38,23 @@ test('a transaction saved in the app is encrypted, stored and still there after 
   await expect(app.getByText('Fauji Cement').first()).toBeVisible({ timeout: 60_000 });
   await expect(app.getByText('625').first()).toBeVisible();
 });
+
+test('a foreign currency purchase is saved with the public rate filled in and survives a reload', async ({ app }) => {
+  await choosePortfolio(app, 'Savings & Gold');
+  // Panels you open stay open in this browser, so only open it when an earlier spec left it folded.
+  if (!(await app.getByRole('button', { name: 'Add currency' }).isVisible())) await app.getByRole('button', { name: /Foreign currency/ }).click();
+  await app.getByRole('button', { name: 'Add currency' }).click();
+  const dialog = app.getByRole('dialog', { name: 'Add foreign currency' });
+  await dialog.getByLabel('Holding').selectOption({ label: 'Dollars at home' });
+  await dialog.getByLabel('Amount (USD)').fill('100');
+  // The rupees are filled in from today's rate (the open-market buying rate), and can be overwritten.
+  await expect(dialog.getByLabel(/Rupees paid/)).not.toHaveValue('');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
+  await expect(app.getByText('650 USD')).toBeVisible();
+
+  await app.reload();
+  await choosePortfolio(app, 'Savings & Gold');
+  // The panel was left open, and a panel you open stays open in this browser.
+  await expect(app.getByText('650 USD')).toBeVisible({ timeout: 60_000 });
+});
