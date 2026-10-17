@@ -52,6 +52,7 @@ private fun classColor(key: String): Color =
         "gold" -> SipwiseTheme.colors.assetGold
         "silver" -> SipwiseTheme.colors.assetSilver
         "plans" -> SipwiseTheme.colors.assetPlans
+        "currency" -> MaterialTheme.colorScheme.tertiary
         else -> SipwiseTheme.colors.assetStocks
     }
 

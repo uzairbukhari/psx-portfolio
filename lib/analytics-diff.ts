@@ -32,7 +32,7 @@ export function eventsForSave(prev: Portfolio | null, next: Portfolio, importSou
   for (const a of next.assets ?? []) {
     if (assetsBefore.has(a.id)) continue;
     const cls = a.kind === 'metal' ? a.metal : a.kind;
-    if (cls === 'gold' || cls === 'silver' || cls === 'fund' || cls === 'plan') out.push({ event: 'asset_added', props: { class: cls } });
+    if (cls === 'gold' || cls === 'silver' || cls === 'fund' || cls === 'plan' || cls === 'currency') out.push({ event: 'asset_added', props: { class: cls } });
   }
   if (JSON.stringify(prev.budgets) !== JSON.stringify(next.budgets)) out.push({ event: 'targets_saved', props: {} });
   return out;

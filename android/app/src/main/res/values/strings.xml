@@ -584,6 +584,9 @@
     <string name="assets_funds">Mutual funds</string>
     <string name="assets_plans">Savings plans</string>
     <string name="assets_metals">Gold and silver</string>
+    <string name="assets_currencies">Foreign currency</string>
+    <string name="assets_fx_open_market">Rs %1$s per unit, open market on %2$s.</string>
+    <string name="assets_fx_interbank">Rs %1$s per unit, interbank estimate on %2$s.</string>
     <string name="assets_fund_units">%1$s units</string>
     <string name="assets_fund_price">Rs %1$s</string>
     <string name="assets_amc_unknown">Other managers</string>

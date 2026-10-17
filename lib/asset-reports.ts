@@ -7,12 +7,14 @@ import { valueFund } from './funds.ts';
 import type { FundNavRow } from './mufap.ts';
 import { planValue, type PlanAsset, type PlanNavRow } from './plans.ts';
 import { purity, TOLA_GRAMS, type Metal, type MetalRateRow } from './metal-rates.ts';
+import { currencyPosition, valueCurrency, type CurrencyAsset } from './currency.ts';
+import type { CurrencyCode, FxRateRow } from './fx-rates.ts';
 
 const cents = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-export type ReportMode = 'stocks' | 'savings' | 'metal';
+export type ReportMode = 'stocks' | 'savings' | 'metal' | 'currency';
 
-/** Which report set a portfolio gets: only when it has no stock activity and its assets are all funds and savings plans ('savings'), or all gold/silver. */
+/** Which report set a portfolio gets: only when it has no stock activity and its assets are all funds and savings plans ('savings'), all gold/silver, or all foreign currency. */
 export function reportMode(p: {
   trades: { voided?: boolean }[];
   dividends?: { voided?: boolean }[];
@@ -24,6 +26,7 @@ export function reportMode(p: {
   if (!live.length) return 'stocks';
   if (live.every((a) => a.kind === 'fund' || a.kind === 'plan')) return 'savings';
   if (live.every((a) => a.kind === 'metal')) return 'metal';
+  if (live.every((a) => a.kind === 'currency')) return 'currency';
   return 'stocks';
 }
 
@@ -242,5 +245,84 @@ export function planReport(
     redeemed,
     value,
     gain: cents(value + redeemed - paid),
+  };
+}
+
+export type CurrencyMonth = {
+  month: string;
+  /** Rupees paid for purchases that month. */
+  bought: number;
+  /** Rupees received from sales that month. */
+  sold: number;
+};
+export type CurrencyReport = {
+  currency: CurrencyCode;
+  months: CurrencyMonth[];
+  /** Units held after each entry, oldest first (a step line). */
+  held: { date: string; units: number }[];
+  units: number;
+  averageRate: number | null;
+  cost: number | null;
+  value: number | null;
+  gain: number | null;
+  realized: number | null;
+  bought: number;
+  sold: number;
+  rate: number | null;
+};
+
+/** One currency across every holding of it: what was paid and received by month, units held over time, and today's gain. */
+export function currencyReport(
+  assets: Asset[],
+  currency: CurrencyCode,
+  rates: FxRateRow[],
+  asOf: string,
+): CurrencyReport {
+  const mine = assets.filter(
+    (a): a is CurrencyAsset => a.kind === 'currency' && a.currency === currency,
+  );
+  const byMonth = new Map<string, CurrencyMonth>();
+  const moves: { date: string; delta: number }[] = [];
+  for (const a of mine) {
+    for (const e of currencyPosition(a).history) {
+      if (e.voided) continue;
+      moves.push({ date: e.date, delta: e.type === 'sell' ? -e.units : e.units });
+      if (e.type === 'opening' || e.pkr === null) continue;
+      const month = e.date.slice(0, 7);
+      const row = byMonth.get(month) ?? { month, bought: 0, sold: 0 };
+      if (e.type === 'buy') row.bought = cents(row.bought + e.pkr);
+      else row.sold = cents(row.sold + e.pkr);
+      byMonth.set(month, row);
+    }
+  }
+  const months = [...byMonth.values()].sort((a, b) => (a.month < b.month ? -1 : 1));
+  moves.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.delta - a.delta));
+  let units = 0;
+  const held: CurrencyReport['held'] = [];
+  for (const m of moves) {
+    units = Math.round((units + m.delta) * 1e4) / 1e4;
+    held.push({ date: m.date, units });
+  }
+  const valued = mine.map((a) => valueCurrency(a, rates, asOf));
+  const sum = (pick: (v: (typeof valued)[number]) => number | null) =>
+    valued.some((v) => pick(v) === null)
+      ? null
+      : cents(valued.reduce((t, v) => t + (pick(v) ?? 0), 0));
+  const cost = sum((v) => v.cost);
+  const value = sum((v) => v.value);
+  const held_ = valued.reduce((t, v) => t + v.units, 0);
+  return {
+    currency,
+    months,
+    held,
+    units: Math.round(held_ * 1e4) / 1e4,
+    averageRate: cost === null || held_ <= 0 ? null : cost / held_,
+    cost,
+    value,
+    gain: value === null || cost === null ? null : cents(value - cost),
+    realized: sum((v) => v.realized),
+    bought: cents(valued.reduce((t, v) => t + v.bought.pkr, 0)),
+    sold: cents(valued.reduce((t, v) => t + v.sold.pkr, 0)),
+    rate: valued.find((v) => v.rate)?.rate?.pkrPerUnit ?? null,
   };
 }

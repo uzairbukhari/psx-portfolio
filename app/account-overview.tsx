@@ -13,6 +13,7 @@ import {
 } from '@/lib/account-overview';
 import { ChartInfo } from './chart-info';
 import { daysBetween } from '@/lib/performance';
+import type { FxRateRow } from '@/lib/fx-rates';
 import type { MetalRateRow } from '@/lib/metal-rates';
 
 /** The same colours as CLASS_COLORS, resolved for the canvas. */
@@ -23,6 +24,7 @@ const classColor = (t: ChartTokens, k: AssetClassKey) =>
     silver: t.neutral,
     plans: t.cat[2],
     funds: t.cat[6],
+    currency: t.cat[5],
   })[k];
 
 const CLASS_COLORS: Record<AssetClassKey, string> = {
@@ -31,6 +33,7 @@ const CLASS_COLORS: Record<AssetClassKey, string> = {
   silver: 'var(--chart-neutral)',
   plans: 'var(--cat-3)',
   funds: 'var(--cat-7)',
+  currency: 'var(--cat-6)',
 };
 const SECTOR_COLORS = [
   'var(--cat-1)',
@@ -78,6 +81,7 @@ export default function AccountOverview({
   metalRates,
   fundNavs = [],
   planNavs = [],
+  fxRates = [],
   chart,
   onOpenPortfolio,
 }: {
@@ -86,13 +90,14 @@ export default function AccountOverview({
   metalRates: MetalRateRow[];
   fundNavs?: FundNavRow[];
   planNavs?: PlanNavRow[];
+  fxRates?: FxRateRow[];
   /** The stocks value chart (with the market pulse beside it), rendered by the page because it loads price history itself. Only shown when stocks are held. */
   chart: ReactNode;
   onOpenPortfolio: (id: string) => void;
 }) {
   const o = useMemo(
-    () => accountOverview(parts, asOf, { metalRates, fundNavs, planNavs }),
-    [parts, asOf, metalRates, fundNavs, planNavs],
+    () => accountOverview(parts, asOf, { metalRates, fundNavs, planNavs, fxRates }),
+    [parts, asOf, metalRates, fundNavs, planNavs, fxRates],
   );
   const { total, returns, income, invested } = o;
   const staleDays = total.oldestQuoteDate
