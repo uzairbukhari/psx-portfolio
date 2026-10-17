@@ -44,6 +44,8 @@ export const SHARED_TABLES: readonly string[] = [
   'security_face_values',
   'corporate_actions',
   'metal_rates',
+  'fx_rates',
+  'fx_rate_history',
   'fund_catalog',
   'fund_navs',
   'fund_payouts',
