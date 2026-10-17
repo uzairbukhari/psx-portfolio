@@ -99,6 +99,7 @@ import { reportMode } from '@/lib/asset-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import AccountOverview from './account-overview';
 import { useMetalRates } from './use-metal-rates';
+import { useFxRates } from './use-fx-rates';
 import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
 import CollapsiblePanel from './collapsible-panel';
 import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
@@ -110,6 +111,7 @@ import {
   MonthlyPicks,
   CompanyDetail,
   GoldSilverSection,
+  ForeignCurrencySection,
   SavingsPlansSection,
   MutualFundsSection,
   SettingsView,
@@ -124,6 +126,7 @@ import {
   DividendSyncView,
 } from './lazy-panels';
 import type { OwnedMetal } from './gold-silver';
+import type { OwnedCurrency } from './foreign-currency';
 import type { OwnedPlan } from './savings-plans';
 import type { OwnedFund } from './mutual-funds';
 import { buildAssetEntries, buildEntries } from '@/lib/ledger-entries';
@@ -1439,8 +1442,15 @@ function DashboardContent({
         )
       : p?.assets?.some((a) => a.kind === 'metal')),
   );
+  const fxData = useFxRates(
+    !!(isAll
+      ? p?.[DISPLAY_PARTS]?.some((part) =>
+          part.portfolio.assets?.some((a) => a.kind === 'currency'),
+        )
+      : p?.assets?.some((a) => a.kind === 'currency')),
+  );
   const [assetAdd, setAssetAdd] = useState<{
-    kind: 'metal' | 'plan' | 'fund';
+    kind: 'metal' | 'plan' | 'fund' | 'currency';
     n: number;
   }>({ kind: 'metal', n: 0 });
   const fundData = useFundCatalog(
@@ -1908,6 +1918,9 @@ function DashboardContent({
       }));
   const ownedMetals: OwnedMetal[] = allAssets.flatMap((o) =>
     o.asset.kind === 'metal' ? [{ ...o, asset: o.asset }] : [],
+  );
+  const ownedCurrencies: OwnedCurrency[] = allAssets.flatMap((o) =>
+    o.asset.kind === 'currency' ? [{ ...o, asset: o.asset }] : [],
   );
   const ownedPlans: OwnedPlan[] = allAssets.flatMap((o) =>
     o.asset.kind === 'plan' ? [{ ...o, asset: o.asset }] : [],
@@ -2923,6 +2936,7 @@ function DashboardContent({
                     parts={overviewParts}
                     asOf={today()}
                     metalRates={metalRates.rates}
+                    fxRates={fxData.data.rates}
                     fundNavs={fundData.navs}
                     planNavs={planNavs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
@@ -3349,6 +3363,26 @@ function DashboardContent({
                   'metal',
                   key,
                   ownedMetals.find((o) => ownedKey(o) === key),
+                )
+              }
+            />
+            <ForeignCurrencySection
+              addRequest={assetAdd.kind === 'currency' ? assetAdd.n : 0}
+              owned={ownedCurrencies}
+              fx={fxData.data}
+              fxError={fxData.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(assets, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'currency'),
+                      ...assets,
+                    ],
+                  },
+                  message,
                 )
               }
             />

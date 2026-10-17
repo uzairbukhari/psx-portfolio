@@ -62,6 +62,7 @@ export const LedgerTimeline = lazyView(() => import('./ledger-timeline'));
 export const MonthlyPicks = lazyView(() => import('./monthly-picks'));
 export const CompanyDetail = lazyView(() => import('./company-detail'));
 export const GoldSilverSection = lazyView(() => import('./gold-silver'));
+export const ForeignCurrencySection = lazyView(() => import('./foreign-currency'));
 export const SavingsPlansSection = lazyView(() => import('./savings-plans'));
 export const MutualFundsSection = lazyView(() => import('./mutual-funds'));
 export const SettingsView = lazyView(() => import('./settings-view'));

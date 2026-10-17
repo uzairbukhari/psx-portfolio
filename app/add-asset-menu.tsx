@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { Coins, Landmark, PiggyBank, Plus, TrendingUp } from 'lucide-react';
+import { Banknote, Coins, Landmark, PiggyBank, Plus, TrendingUp } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export type AssetPick = 'stock' | 'metal' | 'plan' | 'fund';
+export type AssetPick = 'stock' | 'metal' | 'plan' | 'fund' | 'currency';
 
 export const ASSET_CHOICES: {
   kind: AssetPick;
@@ -34,6 +34,12 @@ export const ASSET_CHOICES: {
     label: 'Gold or Silver',
     hint: 'Coins and bars, valued at today’s rate.',
     Icon: Coins,
+  },
+  {
+    kind: 'currency',
+    label: 'Foreign currency',
+    hint: 'US dollars, UAE dirhams or Saudi riyals, tracked in rupees.',
+    Icon: Banknote,
   },
   {
     kind: 'plan',

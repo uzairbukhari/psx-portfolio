@@ -62,6 +62,7 @@ export function createPublicData(call: PublicCall): PublicData {
     async fxRates() {
       return (await call<FxRatesResponse>('/api/public-data/fx')).rates;
     },
+    fxData: () => call<FxRatesResponse>('/api/public-data/fx'),
     funds: () => call<FundCatalogResponse>('/api/public-data/funds'),
     async planNavs() {
       return await call<{ navs: PlanNavRow[]; error?: string }>(
