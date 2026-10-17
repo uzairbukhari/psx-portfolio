@@ -26,6 +26,7 @@ export const PAGE_TITLES: Record<string, string> = {
   company: 'Company',
   fund: 'Mutual fund',
   metal: 'Gold and silver',
+  currency: 'Foreign currency',
   plan: 'Savings plan',
   'research-desk': 'Research desk',
   'ai-lab': 'AI Lab',

@@ -210,6 +210,7 @@ const PATH_TABS: Record<string, string> = Object.fromEntries([
   ...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
   ['/history', 'history'],
 ]);
+const ASSET_PATHS = { metal: 'gold', plan: 'plans', currency: 'currency' } as const;
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
 function assetFromPathname(prefix: string, pathname: string): string {
   const match = new RegExp(`^/${prefix}/([^/]+)/?$`).exec(pathname);
@@ -224,6 +225,8 @@ const fundFromPathname = (pathname: string) =>
   assetFromPathname('funds', pathname);
 const metalFromPathname = (pathname: string) =>
   assetFromPathname('gold', pathname);
+const currencyFromPathname = (pathname: string) =>
+  assetFromPathname('currency', pathname);
 const planFromPathname = (pathname: string) =>
   assetFromPathname('plans', pathname);
 function subscribeWide(onChange: () => void) {
@@ -248,7 +251,9 @@ function tabFromPathname(pathname: string): string {
       ? 'fund'
       : metalFromPathname(pathname)
         ? 'metal'
-        : planFromPathname(pathname)
+        : currencyFromPathname(pathname)
+          ? 'currency'
+          : planFromPathname(pathname)
           ? 'plan'
           : (PATH_TABS[pathname] ?? 'holdings');
 }
@@ -782,6 +787,9 @@ function DashboardContent({
   const [metalFocus, setMetalFocus] = useState(() =>
     metalFromPathname(initialPathname),
   );
+  const [currencyFocus, setCurrencyFocus] = useState(() =>
+    currencyFromPathname(initialPathname),
+  );
   const [planFocus, setPlanFocus] = useState(() =>
     planFromPathname(initialPathname),
   );
@@ -800,6 +808,7 @@ function DashboardContent({
       setCompanyTicker(companyFromPathname(window.location.pathname));
       setFundFocus(fundFromPathname(window.location.pathname));
       setMetalFocus(metalFromPathname(window.location.pathname));
+      setCurrencyFocus(currencyFromPathname(window.location.pathname));
       setPlanFocus(planFromPathname(window.location.pathname));
     }
     window.addEventListener('popstate', onPopState);
@@ -2063,6 +2072,7 @@ function DashboardContent({
     tab === 'company' ||
     tab === 'fund' ||
     tab === 'metal' ||
+    tab === 'currency' ||
     tab === 'plan' ||
     tab === 'notifications';
   // A portfolio with nothing in it shows only its start screen: no tabs to open.
@@ -2135,7 +2145,7 @@ function DashboardContent({
   }
   /** Opens a gold holding or savings plan's own page; from the All view, inside the portfolio that owns it. */
   function openOwnedAsset(
-    kind: 'metal' | 'plan',
+    kind: 'metal' | 'plan' | 'currency',
     key: string,
     owner: { portfolioId?: string; asset: { id: string } } | undefined,
   ) {
@@ -2144,8 +2154,9 @@ function DashboardContent({
       key = owner.asset.id;
     }
     if (kind === 'metal') setMetalFocus(key);
+    else if (kind === 'currency') setCurrencyFocus(key);
     else setPlanFocus(key);
-    const path = `/${kind === 'metal' ? 'gold' : 'plans'}/${encodeURIComponent(key)}`;
+    const path = `/${ASSET_PATHS[kind]}/${encodeURIComponent(key)}`;
     setTabState(kind);
     if (window.location.pathname !== path)
       window.history.pushState(null, '', path);
@@ -2153,17 +2164,18 @@ function DashboardContent({
   }
   /** Moves a gold or plan page that was opened on the All view into its own portfolio so it can be edited. */
   function switchToOwner(
-    kind: 'metal' | 'plan',
+    kind: 'metal' | 'plan' | 'currency',
     owner: { portfolioId?: string; asset: { id: string } } | undefined,
   ) {
     if (!owner?.portfolioId) return;
     workspace?.choose(owner.portfolioId);
     if (kind === 'metal') setMetalFocus(owner.asset.id);
+    else if (kind === 'currency') setCurrencyFocus(owner.asset.id);
     else setPlanFocus(owner.asset.id);
     window.history.replaceState(
       null,
       '',
-      `/${kind === 'metal' ? 'gold' : 'plans'}/${encodeURIComponent(owner.asset.id)}`,
+      `/${ASSET_PATHS[kind]}/${encodeURIComponent(owner.asset.id)}`,
     );
   }
   function pickAsset(kind: AssetPick) {
@@ -3368,6 +3380,13 @@ function DashboardContent({
             />
             <ForeignCurrencySection
               addRequest={assetAdd.kind === 'currency' ? assetAdd.n : 0}
+              onOpenAsset={(key) =>
+                openOwnedAsset(
+                  'currency',
+                  key,
+                  ownedCurrencies.find((o) => ownedKey(o) === key),
+                )
+              }
               owned={ownedCurrencies}
               fx={fxData.data}
               fxError={fxData.error}
@@ -3446,11 +3465,13 @@ function DashboardContent({
                 metalRates={metalRates.rates}
                 fundNavs={fundData.navs}
                 planNavs={planNavs}
+                fx={fxData.data}
               />
             ) : reportMode(p) !== 'stocks' ? (
               <AssetReports
                 portfolio={p}
-                mode={reportMode(p) as 'savings' | 'metal'}
+                fx={fxData.data}
+                mode={reportMode(p) as 'savings' | 'metal' | 'currency'}
                 metalRates={metalRates.rates}
                 fundNavs={fundData.navs}
                 planNavs={planNavs}
@@ -3583,6 +3604,35 @@ function DashboardContent({
                     ...clone(p),
                     assets: [
                       ...(p.assets ?? []).filter((a) => a.kind !== 'metal'),
+                      ...assets,
+                    ],
+                  },
+                  message,
+                )
+              }
+            />
+          </NavPanel>
+          <NavPanel id="currency" tab={tab}>
+            <ForeignCurrencySection
+              focusKey={currencyFocus}
+              onBack={() => setTab('holdings')}
+              onSwitchPortfolio={(key) =>
+                switchToOwner(
+                  'currency',
+                  ownedCurrencies.find((o) => ownedKey(o) === key),
+                )
+              }
+              owned={ownedCurrencies}
+              fx={fxData.data}
+              fxError={fxData.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(assets, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'currency'),
                       ...assets,
                     ],
                   },

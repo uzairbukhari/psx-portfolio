@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { newAssetId } from '@/lib/assets';
 import {
+  currencyPosition,
   valueCurrency,
   type CurrencyAsset,
   type CurrencyEntry,
@@ -39,6 +40,8 @@ const tone = (n: number | null) =>
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
 const units = (n: number) => String(Math.round(n * 1e4) / 1e4);
 const NEW = '';
+const ENTRY_HISTORY_LENGTH =
+  typeof window === 'undefined' ? 0 : window.history.length;
 const dateText = (date: string) =>
   new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -58,6 +61,10 @@ export default function ForeignCurrencySection({
   canEdit,
   busy,
   addRequest = 0,
+  focusKey,
+  onOpenAsset,
+  onBack,
+  onSwitchPortfolio,
   onChange,
 }: {
   owned: OwnedCurrency[];
@@ -67,6 +74,12 @@ export default function ForeignCurrencySection({
   busy: boolean;
   /** Bumped by the page's + menu to open the add dialog. */
   addRequest?: number;
+  /** Shows that one holding's page instead of the table. */
+  focusKey?: string;
+  onOpenAsset?: (key: string) => void;
+  onBack?: () => void;
+  /** On the All view a holding can only be edited inside its own portfolio; this switches to it. */
+  onSwitchPortfolio?: (key: string) => void;
   /** Receives this portfolio's complete currency list after an add, sale or void. */
   onChange: (assets: CurrencyAsset[], message: string) => Promise<void>;
 }) {
@@ -77,7 +90,6 @@ export default function ForeignCurrencySection({
     entryId?: string;
   } | null>(null);
   const [error, setError] = useState('');
-  const [shown, setShown] = useState('');
   const rows = useMemo(
     () =>
       owned.map((o) => ({ ...o, v: valueCurrency(o.asset, fx.rates, asOf) })),
@@ -145,9 +157,159 @@ export default function ForeignCurrencySection({
       }}
     />
   ) : null;
+  if (focusKey !== undefined) {
+    const row = rows.find((r) => ownedKey(r) === focusKey);
+    const back = (
+      <button
+        type="button"
+        data-slot="link"
+        className="back-link company-back"
+        onClick={() => {
+          if (window.history.length > ENTRY_HISTORY_LENGTH)
+            window.history.back();
+          else onBack?.();
+        }}
+      >
+        <ArrowLeft size={15} /> Back
+      </button>
+    );
+    if (!row)
+      return (
+        <div className="company-page">
+          {back}
+          <p className="muted">This holding is not in your portfolio.</p>
+          {dialog}
+        </div>
+      );
+    const { asset, v } = row;
+    return (
+      <div className="company-page">
+        {back}
+        <div className="company-head">
+          <div>
+            <p className="eyebrow">
+              {asset.currency}
+              {asset.heldAt === 'bank'
+                ? ' · BANK ACCOUNT'
+                : asset.heldAt === 'cash'
+                  ? ' · CASH'
+                  : ''}
+            </p>
+            <h1>{asset.name}</h1>
+            <p>{row.portfolioName ?? CURRENCY_NAMES[asset.currency]}</p>
+          </div>
+          <div className="company-price">
+            <strong>{v.rate ? money(v.rate.pkrPerUnit) : '—'}</strong>
+            <small>
+              {v.rate
+                ? `per ${asset.currency} · ${dateText(v.rate.date)}`
+                : 'No rate yet'}
+            </small>
+          </div>
+          {canEdit && (
+            <div className="company-actions">
+              <button
+                disabled={busy}
+                onClick={() => setOpen({ type: 'buy', assetId: asset.id })}
+              >
+                <Plus size={16} /> Add purchase
+              </button>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => setOpen({ type: 'sell', assetId: asset.id })}
+              >
+                Record a sale
+              </button>
+            </div>
+          )}
+          {!canEdit && row.portfolioName && onSwitchPortfolio && (
+            <div className="company-actions">
+              <button onClick={() => onSwitchPortfolio(focusKey)}>
+                Open in {row.portfolioName} to record transactions
+              </button>
+            </div>
+          )}
+        </div>
+        {fxError && (
+          <p className="notice">Could not load today&apos;s rates: {fxError}</p>
+        )}
+        {error && <p className="notice error">{error}</p>}
+        <div className="company-cards">
+          <article>
+            <span>Held</span>
+            <strong>
+              {units(v.units)} {asset.currency}
+            </strong>
+            <small>
+              Average cost {v.averageRate === null ? '—' : money(v.averageRate)}
+            </small>
+          </article>
+          <article>
+            <span>Market value</span>
+            <strong>{v.value === null ? '—' : money(v.value)}</strong>
+            <small>Cost {v.cost === null ? '—' : money(v.cost)}</small>
+          </article>
+          <article>
+            <span>Gain / loss</span>
+            <strong className={tone(v.gain)}>
+              {v.gain === null ? '—' : signed(v.gain)}
+            </strong>
+            <small className={tone(v.gainPercent)}>
+              {v.gainPercent === null
+                ? 'Needs cost and rate'
+                : `${v.gainPercent >= 0 ? '+' : '−'}${Math.abs(v.gainPercent).toFixed(1)}%`}
+            </small>
+          </article>
+          <article>
+            <span>Realised gain</span>
+            <strong className={tone(v.realized)}>
+              {v.realized === null ? '—' : signed(v.realized)}
+            </strong>
+            <small>
+              Bought {moneyShort(v.bought.pkr)} · sold {moneyShort(v.sold.pkr)}
+            </small>
+          </article>
+        </div>
+        <p className="report-source">
+          {v.rate
+            ? `Priced at ${money(v.rate.pkrPerUnit)} per ${asset.currency} · ${v.rate.kind === 'open_market' ? 'open-market buying rate' : 'interbank estimate'}${v.rate.fellBack ? ' (the open-market rate is more than 2 days old)' : ''}${v.rate.stale ? ' · STALE' : ''}`
+            : 'No rate available yet, so the value is not shown.'}
+        </p>
+        <section className="company-section">
+          <h2>Rate and your trades</h2>
+          <RateChart fx={fx} asset={asset} />
+        </section>
+        <section className="company-section">
+          <h2>Held over time</h2>
+          <HeldChart asset={asset} />
+        </section>
+        <section className="company-section">
+          <h2>Activity</h2>
+          <LedgerTimeline
+            portfolio={NO_STOCKS}
+            ticker={asset.name}
+            hideKpis
+            entries={buildAssetEntries(
+              [{ asset }],
+              () => undefined,
+              canEdit
+                ? {
+                    correct: (_a, entryId) =>
+                      setOpen({ type: 'buy', assetId: asset.id, entryId }),
+                    toggleVoid: (_a, entryId) =>
+                      void toggleVoid(asset.id, entryId),
+                  }
+                : undefined,
+            )}
+          />
+        </section>
+        {dialog}
+      </div>
+    );
+  }
   // A currency you never used is not shown; one you have sold out stays, for its history.
   if (rows.length === 0) return dialog;
-  const detail = rows.find((r) => ownedKey(r) === shown);
 
   return (
     <>
@@ -220,10 +382,7 @@ export default function ForeignCurrencySection({
                     <button
                       type="button"
                       className="fund-row__toggle"
-                      aria-expanded={shown === ownedKey(row)}
-                      onClick={() =>
-                        setShown(shown === ownedKey(row) ? '' : ownedKey(row))
-                      }
+                      onClick={() => onOpenAsset?.(ownedKey(row))}
                     >
                       <span>
                         <b>{row.asset.name}</b>
@@ -275,47 +434,21 @@ export default function ForeignCurrencySection({
             ))}
           </table>
         </div>
-        {detail && (
-          <section className="company-section">
-            <h2>{detail.asset.name}</h2>
-            <RateChart fx={fx} currency={detail.asset.currency} />
-            <LedgerTimeline
-              portfolio={NO_STOCKS}
-              ticker={detail.asset.name}
-              hideKpis
-              entries={buildAssetEntries(
-                [{ asset: detail.asset }],
-                () => undefined,
-                canEdit
-                  ? {
-                      correct: (_a, entryId) =>
-                        setOpen({
-                          type: 'buy',
-                          assetId: detail.asset.id,
-                          entryId,
-                        }),
-                      toggleVoid: (_a, entryId) =>
-                        void toggleVoid(detail.asset.id, entryId),
-                    }
-                  : undefined,
-              )}
-            />
-          </section>
-        )}
       </CollapsiblePanel>
       {dialog}
     </>
   );
 }
 
-/** Rupees per unit over time: the interbank history with the open-market rate where it exists. */
+/** Rupees per unit over time: the interbank history with the open-market rate where it exists, and your own buys and sells on it. */
 function RateChart({
   fx,
-  currency,
+  asset,
 }: {
   fx: FxRatesResponse;
-  currency: CurrencyCode;
+  asset: CurrencyAsset;
 }) {
+  const currency = asset.currency;
   const interbank = fx.history.filter(
     (h) => h.currency === currency && h.kind === 'interbank',
   );
@@ -325,10 +458,18 @@ function RateChart({
   if (interbank.length < 2 && open.length < 2)
     return <p className="muted">No rate history yet.</p>;
   const main = interbank.length >= 2 ? interbank : open;
+  const trades = currencyPosition(asset).history.filter(
+    (e) =>
+      !e.voided &&
+      e.type !== 'opening' &&
+      e.pkr !== null &&
+      e.units > 0 &&
+      e.date >= main[0].date,
+  );
   return (
     <EChart
       className="company-chart"
-      label={`${currency} in rupees over time, ${main.length} days. Latest ${money(main[main.length - 1].rate)}.`}
+      label={`${currency} in rupees over time, ${main.length} days. Latest ${money(main[main.length - 1].rate)}. ${trades.length} of your trades marked.`}
       build={(t) => {
         const days = main.map((d) => d.date);
         const openByDay = new Map(open.map((d) => [d.date, d.rate]));
@@ -339,6 +480,13 @@ function RateChart({
           axisFormat: (n) => money(n),
           zoom: true,
           dateLabel: (x) => dateText(String(x)),
+          markers: trades.map((e) => ({
+            x: e.date,
+            y: e.pkr! / e.units,
+            color: e.type === 'sell' ? t.danger : t.success,
+            label: `${e.type === 'sell' ? 'Sold' : 'Bought'} ${units(e.units)} ${currency} at ${money(e.pkr! / e.units)}`,
+            up: e.type === 'sell',
+          })),
           extra:
             interbank.length >= 2 && open.length
               ? [
@@ -351,6 +499,36 @@ function RateChart({
               : undefined,
         });
       }}
+    />
+  );
+}
+
+/** Units held after each recorded purchase or sale, as a step line. */
+function HeldChart({ asset }: { asset: CurrencyAsset }) {
+  const points = currencyPosition(asset)
+    .history.filter((e) => !e.voided)
+    .map((e) => ({ x: e.date, y: e.heldAfter }));
+  if (points.length < 2)
+    return <p className="muted">Add a second entry to see this over time.</p>;
+  return (
+    <EChart
+      className="company-chart"
+      label={`${asset.currency} held after each entry. Now ${units(points[points.length - 1].y)}.`}
+      build={(t) =>
+        timeSeriesOption(t, {
+          name: `${asset.currency} held`,
+          data: [
+            ...points,
+            { x: today(), y: points[points.length - 1].y },
+          ],
+          step: true,
+          area: true,
+          includeZero: true,
+          valueFormat: (n) => `${units(n)} ${asset.currency}`,
+          axisFormat: (n) => units(n),
+          dateLabel: (x) => dateText(String(x)),
+        })
+      }
     />
   );
 }

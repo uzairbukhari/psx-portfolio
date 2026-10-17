@@ -28,7 +28,11 @@ test('Savings & Gold: gold, savings plans and mutual funds each open', async ({ 
   await app.getByRole('button', { name: /Foreign currency/ }).click();
   for (const name of ['Dollars at home', 'Dirhams in the bank']) await expect(app.getByText(name).first()).toBeVisible();
   await app.getByRole('button', { name: /Dollars at home/ }).click();
-  await expect(app.getByText('500 USD').first()).toBeVisible();
+  await expect(app).toHaveURL(/\/currency\//);
+  await expect(app.getByRole('heading', { name: 'Dollars at home' })).toBeVisible();
+  await expect(app.getByText('Rate and your trades')).toBeVisible();
+  await expect(app.getByText('Held over time')).toBeVisible();
+  await app.goBack();
 
   await app.getByRole('button', { name: /Savings plans/ }).click();
   await expect(app.getByText('Mahana Bachat').first()).toBeVisible();

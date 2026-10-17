@@ -18,9 +18,9 @@ for (const [path, marker] of PAGES)
     await expect(app.getByText(/something went wrong|application error/i)).toHaveCount(0);
   });
 
-test('reports cover stocks, metals and mutual funds', async ({ app }) => {
+test('reports cover stocks, metals, mutual funds and foreign currency', async ({ app }) => {
   await app.goto('/reports');
-  for (const tab of ['All', 'Stocks', 'Metals', 'Mutual Funds']) await expect(app.getByRole('tab', { name: tab }).or(app.getByRole('button', { name: tab, exact: true })).first()).toBeVisible();
+  for (const tab of ['All', 'Stocks', 'Metals', 'Mutual Funds', 'Foreign currency']) await expect(app.getByRole('tab', { name: tab }).or(app.getByRole('button', { name: tab, exact: true })).first()).toBeVisible();
 });
 
 test('settings shows the super admin sections', async ({ app }) => {
