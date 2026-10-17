@@ -1,0 +1,35 @@
+name: Foreign currency rate backfill
+
+# One-time fill of five years of USD, AED and SAR interbank history (public data) into `fx_rate_history`.
+# Start it by hand; tick "dry run" first to see the numbers without writing.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Show what would be written without writing'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fx-rates
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Backfill fx_rate_history
+        run: node scripts/fx-rates-backfill.mjs ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

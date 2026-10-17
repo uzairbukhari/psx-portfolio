@@ -12,7 +12,7 @@ import { interbankFromDollar, mergeYear, parseDollarRates, parseOpenMarketPage, 
 const dryRun = process.argv.includes('--dry-run');
 trackRun('fx', { dryRun });
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.9' };
-const OPEN_MARKET_URL = 'https://www.forex.pk/open-market-rates.asp';
+const OPEN_MARKET_URL = 'https://www.forex.pk/open_market_rates.asp';
 const pktToday = () => new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
 
 const date = pktToday();
