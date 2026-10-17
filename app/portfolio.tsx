@@ -1485,6 +1485,29 @@ function DashboardContent({
     ).flatMap((a) => (a.kind === 'fund' ? [a.mufapId] : [])),
     fundData.reload,
   );
+  // A holding's page opened by its link (or refreshed) while the All view is selected: the link carries only the
+  // holding's id, so open the one portfolio that owns it instead of showing "not in your portfolio".
+  const pageAssetId =
+    tab === 'currency'
+      ? currencyFocus
+      : tab === 'metal'
+        ? metalFocus
+        : tab === 'plan'
+          ? planFocus
+          : '';
+  const chooseOwner = useEffectEvent((id: string) => {
+    const path = window.location.pathname;
+    workspace?.choose(id);
+    // Choosing a portfolio sends the page to Holdings; the dashboard remounts from the URL, so put the holding's link back.
+    window.history.replaceState(null, '', path);
+  });
+  useEffect(() => {
+    if (!workspace?.isAll || !pageAssetId || pageAssetId.includes('@')) return;
+    const owners = workspace.account.portfolios.filter((part) =>
+      part.portfolio.assets?.some((a) => a.id === pageAssetId),
+    );
+    if (owners.length === 1) chooseOwner(owners[0].id);
+  }, [workspace?.isAll, workspace?.account, pageAssetId]);
   // Monthly Picks is a general stock-picking tool: it always works on the companies and holdings of every
   // portfolio, whichever one is selected. Its saved inputs and runs live in the account's first portfolio.
   useEffect(() => {

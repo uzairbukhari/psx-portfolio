@@ -65,3 +65,14 @@ test('a load that throws is not remembered', async () => {
   await assert.rejects(edgeCached('boom', 60, async () => { throw new Error('x'); }, undefined, cache));
   assert.equal(await edgeCached('boom', 60, async () => 7, undefined, cache), 7);
 });
+
+test('an answer that is not worth caching is served but asked again next time', async () => {
+  const cache = fakeCache();
+  let loads = 0;
+  const load = async () => ({ rows: loads++ === 0 ? [] : [1] });
+  const worth = (v) => v.rows.length > 0;
+  assert.deepEqual(await edgeCached('k', 60, load, undefined, cache, worth), { rows: [] });
+  assert.deepEqual(await edgeCached('k', 60, load, undefined, cache, worth), { rows: [1] });
+  assert.deepEqual(await edgeCached('k', 60, load, undefined, cache, worth), { rows: [1] });
+  assert.equal(loads, 2);
+});

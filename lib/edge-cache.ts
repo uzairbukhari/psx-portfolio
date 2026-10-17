@@ -18,6 +18,8 @@ export async function edgeCached<T>(
   load: () => Promise<T>,
   waitUntil?: (work: Promise<unknown>) => void,
   cache: CacheLike | undefined = (globalThis as { caches?: { default?: CacheLike } }).caches?.default,
+  /** Answers it returns false for (for example "no rates yet") are served but not kept, so the next request asks again. */
+  worthCaching: (value: T) => boolean = () => true,
 ): Promise<T> {
   // Node (tests, scripts) has no Cache API: just load.
   if (!cache) return load();
@@ -37,6 +39,7 @@ export async function edgeCached<T>(
     // A broken cache must never break the page.
   }
   const value = await load();
+  if (!worthCaching(value)) return value;
   mem.set(key, { until: Date.now() + ttlSeconds * 1000, value });
   const store = cache
     .put(
