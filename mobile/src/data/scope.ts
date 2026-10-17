@@ -2,7 +2,7 @@
 import type { Portfolio } from '../../../lib/portfolio.ts';
 import { safeHoldings } from './derive.ts';
 
-export type Contents = { stocks: number; plans: number; funds: number; metals: number };
+export type Contents = { stocks: number; plans: number; funds: number; metals: number; currencies: number };
 
 export function portfolioContents(p: Portfolio): Contents {
   const assets = p.assets ?? [];
@@ -11,16 +11,17 @@ export function portfolioContents(p: Portfolio): Contents {
     plans: assets.filter((a) => a.kind === 'plan').length,
     funds: assets.filter((a) => a.kind === 'fund').length,
     metals: assets.filter((a) => a.kind === 'metal').length,
+    currencies: assets.filter((a) => a.kind === 'currency').length,
   };
 }
 
-export const addContents = (a: Contents, b: Contents): Contents => ({ stocks: a.stocks + b.stocks, plans: a.plans + b.plans, funds: a.funds + b.funds, metals: a.metals + b.metals });
+export const addContents = (a: Contents, b: Contents): Contents => ({ stocks: a.stocks + b.stocks, plans: a.plans + b.plans, funds: a.funds + b.funds, metals: a.metals + b.metals, currencies: a.currencies + b.currencies });
 
 /** "21 stocks · 1 plan · 2 funds", or "Empty" when there is nothing yet. */
 export function contentsLabel(c: Contents): string {
   const part = (n: number, one: string, many: string) => (n ? [`${n} ${n === 1 ? one : many}`] : []);
-  const parts = [...part(c.stocks, 'stock', 'stocks'), ...part(c.plans, 'plan', 'plans'), ...part(c.funds, 'fund', 'funds'), ...part(c.metals, 'gold or silver item', 'gold or silver items')];
+  const parts = [...part(c.stocks, 'stock', 'stocks'), ...part(c.plans, 'plan', 'plans'), ...part(c.funds, 'fund', 'funds'), ...part(c.metals, 'gold or silver item', 'gold or silver items'), ...part(c.currencies, 'currency holding', 'currency holdings')];
   return parts.length ? parts.join(' · ') : 'Empty';
 }
 
-export const hasAnything = (c: Contents) => c.stocks + c.plans + c.funds + c.metals > 0;
+export const hasAnything = (c: Contents) => c.stocks + c.plans + c.funds + c.metals + c.currencies > 0;

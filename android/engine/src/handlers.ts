@@ -63,6 +63,8 @@ import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
 import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
 import { accountOverview } from '../../../lib/account-overview.ts';
 import { describePieces, valueMetal, type MetalAsset } from '../../../lib/assets.ts';
+import { valueCurrency, type CurrencyAsset } from '../../../lib/currency.ts';
+import type { FxRateRow } from '../../../lib/fx-rates.ts';
 import { valueFund, type FundAsset } from '../../../lib/funds.ts';
 import { dueEntries, planValue, type PlanAsset } from '../../../lib/plans.ts';
 import { tolaFromGrams, type MetalRateRow } from '../../../lib/metal-rates.ts';
@@ -82,6 +84,7 @@ let overlay: Overlay = { quoteRows: [], announcements: [], faceValues: {}, looku
 // Public gold and silver rates and mutual fund prices, kept beside the overlay.
 let metalRates: MetalRateRow[] = [];
 let fundNavs: FundNavRow[] = [];
+let fxRates: FxRateRow[] = [];
 let overlaid: { source: PortfolioAccount; version: number; account: PortfolioAccount } | null = null;
 let overlayVersion = 0;
 
@@ -325,17 +328,22 @@ const handlers: Record<string, Handler> = {
   'rates.set': (args) => {
     metalRates = typeof args.metals === 'string' && args.metals ? (JSON.parse(args.metals) as MetalRateRow[]) : metalRates;
     fundNavs = typeof args.navs === 'string' && args.navs ? (JSON.parse(args.navs) as FundNavRow[]) : fundNavs;
-    return { metals: metalRates.length, navs: fundNavs.length };
+    fxRates = typeof args.fx === 'string' && args.fx ? (JSON.parse(args.fx) as FxRateRow[]) : fxRates;
+    return { metals: metalRates.length, navs: fundNavs.length, fx: fxRates.length };
   },
   'rates.wanted': () => {
     const assets = requireAccount().portfolios.flatMap((x) => x.portfolio.assets ?? []);
-    return { metals: assets.some((a) => a.kind === 'metal'), funds: assets.some((a) => a.kind === 'fund') };
+    return {
+      metals: assets.some((a) => a.kind === 'metal'),
+      funds: assets.some((a) => a.kind === 'fund'),
+      fx: assets.some((a) => a.kind === 'currency'),
+    };
   },
 
   // Net worth for the chosen portfolio (or all): asset mix, portfolios, holdings, sectors, income and money-weighted return.
   'overview.view': (args) => {
     const parts = scopeParts(args);
-    return parts.length ? accountOverview(parts, today(), { metalRates, fundNavs }) : null;
+    return parts.length ? accountOverview(parts, today(), { metalRates, fundNavs, fxRates }) : null;
   },
 
   // Gold and silver, savings plans and mutual funds in the chosen scope (read-only on the phone).
@@ -347,7 +355,24 @@ const handlers: Record<string, Handler> = {
     const metals = owned.flatMap((o) => (o.asset.kind === 'metal' ? [{ asset: o.asset as MetalAsset, portfolio: o.portfolio }] : []));
     const funds = owned.flatMap((o) => (o.asset.kind === 'fund' ? [{ asset: o.asset as FundAsset, portfolio: o.portfolio }] : []));
     const plans = owned.flatMap((o) => (o.asset.kind === 'plan' ? [{ asset: o.asset as PlanAsset, portfolio: o.portfolio }] : []));
+    const currencies = owned.flatMap((o) => (o.asset.kind === 'currency' ? [{ asset: o.asset as CurrencyAsset, portfolio: o.portfolio }] : []));
     return {
+      currencies: currencies.map(({ asset, portfolio }) => {
+        const v = valueCurrency(asset, fxRates, asOf);
+        return {
+          id: asset.id,
+          name: asset.name,
+          currency: asset.currency,
+          heldAt: asset.heldAt ?? '',
+          portfolio,
+          units: v.units,
+          value: v.value,
+          gain: v.gain,
+          cost: v.cost,
+          realized: v.realized,
+          rate: v.rate ? { pkrPerUnit: v.rate.pkrPerUnit, kind: v.rate.kind, date: v.rate.date, stale: v.rate.stale } : null,
+        };
+      }),
       metals: metals.map(({ asset, portfolio }) => {
         const v = valueMetal(asset, metalRates, asOf);
         const recent = [...v.history].reverse().slice(0, 3);

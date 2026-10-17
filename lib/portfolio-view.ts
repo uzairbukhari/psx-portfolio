@@ -36,6 +36,7 @@ export type PublicData = {
   requestLookup(tickers: string[]): Promise<void>;
   /** Public gold and silver rates (no parameters). */
   metalRates?(): Promise<import('./metal-rates.ts').MetalRateRow[]>;
+  fxRates?(): Promise<import('./fx-rates.ts').FxRateRow[]>;
   /** The MUFAP fund directory with each fund's newest price. */
   funds?(): Promise<import('./mufap.ts').FundCatalogResponse>;
   /** Pak-Qatar sub-fund unit prices (no parameters). */

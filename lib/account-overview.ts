@@ -4,6 +4,7 @@
 // basis is never mixed across portfolios. A figure that cannot be known (a missing price or an unknown cost)
 // is reported as null with a reason, never as zero.
 import { valueAsset, type Asset, type AssetValue } from './assets.ts';
+import type { FxRateRow } from './fx-rates.ts';
 import type { MetalRateRow } from './metal-rates.ts';
 import type { FundNavRow } from './mufap.ts';
 import type { PlanNavRow } from './plans.ts';
@@ -16,13 +17,14 @@ import {
 import { consolidatedAccount } from './portfolio-account.ts';
 import { round, taxYearOf, type DisplayPart } from './portfolio.ts';
 
-export type AssetClassKey = 'stocks' | 'gold' | 'silver' | 'plans' | 'funds';
+export type AssetClassKey = 'stocks' | 'gold' | 'silver' | 'plans' | 'funds' | 'currency';
 export const ASSET_CLASS_LABELS: Record<AssetClassKey, string> = {
   stocks: 'Stocks',
   gold: 'Gold',
   silver: 'Silver',
   plans: 'Savings plans',
   funds: 'Mutual funds',
+  currency: 'Foreign currency',
 };
 
 export type ClassTotal = {
@@ -137,6 +139,7 @@ export function accountOverview(
     metalRates?: MetalRateRow[];
     fundNavs?: FundNavRow[];
     planNavs?: PlanNavRow[];
+    fxRates?: FxRateRow[];
   } = {},
 ): AccountOverview {
   const consolidated = consolidatedAccount({
@@ -158,6 +161,7 @@ export function accountOverview(
         asOf,
         options.fundNavs ?? [],
         options.planNavs ?? [],
+        options.fxRates ?? [],
       ),
     })),
   );
@@ -186,7 +190,7 @@ export function accountOverview(
       incomplete: all.some((m) => m.v.value === null || m.v.cost === null),
     };
   };
-  const otherClasses = (['gold', 'silver', 'plans', 'funds'] as const)
+  const otherClasses = (['gold', 'silver', 'plans', 'funds', 'currency'] as const)
     .map(assetClass)
     .filter((c): c is ClassTotal => c !== null);
   const total = round(
@@ -382,9 +386,9 @@ export function accountOverview(
       : unknownCostFlows || summary.unknownCost.length || metalUnknown.length
         ? 'Needs the cost of every holding.'
         : null;
-  const classKeys = ['stocks', 'gold', 'silver', 'plans', 'funds'] as const;
+  const classKeys = ['stocks', 'gold', 'silver', 'plans', 'funds', 'currency'] as const;
   const investedByMonth = new Map(
-    months.map((m) => [m, { stocks: 0, gold: 0, silver: 0, plans: 0, funds: 0 }]),
+    months.map((m) => [m, { stocks: 0, gold: 0, silver: 0, plans: 0, funds: 0, currency: 0 }]),
   );
   const addInvested = (key: AssetClassKey, list: CashFlow[]) => {
     for (const f of list) {

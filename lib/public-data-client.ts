@@ -7,6 +7,7 @@ import type {
   PublicDataResponse,
 } from './api-types.ts';
 import type { PublicData } from './portfolio-view.ts';
+import type { FxRatesResponse } from './fx-rates.ts';
 import type { MetalRateRow } from './metal-rates.ts';
 import type { PlanNavRow } from './plans.ts';
 import type {
@@ -57,6 +58,9 @@ export function createPublicData(call: PublicCall): PublicData {
     async metalRates() {
       return (await call<{ rates: MetalRateRow[] }>('/api/public-data/metals'))
         .rates;
+    },
+    async fxRates() {
+      return (await call<FxRatesResponse>('/api/public-data/fx')).rates;
     },
     funds: () => call<FundCatalogResponse>('/api/public-data/funds'),
     async planNavs() {

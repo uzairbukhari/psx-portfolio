@@ -19,6 +19,14 @@ import {
   valueFund,
   type FundAsset,
 } from './funds.ts';
+import {
+  currencyFlows,
+  currencyUnknownCost,
+  validateCurrency,
+  valueCurrency,
+  type CurrencyAsset,
+} from './currency.ts';
+import type { FxRateRow } from './fx-rates.ts';
 import type { FundNavRow } from './mufap.ts';
 import {
   planFlows,
@@ -52,7 +60,7 @@ export type MetalAsset = {
   note: string;
   entries: MetalEntry[];
 };
-export type Asset = MetalAsset | PlanAsset | FundAsset;
+export type Asset = MetalAsset | PlanAsset | FundAsset | CurrencyAsset;
 
 export const MAX_ASSETS = 200;
 export const MAX_ENTRIES = 5000;
@@ -206,7 +214,13 @@ export function validateAssets(
     throw new Error('Invalid assets.');
   const ids = new Set<string>();
   for (const a of assets as Asset[]) {
-    if (!a || (a.kind !== 'metal' && a.kind !== 'plan' && a.kind !== 'fund'))
+    if (
+      !a ||
+      (a.kind !== 'metal' &&
+        a.kind !== 'plan' &&
+        a.kind !== 'fund' &&
+        a.kind !== 'currency')
+    )
       throw new Error('Unsupported asset type.');
     if (
       typeof a.id !== 'string' ||
@@ -225,6 +239,10 @@ export function validateAssets(
     }
     if (a.kind === 'fund') {
       validateFund(a, today);
+      continue;
+    }
+    if (a.kind === 'currency') {
+      validateCurrency(a, today);
       continue;
     }
     if (a.metal !== 'gold' && a.metal !== 'silver')
@@ -288,7 +306,7 @@ export const describePieces = (
   return g(e.grams);
 };
 
-export type AssetClassKey = 'gold' | 'silver' | 'plans' | 'funds';
+export type AssetClassKey = 'gold' | 'silver' | 'plans' | 'funds' | 'currency';
 /** One asset reduced to what the totals need: its class, value, cost and money flows. Null means "not known", never zero. */
 export type AssetValue = {
   classKey: AssetClassKey;
@@ -310,7 +328,21 @@ export function valueAsset(
   asOf: string,
   navs: FundNavRow[] = [],
   planNavs: PlanNavRow[] = [],
+  fxRates: FxRateRow[] = [],
 ): AssetValue {
+  if (asset.kind === 'currency') {
+    const v = valueCurrency(asset, fxRates, asOf);
+    return {
+      classKey: 'currency',
+      value: v.value,
+      cost: v.cost,
+      gain: v.gain,
+      open: v.units > 0,
+      unknownCost: currencyUnknownCost(asset),
+      estimated: !!v.rate && (v.rate.kind === 'interbank' || v.rate.stale),
+      flows: currencyFlows(asset),
+    };
+  }
   if (asset.kind === 'fund') {
     const v = valueFund(asset, navs, asOf);
     return {

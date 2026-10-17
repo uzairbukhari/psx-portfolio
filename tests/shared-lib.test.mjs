@@ -57,6 +57,8 @@ const SHARED = [
   'funds',
   'mufap',
   'metal-rates',
+  'currency',
+  'fx-rates',
   'public-data-client',
   'psx-market',
   'psx-quotes',
