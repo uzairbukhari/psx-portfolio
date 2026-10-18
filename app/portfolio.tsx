@@ -2851,7 +2851,11 @@ function DashboardContent({
               <small>{vault ? 'Vault unlocked' : 'Signed in'}</small>
             </span>
           )}
-          <ChevronDown size={14} className="account-chevron" />
+          {withName ? (
+            <LockKeyhole size={15} className="account-chevron" />
+          ) : (
+            <ChevronDown size={14} className="account-chevron" />
+          )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="account-menu">
         <div className="account-menu-header">
@@ -2940,27 +2944,27 @@ function DashboardContent({
                 addDisabled={busy}
               />
             )}
-            {!hideTabs && email && <div className="side-user">{accountMenu(true)}</div>}
             {!hideTabs && (
               <div className="side-tools">
                 <button
                   type="button"
                   data-slot="side-tool"
                   className="side-tool"
-                  aria-label={side.mode === 'pinned' ? 'Collapse menu' : 'Expand menu'}
-                  title={(side.mode === 'pinned' ? 'Collapse menu' : 'Expand menu') + ' ( [ )'}
-                  onClick={() => side.setMode(side.mode === 'pinned' ? 'rail' : 'pinned')}
+                  data-active={tab === 'settings' || undefined}
+                  aria-label="Settings"
+                  data-tip="Settings"
+                  onClick={() => setTab('settings')}
                 >
-                  <PanelLeft size={18} aria-hidden="true" />
-                  <span className="tab-long">Collapse</span>
+                  <Settings size={20} aria-hidden="true" />
+                  <span className="tab-long">Settings</span>
                 </button>
                 <button
                   type="button"
                   data-slot="side-tool"
                   className="side-tool"
                   aria-pressed={side.mode !== 'auto'}
-                  aria-label={side.mode === 'auto' ? 'Keep menu pinned' : 'Open menu on hover'}
-                  title={side.mode === 'auto' ? 'Keep menu pinned' : 'Open menu on hover'}
+                  aria-label={side.mode === 'auto' ? 'Pin menu' : 'Unpin menu'}
+                  title={(side.mode === 'auto' ? 'Pin menu' : 'Unpin menu') + ' ( [ )'}
                   onClick={() => side.setMode(side.mode === 'auto' ? 'pinned' : 'auto')}
                 >
                   {side.mode === 'auto' ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
@@ -2968,12 +2972,17 @@ function DashboardContent({
                 </button>
               </div>
             )}
+            {!hideTabs && email && <div className="side-user">{accountMenu(true)}</div>}
             </div>
             <div className="header-right">
               {tab !== 'settings' && tab !== 'company' && tab !== 'sip-plan' && (
                 <div className="page-id">
                   <small>
-                    {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    {tab === 'history'
+                      ? 'Every trade, dividend and asset entry, newest first'
+                      : tab === 'reports'
+                        ? `${isAll ? 'All portfolios' : (workspace?.account.portfolios.find((x) => x.id === workspace.selected)?.name ?? 'Portfolio')} · last 12 months`
+                        : new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </small>
                   <b>
                     {tab === 'holdings'

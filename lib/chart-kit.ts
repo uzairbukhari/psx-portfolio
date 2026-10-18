@@ -631,7 +631,7 @@ export function barOption(t: ChartTokens, c: BarCfg): EChartsOption {
       ),
       barMaxWidth: 26,
       cursor: c.selectable ? 'pointer' : 'default',
-      itemStyle: { color: s.color, borderRadius: c.stack ? 0 : [8, 8, 8, 8] },
+      itemStyle: { color: s.color, borderRadius: c.stack ? 0 : [6, 6, 3, 3] },
       emphasis: { focus: 'series' as const, itemStyle: { opacity: 0.85 } },
     })),
   } as EChartsOption;

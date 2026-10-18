@@ -63,6 +63,7 @@ html:root .side-tools,html:root .nav-badge{display:none}
   html:root .nav-badge{display:inline-block;margin-left:auto;padding:2px 7px;border-radius:999px;border:1px solid var(--border);font-size:10.5px;font-weight:600;letter-spacing:.04em;color:var(--muted-foreground)}
   html:root .nav-sep{display:block;height:1px;margin:10px 8px;background:var(--border)}
   html:root .side-tools{display:flex;flex-direction:column;gap:2px;padding-top:8px;border-top:1px solid var(--border)}
+  html:root .side-tool[data-active]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
   html:root .side-tool{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:12px;background:transparent;color:var(--muted-foreground);font:500 13.5px var(--font-geist-sans),sans-serif;cursor:pointer}
   html:root .side-tool:hover{background:var(--muted);color:var(--foreground)}
   html:root .side-tool[aria-pressed=true]{color:var(--primary)}

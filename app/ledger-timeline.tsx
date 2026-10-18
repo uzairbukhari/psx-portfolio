@@ -103,6 +103,7 @@ export default function LedgerTimeline({
     <div className="ledger">
       {!hideKpis && (
         <KpiStrip
+          className="ledger-kpis"
           items={[
             { label: 'Invested', value: moneyShort(cents(sum(['buy', 'opening']))), primary: true },
             { label: 'Sold', value: moneyShort(cents(sum(['sell']))) },
@@ -155,7 +156,8 @@ export default function LedgerTimeline({
       {groups.length === 0 ? (
         <p className="muted ledger-empty">Nothing matches these filters.</p>
       ) : (
-        groups.map(([month, rows], index) => {
+        <div className="ledger-card">
+        {groups.map(([month, rows], index) => {
           const open = isOpen(month, index);
           const invested = flow(rows, ['buy', 'opening']);
           const received = flow(rows, ['sell', 'dividend']);
@@ -316,7 +318,8 @@ export default function LedgerTimeline({
                 ))}
             </section>
           );
-        })
+        })}
+        </div>
       )}
       {olderCount > 0 && (
         <button

@@ -10,6 +10,8 @@ const MODES: SideMode[] = ['pinned', 'rail', 'auto'];
 function read(): SideMode {
   try {
     const v = window.localStorage.getItem(KEY);
+    // The collapsed-only rail was folded into the unpinned (hover to open) mode.
+    if (v === 'rail') return 'auto';
     return MODES.includes(v as SideMode) ? (v as SideMode) : 'pinned';
   } catch {
     return 'pinned';
@@ -30,13 +32,13 @@ export function useSidebar() {
       /* private window: the choice just lasts for this visit */
     }
   }, []);
-  // "[" collapses or expands the menu, unless the user is typing.
+  // "[" pins or unpins the menu, unless the user is typing.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== '[' || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
-      setMode(mode === 'pinned' ? 'rail' : 'pinned');
+      setMode(mode === 'pinned' ? 'auto' : 'pinned');
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

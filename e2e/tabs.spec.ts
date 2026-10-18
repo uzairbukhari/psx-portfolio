@@ -40,13 +40,13 @@ test('theme switch applies to the page', async ({ app }) => {
   await expect(app.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
-test('sidebar collapses to a rail and remembers it', async ({ app }) => {
+test('sidebar unpins to a hover rail and remembers it', async ({ app }) => {
   const nav = app.getByRole('navigation', { name: 'Main' });
   await expect(nav.getByRole('link', { name: /Holdings/ })).toBeVisible();
-  await app.getByRole('button', { name: 'Collapse menu' }).click();
-  await expect(app.locator('html')).toHaveAttribute('data-side', 'rail');
+  await app.getByRole('button', { name: 'Unpin menu' }).click();
+  await expect(app.locator('html')).toHaveAttribute('data-side', 'auto');
   await app.reload();
-  await expect(app.locator('html')).toHaveAttribute('data-side', 'rail');
-  await app.getByRole('button', { name: 'Expand menu' }).click();
+  await expect(app.locator('html')).toHaveAttribute('data-side', 'auto');
+  await app.getByRole('button', { name: 'Pin menu' }).click();
   await expect(app.locator('html')).toHaveAttribute('data-side', 'pinned');
 });
