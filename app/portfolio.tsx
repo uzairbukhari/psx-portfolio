@@ -170,6 +170,7 @@ import {
 import { parseBackup, type BackupPackage } from '@/lib/vault-backup';
 import { EncryptedRestoreDialog, VaultSecurity } from './vault-security';
 import VaultGate from './vault-gate';
+import { PlanMonthNav } from './plan-month-nav';
 import { refreshImportQuotes } from '@/lib/import-refresh';
 import PortfolioWorkspace, {
   type WorkspaceControls,
@@ -2950,18 +2951,6 @@ function DashboardContent({
                   type="button"
                   data-slot="side-tool"
                   className="side-tool"
-                  data-active={tab === 'settings' || undefined}
-                  aria-label="Settings"
-                  data-tip="Settings"
-                  onClick={() => setTab('settings')}
-                >
-                  <Settings size={20} aria-hidden="true" />
-                  <span className="tab-long">Settings</span>
-                </button>
-                <button
-                  type="button"
-                  data-slot="side-tool"
-                  className="side-tool"
                   aria-pressed={side.mode !== 'auto'}
                   aria-label={side.mode === 'auto' ? 'Pin menu' : 'Unpin menu'}
                   title={(side.mode === 'auto' ? 'Pin menu' : 'Unpin menu') + ' ( [ )'}
@@ -2970,11 +2959,24 @@ function DashboardContent({
                   {side.mode === 'auto' ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
                   <span className="tab-long">{side.mode === 'auto' ? 'Pin menu' : 'Unpin'}</span>
                 </button>
+                <button
+                  type="button"
+                  data-slot="side-tool"
+                  className="side-tool"
+                  data-active={tab === 'settings' || undefined}
+                  aria-label="Settings"
+                  data-tip="Settings"
+                  onClick={() => setTab('settings')}
+                >
+                  <Settings size={20} aria-hidden="true" />
+                  <span className="tab-long">Settings</span>
+                </button>
               </div>
             )}
             {!hideTabs && email && <div className="side-user">{accountMenu(true)}</div>}
             </div>
             <div className="header-right">
+              {tab === 'sip-plan' && <PlanMonthNav month={month} setMonth={setMonth} />}
               {tab !== 'settings' && tab !== 'company' && tab !== 'sip-plan' && (
                 <div className="page-id">
                   <small>
@@ -3137,7 +3139,7 @@ function DashboardContent({
                 }
               >
                 <Plus size={18} />
-                <span className="hdr-label">Add</span>
+                <span className="hdr-label">{tab === 'sip-plan' ? 'Record a buy' : 'Add'}</span>
               </button>
               )}
               {email && <div className="account-phone">{accountMenu(false)}</div>}
@@ -3637,7 +3639,6 @@ function DashboardContent({
               busy={busy}
               onOpenPicks={() => setTab('sip')}
               onOpenCompany={openCompany}
-              onRecordBuy={() => openTx('buy')}
               onSetBudget={async (amount) => {
                 const base = picksPortfolio ?? p;
                 const next = { ...base, budgets: { ...base.budgets, [month]: amount } };

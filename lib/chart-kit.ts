@@ -420,27 +420,11 @@ export function timeSeriesOption(
             filterMode: 'none' as const,
             zoomLock: false,
           },
-          {
-            type: 'slider' as const,
-            height: 16,
-            bottom: 2,
-            borderColor: 'transparent',
-            backgroundColor: rgba(t.rgb.line, 0.05),
-            fillerColor: rgba(t.rgb.primary, 0.14),
-            handleSize: 14,
-            moveHandleSize: 5,
-            showDetail: false,
-            dataBackground: {
-              lineStyle: { color: t.line },
-              areaStyle: { color: t.line },
-            },
-            textStyle: { color: t.muted },
-          },
         ]
       : undefined;
   return {
     ...o,
-    grid: { ...(o.grid as object), bottom: zoom ? 28 : 4 },
+    grid: { ...(o.grid as object), bottom: 4 },
     tooltip: {
       ...(o.tooltip as object),
       trigger: 'axis',

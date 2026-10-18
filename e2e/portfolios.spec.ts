@@ -36,7 +36,7 @@ test('Savings & Gold: gold, savings plans and mutual funds each open', async ({ 
 });
 
 test('Empty portfolio is locked and shows an empty state', async ({ app }) => {
-  await choosePortfolio(app, 'Empty · locked');
+  await choosePortfolio(app, 'Empty');
   await expect(app.getByText('Start your portfolio')).toBeVisible();
   await expect(app.getByText(/This portfolio is locked/)).toBeVisible();
 });

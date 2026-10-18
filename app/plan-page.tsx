@@ -2,7 +2,7 @@
 // Plan: this month’s fresh money, the staircase of money put in so far, the shortlist and the latest Monthly Picks
 // run. The run itself (and every shortlisted company) lives on the Monthly Picks page.
 import { useMemo, useState } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { money, type Portfolio } from '@/lib/portfolio';
 import { moneyInFlows } from '@/lib/performance';
 import { barOption } from '@/lib/chart-kit';
@@ -10,12 +10,6 @@ import { EChart } from './charts/echart';
 import { TickerTile } from './ui-kit';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthName = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1] ?? ''} ${m.slice(0, 4)}`;
-
-const shiftMonth = (m: string, by: number) => {
-  const d = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + by, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-};
 
 export default function PlanPage({
   portfolio: p,
@@ -26,7 +20,6 @@ export default function PlanPage({
   busy,
   onOpenPicks,
   onOpenCompany,
-  onRecordBuy,
   onSetBudget,
 }: {
   portfolio: Portfolio;
@@ -37,7 +30,6 @@ export default function PlanPage({
   busy: boolean;
   onOpenPicks: () => void;
   onOpenCompany: (ticker: string) => void;
-  onRecordBuy: () => void;
   onSetBudget: (amount: number) => Promise<unknown> | void;
 }) {
   const [amountText, setAmountText] = useState('');
@@ -57,23 +49,6 @@ export default function PlanPage({
   const share = Math.min(100, (thisMonth / Math.max(1, fresh)) * 100);
   return (
     <div className="plan-page">
-      <div className="page-head plan-head">
-        <div>
-          <p className="page-kicker">Monthly SIP</p>
-          <div className="plan-month">
-            <button type="button" data-slot="icon" className="icon-btn" aria-label="Previous month" onClick={() => setMonth(shiftMonth(month, -1))}>
-              <ChevronLeft size={16} />
-            </button>
-            <h2>{monthName(month)}</h2>
-            <button type="button" data-slot="icon" className="icon-btn" aria-label="Next month" onClick={() => setMonth(shiftMonth(month, 1))}>
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-        <button type="button" data-slot="cta" className="plan-cta" disabled={busy} onClick={onRecordBuy}>
-          <Plus size={16} aria-hidden="true" /> Record a buy
-        </button>
-      </div>
       <section className="slab plan-slab plan-hero" aria-label="This month">
         <div className="plan-hero-main">
           <span className="lbl">This month</span>

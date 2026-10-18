@@ -446,7 +446,7 @@ html:root .mp-actionbar{border-radius:0 0 20px 20px}
 @media(min-width:761px){
   html:root .side-tools{border-top:0;padding-top:0}
   html:root .side-tools .side-tool{height:44px;font-size:14.5px;gap:12px}
-  html:root .side-tools .side-tool:nth-child(2){height:36px;font-size:13px;opacity:.85}
+  html:root .side-tools .side-tool:nth-child(1){height:36px;font-size:13px;opacity:.85}
   html:root .side-user{border-top:0;padding-top:6px}
   html:root .side-user .account-trigger{border:1px solid var(--border);background:var(--muted);border-radius:16px;padding:8px 10px}
   html:root .side-user .account-trigger:hover{background:var(--muted);border-color:rgb(var(--ch-primary) / .45)}
@@ -454,8 +454,8 @@ html:root .mp-actionbar{border-radius:0 0 20px 20px}
   html:root[data-side=rail] .side .pf-switch,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .pf-switch{width:44px!important;height:44px!important;padding:0!important;justify-content:center;margin:0 auto!important;border-radius:14px!important}
   html:root[data-side=rail] .side :is(.pf-text,.pf-chev),html:root[data-side=auto] .side:not(:hover):not(:focus-within) :is(.pf-text,.pf-chev){display:none}
   html:root[data-side=rail] .side .pf-dots:not(.single),html:root[data-side=auto] .side:not(:hover):not(:focus-within) .pf-dots:not(.single){min-width:0}
-  html:root[data-side=rail] .side .pf-dots i:nth-child(n+2),html:root[data-side=auto] .side:not(:hover):not(:focus-within) .pf-dots i:nth-child(n+2){display:none}
-  html:root[data-side=rail] .side .pf-dots i,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .pf-dots i{margin:0;width:20px;height:20px}
+  html:root[data-side=rail] .side .pf-switch .pf-dots i,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .pf-switch .pf-dots i{width:13px;height:13px;margin-left:-5px}
+  html:root[data-side=rail] .side .pf-switch .pf-dots i:first-child,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .pf-switch .pf-dots i:first-child{margin-left:0}
   html:root[data-side=rail] .side .brand::after,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .brand::after{content:'';width:8px;height:8px;padding:0;margin:0;position:absolute;top:2px;right:2px;border:0;background:var(--warn-ink)}
   html:root .side .brand{position:relative}
   html:root[data-side=rail] .side .header-brand-group,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .header-brand-group{display:flex;justify-content:center;padding:4px 0 14px}
@@ -485,3 +485,27 @@ html:root .company-lower .ledger-card .ledger-row{border-top:1px solid var(--bor
 html:root .company-lower .ledger-card .ledger-month>.ledger-row:first-of-type{border-top:0}
 html:root .header-right>.hdr-search+.hdr-btn{margin-left:0!important}
 html:root .header-right>.hdr-btn:first-child{margin-left:auto}
+
+/* Portfolio switcher menu: a card that opens beside the sidebar. */
+html:root .pf-menu{width:300px!important;min-width:300px;max-width:calc(100vw - 24px);padding:8px!important;border-radius:20px!important;background:var(--card)!important;border:1px solid var(--border);box-shadow:0 24px 60px -20px rgb(var(--ch-shadow) / .55)!important}
+html:root .pf-menu__head{margin:4px 10px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--muted-foreground)}
+html:root .pf-menu .pf-item{display:flex;align-items:center;gap:12px;padding:10px!important;border-radius:14px;cursor:pointer}
+html:root .pf-menu .pf-item:hover,html:root .pf-menu .pf-item[data-highlighted]{background:var(--muted)}
+html:root .pf-menu .pf-item[data-current]{background:rgb(var(--ch-primary) / .12)}
+html:root .pf-menu .pf-dots{min-width:34px;height:34px;justify-content:center;border-radius:11px;background:var(--muted)}
+html:root .pf-menu .pf-dots.single{width:34px;background:var(--btn-grad);color:#fff;font-weight:700;font-size:14px}
+html:root .pf-menu .pf-dots i{border-color:var(--muted)}
+html:root .pf-menu .pf-text b{font-size:14px}
+html:root .pf-menu .pf-text small{font-size:12px}
+html:root .pf-menu .pf-check{color:var(--primary);flex:none}
+html:root .pf-menu .pf-create .pf-dots.single{background:var(--muted);color:var(--foreground);border:1px dashed var(--border)}
+@media(min-width:761px){
+  /* The collapsed tile: an avatar in a rounded square. */
+  html:root[data-side=rail] .side .pf-switch,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .pf-switch{width:48px!important;min-width:0!important;height:48px!important;border-radius:16px!important;background:var(--muted)!important}
+}
+
+/* Plan: month picker lives in the top bar. */
+html:root .header-right .plan-month-nav{display:grid;gap:2px;margin-right:auto;min-width:0}
+html:root .header-right .plan-month-nav small{font-size:12.5px;color:var(--muted-foreground)}
+html:root .header-right .plan-month-nav b{font-family:var(--font-geist-sans),sans-serif;font-size:24px;font-weight:600;letter-spacing:-.02em}
+@media(max-width:760px){html:root .header-right .plan-month-nav b{font-size:18px}}

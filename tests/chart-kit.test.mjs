@@ -127,7 +127,7 @@ test('time series: zoom for long series, markers and reference lines, split colo
     refLines: [{ y: 0 }],
     markers: [{ x: '2026-01-05', y: 3, color: 'green', label: 'Bought' }],
   });
-  assert.equal(o.dataZoom.length, 2);
+  assert.equal(o.dataZoom.length, 1);
   assert.ok(o.series[0].markLine);
   assert.equal(o.series[0].markPoint.data.filter((d) => d.name).length, 1);
   assert.equal(o.series[0].markPoint.data.length, 2, 'the newest point glows');

@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { EncryptedRestoreDialog } from './vault-security';
 import { track } from './analytics';
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -262,26 +262,51 @@ export default function PortfolioWorkspace({
             );
           })()}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="pf-menu">
-          <DropdownMenuItem onClick={() => choose(ALL_PORTFOLIOS)}>
-            All portfolios
-          </DropdownMenuItem>
-          {account.portfolios.map((p) => (
-            <DropdownMenuItem key={p.id} onClick={() => choose(p.id)}>
-              {p.name}
-              {p.locked ? ' · locked' : ''}
-            </DropdownMenuItem>
-          ))}
-          {draft && !entry ? (
-            <DropdownMenuItem onClick={() => choose(draft.id)}>
-              {draft.name}
-            </DropdownMenuItem>
-          ) : null}
+        <DropdownMenuContent
+          align="start"
+          side={typeof window !== 'undefined' && window.matchMedia('(min-width:761px)').matches ? 'right' : 'bottom'}
+          sideOffset={12}
+          className="pf-menu"
+        >
+          <p className="pf-menu__head">Portfolios</p>
+          {(() => {
+            const current = entry || draft ? selected : ALL_PORTFOLIOS;
+            const rows = [
+              { id: ALL_PORTFOLIOS, name: 'All portfolios', sub: `${account.portfolios.length} portfolios`, all: true, locked: false },
+              ...account.portfolios.map((p) => ({ id: p.id, name: p.name, sub: p.locked ? 'Locked' : 'Portfolio', all: false, locked: !!p.locked })),
+              ...(draft && !entry ? [{ id: draft.id, name: draft.name, sub: 'Draft', all: false, locked: false }] : []),
+            ];
+            return rows.map((r) => (
+              <DropdownMenuItem key={r.id} className="pf-item" data-current={r.id === current || undefined} onClick={() => choose(r.id)}>
+                <span className={`pf-dots${r.all ? '' : ' single'}`} aria-hidden="true">
+                  {r.all ? (
+                    <>
+                      <i />
+                      <i />
+                      <i />
+                    </>
+                  ) : (
+                    (r.name ?? '').slice(0, 1).toUpperCase()
+                  )}
+                </span>
+                <span className="pf-text">
+                  <b>{r.name}</b>
+                  <small>{r.sub}</small>
+                </span>
+                {r.id === current ? <Check size={16} className="pf-check" aria-hidden="true" /> : null}
+              </DropdownMenuItem>
+            ));
+          })()}
           {canCreate ? (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={openCreate}>
-                + Create new portfolio
+              <DropdownMenuItem className="pf-item pf-create" onClick={openCreate}>
+                <span className="pf-dots single" aria-hidden="true">
+                  <Plus size={16} />
+                </span>
+                <span className="pf-text">
+                  <b>Create portfolio</b>
+                </span>
               </DropdownMenuItem>
             </>
           ) : null}

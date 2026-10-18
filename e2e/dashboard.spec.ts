@@ -13,7 +13,9 @@ test('All view totals every asset class across the four portfolios', async ({ ap
 test('the portfolio switcher lists all four portfolios, one of them locked', async ({ app }) => {
   await app.getByRole('button', { name: 'Select portfolio' }).click();
   const options = await app.getByRole('menuitem').allInnerTexts();
-  expect(options.map((o) => o.trim())).toEqual(['All portfolios', 'AHL Core', 'Finqalab', 'Savings & Gold', 'Empty · locked', '+ Create new portfolio'].slice(0, options.length));
+  const names = (await app.locator('.pf-menu .pf-text b').allInnerTexts()).map((o) => o.trim());
+  expect(names.slice(0, 5)).toEqual(['All portfolios', 'AHL Core', 'Finqalab', 'Savings & Gold', 'Empty']);
+  expect(options[4]).toContain('Locked');
   expect(options.length).toBeGreaterThanOrEqual(5);
 });
 
