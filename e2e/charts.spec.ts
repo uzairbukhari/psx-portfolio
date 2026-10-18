@@ -5,7 +5,7 @@ const charts = (app: import('@playwright/test').Page) => app.locator('[role=img]
 
 test('reports render interactive canvas charts', async ({ app }) => {
   await app.goto('/reports');
-  await expect(app.getByText(/priced market value/i).first()).toBeVisible({ timeout: 60_000 });
+  await expect(app.getByText(/net worth/i).first()).toBeVisible({ timeout: 60_000 });
   // Lazy charts mount as they scroll into view.
   for (let i = 0; i < 12; i++) {
     await app.mouse.wheel(0, 900);

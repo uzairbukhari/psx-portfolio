@@ -11,6 +11,8 @@ import AuditLog from './audit-log';
 import SystemHealth from './system-health';
 import UsageDashboard from './usage-dashboard';
 import { UserAvatar } from './user-avatar';
+import { Switch } from '@/components/ui/switch';
+import { PillSwitch } from './insight-card';
 import './dashboard-styles';
 import './admin.css';
 import './redesign-admin.css';
@@ -33,13 +35,16 @@ export default function AdminConsole({ section, email, name, picture }: { sectio
         <span>Admin console</span>
         <span className="admin-grow" />
         {showsRange && (
-          <select aria-label="Time range" className="admin-range" value={days} onChange={(e) => setDays(Number(e.target.value))}>
-            {[7, 30, 90].map((d) => <option key={d} value={d}>Last {d} days</option>)}
-          </select>
+          <PillSwitch
+            label="Time range"
+            value={String(days)}
+            onChange={(v) => setDays(Number(v))}
+            options={[7, 30, 90].map((d) => ({ key: String(d), label: `${d} days` }))}
+          />
         )}
         {showsToggle && (
           <label className="admin-switch">
-            <input type="checkbox" checked={includeInternal} onChange={(e) => setIncludeInternal(e.target.checked)} /> Include internal accounts
+            <Switch checked={includeInternal} onCheckedChange={setIncludeInternal} aria-label="Include internal accounts" /> Include internal accounts
           </label>
         )}
         <UserAvatar name={name} email={email} picture={picture} />

@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { EChart } from './charts/echart';
 import {
   barOption,
+  comboOption,
   compact,
-  donutOption,
   hBarOption,
-  timeSeriesOption,
+  treemapOption,
+  waterfallOption,
+  type TreeNode,
 } from '@/lib/chart-kit';
 import { money, moneyShort, round, type Portfolio } from '@/lib/portfolio';
 import { ChartInfo } from './chart-info';
@@ -31,7 +33,6 @@ const sectorColors = [
   'var(--cat-6)',
   'var(--cat-7)',
 ];
-const OTHER_SECTOR_COLOR = 'var(--chart-other)';
 /** The same palette as resolved colours for the canvas (the legends above still use the CSS variables). */
 const catColor = (
   t: { cat: string[]; other: string },
@@ -132,6 +133,38 @@ export default function PortfolioReports({
     label: monthLabel(item.month),
   }));
   const sectors = foldSectors(report.sectorAllocation);
+  const sectorTree: TreeNode[] = (() => {
+    const bySector = new Map<string, TreeNode[]>();
+    for (const c of report.companyAllocation) {
+      const list = bySector.get(c.sector || 'Others') ?? [];
+      list.push({ name: c.ticker, value: c.value, ticker: c.ticker });
+      bySector.set(c.sector || 'Others', list);
+    }
+    return [...bySector.entries()]
+      .map(([name, children]) => ({
+        name,
+        children,
+        total: children.reduce((n, c) => n + (c.value ?? 0), 0),
+      }))
+      .sort((x, y) => y.total - x.total)
+      .map(({ name, children }) => ({ name, children }));
+  })();
+  const companyTickers = new Set(report.companyAllocation.map((c) => c.ticker));
+  const returnSteps = (() => {
+    const r = report.realized;
+    const steps: { label: string; value: number; kind: 'step' | 'total' }[] = [];
+    if (report.summary.totalGain !== null)
+      steps.push({ label: 'Unrealised', value: report.summary.totalGain, kind: 'step' });
+    if (r.totalRealizedGain !== 0)
+      steps.push({ label: 'Sales', value: r.totalRealizedGain, kind: 'step' });
+    if (r.totalDividendIncomeGross !== 0)
+      steps.push({ label: 'Dividends', value: r.totalDividendIncomeGross, kind: 'step' });
+    const tax = (r.totalCapitalGainsTax ?? 0) + (r.totalDividendTax ?? 0);
+    if (tax > 0) steps.push({ label: 'Est. tax', value: -tax, kind: 'step' });
+    const total = round(steps.reduce((n, x) => n + x.value, 0));
+    if (steps.length) steps.push({ label: 'Total', value: total, kind: 'total' });
+    return steps;
+  })();
   const recentInvestment = foldInvestmentCompanies(
     report.recentInvestmentByCompany,
   );
@@ -198,7 +231,7 @@ export default function PortfolioReports({
     <div className="reports" data-view={view}>
       <div className="reports-intro">
         <div className="reports-intro-header">
-          <p className="eyebrow">PORTFOLIO REPORTS</p>
+          <p className="eyebrow">STOCK INSIGHTS</p>
           <p>
             See where your portfolio is concentrated. Allocation uses your
             latest saved PSX prices; purchase activity is based on recorded
@@ -319,7 +352,7 @@ export default function PortfolioReports({
       <div className="reports-tabs seg" aria-label="Report section">
         {(
           [
-            ['all', 'All'],
+            ['all', 'Overview'],
             ['allocation', 'Allocation'],
             ['performance', 'Performance'],
             ['income', 'Income'],
@@ -338,79 +371,35 @@ export default function PortfolioReports({
       </div>
 
       <div className="reports-grid">
-        <section className="panel report-panel" data-group="activity">
+        <section className="panel report-panel" data-group="activity" data-overview>
           <div className="report-heading">
             <div>
-              <p className="eyebrow">SIP TRAJECTORY</p>
+              <p className="eyebrow">INVESTING RHYTHM</p>
               <h3>
-                Cumulative invested
-                <ChartInfo text="Running total of everything you have put into purchases, month by month, including fees. Opening balances and sales are left out." />
+                {activity.length
+                  ? `${money(cumulativeTotal)} invested over ${activity.length} ${activity.length === 1 ? 'month' : 'months'}`
+                  : 'Your monthly investing'}
+                <ChartInfo text="Bars: how much you invested in each calendar month, including fees (months with no purchases show as zero). Line: the running total. Opening balances and sales are left out." />
               </h3>
             </div>
-            <span>
-              {activity.length ? money(cumulativeTotal) : '—'} to date
-            </span>
+            <span>PKR, including fees</span>
           </div>
           {activity.length ? (
             <EChart
               className="report-chart report-chart--trend"
-              label={`Cumulative invested by month, ${activity.length} months, ${money(cumulativeTotal)} to date.`}
+              label={`Monthly investing and running total, ${activity.length} months, ${money(cumulativeTotal)} to date.`}
               build={(t) =>
-                timeSeriesOption(t, {
-                  name: 'Cumulative invested',
-                  data: activity.map((a) => ({ x: a.label, y: a.cumulative })),
-                  categorical: true,
-                  area: true,
-                  includeZero: true,
-                  zoom: false,
+                comboOption(t, {
+                  cats: activity.map((a) => a.label),
+                  bars: { name: 'Invested that month', data: activity.map((a) => a.invested), color: t.primary },
+                  line: { name: 'Running total', data: activity.map((a) => a.cumulative), color: t.success },
                   valueFormat: money,
-                  dateLabel: (x) => String(x),
                 })
               }
             />
           ) : (
             <ReportEmpty>
               Record purchases to see your contribution trajectory.
-            </ReportEmpty>
-          )}
-          <p className="report-source">
-            Source: running total of non-voided purchases · opening balances and
-            sales excluded
-          </p>
-        </section>
-
-        <section className="panel report-panel" data-group="activity">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">CONTRIBUTION RHYTHM</p>
-              <h3>
-                Monthly purchase activity
-                <ChartInfo text="How much you invested in each calendar month, including fees. Months with no purchases show as zero so gaps in your habit are visible." />
-              </h3>
-            </div>
-            <span>PKR invested, including fees</span>
-          </div>
-          {activity.length ? (
-            <EChart
-              className="report-chart report-chart--activity"
-              label={`Monthly purchase activity, ${activity.length} months.`}
-              build={(t) =>
-                barOption(t, {
-                  cats: activity.map((a) => a.label),
-                  series: [
-                    {
-                      name: 'Cash invested',
-                      data: activity.map((a) => a.invested),
-                      color: t.primary,
-                    },
-                  ],
-                  valueFormat: money,
-                })
-              }
-            />
-          ) : (
-            <ReportEmpty>
-              Record purchases to see monthly investment activity.
             </ReportEmpty>
           )}
           <p className="report-source">
@@ -477,30 +466,34 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel" data-group="allocation">
+        <section className="panel report-panel report-panel--wide" data-group="allocation" data-overview>
           <div className="report-heading">
             <div>
               <p className="eyebrow">DIVERSIFICATION</p>
               <h3>
-                Sector allocation
-                <ChartInfo text="Share of your priced portfolio value in each sector. The five largest sectors are shown; the rest are grouped as Other. Only held companies with a saved price and a sector are counted." />
+                {report.summary.largestSector
+                  ? `${report.summary.largestSector.sector} is ${report.summary.largestSector.weight.toFixed(0)}% of your stocks`
+                  : 'Sector allocation'}
+                <ChartInfo text="Every priced holding sized by its market value and grouped by sector. Click a sector to zoom in and a company to open it. Only held companies with a saved price are counted." />
               </h3>
             </div>
             <span>Current snapshot</span>
           </div>
-          {sectors.length ? (
+          {sectorTree.length ? (
             <EChart
-              className="report-chart report-chart--square"
-              label={`Sector allocation: ${sectors.map((x) => `${x.sector} ${x.weight.toFixed(1)}%`).join(', ')}.`}
+              className="report-chart report-chart--tree"
+              label={`Allocation by sector and company: ${sectors.map((x) => `${x.sector} ${x.weight.toFixed(1)}%`).join(', ')}.`}
+              onPick={({ name }) => companyTickers.has(name) && openTicker(name)}
               build={(t) =>
-                donutOption(t, {
-                  centerTitle: 'Priced value',
-                  slices: sectors.map((item, index) => ({
-                    name: item.sector,
-                    value: item.value,
-                    color: catColor(t, item.sector, index),
-                  })),
+                treemapOption(t, {
+                  total: report.summary.pricedValue,
                   valueFormat: money,
+                  root: sectorTree.map(
+                    (sector, i): TreeNode => ({
+                      ...sector,
+                      color: sector.name === 'Other' ? t.other : t.cat[i % t.cat.length],
+                    }),
+                  ),
                 })
               }
             />
@@ -509,23 +502,6 @@ export default function PortfolioReports({
               Assign company sectors and add prices to see diversification.
             </ReportEmpty>
           )}
-          <div className="sector-key" aria-label="Sector allocation legend">
-            {sectors.map((item, index) => (
-              <div key={item.sector}>
-                <i
-                  aria-hidden="true"
-                  style={{
-                    background:
-                      item.sector === 'Other'
-                        ? OTHER_SECTOR_COLOR
-                        : sectorColors[index % sectorColors.length],
-                  }}
-                />
-                <span>{item.sector}</span>
-                <b>{item.weight.toFixed(1)}%</b>
-              </div>
-            ))}
-          </div>
           <p className="report-source">
             Source: company sectors and priced market values · PKR
           </p>
@@ -687,7 +663,36 @@ export default function PortfolioReports({
           </p>
         </section>
 
-        <section className="panel report-panel" data-group="performance">
+        <section className="panel report-panel" data-group="performance" data-overview>
+          <div className="report-heading">
+            <div>
+              <p className="eyebrow">RETURN BRIDGE</p>
+              <h3>
+                {returnSteps.length > 1
+                  ? `${signedMoney(returnSteps[returnSteps.length - 1].value)} total return so far`
+                  : 'What built your return'}
+                <ChartInfo text="Gain still in your holdings, profit from sales you already made, dividends received, and the estimated tax taken off. They add up to the total." />
+              </h3>
+            </div>
+            <span>Unrealised, realised and income</span>
+          </div>
+          {returnSteps.length > 1 ? (
+            <EChart
+              className="report-chart"
+              label={`Return bridge: ${returnSteps.map((x) => `${x.label} ${signedMoney(x.value)}`).join(', ')}.`}
+              build={(t) => waterfallOption(t, { steps: returnSteps, valueFormat: signedMoney })}
+            />
+          ) : (
+            <ReportEmpty>
+              Add purchase prices or record sales to see what built your return.
+            </ReportEmpty>
+          )}
+          <p className="report-source">
+            Source: cost basis, latest quotes, recorded sales and dividends · tax is an estimate
+          </p>
+        </section>
+
+        <section className="panel report-panel" data-group="performance" data-overview>
           <div className="report-heading">
             <div>
               <p className="eyebrow">PERFORMANCE</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { barOption, timeSeriesOption } from '@/lib/chart-kit';
+import { barOption, sparklineOption, timeSeriesOption } from '@/lib/chart-kit';
 import { EChart } from './echart';
 
 type Day = { day: string };
@@ -73,6 +73,36 @@ export function DayLine<T extends Day>({
           zoom: false,
           valueFormat: (n) => String(n),
           dateLabel: (x) => dayText(String(x)),
+        })
+      }
+    />
+  );
+}
+
+/** A bare trend line for a KPI tile: no axes or tooltip, the newest day glows. */
+export function DaySpark<T extends Day>({
+  rows,
+  pick,
+  name,
+  tone = 'primary',
+  className = 'admin-kpi-spark',
+}: {
+  rows: T[];
+  pick: (row: T) => number;
+  name: string;
+  tone?: 'primary' | 'success' | 'danger';
+  className?: string;
+}) {
+  const values = rows.map(pick);
+  if (values.length < 2) return <div className={className} aria-hidden="true" />;
+  return (
+    <EChart
+      className={className}
+      label={`${name}, last ${rows.length} days, latest ${values[values.length - 1]}.`}
+      build={(t) =>
+        sparklineOption(t, {
+          values,
+          color: tone === 'danger' ? t.danger : tone === 'success' ? t.success : t.primary,
         })
       }
     />

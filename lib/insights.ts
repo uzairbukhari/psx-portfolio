@@ -375,7 +375,7 @@ const share = (n: number) => `${Math.round(n)}%`;
 export function allocationTakeaway(root: InsightNode[], total: number): string {
   if (!root.length || total <= 0) return 'Add holdings to see where your money is';
   const top = root[0];
-  const lead = `${top.name} ${/s$/.test(top.name) ? 'are' : 'is'} ${share((top.value / total) * 100)} of your net worth`;
+  const lead = `${top.name} ${top.name.endsWith('s') ? 'are' : 'is'} ${share((top.value / total) * 100)} of your net worth`;
   if (top.classKey !== 'stocks' || !top.children?.length || top.value <= 0) return lead;
   const sector = top.children[0];
   return `${lead}, led by ${sector.name} (${share((sector.value / top.value) * 100)} of stocks)`;

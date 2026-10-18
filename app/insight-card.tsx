@@ -1,4 +1,5 @@
 'use client';
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- a pill switch is a labelled group of toggle buttons and the ring is a CSS drawing described with role=img */
 
 import type { CSSProperties, ReactNode } from 'react';
 import { ChartInfo } from './chart-info';

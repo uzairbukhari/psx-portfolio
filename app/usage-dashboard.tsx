@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { DayBars, DayLine } from './charts/day-charts';
 import type { UsageReport } from '@/lib/analytics-store';
 import { readJson } from '@/lib/safe-json';
+import { EChart } from './charts/echart';
+import { hBarOption, heatmapOption } from '@/lib/chart-kit';
 
 const label = (name: string) => {
   const t = name.replaceAll('_', ' ');
@@ -58,7 +60,7 @@ export default function UsageDashboard({
 
   return (
     <div className="system-health usage-dashboard">
-      <div className="stat-tiles usage-tiles">
+      <div className="usage-kpis">
         {(
           [
             ['Total users', report.totalUsers],
@@ -69,9 +71,9 @@ export default function UsageDashboard({
             ['Active, 30 days', active.mau],
           ] as const
         ).map(([name, value]) => (
-          <div key={name} className="stat-tile">
-            <small>{name}</small>
-            <strong>{value.toLocaleString()}</strong>
+          <div key={name} className="usage-kpi">
+            <small className="lbl">{name}</small>
+            <strong className="num">{value.toLocaleString()}</strong>
           </div>
         ))}
       </div>
@@ -104,24 +106,26 @@ export default function UsageDashboard({
       )}
 
       <h3>Sign-up funnel (last {report.days} days)</h3>
-      <table className="usage-table">
-        <thead>
-          <tr>
-            <th>Step</th>
-            <th>People</th>
-            <th>Of first step</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.funnel.map((s) => (
-            <tr key={s.step}>
-              <td>{s.step}</td>
-              <td>{s.users}</td>
-              <td>{top ? pct(s.users / top) : '–'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {report.funnel.length ? (
+        <EChart
+          className="usage-chart usage-chart--funnel"
+          label={`Sign-up funnel: ${report.funnel.map((f) => `${f.step} ${f.users}`).join(', ')}.`}
+          build={(t) =>
+            hBarOption(t, {
+              name: 'People',
+              cats: report.funnel.map((f) => f.step),
+              values: report.funnel.map((f) => f.users),
+              valueFormat: (n) => String(n),
+              labelFormat: (n) => (top ? `${n} · ${pct(n / top)}` : String(n)),
+              color: t.primary,
+              max: Math.max(1, top) * 1.25,
+              rows: (i) => [{ label: 'Of first step', value: top ? pct(report.funnel[i].users / top) : '–' }],
+            })
+          }
+        />
+      ) : (
+        <p className="muted">No funnel data yet.</p>
+      )}
       <p className="muted">
         The first two steps count anonymous browsers (this device only); the
         rest count signed-in accounts.
@@ -129,35 +133,53 @@ export default function UsageDashboard({
 
       <h3>Most used features (last {report.days} days)</h3>
       {report.features.length ? (
-        <table className="usage-table">
-          <thead>
-            <tr>
-              <th>Feature</th>
-              <th>Users</th>
-              <th>Times</th>
-              <th>Web</th>
-              <th>Phone</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.features.map((f) => (
-              <tr key={f.event}>
-                <td>
-                  {label(f.event)}
-                  <span
-                    className="usage-bar"
-                    style={{ width: `${(f.users / maxUsers) * 100}%` }}
-                    aria-hidden="true"
-                  />
-                </td>
-                <td>{f.users}</td>
-                <td>{f.count}</td>
-                <td>{f.web}</td>
-                <td>{f.phone}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <EChart
+            className="usage-chart usage-chart--rank"
+            height={Math.max(180, report.features.length * 30 + 30)}
+            label={`Most used features: ${report.features.slice(0, 5).map((f) => `${label(f.event)} ${f.users}`).join(', ')}.`}
+            build={(t) =>
+              hBarOption(t, {
+                name: 'Users',
+                cats: report.features.map((f) => label(f.event)),
+                values: report.features.map((f) => f.users),
+                valueFormat: (n) => String(n),
+                color: t.primary,
+                max: maxUsers * 1.2,
+                rows: (i) => [
+                  { label: 'Times', value: String(report.features[i].count) },
+                  { label: 'Web', value: String(report.features[i].web) },
+                  { label: 'Phone', value: String(report.features[i].phone) },
+                ],
+              })
+            }
+          />
+          <details className="usage-details">
+            <summary>Show table</summary>
+            <table className="usage-table">
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Users</th>
+                  <th>Times</th>
+                  <th>Web</th>
+                  <th>Phone</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.features.map((f) => (
+                  <tr key={f.event}>
+                    <td>{label(f.event)}</td>
+                    <td>{f.users}</td>
+                    <td>{f.count}</td>
+                    <td>{f.web}</td>
+                    <td>{f.phone}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </>
       ) : (
         <p className="muted">No feature use recorded yet.</p>
       )}
@@ -289,42 +311,55 @@ export default function UsageDashboard({
 
       <h3>Weekly retention</h3>
       {report.retention.length ? (
-        <div className="usage-scroll">
-          <table className="usage-table">
-            <thead>
-              <tr>
-                <th>Sign-up week</th>
-                <th>Users</th>
-                {report.retention[0].retained.map((_, i) => (
-                  <th key={i}>{i === 0 ? 'Wk 0' : `+${i}`}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.retention.map((c) => (
-                <tr key={c.week}>
-                  <td>{c.week}</td>
-                  <td>{c.size}</td>
-                  {c.retained.map((r, i) => (
-                    <td
-                      key={i}
-                      className="heat"
-                      style={
-                        r === null
-                          ? undefined
-                          : {
-                              background: `color-mix(in srgb, var(--primary) ${Math.round(r * 70)}%, transparent)`,
-                            }
-                      }
-                    >
-                      {r === null ? '' : pct(r)}
-                    </td>
+        <>
+          <EChart
+            className="usage-chart usage-chart--cohort"
+            height={Math.max(150, report.retention.length * 34 + 50)}
+            label={`Weekly retention for ${report.retention.length} sign-up weeks.`}
+            build={(t) =>
+              heatmapOption(t, {
+                cols: report.retention[0].retained.map((_, i) => (i === 0 ? 'Wk 0' : `+${i}`)),
+                rows: report.retention.map((c) => `${c.week} · ${c.size}`),
+                cells: report.retention.flatMap((c, row) =>
+                  c.retained.flatMap((r, col): [number, number, number][] =>
+                    r === null ? [] : [[col, row, r * 100]],
+                  ),
+                ),
+                color: t.primary,
+                valueFormat: (n) => `${Math.round(n)}%`,
+                title: (col, row) =>
+                  `${report.retention[row].week} · ${report.retention[row].size} users · ${col === 0 ? 'week 0' : `week +${col}`}`,
+              })
+            }
+          />
+          <details className="usage-details">
+            <summary>Show table</summary>
+            <div className="usage-scroll">
+              <table className="usage-table">
+                <thead>
+                  <tr>
+                    <th>Sign-up week</th>
+                    <th>Users</th>
+                    {report.retention[0].retained.map((_, i) => (
+                      <th key={i}>{i === 0 ? 'Wk 0' : `+${i}`}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.retention.map((c) => (
+                    <tr key={c.week}>
+                      <td>{c.week}</td>
+                      <td>{c.size}</td>
+                      {c.retained.map((r, i) => (
+                        <td key={i}>{r === null ? '' : pct(r)}</td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
       ) : (
         <p className="muted">Retention appears after the first sign-ups.</p>
       )}

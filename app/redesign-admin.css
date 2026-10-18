@@ -193,3 +193,50 @@ html:root .research-queue .sort-head{background:none!important;color:var(--muted
 html:root .research-queue .sort-head:hover{color:var(--foreground)!important}
 html:root .admin-card .admin-panel h2{margin:0 0 12px}
 html:root .admin-card .admin-panel h2:not(:first-child){margin-top:20px}
+
+/* ───────── Mission control: status slab, KPI sparklines, usage charts, pipeline cards ───────── */
+html:root .admin-status{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px 28px;margin:0 0 18px;padding:24px 28px}
+html:root .admin-status .admin-verdict{margin:10px 0 6px;font-size:clamp(22px,3vw,30px);font-weight:600;letter-spacing:-.03em;color:var(--slab-tx)}
+html:root .admin-status p.mu{margin:0;font-size:13.5px}
+html:root .admin-status .admin-strip{margin:0;flex:1 1 320px;justify-content:flex-end}
+html:root .admin-status .admin-pill{background:var(--slab-chip);color:var(--slab-tx)}
+html:root .admin-status .admin-pill.ok{color:var(--success)}
+html:root .admin-status .admin-pill.late{color:var(--warn-strong)}
+html:root .admin-status .admin-pill.failing{color:var(--danger)}
+html:root .admin-kpi-spark{height:54px;min-height:0;width:100%;margin:6px -2px -4px}
+html:root .admin-up{color:var(--success);font-weight:600}
+html:root .admin-down{color:var(--danger);font-weight:600}
+html:root .admin-switch{display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--muted-foreground)}
+
+html:root .admin-top .ic-switch button{padding:6px 12px}
+
+/* Usage analytics */
+html:root .usage-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}
+html:root .usage-kpi{display:grid;gap:10px;padding:16px 16px 14px;border-radius:18px;background:var(--muted);min-width:0}
+html:root .usage-kpi strong{font-size:26px;font-weight:600;letter-spacing:-.04em}
+html:root .usage-chart--funnel{height:230px}
+html:root .usage-details{margin:6px 0 4px}
+html:root .usage-details>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted-foreground);padding:6px 0}
+html:root .usage-details[open]>summary{color:var(--foreground)}
+@media (max-width:1100px){html:root .usage-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){html:root .usage-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Health: one card per pipeline */
+html:root .pipe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-bottom:8px}
+html:root .pipe-card{display:flex;flex-direction:column;gap:12px;padding:16px 18px;border:1px solid var(--border);border-radius:20px;background:var(--muted);position:relative;overflow:hidden}
+html:root .pipe-card::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--success)}
+html:root .pipe-card[data-status=late]::before{background:var(--warn-strong)}
+html:root .pipe-card[data-status=failing]::before{background:var(--danger)}
+html:root .pipe-card[data-status=idle]::before{background:var(--chart-neutral,var(--muted-foreground))}
+html:root .pipe-card header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+html:root .pipe-card h3{margin:0;font:600 15px/1.2 var(--font-geist-sans),sans-serif;text-transform:none;letter-spacing:-.01em;color:var(--foreground)}
+html:root .pipe-card dl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
+html:root .pipe-card dt{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .pipe-card dd{margin:5px 0 0;font-size:13.5px}
+html:root .pipe-card p{margin:0;font-size:12.5px}
+html:root .pipe-card .pipe-error{overflow-wrap:anywhere}
+html:root .pipe-card footer{margin-top:auto}
+
+/* Platform limits */
+html:root .admin-meter{height:8px;border-radius:4px}
+html:root .admin-meter span{border-radius:4px}

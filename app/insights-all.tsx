@@ -24,6 +24,7 @@ import {
   concentrationTakeaway,
   cumulativeByClass,
   moneyInTakeaway,
+  reportClasses,
   monthCalendar,
   returnBridge,
   treeLeaves,
@@ -34,6 +35,7 @@ import type { MetalRateRow } from '@/lib/metal-rates';
 import type { FundNavRow } from '@/lib/mufap';
 import type { PlanNavRow } from '@/lib/plans';
 import type { FxRatesResponse } from '@/lib/fx-rates';
+import type { ReportMode } from '@/lib/asset-reports';
 import { useOpenCompany } from './ticker-link';
 import { InsightCard, PillSwitch, Ring } from './insight-card';
 import PortfolioReports from './portfolio-reports';
@@ -460,6 +462,62 @@ export function AllInsights({
             )}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+const MODE_LABELS: Record<ReportMode, string> = {
+  stocks: 'Stocks',
+  metal: 'Gold & silver',
+  savings: 'Funds & plans',
+  currency: 'Currency',
+};
+
+/**
+ * Insights for one portfolio: exactly the charts of the asset classes it holds. A portfolio with more than one class
+ * (stocks and gold, say) gets a switch instead of every class stacked.
+ */
+export function PortfolioInsights({
+  portfolio,
+  metalRates,
+  fundNavs,
+  planNavs,
+  fx = NO_FX,
+}: {
+  portfolio: Portfolio;
+  metalRates: MetalRateRow[];
+  fundNavs: FundNavRow[];
+  planNavs: PlanNavRow[];
+  fx?: FxRatesResponse;
+}) {
+  const classes = reportClasses(portfolio);
+  const [picked, setPicked] = useState<ReportMode | null>(null);
+  const mode = picked && classes.includes(picked) ? picked : classes[0];
+  return (
+    <div className="ins">
+      {classes.length > 1 && (
+        <div className="ins-top">
+          <PillSwitch
+            label="Asset class"
+            value={mode}
+            onChange={setPicked}
+            options={classes.map((k) => ({ key: k, label: MODE_LABELS[k] }))}
+          />
+          <p className="ins-hint">This portfolio holds more than one asset class. Pick one to see its charts.</p>
+        </div>
+      )}
+      {mode === 'stocks' ? (
+        <PortfolioReports portfolio={portfolio} />
+      ) : (
+        <AssetReports
+          portfolio={portfolio}
+          mode={mode}
+          metalRates={metalRates}
+          fundNavs={fundNavs}
+          planNavs={planNavs}
+          fx={fx}
+        />
       )}
     </div>
   );

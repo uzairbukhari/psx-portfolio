@@ -268,12 +268,34 @@ export default function SettingsView({
       >
         <ArrowLeft size={15} /> Back to dashboard
       </button>
-      <div className="page-head">
-        <div>
-          <h1>Settings</h1>
-          <p>Manage your account, tax status and portfolio data.</p>
+      <section className="slab set-hero" aria-label="Your account">
+        <UserAvatar name={name} email={email} picture={picture} large />
+        <div className="set-hero-text">
+          <p className="lbl">Settings</p>
+          <h1>{name ?? 'Your account'}</h1>
+          <p className="mu">Manage your account, tax status and portfolio data.</p>
         </div>
-      </div>
+        <ul className="set-chips" aria-label="Account status">
+          <li data-tone={isAdmin ? 'accent' : undefined}>
+            <ShieldCheck size={13} aria-hidden="true" />
+            {isAdmin ? 'Super admin' : 'Member'}
+          </li>
+          <li data-tone={filerStatus ? 'ok' : 'warn'}>
+            <Receipt size={13} aria-hidden="true" />
+            {filerStatus === 'filer' ? 'Filer · 15%' : filerStatus === 'non-filer' ? 'Non-filer · 30%' : 'Tax status not set'}
+          </li>
+          {security && (
+            <li data-tone="ok">
+              <KeyRound size={13} aria-hidden="true" />
+              End-to-end encrypted
+            </li>
+          )}
+          <li data-tone={shareStats ? undefined : 'muted'}>
+            <BarChart3 size={13} aria-hidden="true" />
+            Usage stats {shareStats ? 'on' : 'off'}
+          </li>
+        </ul>
+      </section>
       <div className="settings-layout">
         <nav className="set-nav" aria-label="Settings sections">
           {sections.map(({ id, label, icon: Icon }) => (
@@ -289,7 +311,10 @@ export default function SettingsView({
                 window.scrollTo({ top: 0 });
               }}
             >
-              <Icon size={16} aria-hidden="true" /> {label}
+              <span className="set-nav-icon">
+                <Icon size={16} aria-hidden="true" />
+              </span>
+              {label}
             </a>
           ))}
         </nav>
@@ -458,29 +483,41 @@ export default function SettingsView({
                 title="AI usage"
                 description="Tokens and estimated cost since usage tracking began."
               >
-                <div className="stat-tiles">
-                  {(
-                    [
-                      [
-                        'Input tokens',
-                        usage && usage.inputTokens.toLocaleString(),
-                      ],
-                      [
-                        'Output tokens',
-                        usage && usage.outputTokens.toLocaleString(),
-                      ],
-                      ['Estimated cost', usage && usd.format(usage.costUsd)],
-                    ] as const
-                  ).map(([label, value]) => (
-                    <div key={label} className="stat-tile">
-                      <small>{label}</small>
-                      {value ? (
-                        <strong>{value}</strong>
-                      ) : (
-                        <Skeleton className="h-7 w-24" />
-                      )}
-                    </div>
-                  ))}
+                <div className="usage-meter">
+                  <div className="usage-cost">
+                    <small className="lbl">Estimated cost</small>
+                    {usage ? <strong className="num">{usd.format(usage.costUsd)}</strong> : <Skeleton className="h-9 w-32" />}
+                  </div>
+                  {usage ? (
+                    <>
+                      <div
+                        className="ai-split"
+                        role="img"
+                        aria-label={`${usage.inputTokens.toLocaleString()} input tokens and ${usage.outputTokens.toLocaleString()} output tokens`}
+                      >
+                        <i
+                          data-kind="in"
+                          style={{ flexGrow: Math.max(usage.inputTokens, 1) }}
+                        />
+                        <i
+                          data-kind="out"
+                          style={{ flexGrow: Math.max(usage.outputTokens, 1) }}
+                        />
+                      </div>
+                      <dl className="usage-legend">
+                        <div data-kind="in">
+                          <dt>Input tokens</dt>
+                          <dd className="num">{usage.inputTokens.toLocaleString()}</dd>
+                        </div>
+                        <div data-kind="out">
+                          <dt>Output tokens</dt>
+                          <dd className="num">{usage.outputTokens.toLocaleString()}</dd>
+                        </div>
+                      </dl>
+                    </>
+                  ) : (
+                    <Skeleton className="h-6 w-full" />
+                  )}
                 </div>
               </Section>
             </>

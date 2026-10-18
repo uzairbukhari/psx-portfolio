@@ -1,7 +1,7 @@
 /* oxlint-disable next/no-html-link-for-pages -- full page loads are intended: next/link throws in the vinext production build */
 'use client';
 
-import { DayBars, DayLine } from './charts/day-charts';
+import { DayBars, DayLine, DaySpark } from './charts/day-charts';
 import type { AdminHealth } from '@/lib/admin-health';
 import { delta, type Attention } from '@/lib/admin-overview';
 import type { OverviewMetrics } from '@/lib/analytics-store';
@@ -56,6 +56,10 @@ export default function AdminOverview({
   if (!data) return <p className="muted">Loading…</p>;
   const { health, metrics, attention } = data;
   const ai = health.aiSpend.sources.filter((s) => s.capUsd);
+  const troubled = [
+    ...health.pipelines.filter((p) => p.status === 'late' || p.status === 'failing').map((p) => `${p.label} ${p.status}`),
+    ...(health.platform.status === 'ok' || health.platform.status === 'idle' ? [] : [`Cloudflare ${health.platform.status}`]),
+  ];
   const capped = ai.sort(
     (a, b) => b.usd / (b.capUsd ?? 1) - a.usd / (a.capUsd ?? 1),
   )[0];
@@ -72,19 +76,34 @@ export default function AdminOverview({
           {error}
         </p>
       )}
-      <div className="admin-strip" aria-label="Pipeline status">
-        {health.pipelines.map((p) => (
-          <a key={p.id} href="/admin/health#pipelines" title={p.expected}>
-            <StatusPill
-              status={p.status}
-              label={`${p.label}${p.status === 'ok' || p.status === 'idle' ? '' : p.ageMinutes === null ? ' · never' : ''}`}
-            />
+      <section className="slab admin-status" aria-label="System status">
+        <div>
+          <p className="lbl">System status</p>
+          <h2 className="admin-verdict">
+            {troubled.length === 0
+              ? 'All systems normal'
+              : `${troubled.length} ${troubled.length === 1 ? 'thing needs' : 'things need'} a look`}
+          </h2>
+          <p className="mu">
+            {troubled.length === 0
+              ? `${health.pipelines.length} pipelines on schedule · Cloudflare ${health.platform.status === 'ok' ? 'healthy' : health.platform.status}`
+              : troubled.slice(0, 3).join(' · ')}
+          </p>
+        </div>
+        <div className="admin-strip" aria-label="Pipeline status">
+          {health.pipelines.map((p) => (
+            <a key={p.id} href="/admin/health#pipelines" title={p.expected}>
+              <StatusPill
+                status={p.status}
+                label={`${p.label}${p.status === 'ok' || p.status === 'idle' ? '' : p.ageMinutes === null ? ' · never' : ''}`}
+              />
+            </a>
+          ))}
+          <a href="/admin/platform" title={health.platform.headline}>
+            <StatusPill status={health.platform.status} label="Cloudflare" />
           </a>
-        ))}
-        <a href="/admin/platform" title={health.platform.headline}>
-          <StatusPill status={health.platform.status} label="Cloudflare" />
-        </a>
-      </div>
+        </div>
+      </section>
       <div className="admin-kpis">
         <div className="admin-kpi">
           <small>Active today</small>
@@ -95,6 +114,7 @@ export default function AdminOverview({
             goodWhen="up"
             suffix="vs same day last week"
           />
+          <DaySpark rows={metrics.dailyActive} pick={(d) => d.users} name="Active users" tone="success" />
         </div>
         <div className="admin-kpi">
           <small>New sign-ups, 7 days</small>
@@ -122,6 +142,7 @@ export default function AdminOverview({
               suffix="vs the 24 hours before"
             />
           )}
+          <DaySpark rows={metrics.errorSeries} pick={(d) => d.n} name="Client errors" tone="danger" />
         </div>
         <div className="admin-kpi">
           <small>AI spend, {health.aiSpend.month}</small>

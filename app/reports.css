@@ -23,6 +23,7 @@
 .reports[data-view="performance"] .report-panel:not([data-group="performance"]),
 .reports[data-view="income"] .report-panel:not([data-group="income"]),
 .reports[data-view="activity"] .report-panel:not([data-group="activity"]){display:none}
+.reports[data-view="all"] .report-panel:not([data-overview]){display:none}
 .report-panel{border-radius:14px;transition:border-color .15s ease}
 .report-panel:hover{border-color:rgb(var(--ch-primary) / .35)}
 @media(max-width:900px){
@@ -38,3 +39,5 @@
 .chart-info{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:8px;padding:0;vertical-align:middle;border:0;border-radius:50%;background:transparent;color:var(--muted-foreground);cursor:help;transition:color .15s ease,background-color .15s ease}
 .chart-info:hover,.chart-info:focus-visible{color:var(--primary);background:rgb(var(--ch-primary) / .14)}
 .chart-info:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+
+html:root .report-chart--tree{height:340px}
