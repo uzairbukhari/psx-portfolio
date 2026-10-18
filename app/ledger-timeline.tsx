@@ -103,6 +103,7 @@ export default function LedgerTimeline({
     <div className="ledger">
       {!hideKpis && (
         <KpiStrip
+          className="ledger-kpis"
           items={[
             { label: 'Invested', value: moneyShort(cents(sum(['buy', 'opening']))), primary: true },
             { label: 'Sold', value: moneyShort(cents(sum(['sell']))) },
@@ -155,7 +156,8 @@ export default function LedgerTimeline({
       {groups.length === 0 ? (
         <p className="muted ledger-empty">Nothing matches these filters.</p>
       ) : (
-        groups.map(([month, rows], index) => {
+        <div className="ledger-card">
+        {groups.map(([month, rows], index) => {
           const open = isOpen(month, index);
           const invested = flow(rows, ['buy', 'opening']);
           const received = flow(rows, ['sell', 'dividend']);
@@ -201,11 +203,18 @@ export default function LedgerTimeline({
                     key={e.key}
                     className={'ledger-row' + (e.voided ? ' row-voided' : '')}
                   >
-                    <span className="ledger-date">{e.date.slice(8)}</span>
-                    <span className={`ledger-type type-${e.type}`}>
-                      {e.label}
+                    <span className="ledger-date">
+                      {e.date.slice(8)}
+                      <small>
+                        {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][Number(e.date.slice(5, 7)) - 1]}
+                      </small>
                     </span>
+                    <span
+                      className={`ledger-type type-${e.type}`}
+                      aria-hidden="true"
+                    />
                     <div className="ledger-main">
+                      <b className="ledger-title">{e.label}</b>
                       <span className="ledger-tk">
                         {!ticker && (
                           <button
@@ -309,7 +318,8 @@ export default function LedgerTimeline({
                 ))}
             </section>
           );
-        })
+        })}
+        </div>
       )}
       {olderCount > 0 && (
         <button

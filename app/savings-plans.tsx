@@ -539,6 +539,7 @@ export default function SavingsPlansSection({
   return (
     <>
       <CollapsiblePanel
+        flat
         id="savings-plans"
         title="Savings plans"
         badge={`${totals.active} active`}

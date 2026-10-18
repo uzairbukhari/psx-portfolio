@@ -308,6 +308,7 @@ export default function GoldSilverSection({
   return (
     <>
       <CollapsiblePanel
+        flat
         id="gold-silver"
         title="Gold and Silver"
         badge={`${totals.held} held`}

@@ -1,0 +1,143 @@
+/* Sipwise "after dark" tokens: Android palette mapped onto the existing token names.
+   Loaded last, so it wins over the older per-theme blocks in globals.css. */
+html:root[data-theme=light]{--background:#f4f6fb;--foreground:#0b1430;--primary:#1d4ed8;--primary-2:#3b7bff;--card:#ffffff;--card-border:#dce3ef;--border:#dce3ef;--muted:#eef2f9;--muted-foreground:#52607e;--accent:#e6edfd;--popover:#ffffff;--success:#067a54;--danger:#c42b43;--field:#ffffff;--input:rgba(11,20,48,.24);--ch-primary:29 78 216;--ch-success:6 122 84;--ch-danger:196 43 67;--ch-line:11 20 48;--ch-tint:11 20 48;--ch-shadow:11 20 48;--tab-active-bg:#e6edfd;--tab-active-ink:#1d3faf;--shadow-card:0 1px 2px rgba(11,20,48,.05),0 10px 28px -14px rgba(11,20,48,.16);--s1:#fff;--s2:#eef2f9;--s3:#e3e9f4;--chip:#e8edf7;--gain-bg:#ddf5eb;--loss-bg:#fce6ea;--warn-bg:#fbf0d9;--cat-1:#2563eb;--cat-2:#b45309;--cat-3:#0f8a6a;--cat-4:#7c3aed;--cat-5:#c2410c;--cat-6:#0e7490;--cat-7:#be185d;--asset-stocks:#2563eb;--asset-funds:#7c3aed;--asset-gold:#b7791f;--asset-silver:#64748b;--asset-plans:#0d9488;--asset-fx:#0e7490;--btn-grad:linear-gradient(135deg,#3b7bff,#1d4ed8);--slab:linear-gradient(160deg,#0e1a3f,#0a1230);--slab-g1:rgba(59,130,246,.35);--slab-g2:rgba(34,224,160,.22);--slab-tx:#e8eefa;--slab-mu:#9fb0d6;--slab-line:rgba(255,255,255,.08);--slab-chip:rgba(255,255,255,.08);--slab-val:#2ee6a6}
+html:root[data-theme=dark]{--background:#070b18;--foreground:#e8eefa;--primary:#6ea2ff;--primary-2:#8fb7ff;--card:#0d1428;--card-border:#202b4b;--border:#202b4b;--muted:#131c36;--muted-foreground:#95a2bf;--accent:#1a2546;--popover:#0d1428;--success:#2ee6a6;--danger:#ff6f86;--field:#0a1124;--input:#202b4b;--ch-primary:110 162 255;--ch-success:46 230 166;--ch-danger:255 111 134;--ch-line:149 162 191;--tab-active-bg:#1a2546;--tab-active-ink:#e8eefa;--shadow-card:none;--s1:#0d1428;--s2:#131c36;--s3:#1a2546;--chip:#16203d;--gain-bg:rgba(46,230,166,.12);--loss-bg:rgba(255,111,134,.12);--warn-bg:rgba(245,185,66,.12);--cat-1:#5b8def;--cat-2:#e08a2e;--cat-3:#2bb58c;--cat-4:#9b7bf0;--cat-5:#e8743b;--cat-6:#2aa5c2;--cat-7:#e0528f;--asset-fx:#22d3ee;--btn-grad:linear-gradient(135deg,#4c8dff,#1d4ed8);--slab:linear-gradient(160deg,#0e1a3f,#0a1230);--slab-g1:rgba(59,130,246,.35);--slab-g2:rgba(34,224,160,.22);--slab-tx:#e8eefa;--slab-mu:#9fb0d6;--slab-line:rgba(255,255,255,.08);--slab-chip:rgba(255,255,255,.08);--slab-val:#2ee6a6}
+html:root[data-theme=midnight]{--background:#000;--foreground:#ecedf4;--primary:#6ea2ff;--primary-2:#8fb7ff;--card:#0a0c12;--card-border:#1c2130;--border:#1c2130;--muted:#11141c;--muted-foreground:#8b93a7;--accent:#181c27;--popover:#0a0c12;--success:#2ee6a6;--danger:#ff6f86;--field:#06080d;--input:#1c2130;--ch-primary:110 162 255;--ch-success:46 230 166;--ch-danger:255 111 134;--ch-line:139 147 167;--tab-active-bg:#181c27;--tab-active-ink:#ecedf4;--shadow-card:none;--s1:#0a0c12;--s2:#11141c;--s3:#181c27;--chip:#131722;--gain-bg:rgba(46,230,166,.12);--loss-bg:rgba(255,111,134,.12);--warn-bg:rgba(245,185,66,.12);--cat-1:#5b8def;--cat-2:#e08a2e;--cat-3:#2bb58c;--cat-4:#9b7bf0;--cat-5:#e8743b;--cat-6:#2aa5c2;--cat-7:#e0528f;--asset-fx:#22d3ee;--btn-grad:linear-gradient(135deg,#4c8dff,#1d4ed8);--slab:linear-gradient(160deg,#0b1433,#04060d);--slab-g1:rgba(59,130,246,.28);--slab-g2:rgba(34,224,160,.18);--slab-tx:#ecedf4;--slab-mu:#98a6c8;--slab-line:rgba(255,255,255,.07);--slab-chip:rgba(255,255,255,.07);--slab-val:#2ee6a6}
+html:root[data-theme=paper]{--background:#f6f0e4;--foreground:#2b2218;--primary:#9a4412;--primary-2:#b45a1e;--card:#fffaf0;--card-border:#e4d6be;--border:#e4d6be;--muted:#f0e7d6;--muted-foreground:#6b5a46;--accent:#f2e1c8;--popover:#fffaf0;--success:#1f6b3a;--danger:#a3281c;--field:#fffdf7;--input:rgba(60,40,15,.3);--tab-active-bg:#f2e1c8;--tab-active-ink:#6b2e08;--shadow-card:0 1px 2px rgba(60,40,15,.06),0 10px 28px -14px rgba(60,40,15,.18);--s1:#fffaf0;--s2:#f0e7d6;--s3:#e7dbc5;--chip:#efe4cf;--gain-bg:#e3efdf;--loss-bg:#f6e1da;--warn-bg:#f5e8c8;--cat-1:#b4531f;--cat-2:#2f6fa8;--cat-3:#1f7a4d;--cat-4:#7c4ab0;--cat-5:#a86f00;--cat-6:#0f766e;--cat-7:#b23a63;--asset-stocks:#b4531f;--asset-funds:#7c4ab0;--asset-fx:#2f6fa8;--btn-grad:linear-gradient(135deg,#b45a1e,#8a3a0c);--slab:linear-gradient(160deg,#3a2a1c,#21170f);--slab-g1:rgba(208,138,78,.34);--slab-g2:rgba(70,170,110,.18);--slab-tx:#f7ecdd;--slab-mu:#cdb89c;--slab-line:rgba(255,240,220,.09);--slab-chip:rgba(255,240,220,.09);--slab-val:#7fd9a0}
+
+/* Figures use Geist Mono everywhere a number is the point. */
+html:root .num,html:root .metric strong,html:root .stat strong,html:root .pulse strong,html:root .mono{font-family:var(--font-geist-mono),ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+html:root .gain{color:var(--success)}html:root .loss{color:var(--danger)}
+
+/* Inside a slab the tokens flip to their dark values, so every nested rule (and the charts) reads correctly. */
+html:root .slab{--foreground:var(--slab-tx);--strong-ink:var(--slab-tx);--muted-foreground:var(--slab-mu);--primary:#6ea2ff;--ch-primary:110 162 255;--success:#2ee6a6;--ch-success:46 230 166;--danger:#ff6f86;--ch-danger:255 111 134;--ch-line:149 162 191;--ch-tint:255 255 255;--ch-shadow:0 0 0;--popover:#0d1428;--border:var(--slab-line);--card-border:var(--slab-line);--muted:rgba(255,255,255,.06);--secondary:rgba(255,255,255,.06);--soft-ink:#bcd4f7;--warn-ink:#e8c27a;--warn-strong:#d39a29;--success-ink:#8ff0cd;--danger-ink:#ffb0b8;--card:transparent;--accent:rgba(255,255,255,.08);--tab-active-bg:rgba(255,255,255,.1);--tab-active-ink:#fff;--field:rgba(255,255,255,.06);--input:var(--slab-line);--chart-up:#2ee6a6;--ch-chart-up:46 230 166;--chart-down:#ff6f86;--ch-chart-down:255 111 134;--chart-cursor:rgba(255,255,255,.08)}
+html:root .panel.slab,html:root .slab{background:var(--slab);border:1px solid var(--slab-line);box-shadow:none}
+/* Night slab: dark hero on every main page, in all four themes. */
+html:root .slab{position:relative;overflow:hidden;isolation:isolate;border-radius:24px;padding:24px 26px;color:var(--slab-tx);background:var(--slab);border:1px solid var(--slab-line)}
+html:root .slab::before{content:"";position:absolute;inset:-40% -10% auto auto;width:60%;height:140%;background:radial-gradient(closest-side,var(--slab-g1),transparent);z-index:-1;pointer-events:none}
+html:root .slab::after{content:"";position:absolute;inset:auto auto -60% -10%;width:50%;height:120%;background:radial-gradient(closest-side,var(--slab-g2),transparent);z-index:-1;pointer-events:none}
+html:root .slab .lbl,html:root .slab .mu{color:var(--slab-mu)}
+html:root .lbl{font:600 11.5px/1 var(--font-geist-sans),sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .slab-value{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:clamp(30px,4vw,44px);letter-spacing:-.04em;line-height:1.05;margin:10px 0 0}
+html:root .delta-pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font:600 12.5px/1.4 var(--font-geist-mono),monospace;background:var(--gain-bg);color:var(--success)}
+html:root .delta-pill.is-loss{background:var(--loss-bg);color:var(--danger)}
+html:root .slab .delta-pill{background:rgba(46,230,166,.14);color:#2ee6a6}html:root .slab .delta-pill.is-loss{background:rgba(255,111,134,.14);color:#ff6f86}
+html:root .slab-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:18px;margin-top:20px}
+html:root .slab-stats .num{display:block;font-weight:600;font-size:18px;margin-top:6px}
+
+/* Ticker tile: initials on a hue taken from the symbol. */
+html:root .ticker-tile{display:inline-grid;place-items:center;width:var(--tt,36px);height:var(--tt,36px);border-radius:12px;font:600 calc(var(--tt,36px)*.34)/1 var(--font-geist-mono),monospace;color:#fff;background:hsl(var(--hue,220) 55% 42%);flex-shrink:0}
+html:root .sw-seg{display:inline-flex;gap:2px;padding:3px;border-radius:12px;background:var(--muted);border:1px solid var(--border)}
+html:root .sw-seg button{border:0;background:transparent;color:var(--muted-foreground);font:500 13px/1 var(--font-geist-sans),sans-serif;padding:7px 12px;border-radius:9px;cursor:pointer}
+html:root .sw-seg button[aria-pressed=true]{background:var(--card);color:var(--foreground);box-shadow:var(--shadow-card,none)}
+html:root .skeleton{border-radius:10px;background:linear-gradient(90deg,var(--muted),var(--accent),var(--muted));background-size:200% 100%;animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){html:root .skeleton{animation:none}}
+html:root .empty-state{display:grid;justify-items:center;gap:8px;text-align:center;padding:36px 16px;color:var(--muted-foreground)}
+html:root .empty-state strong{color:var(--foreground);font-size:16px}
+
+/* Cards: flat, rounded, soft shadow in light themes, hairline in dark themes. */
+:root{--radius:16px}
+html:root .pulse,html:root .panel,html:root .report-panel,html:root .card{box-shadow:var(--shadow-card,none);backdrop-filter:none;-webkit-backdrop-filter:none}
+
+/* ───────── Shell: sidebar (desktop) and floating bar (phone) ───────── */
+html:root .nav-add[data-slot]{display:none}
+html:root .side-tools,html:root .nav-badge{display:none}
+@media(min-width:761px){
+  html:root{--side-w:248px}
+  html:root[data-side=rail],html:root[data-side=auto]{--side-w:76px}
+  html:root .desk{max-width:none;margin:0;padding:0 36px 48px calc(var(--side-w) + 36px);transition:padding-left .18s ease}
+  html:root .app-header{display:contents}
+  html:root .app-header::before{content:none}
+  html:root .side{position:fixed;inset:0 auto 0 0;width:var(--side-w);z-index:50;display:flex;flex-direction:column;gap:6px;padding:16px 12px;background:var(--card);border-right:1px solid var(--border);transition:width .18s ease,box-shadow .18s ease}
+  html:root[data-side=auto] .side:is(:hover,:focus-within){width:248px;box-shadow:24px 0 60px -24px rgb(var(--ch-shadow) / .45)}
+  html:root .side .header-brand-group{grid-column:auto;grid-row:auto;padding:4px 8px 14px;height:auto}
+  html:root .side .brand{gap:12px}
+  html:root .side .app-nav[data-slot=tabs-list]{grid-column:auto;grid-row:auto;position:static;flex:1;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:2px;width:auto;height:auto;max-width:none;overflow:visible;background:transparent;border:0;padding:0;box-shadow:none}
+  html:root .side .app-nav-link[data-slot=tabs-trigger]{position:relative;height:44px;width:100%;padding:0 12px;border-radius:12px;gap:12px;justify-content:flex-start;font-size:14.5px;font-weight:500;color:var(--muted-foreground)}
+  html:root .side .app-nav-link[data-slot=tabs-trigger]:hover{background:var(--muted);color:var(--foreground)}
+  html:root .side .app-nav-link[data-slot=tabs-trigger][data-active]{background:var(--tab-active-bg);color:var(--tab-active-ink);box-shadow:none}
+  html:root .side .app-nav-link::after{content:none}
+  html:root .side .app-nav-link .tab-icon{display:block;width:20px;height:20px;margin:0;flex:none}
+  html:root .side .app-nav-link .tab-short{display:none}
+  html:root .nav-badge{display:inline-block;margin-left:auto;padding:2px 7px;border-radius:999px;border:1px solid var(--border);font-size:10.5px;font-weight:600;letter-spacing:.04em;color:var(--muted-foreground)}
+  html:root .nav-sep{display:block;height:1px;margin:10px 8px;background:var(--border)}
+  html:root .side-tools{display:flex;flex-direction:column;gap:2px;padding-top:8px;border-top:1px solid var(--border)}
+  html:root .side-tool[data-active]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
+  html:root .side-tool{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:12px;background:transparent;color:var(--muted-foreground);font:500 13.5px var(--font-geist-sans),sans-serif;cursor:pointer}
+  html:root .side-tool:hover{background:var(--muted);color:var(--foreground)}
+  html:root .side-tool[aria-pressed=true]{color:var(--primary)}
+  /* Collapsed rail: icons only, a tooltip names each page. */
+  html:root[data-side=rail] .side :is(.tab-long,.nav-badge,.logo-word,.header-portfolio-select),html:root[data-side=auto] .side:not(:hover):not(:focus-within) :is(.tab-long,.nav-badge,.logo-word){display:none}
+  html:root[data-side=rail] .side .app-nav-link,html:root[data-side=rail] .side .side-tool,html:root[data-side=auto] .side:not(:hover):not(:focus-within) :is(.app-nav-link,.side-tool){justify-content:center;padding:0}
+  html:root[data-side=rail] .side .app-nav-link:hover::before{content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);padding:6px 10px;border-radius:8px;background:var(--popover);color:var(--foreground);border:1px solid var(--border);box-shadow:0 10px 28px -12px rgb(var(--ch-shadow) / .5);font-size:12.5px;white-space:nowrap;pointer-events:none;z-index:60}
+  /* Top bar: portfolio picker on the left, actions on the right. */
+  html:root .header-right{position:sticky;top:0;z-index:30;height:68px;margin:0 -36px 8px -36px;padding:0 36px;gap:10px;background:color-mix(in srgb,var(--background) 86%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  html:root .header-right>.hdr-btn:first-child,html:root .header-right>:not(.hdr-btn):first-child+.hdr-btn{margin-left:auto}
+  html:root .header-right .header-portfolio-select,html:root .header-right .header-portfolio-label{margin-left:0}
+  html:root .app-header ~ [data-slot=tabs-content]{padding-top:4px}
+}
+@media(max-width:760px){
+  html:root .side{display:contents}
+  html:root .side-tools{display:none}
+  html:root .app-header.chromeless .app-nav{display:none}
+  html:root .desk:has(.app-header.chromeless){padding-bottom:36px}
+  html:root .app-header [data-slot=tabs-list]{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));width:auto;height:64px;padding:0 6px;border:1px solid var(--border);border-radius:24px;background:var(--card);box-shadow:0 18px 44px -14px rgb(var(--ch-shadow) / .55);align-items:center}
+  html:root .app-header [data-slot=tabs-trigger]{height:52px;border-radius:16px}
+  html:root .app-header [data-slot=tabs-trigger][data-extra]{display:none}
+  html:root .app-header [data-slot=tabs-trigger][data-active]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
+  html:root .app-header [data-slot=tabs-trigger]::after{content:none}
+  html:root .nav-add[data-slot]{display:grid;place-items:center;flex:none;width:54px;height:54px;margin-top:-26px;border:4px solid var(--background);border-radius:50%;background:var(--btn-grad,var(--primary));color:#fff;box-shadow:0 10px 24px -8px rgb(var(--ch-primary) / .7);cursor:pointer}
+  html:root .nav-add svg{width:24px;height:24px}
+  html:root .desk{padding-bottom:calc(var(--bar-h,60px) + 36px + env(safe-area-inset-bottom))}
+}
+
+/* ───────── Page pieces used by the redesigned pages ───────── */
+html:root .page-head{display:grid;gap:4px;margin:8px 0 16px}
+html:root .page-head h2{margin:0;font-size:26px;letter-spacing:-.02em}
+html:root .page-kicker{margin:0;font-size:12.5px;color:var(--muted-foreground)}
+html:root .plan-page{display:grid;gap:18px}
+html:root .plan-page .between{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+html:root .plan-page h3{margin:0;font-size:17px}
+html:root .muted-note{color:var(--muted-foreground);font-size:13px}
+html:root .plan-stats{margin-top:0}
+html:root .plan-stats .slab-value{display:block}
+html:root .plan-bar{height:8px;border-radius:4px;background:var(--slab-chip);margin-top:20px;overflow:hidden}
+html:root .plan-bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#6ea2ff,#22e0a0)}
+html:root .sw-link{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--primary);font:600 13.5px var(--font-geist-sans),sans-serif;cursor:pointer;padding:4px 0}
+html:root .chip-row{display:flex;flex-wrap:wrap;gap:8px}
+html:root .sym-chip{display:inline-flex;align-items:center;gap:8px;padding:5px 12px 5px 6px;border:1px solid var(--border);border-radius:999px;background:var(--muted);color:var(--foreground);font:600 13px var(--font-geist-mono),monospace;cursor:pointer}
+html:root .sym-chip:hover{border-color:var(--primary)}
+html:root .pick-list{list-style:none;margin:0;padding:0;display:grid}
+html:root .pick-list li{display:grid;grid-template-columns:32px 36px 1fr auto;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+html:root .pick-list li:first-child{border-top:0}
+html:root .pick-list small{display:block;color:var(--muted-foreground)}
+
+/* ───────── First-run screens: always dark, with the aurora ───────── */
+html:root .vault-stage{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:0;background:var(--background);isolation:isolate;overflow:hidden}
+html:root .vault-stage::before,html:root .vault-stage::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none}
+html:root .vault-stage::before{background:radial-gradient(700px 420px at 12% 8%,rgba(59,130,246,.30),transparent 70%),radial-gradient(620px 420px at 92% 18%,rgba(34,224,160,.16),transparent 70%),radial-gradient(800px 500px at 60% 110%,rgba(124,58,237,.18),transparent 70%)}
+html:root .vault-stage::after{background-image:linear-gradient(rgba(148,178,225,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,178,225,.06) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%)}
+html:root .vault-stage .vault-card{width:100%;max-width:440px;padding:32px;border:1px solid var(--border);border-radius:28px;background:rgba(13,20,40,.72);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 40px 90px -30px rgba(0,0,0,.7)}
+html:root .vault-stage .brand{margin-bottom:22px}
+html:root .vault-kicker{margin:0 0 4px;font-size:13px;color:var(--muted-foreground);overflow-wrap:anywhere}
+html:root .vault-stage .signin-mark{display:none}
+html:root .vault-stage input[type=password],html:root .vault-stage input:not([type]),html:root .vault-stage input[type=text]{background:var(--field);border-color:var(--input);color:var(--foreground)}
+html:root .vault-stage button[type=submit],html:root .vault-stage .vault-card>button:not(.signin-link):not(.secondary),html:root .vault-stage form>button:not(.signin-link):not(.secondary){background:var(--btn-grad,linear-gradient(135deg,#4c8dff,#1d4ed8));color:#fff;width:100%;justify-content:center;border-radius:14px;padding:13px 18px}
+html:root .vault-meter{display:flex;align-items:center;gap:12px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .vault-meter-bar{display:flex;flex:1;gap:4px}
+html:root .vault-meter-bar i{flex:1;height:6px;border-radius:3px;background:var(--muted)}
+html:root .vault-meter-bar i[data-on]{background:var(--danger)}
+html:root .vault-meter-bar[data-score="2"] i[data-on]{background:var(--warn-ink)}
+html:root .vault-meter-bar[data-score="3"] i[data-on],html:root .vault-meter-bar[data-score="4"] i[data-on]{background:var(--success)}
+html:root .vault-checks{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:13px;color:var(--muted-foreground)}
+html:root .vault-checks li::before{content:"○";margin-right:8px}
+html:root .vault-checks li[data-ok]{color:var(--success)}html:root .vault-checks li[data-ok]::before{content:"●"}
+html:root .vault-blocks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+html:root .vault-blocks span{padding:10px 0;text-align:center;border-radius:12px;background:var(--muted);border:1px solid var(--border);font:600 15px var(--font-geist-mono),monospace;letter-spacing:.08em}
+html:root .vault-stage .vault-recovery,html:root .vault-recovery[data-testid]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}
+html:root .vault-danger-link{color:var(--danger)!important}
+@keyframes vshake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+html:root .vault-shake{animation:vshake .35s}
+@media(prefers-reduced-motion:reduce){html:root .vault-shake{animation:none}}
+@media print{html:root .vault-stage{background:#fff!important}html:root .vault-stage::before,html:root .vault-stage::after{display:none}html:root .vault-stage *{color:#000!important;background:transparent!important}html:root .vault-actions,html:root .signin-link,html:root .vault-card label,html:root .vault-card>button{display:none!important}html:root .vault-stage .vault-recovery{position:static;width:auto;height:auto;clip:auto;white-space:normal}html:root .vault-blocks{display:none}}

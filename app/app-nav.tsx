@@ -2,7 +2,8 @@
 // Page navigation for the signed-in app. These are pages with URLs, so they are links in a <nav> landmark (not
 // ARIA tabs): new-tab and middle-click work, screen readers hear "link, current page". Plain clicks are still
 // handled in-app, so the page does not reload and the vault stays unlocked.
-import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { Plus } from 'lucide-react';
 import { flushSync } from 'react-dom';
 import { preloadTab } from './lazy-panels';
 
@@ -13,12 +14,19 @@ export type NavItem = {
   short: string;
   icon: ReactNode;
   title?: string;
+  /** A small tag next to the label (Beta, Admin). */
+  badge?: string;
+  /** Left out of the phone's bottom bar (reachable from Plan or the account menu). */
+  extra?: boolean;
+  /** Draws a divider above this item in the sidebar. */
+  divider?: boolean;
 };
 
 /** Page names for document.title and each view's heading. */
 export const PAGE_TITLES: Record<string, string> = {
   holdings: 'Holdings',
-  reports: 'Reports',
+  reports: 'Insights',
+  'sip-plan': 'Plan',
   history: 'Activity',
   sip: 'Monthly Picks',
   settings: 'Settings',
@@ -46,10 +54,15 @@ export function AppNav({
   items,
   active,
   onNavigate,
+  onAdd,
+  addDisabled,
 }: {
   items: NavItem[];
   active: string;
   onNavigate: (tab: string) => void;
+  /** The raised add button in the middle of the phone's bottom bar. */
+  onAdd?: () => void;
+  addDisabled?: boolean;
 }) {
   function onClick(e: MouseEvent<HTMLAnchorElement>, tab: string) {
     // New-tab and new-window gestures belong to the browser.
@@ -59,25 +72,42 @@ export function AppNav({
   }
   return (
     <nav data-slot="tabs-list" className="app-nav" aria-label="Main">
-      {items.map((item) => {
+      {items.map((item, i) => {
         const current = item.tab === active;
         return (
-          <a
-            key={item.tab}
-            href={item.href}
-            data-slot="tabs-trigger"
-            data-active={current ? '' : undefined}
-            aria-current={current ? 'page' : undefined}
-            title={item.title}
-            className="app-nav-link"
-            onClick={(e) => onClick(e, item.tab)}
-            onPointerEnter={() => preloadTab(item.tab)}
-            onFocus={() => preloadTab(item.tab)}
-          >
-            {item.icon}
-            <span className="tab-long">{item.label}</span>
-            <span className="tab-short">{item.short}</span>
-          </a>
+          <Fragment key={item.tab}>
+            {onAdd && i === 2 && (
+              <button
+                type="button"
+                data-slot="nav-add"
+                className="nav-add"
+                aria-label="Add transaction"
+                disabled={addDisabled}
+                onClick={onAdd}
+              >
+                <Plus aria-hidden="true" />
+              </button>
+            )}
+            {item.divider && <span className="nav-sep" role="separator" />}
+            <a
+              href={item.href}
+              data-slot="tabs-trigger"
+              data-active={current ? '' : undefined}
+              data-extra={item.extra ? '' : undefined}
+              data-tip={item.label}
+              aria-current={current ? 'page' : undefined}
+              title={item.title}
+              className="app-nav-link"
+              onClick={(e) => onClick(e, item.tab)}
+              onPointerEnter={() => preloadTab(item.tab)}
+              onFocus={() => preloadTab(item.tab)}
+            >
+              {item.icon}
+              <span className="tab-long">{item.label}</span>
+              <span className="tab-short">{item.short}</span>
+              {item.badge && <span className="nav-badge">{item.badge}</span>}
+            </a>
+          </Fragment>
         );
       })}
     </nav>

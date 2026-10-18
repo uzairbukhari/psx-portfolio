@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/popover';
 import {
   Plus,
+  RefreshCw,
   Search,
   Briefcase,
   Upload,
@@ -61,6 +62,11 @@ import {
   Microscope,
   LockKeyhole,
   ShieldCheck,
+  TrendingUp,
+  PanelLeft,
+  Pin,
+  PinOff,
+  Target,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
 import {
@@ -97,7 +103,8 @@ import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
 import { reportMode } from '@/lib/asset-reports';
 import PortfolioValueCard from './portfolio-value-card';
-import AccountOverview from './account-overview';
+import HoldingsHome, { MarketGlanceProvider, TodayPill } from './holdings-home';
+import { TickerTile, hueOf } from './ui-kit';
 import { useMetalRates } from './use-metal-rates';
 import { useFxRates } from './use-fx-rates';
 import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
@@ -109,6 +116,7 @@ import {
   AllReports,
   LedgerTimeline,
   MonthlyPicks,
+  PlanPage,
   CompanyDetail,
   GoldSilverSection,
   ForeignCurrencySection,
@@ -162,6 +170,7 @@ import {
 import { parseBackup, type BackupPackage } from '@/lib/vault-backup';
 import { EncryptedRestoreDialog, VaultSecurity } from './vault-security';
 import VaultGate from './vault-gate';
+import { PlanMonthNav } from './plan-month-nav';
 import { refreshImportQuotes } from '@/lib/import-refresh';
 import PortfolioWorkspace, {
   type WorkspaceControls,
@@ -194,11 +203,13 @@ import type {
   PriceHistoryResponse,
 } from '@/lib/api-types';
 import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
+import { useSidebar } from './use-sidebar';
 import { flushAnalytics, hookGlobalErrors, reportError, track } from './analytics';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
   reports: '/reports',
+  'sip-plan': '/plan',
   sip: '/sip',
   history: '/activity',
   'research-desk': '/research-desk',
@@ -209,6 +220,8 @@ const TAB_PATHS: Record<string, string> = {
 const PATH_TABS: Record<string, string> = Object.fromEntries([
   ...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
   ['/history', 'history'],
+  ['/insights', 'reports'],
+  ['/monthly-picks', 'sip'],
 ]);
 const ASSET_PATHS = { metal: 'gold', plan: 'plans', currency: 'currency' } as const;
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
@@ -335,6 +348,9 @@ function CompanyLookupNote({
     </p>
   );
 }
+type HoldingsTab = 'stocks' | 'funds' | 'metal' | 'currency' | 'plan';
+const HOLDINGS_PREVIEW = 7;
+
 type HoldingsSortKey =
   | 'name'
   | 'shares'
@@ -681,7 +697,7 @@ type DashboardProps = {
 export default function Dashboard(props: DashboardProps) {
   if (!props.email) return <DashboardContent {...props} vault={null} />;
   return (
-    <VaultGate email={props.email}>
+    <VaultGate email={props.email} name={props.name} picture={props.picture}>
       {(session, lock) => (
         <PortfolioWorkspace
           session={session}
@@ -794,6 +810,17 @@ function DashboardContent({
     planFromPathname(initialPathname),
   );
   useRouteMeta(tab, tab === 'company' ? companyTicker : undefined);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        document.getElementById('global-search')?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const side = useSidebar();
   function setTab(requested: string) {
     const next = allowTab(requested, isAdmin);
     setTabState(next);
@@ -1458,10 +1485,16 @@ function DashboardContent({
         )
       : p?.assets?.some((a) => a.kind === 'currency')),
   );
+  const [holdingsTab, setHoldingsTab] = useState<HoldingsTab | null>(null);
+  const [showAllHoldings, setShowAllHoldings] = useState(false);
   const [assetAdd, setAssetAdd] = useState<{
     kind: 'metal' | 'plan' | 'fund' | 'currency';
     n: number;
   }>({ kind: 'metal', n: 0 });
+  useEffect(() => {
+    const tab = ({ fund: 'funds', metal: 'metal', currency: 'currency', plan: 'plan' } as Record<string, HoldingsTab>)[assetAdd.kind ?? ''];
+    if (tab && assetAdd.n > 0) setHoldingsTab(tab);
+  }, [assetAdd]);
   const fundData = useFundCatalog(
     !!(isAll
       ? p?.[DISPLAY_PARTS]?.some((part) =>
@@ -1524,7 +1557,7 @@ function DashboardContent({
           : 'holdings'
         : tab === 'history'
           ? 'activity'
-          : tab === 'reports' || tab === 'sip' || tab === 'settings' || tab === 'notifications'
+          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'settings' || tab === 'notifications'
             ? tab
             : null;
     if (screen) track('screen_viewed', { screen });
@@ -2017,6 +2050,22 @@ function DashboardContent({
           return holdingsSort.dir === 'asc' ? cmp : -cmp;
         })
       : rowsFiltered;
+  const shownHoldings = showAllHoldings
+    ? displayedHoldings
+    : displayedHoldings.slice(0, HOLDINGS_PREVIEW);
+  const tabNow: HoldingsTab =
+    holdingsTab ??
+    (held.length
+      ? 'stocks'
+      : ownedFunds.length
+        ? 'funds'
+        : ownedMetals.length
+          ? 'metal'
+          : ownedCurrencies.length
+            ? 'currency'
+            : ownedPlans.length
+              ? 'plan'
+              : 'stocks');
   function toggleHoldingsSort(key: HoldingsSortKey) {
     setHoldingsSort((prev) =>
       prev && prev.key === key
@@ -2041,6 +2090,119 @@ function DashboardContent({
     setQuotePrice(h.quote?.price.toString() ?? '');
     setQuoteDate(h.quote?.date ?? today());
   };
+  const metalSection = (
+            <GoldSilverSection
+              addRequest={assetAdd.kind === 'metal' ? assetAdd.n : 0}
+              owned={ownedMetals}
+              rates={metalRates.rates}
+              ratesError={metalRates.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(assets, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'metal'),
+                      ...assets,
+                    ],
+                  },
+                  message,
+                )
+              }
+              onOpenAsset={(key) =>
+                openOwnedAsset(
+                  'metal',
+                  key,
+                  ownedMetals.find((o) => ownedKey(o) === key),
+                )
+              }
+            />
+  );
+  const currencySection = (
+            <ForeignCurrencySection
+              addRequest={assetAdd.kind === 'currency' ? assetAdd.n : 0}
+              onOpenAsset={(key) =>
+                openOwnedAsset(
+                  'currency',
+                  key,
+                  ownedCurrencies.find((o) => ownedKey(o) === key),
+                )
+              }
+              owned={ownedCurrencies}
+              fx={fxData.data}
+              fxError={fxData.error}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(assets, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'currency'),
+                      ...assets,
+                    ],
+                  },
+                  message,
+                )
+              }
+            />
+  );
+  const plansSection = (
+            <SavingsPlansSection
+              addRequest={assetAdd.kind === 'plan' ? assetAdd.n : 0}
+              owned={ownedPlans}
+              planNavs={planNavs}
+              planNavsError={planNavData.loaded ? planNavData.error : ''}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(plans, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'plan'),
+                      ...plans,
+                    ],
+                  },
+                  message,
+                )
+              }
+              onOpenAsset={(key) =>
+                openOwnedAsset(
+                  'plan',
+                  key,
+                  ownedPlans.find((o) => ownedKey(o) === key),
+                )
+              }
+            />
+  );
+  const fundsSection = (
+            <MutualFundsSection
+              addRequest={assetAdd.kind === 'fund' ? assetAdd.n : 0}
+              owned={ownedFunds}
+              catalog={fundData.funds}
+              navs={fundData.navs}
+              catalogError={fundData.error || tracking.error}
+              onRetryPrice={tracking.retry}
+              retrying={tracking.retrying}
+              canEdit={!isAll && !locked}
+              busy={busy}
+              onChange={(funds, message) =>
+                save(
+                  {
+                    ...clone(p),
+                    assets: [
+                      ...(p.assets ?? []).filter((a) => a.kind !== 'fund'),
+                      ...funds,
+                    ],
+                  },
+                  message,
+                )
+              }
+              onOpenFund={openFund}
+            />
+  );
   const holdingActions = (h: (typeof hs)[number]) => (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -2099,7 +2261,7 @@ function DashboardContent({
     tab === 'plan' ||
     tab === 'notifications';
   // A portfolio with nothing in it shows only its start screen: no tabs to open.
-  const hideTabs = chromeless || (p.companies.length === 0 && !hasAssets);
+  const hideTabs = p.companies.length === 0 && !hasAssets;
   const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
@@ -2665,18 +2827,83 @@ function DashboardContent({
   }
   const navItems: NavItem[] = [
     { tab: 'holdings', href: '/', label: 'Holdings', short: 'Holdings', icon: <Wallet className="tab-icon" aria-hidden="true" /> },
-    { tab: 'reports', href: '/reports', label: 'Reports', short: 'Reports', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
-    { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
+    { tab: 'reports', href: '/reports', label: 'Insights', short: 'Insights', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
     ...(hasStocks
-      ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
+      ? [
+          { tab: 'sip-plan', href: '/plan', label: 'Plan', short: 'Plan', icon: <TrendingUp className="tab-icon" aria-hidden="true" /> },
+          { tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> },
+        ]
       : []),
+    { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
     ...(isAdmin
       ? [
-          { tab: 'research-desk', href: '/research-desk', label: 'Research desk', short: 'Research', icon: <FlaskConical className="tab-icon" aria-hidden="true" /> },
-          { tab: 'ai-lab', href: '/ai-lab', label: 'AI Lab', short: 'AI Lab', icon: <Microscope className="tab-icon" aria-hidden="true" /> },
+          { tab: 'research-desk', href: '/research-desk', label: 'Research desk', short: 'Research', badge: 'Admin', extra: true, divider: true, icon: <FlaskConical className="tab-icon" aria-hidden="true" /> },
+          { tab: 'ai-lab', href: '/ai-lab', label: 'AI Lab', short: 'AI Lab', extra: true, icon: <Microscope className="tab-icon" aria-hidden="true" /> },
         ]
       : []),
   ];
+  const accountMenu = (withName: boolean) => email ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="account-trigger">
+        <UserAvatar name={name} email={email} picture={picture} />
+        {withName && (
+            <span className="account-who">
+              <b>{name || email}</b>
+              <small>{vault ? 'Vault unlocked' : 'Signed in'}</small>
+            </span>
+          )}
+          {withName ? (
+            <LockKeyhole size={15} className="account-chevron" />
+          ) : (
+            <ChevronDown size={14} className="account-chevron" />
+          )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="account-menu">
+        <div className="account-menu-header">
+          <UserAvatar
+            name={name}
+            email={email}
+            picture={picture}
+            large
+          />
+          <div>
+            {name && (
+              <span className="account-menu-name">{name}</span>
+            )}
+            <span className="account-menu-email">{email}</span>
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setTab('settings')}>
+          <Settings size={15} /> Settings
+        </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
+            <ShieldCheck size={15} /> Admin console
+          </DropdownMenuItem>
+        )}
+        <ThemeMenuItems />
+        {vault && (
+          <DropdownMenuItem onClick={vault.lock}>
+            <LockKeyhole size={15} /> Lock vault
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => {
+            track('signed_out');
+            void flushAnalytics().finally(() => {
+              window.location.href = '/api/auth/logout';
+            });
+          }}
+        >
+          <LogOut size={15} /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
+
   return (
     <CompanyNavProvider value={openCompany}>
       <main className="desk">
@@ -2691,7 +2918,8 @@ function DashboardContent({
           }}
         />
         <div className="flex flex-col gap-2">
-          <header className={'app-header' + (hideTabs ? ' no-tabs' : '')}>
+          <header className={'app-header' + (hideTabs ? ' no-tabs' : '') + (chromeless ? ' chromeless' : '')}>
+            <div className="side">
             <div className="header-brand-group">
               <button
                 type="button"
@@ -2706,23 +2934,93 @@ function DashboardContent({
                 <LogoMark size={28} />
                 <Wordmark />
               </button>
-              {tab !== 'settings' && workspace?.selector}
+            </div>
+            {!hideTabs && tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
+            {!hideTabs && (
+              <AppNav
+                items={navItems}
+                active={tab}
+                onNavigate={setTab}
+                onAdd={() => openTx('buy', tab === 'company' ? companyTicker : '')}
+                addDisabled={busy}
+              />
+            )}
+            {!hideTabs && (
+              <div className="side-tools">
+                <button
+                  type="button"
+                  data-slot="side-tool"
+                  className="side-tool"
+                  aria-pressed={side.mode !== 'auto'}
+                  aria-label={side.mode === 'auto' ? 'Pin menu' : 'Unpin menu'}
+                  title={(side.mode === 'auto' ? 'Pin menu' : 'Unpin menu') + ' ( [ )'}
+                  onClick={() => side.setMode(side.mode === 'auto' ? 'pinned' : 'auto')}
+                >
+                  {side.mode === 'auto' ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
+                  <span className="tab-long">{side.mode === 'auto' ? 'Pin menu' : 'Unpin'}</span>
+                </button>
+                <button
+                  type="button"
+                  data-slot="side-tool"
+                  className="side-tool"
+                  data-active={tab === 'settings' || undefined}
+                  aria-label="Settings"
+                  data-tip="Settings"
+                  onClick={() => setTab('settings')}
+                >
+                  <Settings size={20} aria-hidden="true" />
+                  <span className="tab-long">Settings</span>
+                </button>
+              </div>
+            )}
+            {!hideTabs && email && <div className="side-user">{accountMenu(true)}</div>}
             </div>
             <div className="header-right">
+              {tab === 'sip-plan' && <PlanMonthNav month={month} setMonth={setMonth} />}
+              {tab !== 'settings' && tab !== 'company' && tab !== 'sip-plan' && (
+                <div className="page-id">
+                  <small>
+                    {tab === 'history'
+                      ? 'Every trade, dividend and asset entry, newest first'
+                      : tab === 'reports'
+                        ? `${isAll ? 'All portfolios' : (workspace?.account.portfolios.find((x) => x.id === workspace.selected)?.name ?? 'Portfolio')} · last 12 months`
+                        : new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </small>
+                  <b>
+                    {tab === 'holdings'
+                      ? `${new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}${name ? `, ${name.split(' ')[0]}` : ''}`
+                      : (navItems.find((i) => i.tab === tab)?.label ?? '')}
+                  </b>
+                </div>
+              )}
               {tab !== 'settings' && (
-              <button
-                type="button"
-                data-slot="hdr"
-                className="hdr-btn"
-                disabled={busy}
-                aria-label="Add transaction"
-                onClick={() =>
-                  openTx('buy', tab === 'company' ? companyTicker : '')
-                }
-              >
-                <Plus size={18} />
-                <span className="hdr-label">Add transaction</span>
-              </button>
+                <label className="hdr-search">
+                  <Search size={15} aria-hidden="true" />
+                  <input
+                    id="global-search"
+                    type="search"
+                    value={holdingsQuery}
+                    placeholder="Search companies, funds"
+                    aria-label="Search companies"
+                    onChange={(e) => {
+                      setHoldingsQuery(e.target.value);
+                      if (tab !== 'holdings') setTab('holdings');
+                    }}
+                  />
+                  <kbd>Ctrl K</kbd>
+                </label>
+              )}
+              {tab !== 'settings' && (
+                <button
+                  type="button"
+                  data-slot="hdr"
+                  className="hdr-btn"
+                  disabled={busy}
+                  aria-label="Refresh prices"
+                  onClick={() => void refresh()}
+                >
+                  <RefreshCw size={18} />
+                </button>
               )}
               <Popover
                 open={bellOpen}
@@ -2829,67 +3127,26 @@ function DashboardContent({
                   </div>
                 </PopoverContent>
               </Popover>
-              {email && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="account-trigger">
-                    <UserAvatar name={name} email={email} picture={picture} />
-                    <ChevronDown size={14} className="account-chevron" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="account-menu">
-                    <div className="account-menu-header">
-                      <UserAvatar
-                        name={name}
-                        email={email}
-                        picture={picture}
-                        large
-                      />
-                      <div>
-                        {name && (
-                          <span className="account-menu-name">{name}</span>
-                        )}
-                        <span className="account-menu-email">{email}</span>
-                      </div>
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setTab('settings')}>
-                      <Settings size={15} /> Settings
-                    </DropdownMenuItem>
-                    {isAdmin && (
-                      <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
-                        <ShieldCheck size={15} /> Admin console
-                      </DropdownMenuItem>
-                    )}
-                    <ThemeMenuItems />
-                    {vault && (
-                      <DropdownMenuItem onClick={vault.lock}>
-                        <LockKeyhole size={15} /> Lock vault
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => {
-                        track('signed_out');
-                        void flushAnalytics().finally(() => {
-                          window.location.href = '/api/auth/logout';
-                        });
-                      }}
-                    >
-                      <LogOut size={15} /> Sign out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              {tab !== 'settings' && (
+              <button
+                type="button"
+                data-slot="hdr"
+                className="hdr-btn"
+                disabled={busy}
+                aria-label="Add transaction"
+                onClick={() =>
+                  openTx('buy', tab === 'company' ? companyTicker : '')
+                }
+              >
+                <Plus size={18} />
+                <span className="hdr-label">{tab === 'sip-plan' ? 'Record a buy' : 'Add'}</span>
+              </button>
               )}
+              {email && <div className="account-phone">{accountMenu(false)}</div>}
             </div>
-            {!hideTabs && (
-              <AppNav
-                items={navItems}
-                active={tab}
-                onNavigate={setTab}
-              />
-            )}
           </header>
           <NavPanel id="holdings" tab={tab}>
+            <MarketGlanceProvider held={held} p={p}>
             {p.companies.length === 0 && !hasAssets ? (
               <div className="panel empty-holdings">
                 <span className="empty-holdings-icon" aria-hidden="true">
@@ -2966,208 +3223,103 @@ function DashboardContent({
                     <AddAssetMenu onPick={pickAsset} disabled={busy} />
                   </div>
                 )}
-                {overviewParts && overviewParts.length > 1 ? (
-                  <AccountOverview
-                    parts={overviewParts}
+                {(p.companies.length > 0 || hasAssets) && (
+                  <HoldingsHome
+                    p={p}
+                    parts={overviewParts ?? []}
+                    isAll={!!overviewParts && overviewParts.length > 1}
+                    scopeName={target?.name ?? 'Portfolio'}
+                    held={held}
+                    toCheck={unknown.length}
+                    month={month}
                     asOf={today()}
                     metalRates={metalRates.rates}
                     fxRates={fxData.data.rates}
                     fundNavs={fundData.navs}
                     planNavs={planNavs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
+                    onOpenPlan={() => setTab('sip-plan')}
+                    onFix={() =>
+                      document
+                        .getElementById('holdings-table')
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
                     chart={
                       <PortfolioValueCard
-                        chartOnly
-                        shortAside
-                        aside={
-                          widePulse ? (
-                            <PsxMarketPulse
-                              ref={pulseRef}
-                              onOpenShortlist={() => setTab('sip')}
-                              onRefresh={refresh}
-                              refreshing={busy}
-                              {...pulseWatch}
-                            />
-                          ) : undefined
-                        }
                         p={p}
                         value={value}
                         cost={cost}
                         gain={gain}
-                        heldCount={held.length}
                         missingCount={missing.length}
-                        unknownCount={unknown.length}
-                        newBuys={newBuys}
                       />
                     }
                   />
-                ) : p.companies.length > 0 ? (
-                  <PortfolioValueCard
-                    p={p}
-                    value={value}
-                    cost={cost}
-                    gain={gain}
-                    heldCount={held.length}
-                    missingCount={missing.length}
-                    unknownCount={unknown.length}
-                    newBuys={newBuys}
-                    aside={
-                      widePulse ? (
-                        <PsxMarketPulse
-                          ref={pulseRef}
-                          onOpenShortlist={() => setTab('sip')}
-                          onRefresh={refresh}
-                          refreshing={busy}
-                          {...pulseWatch}
-                        />
-                      ) : undefined
-                    }
-                  />
-                ) : null}
-                {p.companies.length > 0 && (
-                  <CollapsiblePanel
-                    id="stocks"
-                    title={
-                      overviewParts && overviewParts.length > 1
-                        ? 'All companies'
-                        : 'Your companies'
-                    }
-                    badge={`${held.length} ${held.length === 1 ? 'holding' : 'holdings'}`}
-                    figures={[
-                      {
-                        label: 'Market value',
-                        value:
-                          missing.length && !value
-                            ? 'Prices needed'
-                            : moneyShort(value),
-                      },
-                      {
-                        label: 'Remaining cost',
-                        value: unknown.length
-                          ? 'Not yet known'
-                          : moneyShort(cost),
-                      },
-                      {
-                        label: 'Gain / loss',
-                        value:
-                          gain === null ? 'Not yet known' : moneyShort(gain),
-                        tone:
-                          gain === null
-                            ? ''
-                            : gain >= 0
-                              ? 'pos-text'
-                              : 'neg-text',
-                      },
-                    ]}
-                  >
-                    <div className="holdings-head holdings-head--inline">
-                      <label className="holdings-search">
-                        <Search size={15} aria-hidden="true" />
-                        <input
-                          type="search"
-                          value={holdingsQuery}
-                          placeholder="Search company, ticker or sector"
-                          aria-label="Search companies"
-                          onChange={(e) => setHoldingsQuery(e.target.value)}
-                        />
-                      </label>
-                      <button
-                        className="secondary compact holdings-add holdings-targets"
-                        disabled={busy || locked}
-                        onClick={() =>
-                          isAll ? setNamedAction(true) : setTargetsOpen(true)
-                        }
-                      >
-                        Targets
-                      </button>
-                      <button
-                        className="secondary compact holdings-add"
-                        disabled={busy}
-                        aria-label="Add company"
-                        onClick={() => {
-                          if (isAll) {
-                            setNamedAction(true);
-                            return;
-                          }
-                          if (locked) return;
-                          setCreatingCompany(true);
-                          setCompany({
-                            ticker: '',
-                            name: '',
-                            sector: '',
-                            target: 0,
-                            approved: false,
-                            screenDate: '',
-                            note: '',
-                          });
-                        }}
-                      >
-                        <Plus size={15} />{' '}
-                        <span className="holdings-add__label">Add company</span>
-                      </button>
-                      <select
-                        className="holdings-filter"
-                        aria-label="Filter companies"
-                        value={sectorFilter}
-                        onChange={(e) => setSectorFilter(e.target.value)}
-                      >
-                        <option value="">All sectors</option>
-                        <option value={SHORTLISTED}>Shortlisted only</option>
-                        {sectorsInUse.map((sector) => (
-                          <option key={sector} value={sector}>
-                            {sector}
-                          </option>
+                )}
+                {(p.companies.length > 0 || hasAssets) && (
+                  <section className="card holdings-card" id="holdings-table">
+                    <div className="holdings-bar">
+                      <h3>Holdings</h3>
+                      <div className="sw-seg holdings-tabs" role="tablist" aria-label="Kind of holding">
+                        {(
+                          [
+                            ['stocks', 'Stocks', held.length],
+                            ['funds', 'Funds', ownedFunds.length],
+                            ['metal', 'Gold & silver', ownedMetals.length],
+                            ['currency', 'Currency', ownedCurrencies.length],
+                            ['plan', 'Plans', ownedPlans.length],
+                          ] as [HoldingsTab, string, number][]
+                        ).map(([key, label, count]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            role="tab"
+                            data-slot="seg"
+                            aria-selected={tabNow === key}
+                            aria-pressed={tabNow === key}
+                            onClick={() => setHoldingsTab(key)}
+                          >
+                            {label}
+                            <b>{count}</b>
+                          </button>
                         ))}
-                      </select>
-                      <div className="holdings-sort">
-                        <select
-                          aria-label="Sort holdings"
-                          value={holdingsSort?.key ?? ''}
-                          onChange={(e) => {
-                            const key = e.target.value as HoldingsSortKey | '';
-                            if (!key) setHoldingsSort(null);
-                            else if (holdingsSort?.key !== key)
-                              toggleHoldingsSort(key);
-                          }}
-                        >
-                          <option value="">Sort: market value</option>
-                          {(
-                            [
-                              ['name', 'Company'],
-                              ['value', 'Market value'],
-                              ['gain', 'Gain / loss'],
-                              ['shares', 'Shares'],
-                              ['average', 'Avg. cost'],
-                              ['price', 'Latest price'],
-                              ['weight', 'Portfolio weight'],
-                            ] as [HoldingsSortKey, string][]
-                          ).map(([key, label]) => (
-                            <option key={key} value={key}>
-                              Sort: {label}
-                            </option>
-                          ))}
-                        </select>
-                        {holdingsSort && (
+                      </div>
+                      {tabNow === 'stocks' && (
+                        <div className="holdings-bar__end">
+                          <div className="sw-seg" role="group" aria-label="Sort holdings">
+                            {(
+                              [
+                                ['value', 'Value'],
+                                ['gain', 'Gain'],
+                                ['weight', 'Weight'],
+                              ] as [HoldingsSortKey, string][]
+                            ).map(([key, label]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                data-slot="seg"
+                                aria-pressed={(holdingsSort?.key ?? 'value') === key}
+                                onClick={() => setHoldingsSort({ key, dir: 'desc' })}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
                           <button
                             type="button"
-                            className="secondary compact"
-                            aria-label="Reverse sort order"
-                            onClick={() => toggleHoldingsSort(holdingsSort.key)}
+                            data-slot="ghost"
+                            className="holdings-export"
+                            disabled={busy || locked}
+                            onClick={() =>
+                              isAll ? setNamedAction(true) : setTargetsOpen(true)
+                            }
                           >
-                            {holdingsSort.dir === 'asc' ? '▲' : '▼'}
+                            <Target size={15} /> Targets
                           </button>
-                        )}
-                      </div>
-                      {soldOut.length > 0 && (
-                        <label className="check-row holdings-soldout">
-                          <Checkbox
-                            checked={showSoldOut}
-                            onCheckedChange={(v) => setShowSoldOut(!!v)}
-                          />{' '}
-                          Show sold out ({soldOut.length})
-                        </label>
+                        </div>
                       )}
                     </div>
+                    {tabNow === 'stocks' && (
+                    <>
                     <div className="holdings-cards">
                       {displayedHoldings.map((h) => (
                         <article className="holding-card" key={h.ticker}>
@@ -3233,135 +3385,213 @@ function DashboardContent({
                         </article>
                       ))}
                     </div>
-                    <section className="panel table-panel holdings-table">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
+                    <div className="holdings-table-wrap">
+                      <table className="hold">
+                        <thead>
+                          <tr>
                             {(
                               [
                                 ['name', 'Company'],
+                                ['weight', 'Weight'],
                                 ['shares', 'Shares'],
-                                ['average', 'Avg. cost'],
-                                ['price', 'Latest price'],
-                                ['value', 'Market value'],
-                                ['gain', 'Gain / loss'],
-                                ['weight', 'Portfolio weight'],
+                                ['average', 'Avg cost'],
+                                ['price', 'Price'],
                               ] as [HoldingsSortKey, string][]
                             ).map(([key, label]) => (
-                              <TableHead key={key}>
+                              <th key={key}>
                                 <button
                                   type="button"
+                                  data-slot="sort"
                                   className="sort-head"
                                   onClick={() => toggleHoldingsSort(key)}
                                 >
                                   {label}
                                   {sortIndicator(key)}
                                 </button>
-                              </TableHead>
+                              </th>
                             ))}
-                            <TableHead />
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {displayedHoldings.map((h) => (
-                            <TableRow key={h.ticker}>
-                              <TableCell>
+                            <th>Today</th>
+                            {(
+                              [
+                                ['value', 'Value'],
+                                ['gain', 'Gain'],
+                              ] as [HoldingsSortKey, string][]
+                            ).map(([key, label]) => (
+                              <th key={key}>
                                 <button
-                                  className="quote-btn ticker"
-                                  onClick={() => openCompany(h.ticker)}
+                                  type="button"
+                                  data-slot="sort"
+                                  className="sort-head"
+                                  onClick={() => toggleHoldingsSort(key)}
                                 >
-                                  {h.ticker}
+                                  {label}
+                                  {sortIndicator(key)}
                                 </button>
-                                {h.target > 0 && (
-                                  <span
-                                    className="shortlist-dot"
-                                    title="On SIP shortlist"
-                                    aria-label="On SIP shortlist"
-                                  />
-                                )}
-                                <small>
-                                  {h.name}
-                                  {h.sector ? ` · ${h.sector}` : ''}
-                                </small>
-                                {h.target > 0 && (
-                                  <span
-                                    className="shortlist-dot"
-                                    title="On SIP shortlist"
-                                    aria-label="On SIP shortlist"
-                                  />
-                                )}
-                              </TableCell>
-                              <TableCell className="amount">
-                                {h.shares.toLocaleString()}
-                              </TableCell>
-                              <TableCell>
-                                {h.average === null ? '—' : money(h.average)}
-                              </TableCell>
-                              <TableCell>
-                                <button
-                                  className="quote-btn"
-                                  onClick={() => {
-                                    setQuoteTicker(h.ticker);
-                                    setQuotePrice(
-                                      h.quote?.price.toString() ?? '',
-                                    );
-                                    setQuoteDate(h.quote?.date ?? today());
-                                  }}
-                                >
-                                  {h.quote ? money(h.quote.price) : 'Add price'}
-                                </button>
-                                {h.quote && (
-                                  <small>
-                                    {h.quote.date}
-                                    {h.quote.manual ? ' · manual' : ''}
-                                    {h.quote.date !== today()
-                                      ? ' · older quote'
-                                      : ''}
-                                  </small>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {h.value === null ? '—' : moneyShort(h.value)}
-                              </TableCell>
-                              <TableCell className={gainClass(h)}>
-                                {h.gain === null ? '—' : moneyShort(h.gain)}
-                                {gainPct(h) !== null && (
-                                  <small>{gainText(h)}</small>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {!missing.length && value > 0 ? (
-                                  <>
+                              </th>
+                            ))}
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {shownHoldings.map((h) => {
+                            const weight =
+                              !missing.length && value > 0
+                                ? ((h.value ?? 0) / value) * 100
+                                : null;
+                            return (
+                              <tr key={h.ticker}>
+                                <td>
+                                  <button
+                                    type="button"
+                                    data-slot="company"
+                                    className="co"
+                                    onClick={() => openCompany(h.ticker)}
+                                  >
+                                    <TickerTile ticker={h.ticker} />
                                     <span>
-                                      {(((h.value ?? 0) / value) * 100).toFixed(
-                                        1,
-                                      )}
-                                      %
+                                      <b>
+                                        {h.ticker}
+                                        {h.target > 0 && (
+                                          <i
+                                            className="shortlist-dot"
+                                            title="On SIP shortlist"
+                                            aria-label="On SIP shortlist"
+                                          />
+                                        )}
+                                      </b>
+                                      <small>
+                                        {h.name}
+                                        {h.sector ? ` · ${h.sector}` : ''}
+                                      </small>
                                     </span>
-                                    <div className="bar">
-                                      <i
-                                        style={{
-                                          width: `${((h.value ?? 0) / value) * 100}%`,
-                                        }}
-                                      />
+                                  </button>
+                                </td>
+                                <td>
+                                  {weight === null ? (
+                                    '—'
+                                  ) : (
+                                    <div className="wt">
+                                      <span className="bar">
+                                        <i
+                                          style={{
+                                            width: `${Math.min(100, weight * 2.6)}%`,
+                                            background: `hsl(${hueOf(h.ticker)} 70% 58%)`,
+                                          }}
+                                        />
+                                      </span>
+                                      <span className="num">
+                                        {weight.toFixed(1)}%
+                                      </span>
                                     </div>
-                                  </>
-                                ) : (
-                                  '—'
-                                )}
-                              </TableCell>
-                              <TableCell>{holdingActions(h)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                      <p className="table-note">
-                        A dash means unknown, not zero. Quotes may be delayed.
-                        Market values exclude cash and unrecorded corporate
-                        actions.
-                      </p>
-                    </section>
-                  </CollapsiblePanel>
+                                  )}
+                                </td>
+                                <td className="num">
+                                  {h.shares.toLocaleString()}
+                                </td>
+                                <td className="num">
+                                  {h.average === null ? (
+                                    <button
+                                      type="button"
+                                      data-slot="chip"
+                                      className="cost-chip"
+                                      onClick={() => openCompany(h.ticker)}
+                                    >
+                                      Add cost
+                                    </button>
+                                  ) : (
+                                    money(h.average)
+                                  )}
+                                </td>
+                                <td className="num">
+                                  <button
+                                    type="button"
+                                    data-slot="quote"
+                                    className="quote-btn"
+                                    onClick={() => openQuoteEntry(h)}
+                                  >
+                                    {h.quote ? money(h.quote.price) : 'Add price'}
+                                  </button>
+                                  {h.quote &&
+                                    (h.quote.manual || h.quote.date !== today()) && (
+                                      <small className="quote-date">
+                                        {h.quote.date}
+                                        {h.quote.manual ? ' · manual' : ''}
+                                      </small>
+                                    )}
+                                </td>
+                                <td>
+                                  <TodayPill ticker={h.ticker} />
+                                </td>
+                                <td className="num strong">
+                                  {h.value === null ? '—' : moneyShort(h.value)}
+                                </td>
+                                <td>
+                                  {h.gain === null ? (
+                                    <span className="fa">—</span>
+                                  ) : (
+                                    <>
+                                      <div className={`num strong ${gainClass(h)}`}>
+                                        {moneyShort(h.gain)}
+                                      </div>
+                                      {gainPct(h) !== null && (
+                                        <div className={`num sub ${gainClass(h)}`}>
+                                          {gainText(h)}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </td>
+                                <td>{holdingActions(h)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="holdings-foot">
+                      <span>
+                        {displayedHoldings.length > HOLDINGS_PREVIEW ? (
+                          <>
+                            Showing {shownHoldings.length} of{' '}
+                            {displayedHoldings.length} holdings ·{' '}
+                            <button
+                              type="button"
+                              data-slot="link"
+                              className="sw-link"
+                              onClick={() => setShowAllHoldings((v) => !v)}
+                            >
+                              {showAllHoldings ? 'Show fewer' : 'Show all'}
+                            </button>
+                          </>
+                        ) : (
+                          `${displayedHoldings.length} ${displayedHoldings.length === 1 ? 'holding' : 'holdings'}`
+                        )}
+                        {' · A dash means unknown, not zero. Quotes may be delayed.'}
+                      </span>
+                      <span className="num">
+                        Stocks total{' '}
+                        <b>
+                          {missing.length && !value
+                            ? 'Prices needed'
+                            : moneyShort(value)}
+                        </b>
+                      </span>
+                    </div>
+                    </>
+                    )}
+                    <div hidden={tabNow !== 'funds'}>
+                      {fundsSection}
+                    </div>
+                    <div hidden={tabNow !== 'metal'}>
+                      {metalSection}
+                    </div>
+                    <div hidden={tabNow !== 'currency'}>
+                      {currencySection}
+                    </div>
+                    <div hidden={tabNow !== 'plan'}>
+                      {plansSection}
+                    </div>
+                  </section>
                 )}
                 {widePulse === false && (!isAll || held.length > 0) && (
                   <PsxMarketPulse
@@ -3374,111 +3604,7 @@ function DashboardContent({
                 )}
               </>
             )}
-            <GoldSilverSection
-              addRequest={assetAdd.kind === 'metal' ? assetAdd.n : 0}
-              owned={ownedMetals}
-              rates={metalRates.rates}
-              ratesError={metalRates.error}
-              canEdit={!isAll && !locked}
-              busy={busy}
-              onChange={(assets, message) =>
-                save(
-                  {
-                    ...clone(p),
-                    assets: [
-                      ...(p.assets ?? []).filter((a) => a.kind !== 'metal'),
-                      ...assets,
-                    ],
-                  },
-                  message,
-                )
-              }
-              onOpenAsset={(key) =>
-                openOwnedAsset(
-                  'metal',
-                  key,
-                  ownedMetals.find((o) => ownedKey(o) === key),
-                )
-              }
-            />
-            <ForeignCurrencySection
-              addRequest={assetAdd.kind === 'currency' ? assetAdd.n : 0}
-              onOpenAsset={(key) =>
-                openOwnedAsset(
-                  'currency',
-                  key,
-                  ownedCurrencies.find((o) => ownedKey(o) === key),
-                )
-              }
-              owned={ownedCurrencies}
-              fx={fxData.data}
-              fxError={fxData.error}
-              canEdit={!isAll && !locked}
-              busy={busy}
-              onChange={(assets, message) =>
-                save(
-                  {
-                    ...clone(p),
-                    assets: [
-                      ...(p.assets ?? []).filter((a) => a.kind !== 'currency'),
-                      ...assets,
-                    ],
-                  },
-                  message,
-                )
-              }
-            />
-            <SavingsPlansSection
-              addRequest={assetAdd.kind === 'plan' ? assetAdd.n : 0}
-              owned={ownedPlans}
-              planNavs={planNavs}
-              planNavsError={planNavData.loaded ? planNavData.error : ''}
-              canEdit={!isAll && !locked}
-              busy={busy}
-              onChange={(plans, message) =>
-                save(
-                  {
-                    ...clone(p),
-                    assets: [
-                      ...(p.assets ?? []).filter((a) => a.kind !== 'plan'),
-                      ...plans,
-                    ],
-                  },
-                  message,
-                )
-              }
-              onOpenAsset={(key) =>
-                openOwnedAsset(
-                  'plan',
-                  key,
-                  ownedPlans.find((o) => ownedKey(o) === key),
-                )
-              }
-            />
-            <MutualFundsSection
-              addRequest={assetAdd.kind === 'fund' ? assetAdd.n : 0}
-              owned={ownedFunds}
-              catalog={fundData.funds}
-              navs={fundData.navs}
-              catalogError={fundData.error || tracking.error}
-              onRetryPrice={tracking.retry}
-              retrying={tracking.retrying}
-              canEdit={!isAll && !locked}
-              busy={busy}
-              onChange={(funds, message) =>
-                save(
-                  {
-                    ...clone(p),
-                    assets: [
-                      ...(p.assets ?? []).filter((a) => a.kind !== 'fund'),
-                      ...funds,
-                    ],
-                  },
-                  message,
-                )
-              }
-              onOpenFund={openFund}
-            />
+            </MarketGlanceProvider>
           </NavPanel>
           <NavPanel id="reports" tab={tab}>
             {isAll ? (
@@ -3502,6 +3628,28 @@ function DashboardContent({
             ) : (
               <PortfolioReports portfolio={p} />
             )}
+          </NavPanel>
+          <NavPanel id="sip-plan" tab={tab}>
+            <PlanPage
+              portfolio={picksPortfolio ?? p}
+              month={month}
+              setMonth={setMonth}
+              feePct={fees}
+              setFeePct={setFees}
+              busy={busy}
+              onOpenPicks={() => setTab('sip')}
+              onOpenCompany={openCompany}
+              onSetBudget={async (amount) => {
+                const base = picksPortfolio ?? p;
+                const next = { ...base, budgets: { ...base.budgets, [month]: amount } };
+                if (!picksHome || workspace!.account.portfolios.length < 2) return save(next, 'Monthly budget saved.');
+                await save(
+                  { ...picksHome.portfolio, budgets: next.budgets },
+                  'Monthly budget saved.',
+                  { target: { id: picksHome.id }, reload: true },
+                );
+              }}
+            />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>
             {!hasStocks ? (

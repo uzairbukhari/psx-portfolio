@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { env } from 'cloudflare:workers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { StaleBuildReload } from './stale-build-reload';
 import { DEFAULT_THEME, THEME_META, themeInitScript } from '@/lib/theme';
 
 const geistSans = Geist({
@@ -42,6 +43,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <StaleBuildReload />
         {children}
       </body>
     </html>

@@ -1,5 +1,6 @@
 import { LogoMark } from '@/components/logo';
 import './landing.css';
+import './always-dark.css';
 
 /** Branded full-page message used by the error and not-found pages. */
 export function ErrorCard({

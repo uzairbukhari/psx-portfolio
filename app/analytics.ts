@@ -101,7 +101,7 @@ function requeue(events: IncomingEvent[]) {
 let onlineHooked = false;
 
 const SCREEN_BY_PATH: [RegExp, string][] = [
-  [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/reports/, 'reports'], [/^\/sip/, 'sip'],
+  [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/(reports|insights)/, 'reports'], [/^\/(sip|monthly-picks|plan\/?$)/, 'sip'],
   [/^\/settings/, 'settings'], [/^\/notifications/, 'notifications'], [/^\/overview/, 'overview'], [/^\/$/, 'holdings'],
 ];
 const reported = new Set<string>();

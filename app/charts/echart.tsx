@@ -61,7 +61,7 @@ export function EChart({
 
   // Theme: html[data-theme] (and the system colour scheme when it is "system").
   useEffect(() => {
-    const bump = () => setTokens(readTokens());
+    const bump = () => setTokens(readTokens(box.current ?? undefined));
     const mo = new MutationObserver(bump);
     mo.observe(document.documentElement, {
       attributes: true,
@@ -105,7 +105,7 @@ export function EChart({
         raf = requestAnimationFrame(() => c.resize());
       });
       ro.observe(box.current);
-      setTokens(readTokens());
+      setTokens(readTokens(box.current ?? undefined));
       setReady(true);
     });
     return () => {

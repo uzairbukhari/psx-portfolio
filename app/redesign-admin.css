@@ -1,0 +1,195 @@
+/* "After dark" look for the super-admin areas: Research desk, AI Lab and the Admin console.
+   Tokens only. Every selector starts with html:root so it beats equal-specificity rules in any chunk order. */
+
+/* ───────── Shared pieces ───────── */
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .eyebrow{display:flex;align-items:center;gap:6px;margin:0;font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root :is(.research-hero,.ai-lab__hero) .eyebrow{color:var(--slab-mu)}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) :is(.secondary,.import-label){display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border:1px solid var(--border);border-radius:14px;background:var(--card);color:var(--foreground);font:600 14px/1 var(--font-geist-sans),sans-serif;box-shadow:none;cursor:pointer;white-space:nowrap}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) :is(.secondary,.import-label):hover{border-color:var(--primary);background:var(--muted)}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .secondary.compact{height:32px;padding:0 12px;border-radius:11px;font-size:13px}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .secondary:disabled{opacity:.5;cursor:not-allowed}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .import-label input{display:none}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) button:where(:not([data-slot]):not(.secondary):not(.link-button):not(.linkish):not(.sort-head):not(.text-button):not([role=tab])){display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border:0;border-radius:14px;background:var(--btn-grad,var(--primary));color:#fff;font:600 14px/1 var(--font-geist-sans),sans-serif;box-shadow:0 8px 22px -10px rgb(var(--ch-primary) / .7)}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) button:not([data-slot]):disabled{opacity:.5;box-shadow:none}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border:0;border-radius:14px;background:var(--btn-grad,var(--primary));color:#fff;font:600 14px/1 var(--font-geist-sans),sans-serif;box-shadow:0 8px 22px -10px rgb(var(--ch-primary) / .7)}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .panel{padding:20px;border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea){border:1px solid var(--border);border-radius:12px;background:var(--field);color:var(--foreground)}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) :is(input,select,textarea):focus-visible{outline:2px solid rgb(var(--ch-primary) / .5);outline-offset:1px;border-color:var(--primary)}
+
+/* Status chips: one shape, token colours. */
+html:root .research-queue .tag{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;font:600 12px/1.1 var(--font-geist-mono),monospace;letter-spacing:-.01em;background:var(--chip);color:var(--muted-foreground);border:0}
+html:root .research-queue .tag.status-complete{background:var(--gain-bg);color:var(--success)}
+html:root .research-queue .tag.status-needs_attention,html:root .research-queue .tag.status-update-needed,html:root .research-queue .tag.status-failed{background:var(--loss-bg);color:var(--danger)}
+html:root .research-queue .tag.status-queued,html:root .research-queue .tag.status-running,html:root .research-queue .tag.status-researching{background:rgb(var(--ch-primary) / .14);color:var(--primary)}
+
+/* Hero slab (class added in TSX); keeps the buttons readable on the dark ground. */
+html:root .research-hero,html:root .ai-lab__hero{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:18px 32px;margin-bottom:18px}
+html:root .research-hero h2,html:root .ai-lab__hero h2{margin:8px 0 6px;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--slab-tx)}
+html:root .research-hero p:not(.eyebrow),html:root .ai-lab__hero p:not(.eyebrow){margin:0;color:var(--slab-mu);font-size:14px;max-width:70ch}
+html:root :is(.research-hero,.ai-lab__hero) :is(.secondary,.import-label){background:var(--slab-chip);border-color:var(--slab-line);color:var(--slab-tx)}
+html:root :is(.research-hero,.ai-lab__hero) :is(.secondary,.import-label):hover{background:rgb(var(--ch-tint) / .14);border-color:var(--slab-line)}
+html:root .ai-lab__spend{display:grid;gap:4px;min-width:180px;padding:14px 18px;border:1px solid var(--slab-line);border-radius:16px;background:var(--slab-chip)}
+html:root .ai-lab__spend small{color:var(--slab-mu);font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase}
+html:root .ai-lab__spend b{font:600 22px/1.1 var(--font-geist-mono),monospace;letter-spacing:-.03em;color:var(--slab-val)}
+
+/* Metric tiles */
+html:root .research-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0 0 18px}
+html:root .research-metrics article{display:grid;gap:8px;padding:18px 20px;border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .research-metrics article span{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .research-metrics article strong{font:600 30px/1 var(--font-geist-mono),monospace;letter-spacing:-.04em;color:var(--foreground)}
+html:root .research-metrics article.stat-pos strong{color:var(--success)}
+html:root .research-metrics article.stat-neg strong{color:var(--danger)}
+
+/* Tables: 11px uppercase headers, hairline rows, mono right-aligned numbers. */
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) table{width:100%;border-collapse:collapse;font-size:14px}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) :is(thead th,.admin-table th,.usage-table th){padding:10px 12px;border-bottom:1px solid var(--border);background:transparent;font:600 11px/1.2 var(--font-geist-sans),sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) :is(tbody td,.admin-table td,.usage-table td){padding:12px;border-bottom:1px solid var(--border);vertical-align:middle}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) tbody tr:last-child td{border-bottom:0}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) tbody tr:hover td{background:rgb(var(--ch-primary) / .05)}
+html:root :is(.research-queue,.original-research-dossier) td.amount,html:root .research-queue th:nth-child(n+3):nth-child(-n+4){text-align:right;font-family:var(--font-geist-mono),monospace;font-variant-numeric:tabular-nums}
+html:root .research-queue .table-panel{padding:6px 8px;overflow:hidden}
+html:root .research-queue .sort-head{display:inline-flex;align-items:center;gap:4px;padding:0;border:0;background:none;color:var(--muted-foreground);font:600 11px/1.2 var(--font-geist-sans),sans-serif;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;box-shadow:none}
+html:root .research-queue .sort-head:hover{color:var(--foreground)}
+html:root .research-queue tr.row-attention td:first-child{box-shadow:inset 3px 0 0 var(--danger)}
+html:root .research-queue .ticker{font:600 14px var(--font-geist-mono),monospace;color:var(--foreground)}
+html:root .research-queue td small{display:block;color:var(--muted-foreground);font-size:12.5px}
+
+/* Research dossier page */
+html:root .original-research-dossier{padding:8px 0 32px}
+html:root .original-research-dossier .main-content{max-width:none;padding:0}
+html:root .original-research-dossier .page-heading{margin-bottom:18px}
+html:root .original-research-dossier h1{font-size:28px;letter-spacing:-.02em}
+html:root .original-research-dossier h2{font-size:17px;letter-spacing:-.01em}
+html:root .original-research-dossier .stats{gap:14px;margin-bottom:18px}
+html:root .original-research-dossier .stat{padding:18px 20px;border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none);backdrop-filter:none}
+html:root .original-research-dossier .stat>span{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .original-research-dossier .stat strong{font-size:28px;font-weight:600;margin:10px 0 6px}
+html:root .original-research-dossier .stat-icon{border-radius:12px;background:rgb(var(--ch-primary) / .14);color:var(--primary)}
+html:root .original-research-dossier .demo-banner{border-radius:14px;color:var(--muted-foreground);background:rgb(var(--ch-primary) / .08);border-color:var(--border)}
+html:root .original-research-dossier .demo-tag{color:var(--primary);letter-spacing:.09em}
+html:root .original-research-dossier .dossier-tabs{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--border);border-radius:999px;background:var(--muted)}
+html:root .original-research-dossier .dossier-tabs button{height:auto;padding:7px 14px;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground);font:600 13px/1 var(--font-geist-sans),sans-serif;box-shadow:none}
+html:root .original-research-dossier .dossier-tabs button:is(.active,[aria-selected=true],[aria-pressed=true]){background:var(--card);color:var(--foreground);box-shadow:var(--shadow-card,none)}
+html:root .original-research-dossier .total-score,html:root .original-research-dossier .score-row b{font-family:var(--font-geist-mono),monospace}
+
+/* Research progress dialog */
+html:root .research-progress .current-stage{border-radius:16px;background:var(--muted)}
+html:root .research-progress .job-facts>div{border-radius:16px;background:var(--muted);border-color:var(--border)}
+html:root .research-progress .job-facts span{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase}
+html:root .research-progress .job-facts b{font-family:var(--font-geist-mono),monospace}
+html:root .research-progress .stage-step{background:var(--muted)}
+html:root .research-progress .stage-step.done{box-shadow:none}
+html:root .spend-gauge{box-shadow:none}
+html:root .spend-gauge-hole{background:var(--card)}
+
+/* ───────── AI Lab ───────── */
+html:root .ai-lab{gap:18px;margin-top:8px}
+html:root .ai-lab .ai-lab__hero{padding:24px 26px;border:1px solid var(--slab-line);border-radius:24px;background:var(--slab);color:var(--slab-tx)}
+html:root .ai-lab .ai-lab__tabs{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--border);border-radius:999px;background:var(--muted);justify-self:start;max-width:100%;overflow-x:auto}
+html:root .ai-lab .ai-lab__tabs button{height:auto!important;padding:8px 16px!important;border:0!important;border-radius:999px!important;background:transparent!important;color:var(--muted-foreground)!important;font:600 13px/1 var(--font-geist-sans),sans-serif!important;box-shadow:none!important}
+html:root .ai-lab .ai-lab__tabs button:hover{color:var(--foreground)!important}
+html:root .ai-lab .ai-lab__tabs button.ai-lab__tab--on{background:var(--card)!important;color:var(--foreground)!important;box-shadow:var(--shadow-card,none)!important}
+html:root .ai-lab .ai-lab__panel,html:root .ai-lab .ai-lab__summary,html:root .ai-lab .ai-lab__pick,html:root .ai-lab .ai-lab__holding{border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .ai-lab .ai-lab__panel{padding:22px}
+html:root .ai-lab .ai-lab__panel h3{font-size:16px;font-weight:600}
+html:root .ai-lab .ai-lab__fields label{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .ai-lab .ai-lab__fields :is(input,select){font:500 15px var(--font-geist-mono),monospace;text-transform:none;letter-spacing:0;color:var(--foreground)}
+html:root .ai-lab .ai-lab__fields small{text-transform:none;letter-spacing:0;font-weight:400}
+html:root .ai-lab .ai-lab__state{padding:3px 9px;border-radius:999px;font:600 11.5px/1.2 var(--font-geist-mono),monospace;background:var(--chip);color:var(--muted-foreground)}
+html:root .ai-lab .ai-lab__state--ready,html:root .ai-lab .ai-lab__state--carried{background:var(--gain-bg);color:var(--success)}
+html:root .ai-lab .ai-lab__state--failed{background:var(--loss-bg);color:var(--danger)}
+html:root .ai-lab :is(.ai-lab__state--queued,.ai-lab__state--researching,.ai-lab__state--stale){background:var(--warn-bg);color:var(--warn-ink)}
+html:root .ai-lab .ai-lab__table{border:1px solid var(--border);border-radius:16px;background:transparent}
+html:root .ai-lab .ai-lab__row{padding:9px 16px;border-top:1px solid var(--border)}
+html:root .ai-lab .ai-lab__row--head{padding:10px 16px;background:var(--muted);font:600 11px/1.2 var(--font-geist-sans),sans-serif;letter-spacing:.07em}
+html:root .ai-lab .ai-lab__row--on{background:rgb(var(--ch-primary) / .07)}
+html:root .ai-lab .ai-lab__who b{font:600 14px var(--font-geist-mono),monospace}
+html:root .ai-lab .ai-lab__option{border-radius:16px;background:var(--muted);border-color:var(--border)}
+html:root .ai-lab .ai-lab__option--on{border-color:rgb(var(--ch-primary) / .6);background:rgb(var(--ch-primary) / .1)}
+html:root .ai-lab input[type=checkbox]{accent-color:var(--primary)}
+html:root .ai-lab .ai-lab__generate{margin-left:auto}
+html:root .ai-lab .ai-lab__summary dd,html:root .ai-lab .ai-lab__pick-money b{font-family:var(--font-geist-mono),monospace;letter-spacing:-.03em}
+html:root .ai-lab .ai-lab__summary dt{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase}
+html:root .ai-lab .link-button,html:root .ai-lab .link-button.ticker{background:none;border:0;box-shadow:none;height:auto;padding:0}
+html:root .ai-lab .link-button.ticker{font-family:var(--font-geist-mono),monospace;letter-spacing:-.02em}
+html:root .ai-lab .notice{border-radius:14px}
+
+/* ───────── Admin console ───────── */
+html:root .admin-shell{background:var(--background);color:var(--foreground)}
+html:root .admin-top{height:60px;padding:0 24px;border-bottom:1px solid var(--border);background:var(--card);backdrop-filter:none}
+html:root .admin-top strong{font:700 16px var(--font-geist-sans),sans-serif;letter-spacing:-.01em}
+html:root .admin-body{grid-template-columns:248px minmax(0,1fr);min-height:calc(100vh - 60px)}
+html:root .admin-nav{gap:4px;padding:16px 12px;border-right:1px solid var(--border);background:var(--card)}
+html:root .admin-nav a{height:44px;padding:0 12px;gap:12px;border:0;border-radius:12px;font-size:14.5px;font-weight:500;color:var(--muted-foreground)}
+html:root .admin-nav a:hover{background:var(--muted);color:var(--foreground)}
+html:root .admin-nav a.active{background:var(--accent);color:var(--foreground);font-weight:600;box-shadow:inset 3px 0 0 var(--primary)}
+html:root .admin-nav a.active svg{color:var(--primary)}
+html:root .admin-main{padding:28px 36px 56px;max-width:1600px}
+html:root .admin-main h1{margin:0 0 6px;font-size:28px;font-weight:600;letter-spacing:-.02em}
+html:root .admin-main>.muted{margin:0 0 20px;font-size:14px;color:var(--muted-foreground)}
+html:root .admin-switch{padding:7px 12px;border:1px solid var(--border);border-radius:999px;background:var(--muted);font-weight:500}
+html:root .admin-range{height:36px;border-radius:999px;padding:0 14px}
+html:root .admin-card{padding:22px 24px;border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none)}
+/* A card that only holds tiles and panels is a flat stage: the tiles and panels are the cards. */
+html:root .admin-card:has(.admin-overview){padding:0;border:0;background:transparent;box-shadow:none}
+html:root .admin-card h2{margin:28px 0 12px;font-size:16px;font-weight:600;letter-spacing:-.01em}
+html:root .admin-card h3{margin:20px 0 8px;font:600 11px/1.2 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .admin-refresh{color:var(--muted-foreground)}
+html:root .admin-pill{padding:4px 10px;font:600 12px/1.2 var(--font-geist-mono),monospace;letter-spacing:-.01em;background:var(--chip);color:var(--muted-foreground)}
+html:root .admin-pill i{width:7px;height:7px}
+html:root .admin-pill.ok{background:var(--gain-bg);color:var(--success)}
+html:root .admin-pill.late{background:var(--warn-bg);color:var(--warn-ink)}
+html:root .admin-pill.failing{background:var(--loss-bg);color:var(--danger)}
+html:root .admin-strip{margin:0 0 18px}
+html:root .admin-kpis,html:root .admin-spend{gap:14px;margin-bottom:18px}
+html:root .admin-kpi{gap:6px;padding:18px 20px;border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .admin-kpi>span:first-child,html:root .admin-kpi>small:first-child{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .admin-kpi strong{margin:6px 0 2px;font:600 30px/1.05 var(--font-geist-mono),monospace;letter-spacing:-.04em}
+html:root .admin-kpi small{font-size:12.5px}
+html:root .admin-card .admin-kpi{background:var(--muted);box-shadow:none;border-radius:16px}
+html:root .admin-card:has(.admin-overview) .admin-kpi{background:var(--card);box-shadow:var(--shadow-card,none);border-radius:22px}
+html:root .admin-up{color:var(--success)}html:root .admin-down{color:var(--danger)}
+html:root .admin-meter{height:6px;background:var(--muted)}
+html:root .admin-meter span{border-radius:3px}
+html:root .admin-panel{padding:20px;border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .admin-panel h2{font-size:15px;font-weight:600}
+html:root .admin-two{gap:14px}
+html:root .admin-attention li{border-top-color:var(--border)}
+html:root .admin-error{color:var(--danger)}
+html:root .admin-table,html:root .usage-table{font-size:14px}
+html:root .admin-table td:not(:first-child),html:root .usage-table td:not(:first-child){font-variant-numeric:tabular-nums}
+html:root .usage-table td:not(:first-child){font-family:var(--font-geist-mono),monospace}
+html:root .usage-tiles>*,html:root .admin-card .usage-tiles>div{border-radius:16px}
+html:root .admin-card .audit-filters button{height:auto;padding:7px 12px;border:1px solid var(--border);border-radius:999px;background:var(--muted);color:var(--muted-foreground);font:600 13px/1 var(--font-geist-sans),sans-serif;box-shadow:none}
+html:root .admin-card .audit-filters button[aria-pressed=true]{background:var(--card);color:var(--foreground);border-color:var(--primary)}
+html:root .admin-card .audit-filters :is(select,input[type=text],input:not([type])){height:36px;border-radius:12px}
+html:root .admin-card .notice{border-radius:14px}
+html:root .linkish{color:var(--primary)}
+@media(max-width:900px){
+  html:root .admin-body{grid-template-columns:minmax(0,1fr)}
+  html:root .admin-nav{flex-direction:row;padding:8px 16px;border-right:0;border-bottom:1px solid var(--border)}
+  html:root .admin-nav a{height:40px;white-space:nowrap}
+  html:root .admin-main{padding:16px 16px 40px}
+  html:root .admin-card{padding:16px}
+  html:root .research-metrics{grid-template-columns:1fr}
+}
+html:root .research-hero>.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+html:root :is(.research-queue,.original-research-dossier) label.import-label{flex-direction:row;margin:0}
+html:root .ai-lab .link-button:not(.ticker){font:600 13.5px var(--font-geist-sans),sans-serif;color:var(--primary);text-decoration:none}
+html:root .ai-lab .link-button:not(.ticker):hover{text-decoration:underline;color:var(--primary)}
+html:root .admin-card p{margin:0 0 14px;line-height:1.55}
+html:root .admin-card :is(table,.table-wrap)+p,html:root .admin-card :is(table,.table-wrap)+.muted{margin-top:14px}
+html:root .admin-card p+:is(.admin-kpis,.usage-tiles,.stat-tiles){margin-top:6px}
+html:root .stat-tile{display:grid;gap:6px;padding:18px 20px;border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .admin-card .stat-tile{background:var(--muted);box-shadow:none;border-radius:16px}
+html:root .stat-tile>small{font:600 11px/1.1 var(--font-geist-sans),sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .stat-tile strong{margin:4px 0 0;font:600 28px/1.05 var(--font-geist-mono),monospace;letter-spacing:-.04em}
+/* globals.css marks .secondary and .sort-head with !important, so these have to as well. */
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .secondary{background:var(--card)!important;color:var(--foreground)!important;border:1px solid var(--border)!important;box-shadow:none!important}
+html:root :is(.research-queue,.original-research-dossier,.ai-lab,.admin-shell) .secondary:hover{background:var(--muted)!important;border-color:var(--primary)!important}
+html:root :is(.research-hero,.ai-lab__hero) .secondary{background:var(--slab-chip)!important;color:var(--slab-tx)!important;border-color:var(--slab-line)!important}
+html:root :is(.research-hero,.ai-lab__hero) .secondary:hover{background:rgb(var(--ch-tint) / .14)!important;border-color:var(--slab-line)!important}
+html:root .research-queue .sort-head{background:none!important;color:var(--muted-foreground)!important;font-size:11px!important;font-weight:600!important;padding:0!important}
+html:root .research-queue .sort-head:hover{color:var(--foreground)!important}
+html:root .admin-card .admin-panel h2{margin:0 0 12px}
+html:root .admin-card .admin-panel h2:not(:first-child){margin-top:20px}

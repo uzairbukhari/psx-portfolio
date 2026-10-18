@@ -1,0 +1,126 @@
+/* First-run dark tokens + aurora. Imported by the landing (no dashboard CSS there) and by the dashboard styles.
+   Every rule is prefixed html:root so production chunk order cannot let globals.css win. */
+html:root .always-dark{--background:#05070d;--foreground:#e8eefa;--strong-ink:#fff;--muted-foreground:#95a2bf;--primary:#6ea2ff;--primary-2:#8fb7ff;--ch-primary:110 162 255;--card:#0d1428;--card-border:#202b4b;--border:#202b4b;--muted:#131c36;--accent:#1a2546;--popover:#0d1428;--success:#2ee6a6;--ch-success:46 230 166;--danger:#ff6f86;--ch-danger:255 111 134;--field:#0a1124;--input:#2a3760;--ch-line:149 162 191;--ch-tint:255 255 255;--ch-shadow:0 0 0;--secondary:rgba(255,255,255,.06);--soft-ink:#bcd4f7;--warn-ink:#e8c27a;--danger-ink:#ffb0b8;--success-ink:#8ff0cd;color-scheme:dark;color:var(--foreground)}
+html:root .always-dark{--soft-text:#b7c8e2;--lp-nav:rgba(7,11,24,.72);--lp-hero:radial-gradient(900px 520px at 85% 8%,rgba(59,130,246,.34),transparent 60%),radial-gradient(700px 480px at 8% 92%,rgba(34,224,160,.16),transparent 60%),linear-gradient(170deg,#0b1f3a 0%,#0a1630 45%,#070b18 100%);--lp-grad:linear-gradient(90deg,#93c5fd,#6ea2ff 40%,#2ee6a6);--lp-card:linear-gradient(160deg,rgba(23,37,66,.85),rgba(11,20,38,.9));--lp-dim:#6f86ab;--lp-cipher:#070b14;--lp-device:#070b14;--lp-device-edge:#1b2436;--lp-tabbar:#0a101c;--primary-glow:rgba(110,162,255,.5);--chart-other:#5b6b85;--chart-neutral:#7f93b8;--cat-1:#5b8def;--cat-2:#e08a2e;--cat-3:#2bb58c;--cat-4:#9b7bf0;--cat-5:#e8743b;--cat-6:#2aa5c2;--cat-7:#e0528f}
+/* ---- landing: aurora + grid, hero to match the mockup ---- */
+html:root .landing.always-dark{position:relative;background:var(--background);--muted:var(--muted-foreground);--ink:var(--foreground);--soft:var(--soft-text);--bg:var(--background)}
+html:root .landing.always-dark::before,html:root .landing.always-dark::after{content:"";position:absolute;left:0;right:0;top:0;height:900px;pointer-events:none;z-index:0}
+html:root .landing.always-dark::before{background:radial-gradient(700px 420px at 12% 8%,rgba(59,130,246,.30),transparent 70%),radial-gradient(620px 420px at 92% 18%,rgba(34,224,160,.16),transparent 70%),radial-gradient(800px 500px at 60% 110%,rgba(124,58,237,.18),transparent 70%)}
+html:root .landing.always-dark::after{background-image:linear-gradient(rgba(148,178,225,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(148,178,225,.06) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%)}
+html:root .landing.always-dark .hero,html:root .landing.always-dark section.block,html:root .landing.always-dark .final,html:root .landing.always-dark .lp-footer,html:root .landing.always-dark footer{position:relative;z-index:1}
+html:root .landing.always-dark .hero{background:none;padding:56px 0 96px;overflow:visible}
+html:root .landing.always-dark .lp-nav{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom-color:transparent}
+html:root .landing.always-dark .lp-nav.scrolled{background:rgba(5,7,13,.72);backdrop-filter:blur(16px);border-bottom-color:var(--border)}
+html:root .landing.always-dark .lp-nav .lp-wrap,html:root .landing.always-dark .hero .lp-wrap{max-width:1224px}
+html:root .landing.always-dark .lp-nav .lp-wrap{height:84px}
+html:root .landing.always-dark .nav-cta{background:rgba(255,255,255,.06);border:1px solid #24304f;border-radius:14px;padding:11px 18px}
+html:root .landing.always-dark .hero .lp-wrap{grid-template-columns:1fr 1fr;gap:40px;padding-top:56px}
+html:root .landing.always-dark .lp-eyebrow{background:rgba(34,224,160,.1);border-color:transparent;color:var(--success);font-size:11.5px;letter-spacing:.1em;padding:7px 12px}
+html:root .landing.always-dark h1{font-size:60px;line-height:1.04;letter-spacing:-.035em;font-weight:600;margin:22px 0 20px}
+html:root .landing.always-dark h1 span{background:linear-gradient(90deg,#6ea2ff,#22e0a0);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline}
+html:root .landing.always-dark .lede{font-size:17px;color:var(--muted-foreground);max-width:520px;margin-bottom:32px}
+html:root .landing.always-dark .google-btn{height:52px;border-radius:16px;background:#fff;color:#1f1f1f;box-shadow:0 10px 30px -12px rgba(0,0,0,.6);min-width:0;padding:0 22px;gap:12px;border:0;font-size:15px}
+html:root .landing.always-dark .cta-note{font-size:13.5px;margin-top:16px}
+html:root .landing.always-dark .visual{min-height:520px;padding:0}
+html:root .landing.always-dark .visual .nw-slab{position:absolute;left:30px;right:30px;top:40px;padding:24px;border-radius:24px;border:1px solid rgba(255,255,255,.08);background:radial-gradient(420px 220px at 0% 0%,rgba(59,130,246,.35),transparent 70%),radial-gradient(360px 240px at 100% 100%,rgba(34,224,160,.22),transparent 70%),linear-gradient(160deg,#0e1a3f,#0a1230);box-shadow:0 40px 80px -40px rgba(0,0,0,.9)}
+html:root .landing.always-dark .nw-slab .nw-top{display:flex;justify-content:space-between;align-items:center}
+html:root .landing.always-dark .nw-slab .lp-label{font-size:11.5px;letter-spacing:.1em;color:#9fb0d6}
+html:root .landing.always-dark .nw-slab .gain-pill{font-family:var(--font-geist-mono),monospace;font-size:12px;color:var(--success);background:rgba(46,230,166,.12);border-radius:999px;padding:4px 10px}
+html:root .landing.always-dark .nw-slab .nw-value{font-size:44px;font-weight:600;letter-spacing:-.02em;margin:14px 0 6px;text-shadow:none}
+html:root .landing.always-dark .nw-slab .nw-value small{display:inline;font-size:.55em;color:#9fb0d6;margin-right:8px;font-weight:500}
+html:root .landing.always-dark .nw-slab .spark{height:auto;width:100%;margin:6px 0 0}
+html:root .landing.always-dark .nw-slab .mix{margin:16px 0 0;height:8px;gap:4px}
+html:root .landing.always-dark .nw-slab .mix i{border-radius:4px}
+html:root .landing.always-dark .float{position:absolute;display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:20px;background:rgba(13,20,40,.72);border:1px solid rgba(110,162,255,.16);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 40px 80px -40px rgba(0,0,0,.9)}
+html:root .landing.always-dark .float.sip{right:-20px;top:-20px;left:auto;width:auto}
+html:root .landing.always-dark .float.lock{left:-30px;bottom:30px;max-width:300px;width:auto}
+html:root .landing.always-dark .float .ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:rgba(34,224,160,.12);color:var(--success)}
+html:root .landing.always-dark .float b{display:block;margin:0;font-size:13px}
+html:root .landing.always-dark .float small{color:var(--muted-foreground);margin:0}
+html:root .landing.always-dark .float .sip-ring{width:54px;height:54px;flex:none}
+html:root .landing.always-dark .float .lp-label{font-size:11px;letter-spacing:.1em}
+html:root .landing.always-dark .float .sip-line{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:14px;margin-top:2px}
+html:root .landing.always-dark .float .sip-line span{font-weight:400;color:var(--muted-foreground)}
+@media (max-width:1024px){html:root .landing.always-dark .hero .lp-wrap{grid-template-columns:1fr}html:root .landing.always-dark h1{font-size:48px}html:root .landing.always-dark .visual{min-height:440px;max-width:560px}}
+@media (max-width:640px){html:root .landing.always-dark h1{font-size:38px}html:root .landing.always-dark .hero .lp-wrap{padding-top:16px}html:root .landing.always-dark .lp-nav .lp-wrap{height:60px}html:root .landing.always-dark .visual{min-height:0;display:grid;gap:12px}html:root .landing.always-dark .visual .nw-slab,html:root .landing.always-dark .float.sip,html:root .landing.always-dark .float.lock{position:static;max-width:none}}
+/* ---- loading screen ---- */
+html:root main.app-loading.vault-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:100%}
+html:root main.app-loading.vault-stage .boot{margin:0 auto}
+html:root .app-loading .boot{display:grid;justify-items:center;gap:14px;text-align:center}
+html:root .app-loading .boot-orb{position:relative;width:132px;height:132px;display:grid;place-items:center;margin-bottom:6px}
+html:root .app-loading .boot-ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid transparent;border-top-color:#6ea2ff;border-right-color:rgba(110,162,255,.25);animation:boot-spin 1.6s linear infinite;filter:drop-shadow(0 0 8px rgba(110,162,255,.7))}
+html:root .app-loading .boot-ring.r2{inset:14px;border-top-color:#22e0a0;border-right-color:rgba(34,224,160,.2);animation-duration:2.4s;animation-direction:reverse;filter:drop-shadow(0 0 8px rgba(34,224,160,.6))}
+html:root .app-loading .boot-core{width:72px;height:72px;border-radius:22px;display:grid;place-items:center;background:rgba(13,20,40,.8);border:1px solid rgba(110,162,255,.22);box-shadow:0 0 40px -6px rgba(59,130,246,.55);animation:boot-pulse 2.4s ease-in-out infinite}
+html:root .app-loading .brand{font-size:22px;color:var(--foreground)}
+html:root .app-loading .boot-line{margin:0;font-size:14px;color:var(--muted-foreground)}
+html:root .app-loading .boot-bar{display:block;width:200px;height:3px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+html:root .app-loading .boot-bar i{display:block;height:100%;width:40%;border-radius:3px;background:linear-gradient(90deg,#6ea2ff,#22e0a0);animation:boot-slide 1.4s ease-in-out infinite}
+html:root .app-loading .boot-note{margin:6px 0 0;display:flex;align-items:center;gap:6px;font-size:12px;color:#5d6a88}
+@keyframes boot-spin{to{transform:rotate(360deg)}}
+@keyframes boot-pulse{50%{transform:scale(1.05);box-shadow:0 0 56px -4px rgba(34,224,160,.45)}}
+@keyframes boot-slide{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
+@media (prefers-reduced-motion:reduce){html:root .app-loading .boot-ring,html:root .app-loading .boot-core,html:root .app-loading .boot-bar i{animation:none}}
+/* ---- vault gate layout (unlock / create) ---- */
+html:root .vault-stage{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:0}
+html:root .vault-stage .vault-top{display:flex;justify-content:space-between;align-items:center;padding:24px 40px}
+html:root .vault-stage .vault-top .brand{margin:0;font-size:20px}
+html:root .vault-stage .vault-top-note{display:flex;gap:6px;align-items:center;color:var(--muted-foreground);font-size:13.5px}
+html:root .vault-stage .vault-top-note .signin-link{display:inline;width:auto;margin:0;padding:0}
+html:root .vault-stage .vault-layout{flex:1;display:flex;gap:40px;justify-content:center;align-items:center;padding:20px 24px 40px;flex-wrap:wrap}
+html:root .vault-stage .vault-layout .vault-card{width:100%;max-width:440px;padding:32px;border-radius:28px;background:rgba(13,20,40,.72);border:1px solid rgba(110,162,255,.16)}
+html:root .vault-stage .vault-card h2{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0 0 4px}
+html:root .vault-stage .vault-card-center{text-align:center}
+html:root .vault-stage .vault-card-center form,html:root .vault-stage .vault-card-center label{text-align:left}
+html:root .vault-stage .vault-card-center .vault-kicker{order:2;font-family:var(--font-geist-mono),monospace;margin:0 0 0}
+html:root .vault-stage .vault-card-center{display:flex;flex-direction:column}
+html:root .vault-stage .vault-card-center h2{order:1;margin-top:14px}
+html:root .vault-stage .vault-card-center .vault-avatar{order:0;align-self:center}
+html:root .vault-stage .vault-card-center form{order:3;margin-top:26px}
+html:root .vault-stage .vault-card-center>.signin-link{order:4}
+html:root .vault-stage .vault-avatar{position:relative;width:72px;height:72px}
+html:root .vault-stage .vault-avatar span{display:grid;place-items:center;width:72px;height:72px;border-radius:50%;font-size:28px;font-weight:600;color:#fff;background:linear-gradient(135deg,#3b82f6,#22e0a0)}
+html:root .vault-stage .vault-avatar i{position:absolute;right:-6px;bottom:-6px;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:#1d4ed8;color:#fff;box-shadow:0 0 0 3px #0d1428}
+html:root .vault-stage .vault-field{display:flex;align-items:center;height:52px;padding:0 14px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid #2a365c}
+html:root .vault-stage .vault-field:focus-within{border-color:#6ea2ff;box-shadow:0 0 0 4px rgba(110,162,255,.18)}
+html:root .vault-stage .vault-field input{flex:1;border:0;background:transparent;box-shadow:none;height:100%;padding:0;outline:none;font-family:var(--font-geist-mono),monospace;letter-spacing:.12em}
+html:root .vault-stage .vault-field input:focus{box-shadow:none;border:0}
+html:root .vault-stage .vault-field button[data-slot=eye]{background:none;border:0;box-shadow:none;color:var(--muted-foreground);width:auto;padding:4px;cursor:pointer}
+html:root .vault-stage .vault-keep{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 12px;margin:16px 0 0;font-size:13.5px;color:var(--foreground)}
+html:root .vault-stage .vault-keep small{grid-column:1/-1;color:var(--muted-foreground);font-size:12px;line-height:1.45}
+html:root .vault-stage .vault-keep input[type=checkbox]{appearance:none;-webkit-appearance:none;width:40px;height:24px;border-radius:999px;background:#2a365c;position:relative;margin:0;cursor:pointer;border:0;padding:0;transition:background .15s}
+html:root .vault-stage .vault-keep input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+html:root .vault-stage .vault-keep input[type=checkbox]:checked{background:#2e6bf0}
+html:root .vault-stage .vault-keep input[type=checkbox]:checked::after{left:19px}
+html:root .vault-stage .vault-keep input[type=checkbox]:focus-visible{outline:2px solid #6ea2ff;outline-offset:3px}
+html:root .vault-stage form>button[type=submit]{height:52px;border-radius:16px;font-size:15px;display:flex;gap:8px;align-items:center;margin-top:20px}
+html:root .vault-stage .vault-aside{display:grid;gap:24px;width:380px;max-width:100%}
+html:root .vault-stage .vault-sidecard{padding:26px;border-radius:28px;background:rgba(13,20,40,.72);border:1px solid rgba(110,162,255,.16);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+html:root .vault-stage .vault-sidecard h3{margin:6px 0 10px;font-size:18px;font-weight:600}
+html:root .vault-stage .vault-sidecard .muted{font-size:13.5px;margin:0 0 16px}
+html:root .vault-stage .vault-sidecard .muted.small{font-size:12px;margin:0 0 8px}
+html:root .vault-stage .vault-sidecard hr{border:0;border-top:1px solid var(--border);margin:18px 0}
+html:root .vault-stage .vault-sidecard .lbl{margin:0;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .vault-stage .vault-row-btn{display:flex;align-items:center;gap:10px;width:100%;padding:14px;border-radius:16px;background:rgba(110,162,255,.08);border:1px solid rgba(110,162,255,.25);color:var(--foreground);font-size:14px;font-weight:600;cursor:pointer;box-shadow:none;text-align:left}
+html:root .vault-stage .vault-row-btn svg:first-child{color:var(--primary)}
+html:root .vault-stage .vault-row-btn svg:last-child{margin-left:auto}
+html:root .vault-stage .vault-row-btn.danger{background:transparent;border-color:rgba(255,111,134,.3);color:var(--danger);font-size:13.5px;padding:12px 14px}
+html:root .vault-stage .vault-stages{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+html:root .vault-stage .vault-stages li{display:flex;align-items:center;gap:12px;font-size:14px}
+html:root .vault-stage .vault-stages .ck{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1.5px solid #2a365c;flex:none}
+html:root .vault-stage .vault-stages li[data-state=done] .ck{background:rgba(46,230,166,.15);border-color:transparent;color:var(--success)}
+html:root .vault-stage .vault-stages li[data-state=active] .ck{background:rgba(110,162,255,.15);border-color:transparent;color:var(--primary)}
+html:root .vault-stage .vault-stages li[data-state=todo]{color:#5d6a88}
+html:root .vault-stage .vault-foot{display:flex;justify-content:center;align-items:center;gap:8px;padding:0 16px 24px;margin:0;color:#5d6a88;font-size:12.5px}
+@media (max-width:760px){html:root .vault-stage .vault-top{padding:16px}html:root .vault-stage .vault-layout{padding:8px 16px 24px;gap:20px}html:root .vault-stage .vault-aside{width:100%}html:root .vault-stage .vault-layout .vault-card{padding:24px}}
+html:root .vault-stage>*{width:100%;max-width:none}
+html:root .vault-stage .vault-field input,html:root .vault-stage .vault-field input[type=password],html:root .vault-stage .vault-field input[type=text]{background:transparent;border:0;box-shadow:none;padding:0}
+html:root .vault-stage .vault-top .brand{display:flex;align-items:center;gap:10px}
+html:root .vault-stage .vault-top-note .signin-link{display:inline-block}
+html:root .vault-stage .vault-top{border:0;background:none;position:static;backdrop-filter:none}
+html:root .vault-stage .vault-card-wide{max-width:560px;padding:32px}
+html:root .vault-stage .vault-card:not(.vault-card-center)>.vault-kicker{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .vault-stage .vault-blocks{grid-template-columns:repeat(4,1fr)}
+html:root .vault-stage .vault-actions{display:flex;gap:10px}
+html:root .vault-stage .vault-actions button{flex:1;background:rgba(255,255,255,.05);border:1px solid #24304f;color:var(--foreground);border-radius:14px;height:44px;box-shadow:none}
+html:root .vault-stage .vault-layout .vault-card.vault-card-wide{max-width:560px}
+html:root .vault-stage .vault-avatar .vault-avatar-img{width:72px;height:72px;border-radius:50%;object-fit:cover;display:block}

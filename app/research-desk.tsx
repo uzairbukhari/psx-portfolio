@@ -561,7 +561,7 @@ export default function ResearchDesk({
   return (
     <section className="research-queue">
       {confirmDialog}
-      <div className="research-hero">
+      <div className="research-hero slab">
         <div>
           <p className="eyebrow">PSX RESEARCH DESK</p>
           <h2>Research queue &amp; dossiers</h2>

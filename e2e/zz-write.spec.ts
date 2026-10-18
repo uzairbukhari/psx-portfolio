@@ -41,6 +41,7 @@ test('a transaction saved in the app is encrypted, stored and still there after 
 
 test('a foreign currency purchase is saved with the public rate filled in and survives a reload', async ({ app }) => {
   await choosePortfolio(app, 'Savings & Gold');
+  await app.getByRole('tab', { name: /Currency/ }).click();
   // Panels you open stay open in this browser, so only open it when an earlier spec left it folded.
   if (!(await app.getByRole('button', { name: 'Add currency' }).isVisible())) await app.getByRole('button', { name: /Foreign currency/ }).click();
   await app.getByRole('button', { name: 'Add currency' }).click();
@@ -55,6 +56,7 @@ test('a foreign currency purchase is saved with the public rate filled in and su
 
   await app.reload();
   await choosePortfolio(app, 'Savings & Gold');
+  await app.getByRole('tab', { name: /Currency/ }).click();
   // The panel was left open, and a panel you open stays open in this browser.
   await expect(app.getByText('650 USD')).toBeVisible({ timeout: 60_000 });
 });

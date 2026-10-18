@@ -821,11 +821,11 @@ export function AllReports({
     (k) => has[k],
   );
   const labels = {
-    all: 'All',
+    all: 'Overview',
     stocks: 'Stocks',
-    metals: 'Metals',
-    funds: 'Mutual Funds',
-    currency: 'Foreign currency',
+    metals: 'Gold & silver',
+    funds: 'Funds',
+    currency: 'Currency',
   };
   const show = (k: Kind) =>
     kinds.length === 1 || view === 'all' || view === k;
@@ -847,7 +847,7 @@ export function AllReports({
     );
   if (!kinds.length) return <PortfolioReports portfolio={portfolio} />;
   return (
-    <div>
+    <div className="reports-all">
       {kinds.length > 1 && (
         <div
           className="reports-tabs seg"

@@ -9,6 +9,7 @@ import {
   PrivacySection,
 } from './landing/sections';
 import './landing.css';
+import './always-dark.css';
 
 const ERROR_COPY: Record<string, string> = {
   oauth_email:
@@ -33,7 +34,7 @@ export function LandingPage({
     ? (ERROR_COPY[errorCode] ?? 'Sign-in failed. Try again.')
     : '';
   return (
-    <main className="landing">
+    <main className="landing always-dark">
       <LandingNav returnTo={returnTo} onLanding />
       <Hero returnTo={returnTo} error={error} />
       <AssetsSection />

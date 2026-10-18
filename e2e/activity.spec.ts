@@ -2,7 +2,7 @@ import { expect, isLocal, pageText, test } from './fixtures';
 
 test('activity timeline: filters, voided entries and expected dividends', async ({ app }) => {
   await app.goto('/activity');
-  await expect(app.getByText(/Every buy, sale, dividend and split/)).toBeVisible({ timeout: 60_000 });
+  await expect(app.getByText(/Every trade, dividend and asset entry/)).toBeVisible({ timeout: 60_000 });
   for (const filter of ['Buys', 'Sells', 'Dividends', 'Splits', 'Other assets']) await expect(app.getByRole('button', { name: filter }).first()).toBeVisible();
   await expect(app.getByLabel(/Voided \(\d+\)/)).toBeVisible();
   // Seeded: OGDC and MEBL. The matching public OGDC announcement must not add a duplicate (local fixtures only).

@@ -26,6 +26,14 @@ import {
 } from '@/components/ui/dialog';
 import { EncryptedRestoreDialog } from './vault-security';
 import { track } from './analytics';
+import { Check, ChevronDown, Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export type ImportRequest = {
   file: File;
@@ -216,30 +224,94 @@ export default function PortfolioWorkspace({
   }
   const selector =
     account.portfolios.length > 1 || draft || canCreate ? (
-      <select
-        className="header-portfolio-select"
-        aria-label="Select portfolio"
-        value={entry || draft ? selected : ALL_PORTFOLIOS}
-        disabled={busy}
-        onChange={(e) => {
-          if (e.target.value === NEW_PORTFOLIO) openCreate();
-          else choose(e.target.value);
-        }}
-      >
-        <option value={ALL_PORTFOLIOS}>All</option>
-        {account.portfolios.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-            {p.locked ? ' · locked' : ''}
-          </option>
-        ))}
-        {draft && !entry ? (
-          <option value={draft.id}>{draft.name}</option>
-        ) : null}
-        {canCreate ? (
-          <option value={NEW_PORTFOLIO}>+ Create new portfolio</option>
-        ) : null}
-      </select>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="header-portfolio-select pf-switch"
+          aria-label="Select portfolio"
+          disabled={busy}
+        >
+          {(() => {
+            const current = entry || draft ? selected : ALL_PORTFOLIOS;
+            const all = current === ALL_PORTFOLIOS;
+            const label = all
+              ? 'All portfolios'
+              : (account.portfolios.find((x) => x.id === current)?.name ?? draft?.name ?? 'Portfolio');
+            return (
+              <>
+                <span className={`pf-dots${all ? '' : ' single'}`} aria-hidden="true">
+                  {all ? (
+                    <>
+                      <i />
+                      <i />
+                      <i />
+                    </>
+                  ) : (
+                    label.slice(0, 1).toUpperCase()
+                  )}
+                </span>
+                <span className="pf-text">
+                  <b>{label}</b>
+                  <small>
+                    {all
+                      ? `${account.portfolios.length} portfolios`
+                      : 'Portfolio'}
+                  </small>
+                </span>
+                <ChevronDown size={16} className="pf-chev" aria-hidden="true" />
+              </>
+            );
+          })()}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side={typeof window !== 'undefined' && window.matchMedia('(min-width:761px)').matches ? 'right' : 'bottom'}
+          sideOffset={12}
+          className="pf-menu"
+        >
+          <p className="pf-menu__head">Portfolios</p>
+          {(() => {
+            const current = entry || draft ? selected : ALL_PORTFOLIOS;
+            const rows = [
+              { id: ALL_PORTFOLIOS, name: 'All portfolios', sub: `${account.portfolios.length} portfolios`, all: true, locked: false },
+              ...account.portfolios.map((p) => ({ id: p.id, name: p.name, sub: p.locked ? 'Locked' : 'Portfolio', all: false, locked: !!p.locked })),
+              ...(draft && !entry ? [{ id: draft.id, name: draft.name, sub: 'Draft', all: false, locked: false }] : []),
+            ];
+            return rows.map((r) => (
+              <DropdownMenuItem key={r.id} className="pf-item" data-current={r.id === current || undefined} onClick={() => choose(r.id)}>
+                <span className={`pf-dots${r.all ? '' : ' single'}`} aria-hidden="true">
+                  {r.all ? (
+                    <>
+                      <i />
+                      <i />
+                      <i />
+                    </>
+                  ) : (
+                    (r.name ?? '').slice(0, 1).toUpperCase()
+                  )}
+                </span>
+                <span className="pf-text">
+                  <b>{r.name}</b>
+                  <small>{r.sub}</small>
+                </span>
+                {r.id === current ? <Check size={16} className="pf-check" aria-hidden="true" /> : null}
+              </DropdownMenuItem>
+            ));
+          })()}
+          {canCreate ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="pf-item pf-create" onClick={openCreate}>
+                <span className="pf-dots single" aria-hidden="true">
+                  <Plus size={16} />
+                </span>
+                <span className="pf-text">
+                  <b>Create portfolio</b>
+                </span>
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
     ) : (
       <span className="header-portfolio-label">All</span>
     );

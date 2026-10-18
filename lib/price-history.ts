@@ -1,7 +1,7 @@
 import { positionTimeline, type Portfolio } from './portfolio.ts';
 
 export type PricePoint = [number, number];
-export type HistoryRange = 'today' | '7d' | '1m' | '1y' | '3y' | '5y';
+export type HistoryRange = 'today' | '7d' | '1m' | '3m' | '6m' | '1y' | '3y' | '5y';
 
 const DAY = 86_400;
 
@@ -10,7 +10,7 @@ export const EOD_KEEP = 1400;
 export const INDEX_EOD_KEEP = 2500;
 export const eodKeep = (ticker: string) => (ticker === 'KSE100' ? INDEX_EOD_KEEP : EOD_KEEP);
 
-const RANGE_DAYS: Record<Exclude<HistoryRange, 'today'>, number> = { '7d': 7, '1m': 31, '1y': 366, '3y': 1096, '5y': 1827 };
+const RANGE_DAYS: Record<Exclude<HistoryRange, 'today'>, number> = { '7d': 7, '1m': 31, '3m': 92, '6m': 183, '1y': 366, '3y': 1096, '5y': 1827 };
 
 /** Newest-first PSX eod rows -> chronological [sec, close] pairs, bad rows dropped. */
 export function parseEod(rows: number[][]): PricePoint[] {
@@ -53,7 +53,7 @@ export function rangeChange(points: PricePoint[]) {
 
 /** `cost`/`gain` are null on days a held position has an unknown opening cost. */
 export type ValuePoint = { date: string; value: number; cost: number | null; gain: number | null };
-export type ValueRange = '1m' | '1y' | 'all';
+export type ValueRange = '1m' | '3m' | '6m' | '1y' | 'all';
 
 export const pktDate = (sec: number) => new Date((sec + 5 * 3600) * 1000).toISOString().slice(0, 10);
 const cents = (n: number) => Math.round(n * 100) / 100;
@@ -129,7 +129,7 @@ export function portfolioValueSeries(
 export function sliceValueRange(points: ValuePoint[], range: ValueRange): ValuePoint[] {
   if (range === 'all' || !points.length) return points;
   const end = new Date(`${points[points.length - 1].date}T00:00:00Z`);
-  end.setUTCDate(end.getUTCDate() - (range === '1m' ? 31 : 366));
+  end.setUTCDate(end.getUTCDate() - ({ '1m': 31, '3m': 92, '6m': 183, '1y': 366 } as const)[range]);
   const from = end.toISOString().slice(0, 10);
   return points.filter((pt) => pt.date >= from);
 }

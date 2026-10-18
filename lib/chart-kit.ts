@@ -20,6 +20,8 @@ export type ChartTokens = {
   /** "r g b" triplets, for translucent fills. */
   rgb: { primary: string; success: string; danger: string; line: string };
   font: string;
+  /** Figures (axis labels, tooltips) use the mono face. */
+  mono: string;
 };
 
 /** Comma syntax on purpose: the canvas colour parser does not read `rgb(r g b / a)`. */
@@ -56,6 +58,7 @@ export const FALLBACK_TOKENS: ChartTokens = {
     line: '15 26 46',
   },
   font: 'system-ui, sans-serif',
+  mono: 'ui-monospace, Menlo, monospace',
 };
 
 export function readTokens(
@@ -86,6 +89,10 @@ export function readTokens(
       line: v('--ch-line', f.rgb.line),
     },
     font: getComputedStyle(document.body).fontFamily || f.font,
+    mono:
+      v('--font-geist-mono', '') && `${v('--font-geist-mono', '')}, ${f.mono}`
+        ? `${v('--font-geist-mono', '')}, ${f.mono}`
+        : f.mono,
   };
 }
 
@@ -180,7 +187,12 @@ function base(
 const axisCommon = (t: ChartTokens) => ({
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true },
+  axisLabel: {
+    color: t.muted,
+    fontSize: 11,
+    hideOverlap: true,
+    fontFamily: t.mono,
+  },
 });
 
 const valueAxis = (
@@ -190,13 +202,15 @@ const valueAxis = (
 ) => ({
   type: 'value' as const,
   ...axisCommon(t),
+  position: 'right' as const,
   axisLabel: {
     color: t.muted,
     fontSize: 11,
+    fontFamily: t.mono,
     formatter: (n: number) => format(n),
     hideOverlap: true,
   },
-  splitLine: { lineStyle: { color: t.line } },
+  splitLine: { lineStyle: { color: t.line, type: [2, 4] as number[] } },
   ...extra,
 });
 
@@ -272,6 +286,11 @@ export function timeSeriesOption(
   const markers = (c.markers ?? []).filter(
     (m) => Number.isFinite(ms(m.x)) && Number.isFinite(m.y),
   );
+  const last = c.data[c.data.length - 1];
+  const glow =
+    !c.categorical && c.data.length > 1 && last && Number.isFinite(ms(last.x)) && Number.isFinite(last.y)
+      ? last
+      : null;
   const areaRgb =
     main === t.success
       ? t.rgb.success
@@ -311,7 +330,7 @@ export function timeSeriesOption(
     smooth: false,
     step: c.step ? ('end' as const) : false,
     sampling: 'lttb' as const,
-    lineStyle: { width: 2, color: main },
+    lineStyle: { width: 2.4, color: main, cap: 'round' as const, join: 'round' as const },
     itemStyle: { color: main },
     emphasis: { focus: 'none' as const },
     areaStyle: c.area
@@ -338,24 +357,43 @@ export function timeSeriesOption(
           }
       : undefined,
     markLine,
-    markPoint: markers.length
+    markPoint: markers.length || glow
       ? {
           symbol: 'circle',
           symbolSize: 9,
           animation: false,
-          data: markers.map((m) => ({
-            coord: [m.x, m.y],
-            name: m.label,
-            itemStyle: {
-              color: m.color,
-              borderColor: t.popover,
-              borderWidth: 1.5,
-            },
-          })),
+          data: [
+            ...markers.map((m) => ({
+              coord: [m.x, m.y],
+              name: m.label,
+              itemStyle: {
+                color: m.color,
+                borderColor: t.popover,
+                borderWidth: 1.5,
+              },
+            })),
+            // The newest point glows, like the Android charts.
+            ...(glow
+              ? [
+                  {
+                    coord: [glow.x, glow.y],
+                    name: '',
+                    symbolSize: 10,
+                    itemStyle: {
+                      color: main,
+                      borderColor: t.popover,
+                      borderWidth: 2,
+                      shadowBlur: 14,
+                      shadowColor: main,
+                    },
+                  },
+                ]
+              : []),
+          ],
           label: { show: false },
           tooltip: {
             formatter: (p: { name?: string }) =>
-              `<div style="font-weight:600">${esc(p.name ?? '')}</div>`,
+              p.name ? `<div style="font-weight:600">${esc(p.name)}</div>` : '',
           },
         }
       : undefined,
@@ -382,27 +420,11 @@ export function timeSeriesOption(
             filterMode: 'none' as const,
             zoomLock: false,
           },
-          {
-            type: 'slider' as const,
-            height: 16,
-            bottom: 2,
-            borderColor: 'transparent',
-            backgroundColor: rgba(t.rgb.line, 0.05),
-            fillerColor: rgba(t.rgb.primary, 0.14),
-            handleSize: 14,
-            moveHandleSize: 5,
-            showDetail: false,
-            dataBackground: {
-              lineStyle: { color: t.line },
-              areaStyle: { color: t.line },
-            },
-            textStyle: { color: t.muted },
-          },
         ]
       : undefined;
   return {
     ...o,
-    grid: { ...(o.grid as object), bottom: zoom ? 28 : 4 },
+    grid: { ...(o.grid as object), bottom: 4 },
     tooltip: {
       ...(o.tooltip as object),
       trigger: 'axis',
@@ -575,7 +597,7 @@ export function barOption(t: ChartTokens, c: BarCfg): EChartsOption {
       type: 'category',
       data: c.cats,
       ...axisCommon(t),
-      axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true },
+      axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true, fontFamily: t.mono },
     },
     yAxis: valueAxis(t, c.axisFormat ?? compact, {
       name: c.yName,
@@ -591,9 +613,9 @@ export function barOption(t: ChartTokens, c: BarCfg): EChartsOption {
           ? { value: v, itemStyle: { color: v >= 0 ? t.success : t.danger } }
           : v,
       ),
-      barMaxWidth: 36,
+      barMaxWidth: 26,
       cursor: c.selectable ? 'pointer' : 'default',
-      itemStyle: { color: s.color, borderRadius: c.stack ? 0 : [4, 4, 0, 0] },
+      itemStyle: { color: s.color, borderRadius: c.stack ? 0 : [6, 6, 3, 3] },
       emphasis: { focus: 'series' as const, itemStyle: { opacity: 0.85 } },
     })),
   } as EChartsOption;
@@ -679,9 +701,9 @@ export function hBarOption(t: ChartTokens, c: HBarCfg): EChartsOption {
               }
             : v,
         ),
-        barMaxWidth: 22,
+        barMaxWidth: 14,
         cursor: c.selectable ? 'pointer' : 'default',
-        itemStyle: { color: c.color ?? t.primary, borderRadius: 4 },
+        itemStyle: { color: c.color ?? t.primary, borderRadius: 7 },
         label: {
           show: true,
           position: 'right',
@@ -742,19 +764,19 @@ export function donutOption(t: ChartTokens, c: DonutCfg): EChartsOption {
     series: [
       {
         type: 'pie',
-        radius: ['58%', '86%'],
+        radius: ['62%', '86%'],
         center: ['50%', '50%'],
-        padAngle: 1.5,
+        padAngle: 3,
         avoidLabelOverlap: true,
         cursor: c.selectable ? 'pointer' : 'default',
-        itemStyle: { borderRadius: 4, borderColor: t.popover, borderWidth: 1 },
+        itemStyle: { borderRadius: 8, borderColor: t.popover, borderWidth: 1 },
         label: {
           show: true,
           position: 'center',
           formatter: centerText,
           rich: {
             k: { color: t.muted, fontSize: 11, lineHeight: 16 },
-            v: { color: t.text, fontSize: 16, fontWeight: 700 },
+            v: { color: t.text, fontSize: 13, fontWeight: 700, fontFamily: t.mono },
           },
         },
         emphasis: {
@@ -764,7 +786,7 @@ export function donutOption(t: ChartTokens, c: DonutCfg): EChartsOption {
             formatter: centerText,
             rich: {
               k: { color: t.muted, fontSize: 11, lineHeight: 16 },
-              v: { color: t.text, fontSize: 16, fontWeight: 700 },
+              v: { color: t.text, fontSize: 13, fontWeight: 700, fontFamily: t.mono },
             },
           },
         },
