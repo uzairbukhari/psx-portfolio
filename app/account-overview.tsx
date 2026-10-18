@@ -482,10 +482,13 @@ export default function AccountOverview({
               <li key={p.id}>
                 <button
                   type="button"
-                  className="overview-portfolio"
+                  className="overview-portfolio" data-slot="portfolio"
                   onClick={() => onOpenPortfolio(p.id)}
                 >
                   <span className="overview-portfolio__top">
+                    <i className="pf-avatar" aria-hidden="true">
+                      {p.name.slice(0, 1).toUpperCase()}
+                    </i>
                     <b>{p.name}</b>
                     <span className="overview-portfolio__share">
                       {p.share.toFixed(1)}%
@@ -551,11 +554,8 @@ export default function AccountOverview({
             </p>
           )}
           <p className="report-source">
-            {money(invested.total)} invested in the last 12 months. Counts money
-            put in across every portfolio: stock buys (with fees), fund and plan
-            payments, and gold and silver purchases. Sales and redemptions are
-            not subtracted. Dividends are in the Income panel (
-            {money(income.receivedTotal)} received in total).
+            {money(invested.total)} invested in the last 12 months · dividends
+            received {money(income.receivedTotal)}
           </p>
         </section>
       </div>

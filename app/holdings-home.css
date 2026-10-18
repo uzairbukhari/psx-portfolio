@@ -163,3 +163,19 @@ html:root .value-chart-canvas{min-height:0;height:210px;flex:none}
 html:root .hero-slab{padding-top:20px;padding-bottom:18px}
 html:root .report-chart--trend,html:root .report-chart--activity,html:root .report-chart--medium,html:root .report-chart--square{min-height:200px;max-height:240px}
 html:root .plan-stair{min-height:150px;max-height:170px}
+
+/* Each portfolio, invested chart */
+html:root .overview-income{height:190px;min-height:0;max-height:190px}
+html:root .overview-panel .report-source{margin-top:10px;padding-top:10px}
+html:root .overview-portfolios{display:grid;grid-template-columns:1fr;gap:10px;list-style:none;margin:0;padding:0}
+html:root button.overview-portfolio[data-slot=portfolio]{display:grid;grid-template-columns:1fr auto;grid-template-areas:"top value" "small gain" "bar bar";gap:4px 14px;align-items:center;width:100%;text-align:left;padding:14px 16px;border-radius:16px;background:var(--muted);border:1px solid var(--border);color:var(--foreground);box-shadow:none;cursor:pointer;transition:border-color .15s,transform .15s}
+html:root button.overview-portfolio[data-slot=portfolio]:hover{border-color:rgb(var(--ch-primary) / .5);transform:translateY(-1px)}
+html:root .overview-portfolio .overview-portfolio__top{grid-area:top;display:flex;align-items:center;gap:10px;min-width:0}
+html:root .overview-portfolio .overview-portfolio__top b{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root .overview-portfolio .pf-avatar{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;font:600 14px/1 var(--font-geist-sans),sans-serif;font-style:normal;background:var(--btn-grad);color:#fff}
+html:root .overview-portfolio .overview-portfolio__share{margin-left:auto;padding:2px 8px;border-radius:999px;background:var(--accent);color:var(--muted-foreground);font:500 11.5px/1.4 var(--font-geist-mono),monospace}
+html:root .overview-portfolio .overview-portfolio__value{grid-area:value;justify-self:end;font:600 20px/1.1 var(--font-geist-mono),monospace;letter-spacing:-.02em}
+html:root .overview-portfolio small{grid-area:small;color:var(--muted-foreground);font-size:12px}
+html:root .overview-portfolio .overview-portfolio__gain{grid-area:gain;justify-self:end;font:500 12px/1.4 var(--font-geist-mono),monospace}
+html:root .overview-portfolio .bar{grid-area:bar;display:block;height:4px;margin-top:6px;border-radius:3px;background:var(--border);overflow:hidden}
+html:root .overview-portfolio .bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--primary),var(--success))}
