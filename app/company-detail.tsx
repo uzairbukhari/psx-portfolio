@@ -28,6 +28,8 @@ import {
 import LedgerTimeline from './ledger-timeline';
 import { buildEntries } from '@/lib/ledger-entries';
 import { readJson } from '@/lib/safe-json';
+import { useMarketGlance } from './use-market-glance';
+import { TickerTile } from './ui-kit';
 
 type Holding = {
   ticker: string;
@@ -153,25 +155,28 @@ function PriceChart({
           .filter(({ x }) => x >= first && x <= last);
 
   return (
-    <section className="panel">
+    <section className="card company-price-card">
       <div className="company-chart-head">
         <div>
-          <h3>Performance on PSX</h3>
+          <span className="lbl">Price</span>
           {change && (
-            <small className={up ? 'pos-text' : 'neg-text'}>
-              {up ? '+' : ''}
-              {money(Math.round(change.change * 100) / 100)} (
-              {pct(change.percent)}) over{' '}
-              {RANGES.find(([v]) => v === range)![1]}
-            </small>
+            <div className="company-chart-delta">
+              <span className={`pill ${up ? 'g' : 'l'}`}>
+                {up ? '+' : '−'}Rs{' '}
+                {Math.abs(Math.round(change.change * 100) / 100).toFixed(2)} ·{' '}
+                {Math.abs(change.percent).toFixed(1)}%
+              </span>
+              <small>over {RANGES.find(([v]) => v === range)![1]}</small>
+            </div>
           )}
         </div>
-        <div className="seg" aria-label="Chart range">
+        <div className="sw-seg" role="group" aria-label="Chart range">
           {RANGES.map(([value, label]) => (
             <button
               key={value}
               type="button"
-              data-active={range === value || undefined}
+              data-slot="seg"
+              aria-pressed={range === value}
               onClick={() => setRange(value)}
             >
               {label}
@@ -227,12 +232,23 @@ function PriceChart({
           }
         />
       )}
-      {markers.length > 0 && (
-        <p className="report-source">
-          Green dots: your purchases · red dots: your sales · dashed line:
-          average cost
-        </p>
-      )}
+      <div className="company-legend">
+        <span>
+          <i className="swatch" /> Close
+        </span>
+        {holding?.average != null && (
+          <span>
+            <i className="swatch dash" /> Your average cost
+          </span>
+        )}
+        <span>
+          <i className="dot buy" /> Your buys
+        </span>
+        <span>
+          <i className="dot sell" /> Your sales
+        </span>
+        <span className="hint">Scroll to zoom · drag to pan</span>
+      </div>
     </section>
   );
 }
@@ -326,6 +342,21 @@ export default function CompanyDetail({
   };
   const held = (holding?.shares ?? 0) > 0;
 
+  const glance = useMarketGlance(
+    [ticker],
+    Object.fromEntries(portfolio.companies.map((c) => [c.ticker, c.name])),
+    portfolio.quotes,
+  );
+  const todayRow = glance.companies.find((c) => c.ticker === ticker);
+  const [lowerTab, setLowerTab] = useState<'activity' | 'dividends'>('activity');
+  const dividendTotal =
+    summary.dividendNet === null ? summary.dividendGross : summary.dividendNet;
+  const expectedTotal = expectedDividends.reduce(
+    (sum, d) =>
+      sum + (byId.get(d.id)?.netAmount ?? byId.get(d.id)?.grossAmount ?? 0),
+    0,
+  );
+
   return (
     <div className="company-page">
       <button
@@ -334,23 +365,51 @@ export default function CompanyDetail({
         className="back-link company-back"
         onClick={goBack}
       >
-        <ArrowLeft size={15} /> Back
+        <ArrowLeft size={15} /> Holdings
+        {holding?.sector && (
+          <>
+            <span className="sep">/</span>
+            {holding.sector}
+          </>
+        )}
       </button>
       <div className="company-head">
-        <div>
-          <p className="eyebrow">
-            {holding?.sector ? holding.sector.toUpperCase() : 'COMPANY'}
-          </p>
-          <h1>{ticker}</h1>
-          <p>{holding?.name ?? 'Not in your companies list'}</p>
+        <div className="company-id">
+          <TickerTile ticker={ticker} size={56} />
+          <div>
+            <h1>{holding?.name ?? ticker}</h1>
+            <p className="company-sub">
+              <b className="num">{ticker}</b>
+              {holding?.sector && <span className="pill">{holding.sector}</span>}
+              {!holding && <span>Not in your companies list</span>}
+            </p>
+          </div>
         </div>
         <div className="company-price">
-          <strong>{holding?.quote ? money(holding.quote.price) : '—'}</strong>
-          <small>
-            {holding?.quote
-              ? `Latest quote · ${holding.quote.date}${holding.quote.manual ? ' · manual' : ''}`
-              : 'No quote yet'}
-          </small>
+          {holding?.quote ? (
+            <strong className="num">
+              <span className="rs">Rs</span> {holding.quote.price.toFixed(2)}
+            </strong>
+          ) : (
+            <strong className="num">—</strong>
+          )}
+          <div className="company-price-meta">
+            {todayRow?.changePercent !== null &&
+              todayRow?.changePercent !== undefined && (
+                <span
+                  className={`pill ${todayRow.changePercent >= 0 ? 'g' : 'l'}`}
+                >
+                  {todayRow.changePercent >= 0 ? '▲' : '▼'}{' '}
+                  {Math.abs(todayRow.change ?? 0).toFixed(2)} ·{' '}
+                  {Math.abs(todayRow.changePercent).toFixed(2)}%
+                </span>
+              )}
+            <small>
+              {holding?.quote
+                ? `Latest quote · ${holding.quote.date}${holding.quote.manual ? ' · manual' : ''}`
+                : 'No quote yet'}
+            </small>
+          </div>
         </div>
         <div className="company-actions">
           <button disabled={busy} onClick={onAddPurchase}>
@@ -391,55 +450,103 @@ export default function CompanyDetail({
         </div>
       </div>
 
-      <div className="company-cards">
-        <article>
-          <span>Shares held</span>
-          <strong>{(holding?.shares ?? 0).toLocaleString()}</strong>
-          <small>
-            Avg. cost {holding?.average == null ? '—' : money(holding.average)}
-          </small>
-        </article>
-        <article>
-          <span>Market value</span>
-          <strong>{summary.value === null ? '—' : money(summary.value)}</strong>
-          <small>
-            Cost {summary.cost === null ? '—' : money(summary.cost)}
-          </small>
-        </article>
-        <article>
-          <span>Profit / loss</span>
-          <strong className={tone(summary.gain)}>
-            {summary.gain === null ? '—' : money(summary.gain)}
-          </strong>
-          <small className={tone(summary.gainPercent)}>
-            {summary.gainPercent === null
-              ? 'Needs cost and price'
-              : pct(summary.gainPercent)}
-          </small>
-        </article>
-        <article>
-          <span>Dividends earned</span>
-          <strong>
-            {money(
-              summary.dividendNet === null
-                ? summary.dividendGross
-                : summary.dividendNet,
+      <div className="company-grid">
+        <PriceChart
+          key={ticker}
+          ticker={ticker}
+          holding={holding}
+          trades={trades}
+        />
+        <div className="company-side">
+          <section className="card company-position">
+            <span className="lbl">Your position</span>
+            <div className="position-tiles">
+              <div>
+                <span>Shares held</span>
+                <b className="num">{(holding?.shares ?? 0).toLocaleString()}</b>
+              </div>
+              <div>
+                <span>Avg cost</span>
+                <b className="num">
+                  {holding?.average == null ? '—' : money(holding.average)}
+                </b>
+              </div>
+              <div>
+                <span>Market value</span>
+                <b className="num">
+                  {summary.value === null ? '—' : money(summary.value)}
+                </b>
+              </div>
+              <div>
+                <span>Profit / loss</span>
+                <b className={`num ${tone(summary.gain) ?? ''}`}>
+                  {summary.gain === null ? '—' : money(summary.gain)}
+                </b>
+                {summary.gainPercent !== null && (
+                  <small className={tone(summary.gainPercent)}>
+                    {pct(summary.gainPercent)}
+                  </small>
+                )}
+              </div>
+            </div>
+            {summary.gain === null && (
+              <p className="position-note">Needs cost and price for profit / loss.</p>
             )}
-          </strong>
-          <small>
-            {summary.dividendNet === null
-              ? 'Gross · set filer status for net'
-              : 'Net of tax'}
-          </small>
-        </article>
+          </section>
+          <section className="card company-dividends-card">
+            <div className="between">
+              <span className="lbl">Dividends</span>
+              <b className="num pos-text">+{money(dividendTotal)}</b>
+            </div>
+            <small className="position-note">
+              {summary.dividendNet === null
+                ? 'Gross · set filer status for net'
+                : 'Net of tax'}
+            </small>
+            {expectedDividends.length > 0 && (
+              <div className="expected-note">
+                <div>
+                  <b>{money(Math.round(expectedTotal))} expected</b>
+                  <small>
+                    Book closure {expectedDividends[0].date}
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onConfirmDividend(expectedDividends[0])}
+                >
+                  Mark received
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
       </div>
 
-      <PriceChart
-        key={ticker}
-        ticker={ticker}
-        holding={holding}
-        trades={trades}
-      />
+      <section className="card company-lower">
+        <div className="sw-seg" role="tablist" aria-label="Company details">
+          {(
+            [
+              ['activity', 'Activity'],
+              ['dividends', 'Dividends'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              data-slot="seg"
+              aria-selected={lowerTab === key}
+              aria-pressed={lowerTab === key}
+              onClick={() => setLowerTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+      {lowerTab === 'activity' && (
 
       <section className="company-section">
         <h2>Activity</h2>
@@ -454,6 +561,10 @@ export default function CompanyDetail({
           />
         )}
       </section>
+      )}
+
+      {lowerTab === 'dividends' && (
+      <>
 
       {expectedDividends.length > 0 && (
         <section className="company-section">
@@ -570,6 +681,9 @@ export default function CompanyDetail({
             </div>
           </>
         )}
+      </section>
+      </>
+      )}
       </section>
     </div>
   );
