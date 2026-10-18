@@ -205,7 +205,7 @@ export default function PortfolioReports({
             transactions.
           </p>
         </div>
-        <div className="reports-hero-stats">
+        <div className="reports-hero-stats slab">
           <div className="reports-priced-value">
             <span>Priced market value</span>
             <strong>{moneyShort(report.summary.pricedValue)}</strong>

@@ -131,3 +131,19 @@ html:root .position-note,html:root .expected-note{color:var(--muted-foreground);
 @media (max-width:900px){html:root .company-grid{grid-template-columns:1fr}}
 html:root .company-lower .company-section{margin-top:16px}
 html:root .company-dividends-card .lbl{display:flex;justify-content:space-between;gap:8px}
+
+/* Insights */
+html:root .reports-intro-header .eyebrow{display:none}
+html:root .reports-intro-header p:not(.eyebrow){font-size:13px;max-width:none}
+html:root .reports-hero-stats.slab{gap:0;padding:22px 8px;border-radius:20px;grid-template-columns:repeat(4,minmax(0,1fr))}
+html:root .reports-hero-stats.slab .reports-priced-value{background:transparent;border:0;border-radius:0;padding:4px 22px;border-left:1px solid rgba(255,255,255,.08)}
+html:root .reports-hero-stats.slab .reports-priced-value:first-child{border-left:0}
+html:root .reports-hero-stats.slab .reports-priced-value span{color:var(--slab-mu,rgba(255,255,255,.6))}
+html:root .reports-hero-stats.slab .reports-priced-value strong{font:600 28px/1.1 var(--font-geist-mono),monospace;letter-spacing:-.02em;margin:10px 0 6px;color:#fff}
+html:root .reports-hero-stats.slab .reports-priced-value.pos strong{color:var(--success)}
+html:root .reports-hero-stats.slab .reports-priced-value.neg strong{color:var(--danger)}
+html:root .reports-hero-stats.slab .reports-priced-value small{color:var(--slab-mu,rgba(255,255,255,.6))}
+html:root .reports-summary article{border-radius:14px;background:var(--card)}
+html:root .report-panel{border-radius:18px;padding:20px}
+html:root .report-heading h3{font-size:18px}
+@media(max-width:760px){html:root .reports-hero-stats.slab{grid-template-columns:1fr 1fr;gap:14px}html:root .reports-hero-stats.slab .reports-priced-value{border-left:0;padding:4px 14px}}
