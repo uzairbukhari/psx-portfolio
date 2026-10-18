@@ -2,14 +2,6 @@ import { Lock } from 'lucide-react';
 import { GoogleButton } from './google-button';
 import { NetWorthPreview } from './net-worth-preview';
 
-const CHIPS = [
-  ['PSX stocks', 'var(--asset-stocks)'],
-  ['Mutual funds', 'var(--asset-funds)'],
-  ['Gold', 'var(--asset-gold)'],
-  ['Silver', 'var(--asset-silver)'],
-  ['Savings plans', 'var(--asset-plans)'],
-] as const;
-
 export function Hero({
   returnTo,
   error,
@@ -26,7 +18,7 @@ export function Hero({
             Built for investors in Pakistan
           </span>
           <h1>
-            Everything you own, <span>in one private ledger.</span>
+            Everything you own,<br /> <span>in one private ledger.</span>
           </h1>
           <p className="lede">
             Track PSX stocks, mutual funds, gold, silver and savings plans side
@@ -42,14 +34,6 @@ export function Hero({
           <div className="cta-note">
             <Lock size={15} aria-hidden="true" />
             End-to-end encrypted. Nothing is shared, and no orders are placed.
-          </div>
-          <div className="chips">
-            {CHIPS.map(([label, color]) => (
-              <span className="lp-chip" key={label}>
-                <i style={{ background: color }} />
-                {label}
-              </span>
-            ))}
           </div>
         </div>
         <NetWorthPreview />

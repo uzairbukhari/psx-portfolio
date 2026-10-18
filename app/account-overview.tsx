@@ -15,6 +15,7 @@ import { ChartInfo } from './chart-info';
 import { daysBetween } from '@/lib/performance';
 import type { FxRateRow } from '@/lib/fx-rates';
 import type { MetalRateRow } from '@/lib/metal-rates';
+import type { MarketGlance } from './use-market-glance';
 
 /** The same colours as CLASS_COLORS, resolved for the canvas. */
 const classColor = (t: ChartTokens, k: AssetClassKey) =>
@@ -53,6 +54,54 @@ const investedKeys: AssetClassKey[] = [
 ];
 const OTHER_COLOR = 'var(--chart-other)';
 
+/** The index as a small line; no axes, the card carries the numbers. */
+function KseSpark({ points, up }: { points: { value: number }[]; up: boolean }) {
+  if (points.length < 2) return <div className="glance-spark" />;
+  const values = points.map((p) => p.value);
+  const lo = Math.min(...values);
+  const range = Math.max(...values) - lo || 1;
+  const coords = points.map(
+    (p, i) => `${((i / (points.length - 1)) * 300).toFixed(1)},${(56 - ((p.value - lo) / range) * 50 - 3).toFixed(1)}`,
+  );
+  return (
+    <svg className="glance-spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points={`0,56 ${coords.join(' ')} 300,56`} className={up ? 'area up' : 'area down'} />
+      <polyline points={coords.join(' ')} className={up ? 'line up' : 'line down'} fill="none" />
+    </svg>
+  );
+}
+
+function MixDonut({ classes }: { classes: { key: AssetClassKey; label: string; share: number }[] }) {
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  let offset = 0;
+  return (
+    <svg className="glance-donut" viewBox="0 0 128 128" role="img" aria-label={`Assets: ${classes.map((c) => `${c.label} ${c.share.toFixed(1)}%`).join(', ')}`}>
+      {classes.map((c) => {
+        const len = (Math.max(0, c.share) / 100) * C;
+        const el = (
+          <circle
+            key={c.key}
+            cx="64"
+            cy="64"
+            r={R}
+            fill="none"
+            stroke={CLASS_COLORS[c.key]}
+            strokeWidth="14"
+            strokeDasharray={`${Math.max(0, len - 1.5)} ${C}`}
+            strokeDashoffset={-offset}
+            transform="rotate(-90 64 64)"
+          />
+        );
+        offset += len;
+        return el;
+      })}
+      <text x="64" y="58" textAnchor="middle" className="donut-lbl">ASSETS</text>
+      <text x="64" y="78" textAnchor="middle" className="donut-num">{classes.length}</text>
+    </svg>
+  );
+}
+
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
 const pct = (n: number | null, digits = 1) =>
   n === null ? null : `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(digits)}%`;
@@ -84,6 +133,14 @@ export default function AccountOverview({
   fxRates = [],
   chart,
   onOpenPortfolio,
+  compact = false,
+  scopeName = 'all portfolios',
+  glance,
+  today,
+  toCheck,
+  sip,
+  onOpenPlan,
+  onFix,
 }: {
   parts: (DisplayPart & { locked?: boolean })[];
   asOf: string;
@@ -94,12 +151,24 @@ export default function AccountOverview({
   /** The stocks value chart (with the market pulse beside it), rendered by the page because it loads price history itself. Only shown when stocks are held. */
   chart: ReactNode;
   onOpenPortfolio: (id: string) => void;
+  /** One portfolio: the hero and the three cards only, without the All dashboard's breakdown panels. */
+  compact?: boolean;
+  scopeName?: string;
+  glance: MarketGlance;
+  /** What the stocks held moved today, from the public day change; null until prices are in. */
+  today: { amount: number; percent: number } | null;
+  /** Holdings whose cost is unknown. */
+  toCheck: number;
+  sip: { label: string; fresh: number; put: number };
+  onOpenPlan: () => void;
+  onFix: () => void;
 }) {
   const o = useMemo(
     () => accountOverview(parts, asOf, { metalRates, fundNavs, planNavs, fxRates }),
     [parts, asOf, metalRates, fundNavs, planNavs, fxRates],
   );
   const { total, returns, income, invested } = o;
+  const sipShare = Math.min(100, (sip.put / Math.max(1, sip.fresh)) * 100);
   const staleDays = total.oldestQuoteDate
     ? daysBetween(total.oldestQuoteDate, asOf)
     : null;
@@ -115,89 +184,179 @@ export default function AccountOverview({
 
   return (
     <div className="overview">
-      <section className="panel overview-hero slab" aria-label="Net worth">
-        <div className="overview-hero__main">
-          <span className="value-card-label">Net worth · all portfolios</span>
-          <strong className="amount overview-hero__value">
-            {total.incomplete.length && !total.value
-              ? 'Prices needed'
-              : moneyShort(total.value)}
-          </strong>
-          <small>
-            {o.portfolios.length} portfolios · {o.holdingCount}{' '}
-            {o.holdingCount === 1 ? 'holding' : 'holdings'}
-            {total.oldestQuoteDate
-              ? ` · oldest price ${dateLabel(total.oldestQuoteDate)}${staleDays && staleDays > 3 ? ' (stale)' : ''}`
-              : ''}
-          </small>
+      <section className="slab hero-slab" aria-label="Net worth">
+        <div className="hero-left">
+          <span className="lbl">
+            Net worth · {compact ? scopeName : 'all portfolios'}
+          </span>
+          <div className="hero-figure num">
+            {total.incomplete.length && !total.value ? (
+              <span className="hero-pending">Prices needed</span>
+            ) : (
+              <>
+                <span className="rs">Rs</span>
+                {Math.round(total.value).toLocaleString('en-PK')}
+              </>
+            )}
+          </div>
+          <div className="hero-pills">
+            {total.gain !== null && (
+              <>
+                <span className={`pill ${total.gain >= 0 ? 'g' : 'l'}`}>
+                  {total.gain >= 0 ? '▲' : '▼'} {moneyShort(Math.abs(total.gain))}
+                </span>
+                {pct(total.gainPercent) && (
+                  <span className={`pill ${total.gain >= 0 ? 'g' : 'l'}`}>
+                    {pct(total.gainPercent)}
+                  </span>
+                )}
+                <span className="hero-note">on what you hold</span>
+              </>
+            )}
+          </div>
+          {today && (
+            <div className="hero-pills">
+              <span className={`pill ${today.amount >= 0 ? 'g' : 'l'}`}>
+                {today.amount >= 0 ? '▲' : '▼'} {moneyShort(Math.abs(today.amount))} ·{' '}
+                {Math.abs(today.percent).toFixed(2)}%
+              </span>
+              <span className="hero-note">today</span>
+            </div>
+          )}
           {total.incomplete.length > 0 && (
             <output className="overview-incomplete">
               Incomplete: {total.incomplete.join(' ')}
             </output>
           )}
-        </div>
-        <dl className="overview-stats">
-          <div>
-            <dt>Invested (remaining cost)</dt>
-            <dd className="amount">
-              {total.cost === null ? 'Not yet known' : moneyShort(total.cost)}
-            </dd>
-          </div>
-          <div>
-            <dt>Gain / loss</dt>
-            <dd className={`amount ${tone(total.gain)}`}>
-              {total.gain === null ? 'Not yet known' : signed(total.gain)}
-              {pct(total.gainPercent) && (
-                <small className={tone(total.gain)}>
-                  {pct(total.gainPercent)}
-                </small>
+          <dl className="hero-stats">
+            <div>
+              <dt className="lbl">Invested</dt>
+              <dd className="num">
+                {total.cost === null ? 'Not yet known' : moneyShort(total.cost)}
+              </dd>
+            </div>
+            <div>
+              <dt className="lbl">Yearly return</dt>
+              <dd
+                className={`num ${returns.rate === null ? '' : returns.rate >= 0 ? 'hero-gain' : 'hero-loss'}`}
+                title={
+                  returns.rate === null
+                    ? (returns.blockedBy ??
+                      (returns.reason === 'too-short'
+                        ? 'Shown after 90 days of history'
+                        : 'Not enough history yet'))
+                    : 'Money-weighted, after dividends received'
+                }
+              >
+                {returns.rate !== null ? pct(returns.rate * 100) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="lbl">Dividends, tax year</dt>
+              <dd className="num">{moneyShort(income.received)}</dd>
+              {income.expectedCount > 0 && (
+                <small>{moneyShort(income.expected)} more expected</small>
               )}
-            </dd>
-          </div>
-          <div>
-            <dt>Yearly return (includes income)</dt>
-            <dd
-              className={`amount ${tone(returns.rate === null ? null : returns.rate)}`}
-            >
-              {returns.rate !== null ? pct(returns.rate * 100) : '—'}
-              <small>
-                {returns.rate !== null
-                  ? 'Money-weighted, after dividends received'
-                  : returns.blockedBy
-                    ? returns.blockedBy
-                    : returns.reason === 'too-short'
-                      ? 'Shown after 90 days of history'
-                      : 'Not enough history yet'}
-              </small>
-            </dd>
-          </div>
-          <div>
-            <dt>Dividends this tax year</dt>
-            <dd className="amount">
-              {moneyShort(income.received)}
-              <small>
-                {income.expectedCount > 0
-                  ? `${moneyShort(income.expected)} more expected (not income yet)`
-                  : income.received > 0 || income.receivedTotal === 0
-                    ? `Tax year ${income.taxYear}`
-                    : income.unknownDateCount > 0
-                      ? `${income.unknownDateCount} received without a payment date, not counted · add the date to include`
-                      : `None paid in tax year ${income.taxYear} (from 1 July) · ${moneyShort(income.receivedPrevious)} in ${income.previousTaxYear}`}
-              </small>
-            </dd>
-          </div>
-        </dl>
+            </div>
+            <div>
+              <dt className="lbl">To check</dt>
+              <dd>
+                {toCheck > 0 ? (
+                  <button
+                    type="button"
+                    data-slot="chip"
+                    className="hero-chip warn"
+                    onClick={onFix}
+                  >
+                    {toCheck} {toCheck === 1 ? 'cost' : 'costs'} missing · Fix
+                  </button>
+                ) : (
+                  <span className="hero-chip ok">All costs known</span>
+                )}
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div className="hero-right">{hasStocks ? chart : null}</div>
       </section>
 
-      {hasStocks && (
-        <section
-          className="panel overview-panel overview-market"
-          aria-label="Stocks and market"
-        >
-          {chart}
+      <div className="glance-row">
+        <section className="card glance-sip" aria-label="This month">
+          <svg className="sip-ring" viewBox="0 0 104 104" aria-hidden="true">
+            <circle cx="52" cy="52" r="44" className="ring-track" />
+            <circle
+              cx="52"
+              cy="52"
+              r="44"
+              className="ring-fill"
+              strokeDasharray={`${(2 * Math.PI * 44 * sipShare) / 100} ${2 * Math.PI * 44}`}
+              transform="rotate(-90 52 52)"
+            />
+            <text x="52" y="58" textAnchor="middle" className="ring-text">
+              {Math.round(sipShare)}%
+            </text>
+          </svg>
+          <div>
+            <span className="lbl">{sip.label} SIP</span>
+            <div className="num glance-big">{money(sip.put).replace(/\.\d+$/, '')}</div>
+            <small>of {money(sip.fresh).replace(/\.\d+$/, '')} planned</small>
+            <button type="button" data-slot="link" className="sw-link" onClick={onOpenPlan}>
+              Open the plan →
+            </button>
+          </div>
         </section>
-      )}
+        <section className="card glance-kse" aria-label="KSE-100">
+          <div className="between">
+            <span className="lbl">
+              KSE-100{glance.market ? ` · ${glance.market.label}` : ''}
+            </span>
+            {glance.index && (
+              <span className={`pill ${glance.index.change >= 0 ? 'g' : 'l'}`}>
+                {glance.index.change >= 0 ? '+' : '−'}
+                {Math.abs(glance.index.change).toLocaleString('en-PK', { maximumFractionDigits: 2 })} ·{' '}
+                {Math.abs(glance.index.changePercent).toFixed(2)}%
+              </span>
+            )}
+          </div>
+          <div className="num glance-big">
+            {glance.index
+              ? glance.index.close.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : '—'}
+          </div>
+          <KseSpark points={glance.series} up={(glance.index?.change ?? 0) >= 0} />
+          {glance.breadth && glance.breadth.covered > 0 && (
+            <>
+              <div className="breadth-bar" aria-hidden="true">
+                <i className="up" style={{ flex: glance.breadth.advances }} />
+                <i className="flat" style={{ flex: glance.breadth.unchanged }} />
+                <i className="down" style={{ flex: glance.breadth.declines }} />
+              </div>
+              <div className="between num breadth-legend">
+                <span className="hero-gain">{glance.breadth.advances} up</span>
+                <span>{glance.breadth.unchanged} flat</span>
+                <span className="hero-loss">{glance.breadth.declines} down</span>
+              </div>
+            </>
+          )}
+        </section>
+        <section className="card glance-mix" aria-label="Asset mix">
+          <MixDonut classes={o.classes} />
+          <ul>
+            {o.classes.map((c) => (
+              <li key={c.key}>
+                <span>
+                  <i aria-hidden="true" style={{ background: CLASS_COLORS[c.key] }} />
+                  {c.label}
+                </span>
+                <b className="num">{c.share.toFixed(1)}%</b>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
 
+      {!compact && (
+        <>
       <div className="overview-grid" data-cols={hasStocks ? 2 : 3}>
         <section className="panel overview-panel" aria-label="Asset mix">
           <div className="report-heading">
@@ -392,6 +551,8 @@ export default function AccountOverview({
           </p>
         </section>
       </div>
+        </>
+      )}
     </div>
   );
 }

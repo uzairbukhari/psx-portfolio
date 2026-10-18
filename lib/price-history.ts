@@ -53,7 +53,7 @@ export function rangeChange(points: PricePoint[]) {
 
 /** `cost`/`gain` are null on days a held position has an unknown opening cost. */
 export type ValuePoint = { date: string; value: number; cost: number | null; gain: number | null };
-export type ValueRange = '1m' | '1y' | 'all';
+export type ValueRange = '1m' | '3m' | '6m' | '1y' | 'all';
 
 export const pktDate = (sec: number) => new Date((sec + 5 * 3600) * 1000).toISOString().slice(0, 10);
 const cents = (n: number) => Math.round(n * 100) / 100;
@@ -129,7 +129,7 @@ export function portfolioValueSeries(
 export function sliceValueRange(points: ValuePoint[], range: ValueRange): ValuePoint[] {
   if (range === 'all' || !points.length) return points;
   const end = new Date(`${points[points.length - 1].date}T00:00:00Z`);
-  end.setUTCDate(end.getUTCDate() - (range === '1m' ? 31 : 366));
+  end.setUTCDate(end.getUTCDate() - ({ '1m': 31, '3m': 92, '6m': 183, '1y': 366 } as const)[range]);
   const from = end.toISOString().slice(0, 10);
   return points.filter((pt) => pt.date >= from);
 }

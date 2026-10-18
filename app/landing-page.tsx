@@ -9,6 +9,7 @@ import {
   PrivacySection,
 } from './landing/sections';
 import './landing.css';
+import './always-dark.css';
 
 const ERROR_COPY: Record<string, string> = {
   oauth_email:

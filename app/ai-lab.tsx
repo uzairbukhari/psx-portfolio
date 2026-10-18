@@ -104,7 +104,7 @@ export default function AiLab({ portfolio, busy, onSave, onOpenCompany }: Props)
 
   return (
     <div className="ai-lab">
-      <section className="ai-lab__hero">
+      <section className="ai-lab__hero slab">
         <div>
           <p className="eyebrow"><FlaskConical size={14} aria-hidden="true" /> EXPERIMENTAL · SUPER ADMIN ONLY</p>
           <h2>AI Lab</h2>

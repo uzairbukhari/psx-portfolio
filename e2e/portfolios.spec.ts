@@ -2,7 +2,7 @@ import { choosePortfolio, expect, isLocal, pageText, test } from './fixtures';
 
 test('AHL Core: holdings, market value and the sold-out company', async ({ app }) => {
   await choosePortfolio(app, 'AHL Core');
-  await expect(app.getByText('Portfolio market value')).toBeVisible();
+  await expect(app.getByText(/Net worth/).first()).toBeVisible();
   await expect(app.getByText('13 holdings').first()).toBeVisible();
   if (isLocal) await expect(app.getByText('Rs 671,600').first()).toBeVisible();
 });

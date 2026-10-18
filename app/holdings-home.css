@@ -1,0 +1,111 @@
+/* Holdings home: net worth slab, glance cards, holdings table. Every rule is prefixed html:root so production CSS
+   order cannot let globals.css or account-overview.css win. Colours are theme tokens only. */
+html:root .overview{display:grid;gap:18px}
+html:root .hero-slab{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.3fr);gap:28px;padding:26px 26px 20px;border-radius:24px}
+html:root .hero-left{display:flex;flex-direction:column;min-width:0}
+html:root .hero-slab .lbl{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--slab-mu)}
+html:root .hero-figure{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:clamp(34px,3.6vw,50px);letter-spacing:-.04em;line-height:1.05;margin:10px 0 12px;color:var(--slab-tx)}
+html:root .hero-figure .rs{font-size:.5em;color:var(--slab-mu);margin-right:8px;font-weight:500;letter-spacing:0}
+html:root .hero-pending{font-size:.6em;color:var(--slab-mu)}
+html:root .hero-pills{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+html:root .hero-note{color:var(--slab-mu);font-size:13px}
+html:root .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-geist-mono),monospace;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;background:var(--chip);color:var(--muted-foreground)}
+html:root .pill.g{background:var(--gain-bg);color:var(--success)}
+html:root .pill.l{background:var(--loss-bg);color:var(--danger)}
+html:root .hero-slab .pill.g{background:rgba(46,230,166,.14);color:#2ee6a6}
+html:root .hero-slab .pill.l{background:rgba(255,111,134,.14);color:#ff6f86}
+html:root .overview-incomplete{display:block;margin-top:10px;font-size:12.5px;color:var(--warn-ink);background:var(--warn-bg);border-radius:12px;padding:8px 12px}
+html:root .hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px;margin:auto 0 0;padding-top:22px;border-top:1px solid var(--slab-line)}
+html:root .hero-stats dt{margin:0}
+html:root .hero-stats dd{margin:6px 0 0;font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:19px;color:var(--slab-tx)}
+html:root .hero-stats small{display:block;font-size:12px;color:var(--slab-mu);font-family:var(--font-geist-sans),sans-serif;margin-top:2px}
+html:root .hero-gain{color:#2ee6a6!important}html:root .hero-loss{color:#ff6f86!important}
+html:root .hero-chip{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;border:0;font-family:var(--font-geist-sans),sans-serif}
+html:root .hero-chip.warn{background:rgba(245,185,66,.16);color:#f5b942;cursor:pointer}
+html:root .hero-chip.ok{background:rgba(46,230,166,.14);color:#2ee6a6}
+html:root .hero-right{min-width:0;display:flex;flex-direction:column}
+html:root .value-chart{display:flex;flex-direction:column;gap:10px;min-height:300px;flex:1}
+html:root .value-chart-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+html:root .value-chart .legend{display:flex;gap:16px;font-size:12.5px;color:var(--slab-mu)}
+html:root .value-chart .legend span{display:inline-flex;align-items:center;gap:7px}
+html:root .value-chart .swatch{display:inline-block;width:14px;height:3px;border-radius:2px;background:#2ee6a6}
+html:root .value-chart .swatch.dash{background:none;border-top:2px dashed var(--slab-mu);height:0}
+html:root .value-chart-canvas{flex:1;min-height:260px;width:100%}
+html:root .value-chart-note{margin:0;font-size:11.5px;color:var(--slab-mu)}
+html:root .hero-slab .sw-seg{background:rgba(255,255,255,.07)}
+html:root .hero-slab .sw-seg button{color:var(--slab-mu)}
+html:root .hero-slab .sw-seg button[aria-pressed=true]{background:rgba(255,255,255,.16);color:#fff}
+html:root .glance-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+html:root .glance-row .card{padding:22px;min-width:0}
+html:root .glance-row .lbl{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .glance-big{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:24px;margin:6px 0 4px;letter-spacing:-.02em}
+html:root .glance-sip{display:flex;gap:18px;align-items:center}
+html:root .glance-sip .sip-ring{width:104px;height:104px;flex:none}
+html:root .glance-sip .ring-track{fill:none;stroke:var(--muted);stroke-width:11}
+html:root .glance-sip .ring-fill{fill:none;stroke:var(--primary);stroke-width:11;stroke-linecap:round}
+html:root .glance-sip .ring-text{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:20px;fill:var(--foreground)}
+html:root .glance-sip small{display:block;color:var(--muted-foreground);font-size:12.5px}
+html:root .sw-link{background:none;border:0;box-shadow:none;padding:0;margin-top:10px;color:var(--primary);font-size:13px;font-weight:500;cursor:pointer;display:inline-block;width:auto}
+html:root .glance-kse .between{display:flex;justify-content:space-between;align-items:center;gap:8px}
+html:root .glance-spark{display:block;width:100%;height:64px;margin:6px 0 0}
+html:root .glance-spark .line{stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+html:root .glance-spark .line.up{stroke:var(--success)}html:root .glance-spark .line.down{stroke:var(--danger)}
+html:root .glance-spark .area.up{fill:rgb(var(--ch-success) / .16)}html:root .glance-spark .area.down{fill:rgb(var(--ch-danger) / .14)}
+html:root .breadth-bar{display:flex;gap:4px;margin-top:12px}
+html:root .breadth-bar i{height:6px;border-radius:4px;display:block}
+html:root .breadth-bar .up{background:var(--success)}html:root .breadth-bar .flat{background:var(--muted)}html:root .breadth-bar .down{background:var(--danger)}
+html:root .breadth-legend{font-size:12px;margin-top:6px;display:flex;justify-content:space-between;color:var(--muted-foreground)}
+html:root .breadth-legend .hero-gain{color:var(--success)!important}html:root .breadth-legend .hero-loss{color:var(--danger)!important}
+html:root .glance-mix{display:flex;gap:16px;align-items:center}
+html:root .glance-donut{width:128px;height:128px;flex:none}
+html:root .glance-donut .donut-lbl{font-size:9.5px;letter-spacing:.1em;fill:var(--muted-foreground);font-family:var(--font-geist-sans),sans-serif}
+html:root .glance-donut .donut-num{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:17px;fill:var(--foreground)}
+html:root .glance-mix ul{list-style:none;margin:0;padding:0;flex:1;display:grid;gap:5px;min-width:0}
+html:root .glance-mix li{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}
+html:root .glance-mix li span{display:inline-flex;align-items:center;gap:7px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root .glance-mix li i{width:8px;height:8px;border-radius:3px;flex:none}
+html:root .glance-mix li b{font-weight:400;color:var(--muted-foreground)}
+@media (max-width:1180px){html:root .hero-slab{grid-template-columns:1fr}html:root .glance-row{grid-template-columns:1fr 1fr}}
+@media (max-width:720px){html:root .glance-row{grid-template-columns:1fr}html:root .hero-slab{padding:20px 16px}html:root .hero-stats{grid-template-columns:1fr 1fr}}
+html:root .card{background:var(--card);border:1px solid var(--card-border);border-radius:24px}
+/* holdings card + table */
+html:root .holdings-card{padding:18px 18px 8px;display:grid;gap:12px}
+html:root .holdings-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+html:root .holdings-bar h3{margin:0;font-size:17px;font-weight:600}
+html:root .holdings-bar__end{margin-left:auto;display:flex;align-items:center;gap:10px}
+html:root .holdings-tabs button b{margin-left:6px;font-size:11px;font-weight:500;color:var(--muted-foreground);font-family:var(--font-geist-mono),monospace}
+html:root .holdings-tabs button[aria-pressed=true] b{color:inherit;opacity:.7}
+html:root .holdings-export{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:12px;background:transparent;border:1px solid var(--border);color:var(--foreground);font-size:13px;font-weight:600;cursor:pointer;box-shadow:none}
+html:root .holdings-card .holdings-head--inline{margin:0;padding:0;border:0;background:none}
+html:root .holdings-table-wrap{overflow-x:auto}
+html:root table.hold{width:100%;border-collapse:collapse;font-size:13.5px}
+html:root table.hold th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;color:var(--muted-foreground);padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+html:root table.hold th .sort-head{background:none;border:0;padding:0;box-shadow:none;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;width:auto}
+html:root table.hold td{padding:11px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+html:root table.hold tbody tr:last-child td{border-bottom:0}
+html:root table.hold tbody tr:hover td{background:rgb(var(--ch-primary) / .05)}
+html:root table.hold .num{font-family:var(--font-geist-mono),monospace;font-variant-numeric:tabular-nums}
+html:root table.hold .strong{font-weight:600}
+html:root table.hold .sub{font-size:11.5px;opacity:.85}
+html:root table.hold .co{display:flex;align-items:center;gap:12px;background:none;border:0;padding:0;box-shadow:none;text-align:left;color:inherit;cursor:pointer;width:auto}
+html:root table.hold .co b{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
+html:root table.hold .co small{display:block;color:var(--muted-foreground);font-size:12px;font-weight:400}
+html:root table.hold .wt{display:flex;align-items:center;gap:10px}
+html:root table.hold .wt .bar{display:block;width:70px;height:4px;border-radius:3px;background:var(--muted);overflow:hidden}
+html:root table.hold .wt .bar i{display:block;height:100%;border-radius:3px}
+html:root table.hold .wt .num{color:var(--muted-foreground);width:46px}
+html:root table.hold .quote-btn{background:none;border:0;padding:0;box-shadow:none;color:inherit;font:inherit;cursor:pointer;width:auto;text-decoration:none}
+html:root table.hold .quote-date{display:block;font-size:11px;color:var(--muted-foreground)}
+html:root table.hold .cost-chip{display:inline-flex;background:var(--warn-bg);color:var(--warn-ink);border:0;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:none;width:auto;font-family:var(--font-geist-sans),sans-serif}
+html:root table.hold .fa{color:var(--muted-foreground)}
+html:root table.hold .pos-text,html:root table.hold .neg-text{font-weight:inherit}
+html:root .holdings-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 4px;border-top:1px solid var(--border);font-size:12.5px;color:var(--muted-foreground);flex-wrap:wrap}
+html:root .holdings-foot b{color:var(--foreground)}
+html:root .holdings-card .holdings-cards{display:none}
+@media (max-width:760px){html:root .holdings-table-wrap{display:none}html:root .holdings-card .holdings-cards{display:grid}html:root .holdings-bar__end{margin-left:0;width:100%}}
+html:root .pill{white-space:nowrap}
+html:root table.hold th,html:root table.hold th .sort-head{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;color:var(--muted-foreground);font-family:var(--font-geist-sans),sans-serif}
+html:root table.hold td .quote-btn,html:root table.hold td .quote-btn:hover{color:var(--foreground);font-family:var(--font-geist-mono),monospace;background:none;text-decoration:none}
+html:root table.hold td .icon-btn{width:30px;height:30px;padding:0}
+html:root table.hold td button.quote-btn{color:var(--foreground)}
+html:root .hero-slab .overview-incomplete{background:rgba(245,185,66,.14);color:#f5b942}

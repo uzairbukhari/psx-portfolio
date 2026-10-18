@@ -3,7 +3,7 @@
 // (or the recovery key). Everything decrypted lives in the VaultSession in this tab's memory; locking (button,
 // 15 minutes of inactivity, sign-out) zeroes the key and unmounts the dashboard, which drops its state.
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { KeyRound, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { Check, ChevronRight, Eye, EyeOff, KeyRound, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -48,7 +48,18 @@ function strengthOf(password: string): { score: number; label: string } {
   return { score, label: ['', 'Too short', 'Okay', 'Good', 'Strong'][score] ?? '' };
 }
 
-/** Tells the person what the key derivation is doing, so a few seconds of waiting reads as progress. */
+function useStageIndex(busy: boolean, count: number) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (!busy) return setI(0);
+    const id = window.setInterval(() => setI((n) => Math.min(n + 1, count - 1)), 1800);
+    return () => window.clearInterval(id);
+  }, [busy, count]);
+  return i;
+}
+
+const STAGES = ['Password checked on this device', 'Decrypting your ledger', 'Loading today’s prices'];
+
 function useStage(busy: boolean, stages: string[]) {
   const [i, setI] = useState(0);
   useEffect(() => {
@@ -59,28 +70,74 @@ function useStage(busy: boolean, stages: string[]) {
   return stages[Math.min(i, stages.length - 1)];
 }
 
-function Shell({ title, kicker, children }: { title: string; kicker?: string; children: ReactNode }) {
+function Shell({
+  title,
+  kicker,
+  children,
+  aside,
+  avatar,
+  step,
+  wide,
+}: {
+  title: string;
+  kicker?: string;
+  children: ReactNode;
+  aside?: ReactNode;
+  avatar?: ReactNode;
+  step?: string;
+  wide?: boolean;
+}) {
   return (
     <main className="load-error vault-stage always-dark">
-      <div className="signin-card vault-card">
-        <div className="brand" style={{ marginBottom: 18 }}>
-          <LogoMark size={26} />
+      <header className="vault-top">
+        <div className="brand">
+          <LogoMark size={32} />
           <Wordmark />
         </div>
-        <span className="signin-mark">
-          <LockKeyhole size={22} />
-        </span>
-        {kicker && <p className="vault-kicker">{kicker}</p>}
-        <h2>{title}</h2>
-        {children}
+        {step ? (
+          <span className="vault-top-note">{step}</span>
+        ) : (
+          <span className="vault-top-note">
+            Not you? <SignOut />
+          </span>
+        )}
+      </header>
+      <div className="vault-layout">
+        <div className={`signin-card vault-card${avatar ? ' vault-card-center' : ''}${wide ? ' vault-card-wide' : ''}`}>
+          {avatar}
+          {kicker && <p className="vault-kicker">{kicker}</p>}
+          <h2>{title}</h2>
+          {children}
+        </div>
+        {aside && <div className="vault-aside">{aside}</div>}
       </div>
+      <p className="vault-foot">
+        <ShieldCheck size={14} aria-hidden="true" /> AES-256-GCM on this device · the vault locks after 15 minutes idle
+      </p>
     </main>
+  );
+}
+
+function maskEmail(email: string) {
+  const [name = '', domain = ''] = email.split('@');
+  if (name.length < 3) return email;
+  return `${name[0]}${'•'.repeat(Math.min(7, name.length - 2))}${name.slice(-1)}@${domain}`;
+}
+
+function Avatar({ email }: { email: string }) {
+  return (
+    <div className="vault-avatar" aria-hidden="true">
+      <span>{(email[0] ?? 'S').toUpperCase()}</span>
+      <i>
+        <LockKeyhole size={15} />
+      </i>
+    </div>
   );
 }
 
 function SignOut() {
   return (
-    <button type="button" className="signin-link" onClick={() => void forgetTabKey(browserTabKeepStore()).finally(() => void (window.location.href = '/api/auth/logout'))}>
+    <button type="button" className="signin-link vault-signout" onClick={() => void forgetTabKey(browserTabKeepStore()).finally(() => void (window.location.href = '/api/auth/logout'))}>
       Sign out
     </button>
   );
@@ -88,7 +145,7 @@ function SignOut() {
 
 const lengthOk = (value: string) => [...value.normalize('NFKC')].length >= MIN_PASSWORD_CHARS;
 
-export default function VaultGate({ email, children }: { email: string; children: (session: VaultSession, lock: () => void) => ReactNode }) {
+export default function VaultGate({ email, name, children }: { email: string; name?: string | null; children: (session: VaultSession, lock: () => void) => ReactNode }) {
   const [view, setView] = useState<View>({ kind: 'loading' });
   const sessionRef = useRef<VaultSession | null>(null);
 
@@ -168,13 +225,26 @@ export default function VaultGate({ email, children }: { email: string; children
   if (view.kind === 'unlocked') return <>{children(view.session, () => void lockNow())}</>;
   if (view.kind === 'loading')
     return (
-      <main className="app-loading">
-        <div className="brand">
-          <LogoMark size={28} />
-          <Wordmark />
+      <main className="app-loading vault-stage always-dark" role="status" aria-live="polite">
+        <div className="boot">
+          <div className="boot-orb" aria-hidden="true">
+            <i className="boot-ring" />
+            <i className="boot-ring r2" />
+            <span className="boot-core">
+              <LogoMark size={40} />
+            </span>
+          </div>
+          <div className="brand">
+            <Wordmark />
+          </div>
+          <p className="boot-line">Checking your private vault…</p>
+          <span className="boot-bar" aria-hidden="true">
+            <i />
+          </span>
+          <p className="boot-note">
+            <LockKeyhole size={13} aria-hidden="true" /> Decrypted only on this device
+          </p>
         </div>
-        <Spinner className="size-6" />
-        <p className="muted">Checking your private vault…</p>
       </main>
     );
   if (view.kind === 'error')
@@ -192,7 +262,7 @@ export default function VaultGate({ email, children }: { email: string; children
   if (view.kind === 'setup') return <Setup onPrepared={(prepared) => setView({ kind: 'recovery-key', prepared })} />;
   if (view.kind === 'recovery-key')
     return <RecoveryKey prepared={view.prepared} onDone={open} onBack={() => (view.prepared.discard(), setView({ kind: 'setup' }))} />;
-  return <Unlock status={view.status} mode={view.mode} setMode={(mode) => setView({ ...view, mode })} onOpen={open} onReset={() => lockNow()} email={email} />;
+  return <Unlock status={view.status} mode={view.mode} setMode={(mode) => setView({ ...view, mode })} onOpen={open} onReset={() => lockNow()} email={email} name={name ?? null} />;
 }
 
 function Setup({ onPrepared }: { onPrepared: (prepared: PreparedVault) => void }) {
@@ -213,7 +283,7 @@ function Setup({ onPrepared }: { onPrepared: (prepared: PreparedVault) => void }
     }
   }
   return (
-    <Shell title="Create your private vault">
+    <Shell title="Choose a vault password" kicker="Step 1 · password" step="Step 1 of 2">
       <p className="muted">
         Your holdings are encrypted on this device before they are saved, so nobody else, including whoever runs this app, can read them. Choose a vault password that is separate from your Google sign-in.
       </p>
@@ -292,7 +362,7 @@ function RecoveryKey({ prepared, onDone, onBack }: { prepared: PreparedVault; on
     }
   }
   return (
-    <Shell title="Save your recovery key">
+    <Shell title="Save your recovery key" kicker="Step 2 · recovery key" step="Step 2 of 2" wide>
       <p className="muted">If you forget your vault password, this key is the only way back in. We cannot recover it for you. Save it in a password manager or print it, and keep it away from this device’s backups.</p>
       <div className="vault-recovery" data-testid="recovery-key">{prepared.recoverySecret}</div>
       <div className="vault-blocks" aria-hidden="true">
@@ -341,6 +411,7 @@ function Unlock({
   onOpen,
   onReset,
   email,
+  name,
 }: {
   status: Extract<VaultStatus, { state: 'locked' }>;
   mode: 'password' | 'recover' | 'reset';
@@ -348,6 +419,7 @@ function Unlock({
   onOpen: (session: VaultSession) => void;
   onReset: () => void;
   email: string;
+  name: string | null;
 }) {
   const [password, setPassword] = useState('');
   const [recovery, setRecovery] = useState('');
@@ -356,7 +428,9 @@ function Unlock({
   const [keep, setKeep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const stage = useStage(busy, ['Checking your password…', 'Deriving your key. This takes a few seconds.', 'Opening your ledger…']);
+  const stageIndex = useStageIndex(busy, STAGES.length);
+  const [show, setShow] = useState(false);
+  const firstName = (name ?? '').split(' ')[0];
   async function run(work: () => Promise<VaultSession | void>) {
     setBusy(true);
     setError('');
@@ -436,8 +510,41 @@ function Unlock({
       </Shell>
     );
   return (
-    <Shell title="Unlock your vault" kicker={`Welcome back, ${email}`}>
-      <p className="muted">Your portfolio is encrypted. Enter your vault password to open it. This is separate from your Google sign-in.</p>
+    <Shell
+      title={`Welcome back${firstName ? `, ${firstName}` : ''}`}
+      kicker={maskEmail(email)}
+      avatar={<Avatar email={email} />}
+      aside={
+        <>
+          {busy && (
+            <section className="vault-sidecard" aria-live="polite">
+              <p className="lbl">Unlocking</p>
+              <h3>Opening your vault</h3>
+              <ol className="vault-stages">
+                {STAGES.map((label, n) => (
+                  <li key={label} data-state={n < stageIndex ? 'done' : n === stageIndex ? 'active' : 'todo'}>
+                    <span className="ck">{n < stageIndex ? <Check size={13} /> : n === stageIndex ? <Spinner className="size-3" /> : null}</span>
+                    {label}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+          <section className="vault-sidecard">
+            <h3>Forgot your vault password?</h3>
+            <p className="muted">Your recovery key opens the vault and lets you set a new password.</p>
+            <button type="button" className="vault-row-btn" data-slot="row" onClick={() => setMode('recover')} disabled={busy}>
+              <ShieldCheck size={18} /> Use my recovery key <ChevronRight size={16} />
+            </button>
+            <hr />
+            <p className="muted small">Lost both?</p>
+            <button type="button" className="vault-row-btn danger" data-slot="row" onClick={() => setMode('reset')} disabled={busy}>
+              Erase my vault and start again <ChevronRight size={16} />
+            </button>
+          </section>
+        </>
+      }
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -454,11 +561,17 @@ function Unlock({
       >
         <label>
           Vault password
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={busy} autoFocus required />
+          <span className="vault-field">
+            <input type={show ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={busy} autoFocus required />
+            <button type="button" data-slot="eye" aria-label={show ? 'Hide password text' : 'Show password text'} onClick={() => setShow((v) => !v)}>
+              {show ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </span>
         </label>
         <label className="vault-keep">
-          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} disabled={busy} />
-          <span>Keep me unlocked in this tab. Reloading won’t ask again until I close the tab, lock, or go idle for 15 minutes. Don’t use this on a shared computer.</span>
+          <span>Keep me unlocked in this tab</span>
+          <input type="checkbox" role="switch" checked={keep} onChange={(e) => setKeep(e.target.checked)} disabled={busy} />
+          <small>Reloading won’t ask again until you close the tab, lock, or go idle for 15 minutes. Don’t use this on a shared computer.</small>
         </label>
         {error && (
           <p role="alert" className="notice error vault-shake" key={error}>
@@ -466,17 +579,12 @@ function Unlock({
           </p>
         )}
         <button type="submit" disabled={busy || !password}>
-          <LockKeyhole size={16} /> {busy ? 'Unlocking…' : 'Unlock'}
+          {busy ? <Spinner className="size-4" /> : <LockKeyhole size={17} />} {busy ? 'Unlocking…' : 'Unlock'}
         </button>
-        {busy && <p className="vault-progress"><Spinner className="size-4" /> {stage}</p>}
       </form>
-      <div className="vault-links">
-        <button type="button" className="signin-link" onClick={() => setMode('recover')} disabled={busy}>
-          Forgot password?
-        </button>
-        <SignOut />
-      </div>
-      <p className="vault-lock-note">The vault locks after 15 minutes without activity.</p>
+      <button type="button" className="signin-link" onClick={() => setMode('recover')} disabled={busy}>
+        Forgot password?
+      </button>
     </Shell>
   );
 }

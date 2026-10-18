@@ -13,6 +13,7 @@ import UsageDashboard from './usage-dashboard';
 import { UserAvatar } from './user-avatar';
 import './dashboard-styles';
 import './admin.css';
+import './redesign-admin.css';
 
 const ICONS = { overview: LayoutDashboard, health: Activity, platform: Cloud, analytics: BarChart3, audit: ScrollText, accounts: Users } as const;
 
