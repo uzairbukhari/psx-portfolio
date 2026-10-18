@@ -133,7 +133,6 @@ html:root .company-lower .company-section{margin-top:16px}
 html:root .company-dividends-card .lbl{display:flex;justify-content:space-between;gap:8px}
 
 /* Insights */
-html:root .reports-intro-header .eyebrow{display:none}
 html:root .reports-intro-header p:not(.eyebrow){font-size:13px;max-width:none}
 html:root .reports-hero-stats.slab{gap:0;padding:22px 8px;border-radius:20px;grid-template-columns:repeat(4,minmax(0,1fr))}
 html:root .reports-hero-stats.slab .reports-priced-value{background:transparent;border:0;border-radius:0;padding:4px 22px;border-left:1px solid rgba(255,255,255,.08)}
@@ -156,3 +155,11 @@ html:root .plan-stair{width:100%;min-height:190px}
 html:root .plan-lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:16px;align-items:start;margin-top:16px}
 html:root .plan-lower>.panel{margin:0}
 @media(max-width:900px){html:root .plan-hero,html:root .plan-lower{grid-template-columns:1fr}}
+
+/* Round 4: compact charts, header to the right */
+html:root .header-right{justify-content:flex-end;width:100%}
+html:root .value-chart{min-height:0}
+html:root .value-chart-canvas{min-height:0;height:210px;flex:none}
+html:root .hero-slab{padding-top:20px;padding-bottom:18px}
+html:root .report-chart--trend,html:root .report-chart--activity,html:root .report-chart--medium,html:root .report-chart--square{min-height:200px;max-height:240px}
+html:root .plan-stair{min-height:150px;max-height:170px}

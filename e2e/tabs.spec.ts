@@ -4,7 +4,7 @@ import { expect, test } from './fixtures';
 const PAGES: [string, RegExp][] = [
   ['/reports', /portfolio reports/i],
   ['/insights', /portfolio reports/i],
-  ['/plan', /Money put in, month by month/],
+  ['/plan', /Your staircase/i],
   ['/sip', /Where should this month/],
   ['/monthly-picks', /Where should this month/],
   ['/activity', /Every buy, sale, dividend and split/],
