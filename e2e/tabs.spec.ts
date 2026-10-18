@@ -3,7 +3,10 @@ import { expect, test } from './fixtures';
 // Every top-level page opens with its content (the seed keeps the vault unlocked in this tab across navigations).
 const PAGES: [string, RegExp][] = [
   ['/reports', /portfolio reports/i],
+  ['/insights', /portfolio reports/i],
+  ['/plan', /Money put in, month by month/],
   ['/sip', /Where should this month/],
+  ['/monthly-picks', /Where should this month/],
   ['/activity', /Every buy, sale, dividend and split/],
   ['/research-desk', /Research queue & dossiers/],
   ['/ai-lab', /Holdings review/],
@@ -35,4 +38,15 @@ test('theme switch applies to the page', async ({ app }) => {
   await expect(app.locator('html')).toHaveAttribute('data-theme', 'dark');
   await app.getByText('Light', { exact: true }).first().click();
   await expect(app.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
+test('sidebar collapses to a rail and remembers it', async ({ app }) => {
+  const nav = app.getByRole('navigation', { name: 'Main' });
+  await expect(nav.getByRole('link', { name: /Holdings/ })).toBeVisible();
+  await app.getByRole('button', { name: 'Collapse menu' }).click();
+  await expect(app.locator('html')).toHaveAttribute('data-side', 'rail');
+  await app.reload();
+  await expect(app.locator('html')).toHaveAttribute('data-side', 'rail');
+  await app.getByRole('button', { name: 'Expand menu' }).click();
+  await expect(app.locator('html')).toHaveAttribute('data-side', 'pinned');
 });

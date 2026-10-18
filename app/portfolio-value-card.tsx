@@ -155,7 +155,7 @@ export default function PortfolioValueCard({
       className={
         chartOnly
           ? `value-card value-card--chart-only${aside ? ' value-card--with-aside' : ''}${aside && shortAside ? ' value-card--short-aside' : ''}`
-          : 'panel value-card'
+          : 'panel slab value-card'
       }
     >
       <div className="value-card-body">

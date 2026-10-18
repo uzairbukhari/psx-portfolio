@@ -115,7 +115,7 @@ export default function AccountOverview({
 
   return (
     <div className="overview">
-      <section className="panel overview-hero" aria-label="Net worth">
+      <section className="panel overview-hero slab" aria-label="Net worth">
         <div className="overview-hero__main">
           <span className="value-card-label">Net worth · all portfolios</span>
           <strong className="amount overview-hero__value">

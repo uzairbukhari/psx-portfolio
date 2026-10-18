@@ -40,9 +40,28 @@ type View =
 
 const message = (error: unknown) => (error instanceof Error ? error.message : 'Something went wrong. Try again.');
 
-function Shell({ title, children }: { title: string; children: ReactNode }) {
+/** Passwords are scored by length and variety only, on this device. The meter is a hint, not a rule. */
+function strengthOf(password: string): { score: number; label: string } {
+  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((re) => re.test(password)).length;
+  const raw = password.length >= MIN_PASSWORD_CHARS ? Math.min(4, Math.floor(password.length / 6) + (classes > 2 ? 1 : 0)) : Math.min(1, password.length ? 1 : 0);
+  const score = password.length >= MIN_PASSWORD_CHARS ? Math.max(2, raw) : raw;
+  return { score, label: ['', 'Too short', 'Okay', 'Good', 'Strong'][score] ?? '' };
+}
+
+/** Tells the person what the key derivation is doing, so a few seconds of waiting reads as progress. */
+function useStage(busy: boolean, stages: string[]) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (!busy) return setI(0);
+    const id = window.setInterval(() => setI((n) => Math.min(n + 1, stages.length - 1)), 1500);
+    return () => window.clearInterval(id);
+  }, [busy, stages.length]);
+  return stages[Math.min(i, stages.length - 1)];
+}
+
+function Shell({ title, kicker, children }: { title: string; kicker?: string; children: ReactNode }) {
   return (
-    <main className="load-error">
+    <main className="load-error vault-stage always-dark">
       <div className="signin-card vault-card">
         <div className="brand" style={{ marginBottom: 18 }}>
           <LogoMark size={26} />
@@ -51,6 +70,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
         <span className="signin-mark">
           <LockKeyhole size={22} />
         </span>
+        {kicker && <p className="vault-kicker">{kicker}</p>}
         <h2>{title}</h2>
         {children}
       </div>
@@ -202,7 +222,19 @@ function Setup({ onPrepared }: { onPrepared: (prepared: PreparedVault) => void }
           Vault password
           <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={busy} required />
         </label>
-        <p className="vault-hint muted">At least {MIN_PASSWORD_CHARS} characters. A passphrase of four or five random words works well, and a password manager can generate and store one.</p>
+        <div className="vault-meter" aria-live="polite">
+          <div className="vault-meter-bar" data-score={strengthOf(password).score}>
+            {[1, 2, 3, 4].map((n) => (
+              <i key={n} data-on={strengthOf(password).score >= n ? '' : undefined} />
+            ))}
+          </div>
+          <span>{password ? strengthOf(password).label : 'Strength'}</span>
+        </div>
+        <ul className="vault-checks">
+          <li data-ok={password.length >= MIN_PASSWORD_CHARS ? '' : undefined}>At least {MIN_PASSWORD_CHARS} characters</li>
+          <li data-ok={password && password === again ? '' : undefined}>Both passwords match</li>
+        </ul>
+        <p className="vault-hint muted">A passphrase of four or five random words works well, and a password manager can generate and store one.</p>
         <label>
           Repeat password
           <input type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} disabled={busy} required />
@@ -263,6 +295,11 @@ function RecoveryKey({ prepared, onDone, onBack }: { prepared: PreparedVault; on
     <Shell title="Save your recovery key">
       <p className="muted">If you forget your vault password, this key is the only way back in. We cannot recover it for you. Save it in a password manager or print it, and keep it away from this device’s backups.</p>
       <div className="vault-recovery" data-testid="recovery-key">{prepared.recoverySecret}</div>
+      <div className="vault-blocks" aria-hidden="true">
+        {prepared.recoverySecret.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.map((block, i) => (
+          <span key={i}>{block}</span>
+        ))}
+      </div>
       <div className="vault-actions">
         <button
           type="button"
@@ -273,6 +310,9 @@ function RecoveryKey({ prepared, onDone, onBack }: { prepared: PreparedVault; on
         </button>
         <button type="button" className="secondary compact" onClick={save}>
           Download
+        </button>
+        <button type="button" className="secondary compact" onClick={() => window.print()}>
+          Print
         </button>
       </div>
       <label>
@@ -316,6 +356,7 @@ function Unlock({
   const [keep, setKeep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const stage = useStage(busy, ['Checking your password…', 'Deriving your key. This takes a few seconds.', 'Opening your ledger…']);
   async function run(work: () => Promise<VaultSession | void>) {
     setBusy(true);
     setError('');
@@ -366,6 +407,9 @@ function Unlock({
         <button type="button" className="signin-link" onClick={() => setMode('password')} disabled={busy}>
           Back
         </button>
+        <button type="button" className="signin-link vault-danger-link" onClick={() => setMode('reset')} disabled={busy}>
+          Lost both? Erase the vault
+        </button>
       </Shell>
     );
   if (mode === 'reset')
@@ -392,7 +436,7 @@ function Unlock({
       </Shell>
     );
   return (
-    <Shell title="Unlock your vault">
+    <Shell title="Unlock your vault" kicker={`Welcome back, ${email}`}>
       <p className="muted">Your portfolio is encrypted. Enter your vault password to open it. This is separate from your Google sign-in.</p>
       <form
         onSubmit={(e) => {
@@ -417,21 +461,18 @@ function Unlock({
           <span>Keep me unlocked in this tab. Reloading won’t ask again until I close the tab, lock, or go idle for 15 minutes. Don’t use this on a shared computer.</span>
         </label>
         {error && (
-          <p role="alert" className="notice error">
+          <p role="alert" className="notice error vault-shake" key={error}>
             {error}
           </p>
         )}
         <button type="submit" disabled={busy || !password}>
           <LockKeyhole size={16} /> {busy ? 'Unlocking…' : 'Unlock'}
         </button>
-        {busy && <p className="vault-progress"><Spinner className="size-4" /> Deriving your key. This takes a few seconds.</p>}
+        {busy && <p className="vault-progress"><Spinner className="size-4" /> {stage}</p>}
       </form>
       <div className="vault-links">
         <button type="button" className="signin-link" onClick={() => setMode('recover')} disabled={busy}>
-          Forgot password? Use your recovery key
-        </button>
-        <button type="button" className="signin-link" onClick={() => setMode('reset')} disabled={busy}>
-          Lost both? Erase the vault
+          Forgot password?
         </button>
         <SignOut />
       </div>

@@ -61,6 +61,10 @@ import {
   Microscope,
   LockKeyhole,
   ShieldCheck,
+  TrendingUp,
+  PanelLeft,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
 import {
@@ -109,6 +113,7 @@ import {
   AllReports,
   LedgerTimeline,
   MonthlyPicks,
+  PlanPage,
   CompanyDetail,
   GoldSilverSection,
   ForeignCurrencySection,
@@ -194,11 +199,13 @@ import type {
   PriceHistoryResponse,
 } from '@/lib/api-types';
 import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
+import { useSidebar } from './use-sidebar';
 import { flushAnalytics, hookGlobalErrors, reportError, track } from './analytics';
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
   reports: '/reports',
+  'sip-plan': '/plan',
   sip: '/sip',
   history: '/activity',
   'research-desk': '/research-desk',
@@ -209,6 +216,8 @@ const TAB_PATHS: Record<string, string> = {
 const PATH_TABS: Record<string, string> = Object.fromEntries([
   ...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
   ['/history', 'history'],
+  ['/insights', 'reports'],
+  ['/monthly-picks', 'sip'],
 ]);
 const ASSET_PATHS = { metal: 'gold', plan: 'plans', currency: 'currency' } as const;
 const COMPANY_PATH = new RegExp('^/company/([A-Za-z0-9]{2,12})/?$');
@@ -794,6 +803,7 @@ function DashboardContent({
     planFromPathname(initialPathname),
   );
   useRouteMeta(tab, tab === 'company' ? companyTicker : undefined);
+  const side = useSidebar();
   function setTab(requested: string) {
     const next = allowTab(requested, isAdmin);
     setTabState(next);
@@ -1524,7 +1534,7 @@ function DashboardContent({
           : 'holdings'
         : tab === 'history'
           ? 'activity'
-          : tab === 'reports' || tab === 'sip' || tab === 'settings' || tab === 'notifications'
+          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'settings' || tab === 'notifications'
             ? tab
             : null;
     if (screen) track('screen_viewed', { screen });
@@ -2099,7 +2109,7 @@ function DashboardContent({
     tab === 'plan' ||
     tab === 'notifications';
   // A portfolio with nothing in it shows only its start screen: no tabs to open.
-  const hideTabs = chromeless || (p.companies.length === 0 && !hasAssets);
+  const hideTabs = p.companies.length === 0 && !hasAssets;
   const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
@@ -2665,15 +2675,18 @@ function DashboardContent({
   }
   const navItems: NavItem[] = [
     { tab: 'holdings', href: '/', label: 'Holdings', short: 'Holdings', icon: <Wallet className="tab-icon" aria-hidden="true" /> },
-    { tab: 'reports', href: '/reports', label: 'Reports', short: 'Reports', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
-    { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
+    { tab: 'reports', href: '/reports', label: 'Insights', short: 'Insights', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
     ...(hasStocks
-      ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
+      ? [
+          { tab: 'sip-plan', href: '/plan', label: 'Plan', short: 'Plan', icon: <TrendingUp className="tab-icon" aria-hidden="true" /> },
+          { tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> },
+        ]
       : []),
+    { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
     ...(isAdmin
       ? [
-          { tab: 'research-desk', href: '/research-desk', label: 'Research desk', short: 'Research', icon: <FlaskConical className="tab-icon" aria-hidden="true" /> },
-          { tab: 'ai-lab', href: '/ai-lab', label: 'AI Lab', short: 'AI Lab', icon: <Microscope className="tab-icon" aria-hidden="true" /> },
+          { tab: 'research-desk', href: '/research-desk', label: 'Research desk', short: 'Research', badge: 'Admin', extra: true, divider: true, icon: <FlaskConical className="tab-icon" aria-hidden="true" /> },
+          { tab: 'ai-lab', href: '/ai-lab', label: 'AI Lab', short: 'AI Lab', extra: true, icon: <Microscope className="tab-icon" aria-hidden="true" /> },
         ]
       : []),
   ];
@@ -2691,7 +2704,8 @@ function DashboardContent({
           }}
         />
         <div className="flex flex-col gap-2">
-          <header className={'app-header' + (hideTabs ? ' no-tabs' : '')}>
+          <header className={'app-header' + (hideTabs ? ' no-tabs' : '') + (chromeless ? ' chromeless' : '')}>
+            <div className="side">
             <div className="header-brand-group">
               <button
                 type="button"
@@ -2706,9 +2720,46 @@ function DashboardContent({
                 <LogoMark size={28} />
                 <Wordmark />
               </button>
-              {tab !== 'settings' && workspace?.selector}
+            </div>
+            {!hideTabs && (
+              <AppNav
+                items={navItems}
+                active={tab}
+                onNavigate={setTab}
+                onAdd={() => openTx('buy', tab === 'company' ? companyTicker : '')}
+                addDisabled={busy}
+              />
+            )}
+            {!hideTabs && (
+              <div className="side-tools">
+                <button
+                  type="button"
+                  data-slot="side-tool"
+                  className="side-tool"
+                  aria-label={side.mode === 'pinned' ? 'Collapse menu' : 'Expand menu'}
+                  title={(side.mode === 'pinned' ? 'Collapse menu' : 'Expand menu') + ' ( [ )'}
+                  onClick={() => side.setMode(side.mode === 'pinned' ? 'rail' : 'pinned')}
+                >
+                  <PanelLeft size={18} aria-hidden="true" />
+                  <span className="tab-long">Collapse</span>
+                </button>
+                <button
+                  type="button"
+                  data-slot="side-tool"
+                  className="side-tool"
+                  aria-pressed={side.mode !== 'auto'}
+                  aria-label={side.mode === 'auto' ? 'Keep menu pinned' : 'Open menu on hover'}
+                  title={side.mode === 'auto' ? 'Keep menu pinned' : 'Open menu on hover'}
+                  onClick={() => side.setMode(side.mode === 'auto' ? 'pinned' : 'auto')}
+                >
+                  {side.mode === 'auto' ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
+                  <span className="tab-long">{side.mode === 'auto' ? 'Pin menu' : 'Unpin'}</span>
+                </button>
+              </div>
+            )}
             </div>
             <div className="header-right">
+              {tab !== 'settings' && workspace?.selector}
               {tab !== 'settings' && (
               <button
                 type="button"
@@ -2881,13 +2932,6 @@ function DashboardContent({
                 </DropdownMenu>
               )}
             </div>
-            {!hideTabs && (
-              <AppNav
-                items={navItems}
-                active={tab}
-                onNavigate={setTab}
-              />
-            )}
           </header>
           <NavPanel id="holdings" tab={tab}>
             {p.companies.length === 0 && !hasAssets ? (
@@ -3502,6 +3546,14 @@ function DashboardContent({
             ) : (
               <PortfolioReports portfolio={p} />
             )}
+          </NavPanel>
+          <NavPanel id="sip-plan" tab={tab}>
+            <PlanPage
+              portfolio={picksPortfolio ?? p}
+              month={month}
+              onOpenPicks={() => setTab('sip')}
+              onOpenCompany={openCompany}
+            />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>
             {!hasStocks ? (

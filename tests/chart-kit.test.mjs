@@ -129,7 +129,8 @@ test('time series: zoom for long series, markers and reference lines, split colo
   });
   assert.equal(o.dataZoom.length, 2);
   assert.ok(o.series[0].markLine);
-  assert.equal(o.series[0].markPoint.data.length, 1);
+  assert.equal(o.series[0].markPoint.data.filter((d) => d.name).length, 1);
+  assert.equal(o.series[0].markPoint.data.length, 2, 'the newest point glows');
   assert.equal(o.visualMap[0].pieces[0].color, t.success);
   assert.equal(o.yAxis.scale, false);
   const short = timeSeriesOption(t, {
@@ -211,7 +212,7 @@ test('time series drops reference lines and markers without a finite value', asy
   });
   const s = o.series[0];
   assert.equal(s.markLine.data.length, 1);
-  assert.equal(s.markPoint.data.length, 1);
+  assert.equal(s.markPoint.data.filter((d) => d.name).length, 1);
 });
 
 // Draws every builder with ECharts itself (server-side SVG): a bad option throws here instead of in a user's browser.

@@ -6,3 +6,4 @@ import './ai-lab.css';
 import './reports.css';
 import './account-overview.css';
 import './settings.css';
+import './redesign.css';

@@ -33,7 +33,7 @@ export function LandingPage({
     ? (ERROR_COPY[errorCode] ?? 'Sign-in failed. Try again.')
     : '';
   return (
-    <main className="landing">
+    <main className="landing always-dark">
       <LandingNav returnTo={returnTo} onLanding />
       <Hero returnTo={returnTo} error={error} />
       <AssetsSection />
