@@ -118,7 +118,7 @@ fun MoreScreen(
         UsageCard()
         DevicesCard(ui, settings)
         DeleteCard(user, ui, settings, onAccountDeleted)
-        UpdateCard(updates, includePrereleases = user.role == "super_admin")
+        if (BuildConfig.SELF_UPDATE) UpdateCard(updates, includePrereleases = user.role == "super_admin")
         Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lock_now)) }
         OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sign_out)) }
     }
