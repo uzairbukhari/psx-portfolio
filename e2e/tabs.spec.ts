@@ -7,7 +7,7 @@ const PAGES: [string, RegExp][] = [
   ['/plan', /Your staircase/i],
   ['/sip', /Where should this month/],
   ['/monthly-picks', /Where should this month/],
-  ['/activity', /Every buy, sale, dividend and split/],
+  ['/activity', /Every trade, dividend and asset entry/],
   ['/research-desk', /Research queue & dossiers/],
   ['/ai-lab', /Holdings review/],
   ['/settings', /Manage your account, tax status and portfolio data/],
