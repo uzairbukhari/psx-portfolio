@@ -287,3 +287,26 @@ html:root .mp-table tbody tr:hover td{background:rgb(var(--ch-primary) / .05)}
 html:root .mp-history{border-radius:20px}
 html:root .mp-history__item{border-radius:14px;background:var(--muted)}
 @media(max-width:760px){html:root .mp-summary.slab .mp-kpis{grid-template-columns:1fr 1fr;gap:12px}html:root .mp-summary.slab .mp-kpis div{border-left:0;padding:4px 8px}}
+
+/* Phone header and Insights numbers */
+@media(max-width:760px){
+  html:root .hdr-search{width:44px;flex:none;padding:0 13px;overflow:hidden;transition:width .2s}
+  html:root .hdr-search input{width:0;flex:0 0 0}
+  html:root .hdr-search:focus-within{width:min(100%,calc(100vw - 150px));flex:1}
+  html:root .hdr-search:focus-within input{width:auto;flex:1 1 auto}
+  html:root .header-right:has(.hdr-search:focus-within) .page-id{display:none}
+  html:root .header-right .page-id b{font-size:18px}
+  html:root .header-right .hdr-btn[aria-label="Add transaction"]{padding:0 12px!important}
+  html:root .header-right .hdr-btn[aria-label="Add transaction"] .hdr-label{display:none}
+  html:root .reports-hero-stats.slab .reports-priced-value strong{font-size:19px;overflow-wrap:normal}
+  html:root .company-price{font-size:24px}
+}
+@media(max-width:760px){
+  html:root .header-right .hdr-btn[aria-label="Refresh prices"],html:root .header-right .hdr-btn[aria-label="Add transaction"]{display:none!important}
+  html:root .header-right{gap:8px}
+  html:root .header-right .page-id{flex:1}
+}
+@media(max-width:760px){
+  html:root .header-right{width:auto;flex:1 1 0;min-width:0;margin:0;padding:0}
+  html:root .header-right .page-id b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
