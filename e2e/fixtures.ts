@@ -55,7 +55,8 @@ export const isLocal = !isStaging;
 
 /** Picks a portfolio in the header switcher and waits for the app to finish reloading it. */
 export async function choosePortfolio(page: Page, name: string) {
-  await page.locator('select').first().selectOption({ label: name });
+  await page.getByRole('button', { name: 'Select portfolio' }).click();
+  await page.getByRole('menuitem', { name, exact: false }).first().click();
   // A portfolio with no records shows the "Start your portfolio" screen instead of the tabs.
   await expect(page.getByRole('navigation', { name: 'Main' }).first().or(page.getByText('Start your portfolio'))).toBeVisible({ timeout: 30_000 });
 }

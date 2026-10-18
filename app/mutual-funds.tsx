@@ -509,6 +509,7 @@ export default function MutualFundsSection({
   return (
     <>
       <CollapsiblePanel
+        flat
         id="mutual-funds"
         title="Mutual funds"
         badge={`${totals.held} held`}

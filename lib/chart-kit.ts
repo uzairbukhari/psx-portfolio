@@ -613,7 +613,7 @@ export function barOption(t: ChartTokens, c: BarCfg): EChartsOption {
       type: 'category',
       data: c.cats,
       ...axisCommon(t),
-      axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true },
+      axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true, fontFamily: t.mono },
     },
     yAxis: valueAxis(t, c.axisFormat ?? compact, {
       name: c.yName,
@@ -629,9 +629,9 @@ export function barOption(t: ChartTokens, c: BarCfg): EChartsOption {
           ? { value: v, itemStyle: { color: v >= 0 ? t.success : t.danger } }
           : v,
       ),
-      barMaxWidth: 36,
+      barMaxWidth: 26,
       cursor: c.selectable ? 'pointer' : 'default',
-      itemStyle: { color: s.color, borderRadius: c.stack ? 0 : [6, 6, 0, 0] },
+      itemStyle: { color: s.color, borderRadius: c.stack ? 0 : [8, 8, 8, 8] },
       emphasis: { focus: 'series' as const, itemStyle: { opacity: 0.85 } },
     })),
   } as EChartsOption;
@@ -717,9 +717,9 @@ export function hBarOption(t: ChartTokens, c: HBarCfg): EChartsOption {
               }
             : v,
         ),
-        barMaxWidth: 22,
+        barMaxWidth: 14,
         cursor: c.selectable ? 'pointer' : 'default',
-        itemStyle: { color: c.color ?? t.primary, borderRadius: 4 },
+        itemStyle: { color: c.color ?? t.primary, borderRadius: 7 },
         label: {
           show: true,
           position: 'right',
@@ -780,7 +780,7 @@ export function donutOption(t: ChartTokens, c: DonutCfg): EChartsOption {
     series: [
       {
         type: 'pie',
-        radius: ['58%', '86%'],
+        radius: ['62%', '86%'],
         center: ['50%', '50%'],
         padAngle: 3,
         avoidLabelOverlap: true,

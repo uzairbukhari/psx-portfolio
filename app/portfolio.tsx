@@ -66,7 +66,7 @@ import {
   PanelLeft,
   Pin,
   PinOff,
-  Download,
+  Target,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
 import {
@@ -349,23 +349,6 @@ function CompanyLookupNote({
 }
 type HoldingsTab = 'stocks' | 'funds' | 'metal' | 'currency' | 'plan';
 const HOLDINGS_PREVIEW = 7;
-
-/** The stocks table as a CSV download: what is on screen, for a spreadsheet. */
-function exportHoldingsCsv(
-  rows: { ticker: string; name: string; sector?: string; shares: number; average: number | null; quote?: { price: number } | null; value: number | null; gain: number | null }[],
-) {
-  const cell = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [
-    ['Ticker', 'Name', 'Sector', 'Shares', 'Avg cost', 'Price', 'Value', 'Gain'].map(cell).join(','),
-    ...rows.map((h) => [h.ticker, h.name, h.sector, h.shares, h.average, h.quote?.price, h.value, h.gain].map(cell).join(',')),
-  ];
-  const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'sipwise-holdings.csv';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 type HoldingsSortKey =
   | 'name'
@@ -713,7 +696,7 @@ type DashboardProps = {
 export default function Dashboard(props: DashboardProps) {
   if (!props.email) return <DashboardContent {...props} vault={null} />;
   return (
-    <VaultGate email={props.email} name={props.name}>
+    <VaultGate email={props.email} name={props.name} picture={props.picture}>
       {(session, lock) => (
         <PortfolioWorkspace
           session={session}
@@ -2858,6 +2841,64 @@ function DashboardContent({
         ]
       : []),
   ];
+  const accountMenu = (withName: boolean) => email ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="account-trigger">
+        <UserAvatar name={name} email={email} picture={picture} />
+        {withName && (
+            <span className="account-who">
+              <b>{name || email}</b>
+              <small>{vault ? 'Vault unlocked' : 'Signed in'}</small>
+            </span>
+          )}
+          <ChevronDown size={14} className="account-chevron" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="account-menu">
+        <div className="account-menu-header">
+          <UserAvatar
+            name={name}
+            email={email}
+            picture={picture}
+            large
+          />
+          <div>
+            {name && (
+              <span className="account-menu-name">{name}</span>
+            )}
+            <span className="account-menu-email">{email}</span>
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setTab('settings')}>
+          <Settings size={15} /> Settings
+        </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
+            <ShieldCheck size={15} /> Admin console
+          </DropdownMenuItem>
+        )}
+        <ThemeMenuItems />
+        {vault && (
+          <DropdownMenuItem onClick={vault.lock}>
+            <LockKeyhole size={15} /> Lock vault
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => {
+            track('signed_out');
+            void flushAnalytics().finally(() => {
+              window.location.href = '/api/auth/logout';
+            });
+          }}
+        >
+          <LogOut size={15} /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
+
   return (
     <CompanyNavProvider value={openCompany}>
       <main className="desk">
@@ -2899,6 +2940,7 @@ function DashboardContent({
                 addDisabled={busy}
               />
             )}
+            {!hideTabs && email && <div className="side-user">{accountMenu(true)}</div>}
             {!hideTabs && (
               <div className="side-tools">
                 <button
@@ -2928,7 +2970,7 @@ function DashboardContent({
             )}
             </div>
             <div className="header-right">
-              {tab !== 'settings' && tab !== 'company' && (
+              {tab !== 'settings' && tab !== 'company' && tab !== 'sip-plan' && (
                 <div className="page-id">
                   <small>
                     {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -2968,21 +3010,6 @@ function DashboardContent({
                 >
                   <RefreshCw size={18} />
                 </button>
-              )}
-              {tab !== 'settings' && (
-              <button
-                type="button"
-                data-slot="hdr"
-                className="hdr-btn"
-                disabled={busy}
-                aria-label="Add transaction"
-                onClick={() =>
-                  openTx('buy', tab === 'company' ? companyTicker : '')
-                }
-              >
-                <Plus size={18} />
-                <span className="hdr-label">Add</span>
-              </button>
               )}
               <Popover
                 open={bellOpen}
@@ -3089,57 +3116,22 @@ function DashboardContent({
                   </div>
                 </PopoverContent>
               </Popover>
-              {email && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="account-trigger">
-                    <UserAvatar name={name} email={email} picture={picture} />
-                    <ChevronDown size={14} className="account-chevron" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="account-menu">
-                    <div className="account-menu-header">
-                      <UserAvatar
-                        name={name}
-                        email={email}
-                        picture={picture}
-                        large
-                      />
-                      <div>
-                        {name && (
-                          <span className="account-menu-name">{name}</span>
-                        )}
-                        <span className="account-menu-email">{email}</span>
-                      </div>
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setTab('settings')}>
-                      <Settings size={15} /> Settings
-                    </DropdownMenuItem>
-                    {isAdmin && (
-                      <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
-                        <ShieldCheck size={15} /> Admin console
-                      </DropdownMenuItem>
-                    )}
-                    <ThemeMenuItems />
-                    {vault && (
-                      <DropdownMenuItem onClick={vault.lock}>
-                        <LockKeyhole size={15} /> Lock vault
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => {
-                        track('signed_out');
-                        void flushAnalytics().finally(() => {
-                          window.location.href = '/api/auth/logout';
-                        });
-                      }}
-                    >
-                      <LogOut size={15} /> Sign out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              {tab !== 'settings' && (
+              <button
+                type="button"
+                data-slot="hdr"
+                className="hdr-btn"
+                disabled={busy}
+                aria-label="Add transaction"
+                onClick={() =>
+                  openTx('buy', tab === 'company' ? companyTicker : '')
+                }
+              >
+                <Plus size={18} />
+                <span className="hdr-label">Add</span>
+              </button>
               )}
+              {email && <div className="account-phone">{accountMenu(false)}</div>}
             </div>
           </header>
           <NavPanel id="holdings" tab={tab}>
@@ -3305,51 +3297,18 @@ function DashboardContent({
                             type="button"
                             data-slot="ghost"
                             className="holdings-export"
-                            onClick={() => exportHoldingsCsv(displayedHoldings)}
+                            disabled={busy || locked}
+                            onClick={() =>
+                              isAll ? setNamedAction(true) : setTargetsOpen(true)
+                            }
                           >
-                            <Download size={15} /> Export
+                            <Target size={15} /> Targets
                           </button>
                         </div>
                       )}
                     </div>
                     {tabNow === 'stocks' && (
                     <>
-                    <div className="holdings-head holdings-head--inline">
-                      <button
-                        className="secondary compact holdings-add holdings-targets"
-                        disabled={busy || locked}
-                        onClick={() =>
-                          isAll ? setNamedAction(true) : setTargetsOpen(true)
-                        }
-                      >
-                        Targets
-                      </button>
-                      <button
-                        className="secondary compact holdings-add"
-                        disabled={busy}
-                        aria-label="Add company"
-                        onClick={() => {
-                          if (isAll) {
-                            setNamedAction(true);
-                            return;
-                          }
-                          if (locked) return;
-                          setCreatingCompany(true);
-                          setCompany({
-                            ticker: '',
-                            name: '',
-                            sector: '',
-                            target: 0,
-                            approved: false,
-                            screenDate: '',
-                            note: '',
-                          });
-                        }}
-                      >
-                        <Plus size={15} />{' '}
-                        <span className="holdings-add__label">Add company</span>
-                      </button>
-                    </div>
                     <div className="holdings-cards">
                       {displayedHoldings.map((h) => (
                         <article className="holding-card" key={h.ticker}>

@@ -43,6 +43,7 @@ export default function CollapsiblePanel({
   actions,
   ariaLabel,
   className,
+  flat,
   children,
 }: {
   id: string;
@@ -53,10 +54,19 @@ export default function CollapsiblePanel({
   actions?: ReactNode;
   ariaLabel?: string;
   className?: string;
+  /** Always open and without a header: the body sits inside a card that already has its own title (Holdings tabs). */
+  flat?: boolean;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(() => !readOpen(id));
   const bodyId = `panel-body-${id}`;
+  if (flat)
+    return (
+      <section className={`flat-panel${className ? ` ${className}` : ''}`} aria-label={ariaLabel ?? title}>
+        {actions && <div className="flat-panel__actions">{actions}</div>}
+        {children}
+      </section>
+    );
   return (
     <section
       className={`panel collapsible${collapsed ? ' is-collapsed' : ''}${className ? ` ${className}` : ''}`}

@@ -124,10 +124,17 @@ function maskEmail(email: string) {
   return `${name[0]}${'•'.repeat(Math.min(7, name.length - 2))}${name.slice(-1)}@${domain}`;
 }
 
-function Avatar({ email }: { email: string }) {
+function Avatar({ email, picture }: { email: string; picture?: string | null }) {
   return (
     <div className="vault-avatar" aria-hidden="true">
-      <span>{(email[0] ?? 'S').toUpperCase()}</span>
+      <span>
+        {picture ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={picture} alt="" referrerPolicy="no-referrer" className="vault-avatar-img" />
+        ) : (
+          (email[0] ?? 'S').toUpperCase()
+        )}
+      </span>
       <i>
         <LockKeyhole size={15} />
       </i>
@@ -145,7 +152,7 @@ function SignOut() {
 
 const lengthOk = (value: string) => [...value.normalize('NFKC')].length >= MIN_PASSWORD_CHARS;
 
-export default function VaultGate({ email, name, children }: { email: string; name?: string | null; children: (session: VaultSession, lock: () => void) => ReactNode }) {
+export default function VaultGate({ email, name, picture, children }: { email: string; name?: string | null; picture?: string | null; children: (session: VaultSession, lock: () => void) => ReactNode }) {
   const [view, setView] = useState<View>({ kind: 'loading' });
   const sessionRef = useRef<VaultSession | null>(null);
 
@@ -262,7 +269,7 @@ export default function VaultGate({ email, name, children }: { email: string; na
   if (view.kind === 'setup') return <Setup onPrepared={(prepared) => setView({ kind: 'recovery-key', prepared })} />;
   if (view.kind === 'recovery-key')
     return <RecoveryKey prepared={view.prepared} onDone={open} onBack={() => (view.prepared.discard(), setView({ kind: 'setup' }))} />;
-  return <Unlock status={view.status} mode={view.mode} setMode={(mode) => setView({ ...view, mode })} onOpen={open} onReset={() => lockNow()} email={email} name={name ?? null} />;
+  return <Unlock status={view.status} mode={view.mode} setMode={(mode) => setView({ ...view, mode })} onOpen={open} onReset={() => lockNow()} email={email} name={name ?? null} picture={picture} />;
 }
 
 function Setup({ onPrepared }: { onPrepared: (prepared: PreparedVault) => void }) {
@@ -412,6 +419,7 @@ function Unlock({
   onReset,
   email,
   name,
+  picture,
 }: {
   status: Extract<VaultStatus, { state: 'locked' }>;
   mode: 'password' | 'recover' | 'reset';
@@ -420,6 +428,7 @@ function Unlock({
   onReset: () => void;
   email: string;
   name: string | null;
+  picture?: string | null;
 }) {
   const [password, setPassword] = useState('');
   const [recovery, setRecovery] = useState('');
@@ -513,7 +522,7 @@ function Unlock({
     <Shell
       title={`Welcome back${firstName ? `, ${firstName}` : ''}`}
       kicker={maskEmail(email)}
-      avatar={<Avatar email={email} />}
+      avatar={<Avatar email={email} picture={picture} />}
       aside={
         <>
           {busy && (

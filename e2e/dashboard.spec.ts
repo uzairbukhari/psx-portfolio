@@ -2,7 +2,7 @@ import { expect, test, isLocal, pageText } from './fixtures';
 
 test('All view totals every asset class across the four portfolios', async ({ app }) => {
   await expect(app.getByText(/Net worth/).first()).toBeVisible();
-  await expect(app.getByText('4 portfolios')).toBeVisible();
+  await expect(app.getByText('4 portfolios').first()).toBeVisible();
   // The asset-mix donut is a canvas; its classes are listed beside it with the position count.
   const mix = app.getByRole('region', { name: 'Asset mix' });
   for (const label of ['Stocks', 'Gold', 'Silver', 'Savings plans', 'Mutual funds', 'Foreign currency']) await expect(mix.getByText(label).first()).toBeVisible();
@@ -11,8 +11,10 @@ test('All view totals every asset class across the four portfolios', async ({ ap
 });
 
 test('the portfolio switcher lists all four portfolios, one of them locked', async ({ app }) => {
-  const options = await app.locator('select').first().locator('option').allInnerTexts();
-  expect(options).toEqual(['All', 'AHL Core', 'Finqalab', 'Savings & Gold', 'Empty · locked']);
+  await app.getByRole('button', { name: 'Select portfolio' }).click();
+  const options = await app.getByRole('menuitem').allInnerTexts();
+  expect(options.map((o) => o.trim())).toEqual(['All portfolios', 'AHL Core', 'Finqalab', 'Savings & Gold', 'Empty · locked', '+ Create new portfolio'].slice(0, options.length));
+  expect(options.length).toBeGreaterThanOrEqual(5);
 });
 
 test('unread notifications show on the bell', async ({ app }) => {

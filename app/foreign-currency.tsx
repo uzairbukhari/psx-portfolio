@@ -314,6 +314,7 @@ export default function ForeignCurrencySection({
   return (
     <>
       <CollapsiblePanel
+        flat
         id="foreign-currency"
         title="Foreign currency"
         badge={`${totals.held} held`}

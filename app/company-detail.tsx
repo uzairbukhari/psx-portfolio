@@ -26,6 +26,7 @@ import {
   type PricePoint,
 } from '@/lib/price-history';
 import LedgerTimeline from './ledger-timeline';
+import { cachedHoldings } from './portfolio-memo';
 import { buildEntries } from '@/lib/ledger-entries';
 import { readJson } from '@/lib/safe-json';
 import { useMarketGlance } from './use-market-glance';
@@ -342,6 +343,12 @@ export default function CompanyDetail({
     else onBack();
   };
   const held = (holding?.shares ?? 0) > 0;
+  const stocksValue = cachedHoldings(portfolio).reduce(
+    (a, h) => a + (h.value ?? 0),
+    0,
+  );
+  const weight =
+    summary.value !== null && stocksValue > 0 ? summary.value / stocksValue : null;
 
   const glance = useMarketGlance(
     [ticker],
@@ -414,7 +421,7 @@ export default function CompanyDetail({
         </div>
         <div className="company-actions">
           <button disabled={busy} onClick={onAddPurchase}>
-            <Plus size={16} /> Add transaction
+            <Plus size={16} /> Record trade
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -492,6 +499,17 @@ export default function CompanyDetail({
             </div>
             {summary.gain === null && (
               <p className="position-note">Needs cost and price for profit / loss.</p>
+            )}
+            {weight !== null && (
+              <div className="position-weight">
+                <div className="between">
+                  <span>Weight in stocks</span>
+                  <b className="num">{(weight * 100).toFixed(1)}%</b>
+                </div>
+                <div className="bar-track" aria-hidden="true">
+                  <i style={{ width: `${Math.min(100, weight * 100)}%` }} />
+                </div>
+              </div>
             )}
           </section>
           <section className="card company-dividends-card">

@@ -310,3 +310,134 @@ html:root .mp-history__item{border-radius:14px;background:var(--muted)}
   html:root .header-right{width:auto;flex:1 1 0;min-width:0;margin:0;padding:0}
   html:root .header-right .page-id b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+
+/* Profile lives in the sidebar on desktop; phones keep the header avatar. */
+html:root .account-phone{display:none}
+html:root .side-user{display:none}
+@media(min-width:761px){
+  html:root .side-user{display:block;padding-top:8px;border-top:1px solid var(--border)}
+  html:root .side-user .account-trigger{width:100%;border-radius:14px;border:0;background:transparent;padding:6px;gap:10px;box-shadow:none;backdrop-filter:none}
+  html:root .side-user .account-trigger:hover{background:var(--muted);box-shadow:none}
+  html:root .side-user .account-who{display:flex;flex-direction:column;align-items:flex-start;min-width:0;flex:1;line-height:1.25}
+  html:root .side-user .account-who b{font-size:13.5px;font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  html:root .side-user .account-who small{font-size:11.5px;color:var(--muted-foreground)}
+  html:root[data-side=rail] .side-user :is(.account-who,.account-chevron),html:root[data-side=auto] .side:not(:hover):not(:focus-within) .side-user :is(.account-who,.account-chevron){display:none}
+  html:root[data-side=rail] .side-user .account-trigger,html:root[data-side=auto] .side:not(:hover):not(:focus-within) .side-user .account-trigger{justify-content:center}
+}
+@media(max-width:760px){
+  html:root .account-phone{display:block}
+}
+
+/* Company page: closer to the mock. */
+html:root .company-price{font-size:40px;letter-spacing:-.02em}
+html:root .company-price .rs{font-size:18px;color:var(--muted-foreground);font-weight:500}
+html:root .company-head{align-items:flex-start}
+html:root .company-price{flex-direction:column;align-items:flex-end;gap:6px;margin-left:auto}
+html:root .company-grid .company-chart{height:400px;max-height:none}
+html:root .company-position .position-tiles>*{padding:12px 14px}
+html:root .company-position .position-tiles span{font-size:12.5px;color:var(--muted-foreground)}
+html:root .company-position .position-tiles b{font-size:20px}
+html:root .position-weight{margin-top:14px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .position-weight .between{display:flex;justify-content:space-between;margin-bottom:6px}
+html:root .position-weight .bar-track{height:5px;border-radius:99px;background:var(--muted);overflow:hidden}
+html:root .position-weight .bar-track i{display:block;height:100%;border-radius:99px;background:var(--primary)}
+html:root .company-lower{position:relative;padding:14px 18px}
+html:root .company-lower .company-section{margin-top:6px}
+html:root .company-lower .company-section>h2{display:none}
+html:root .company-lower .ledger-month>h4{display:none}
+html:root .company-lower .ledger-month{border:0;background:transparent;border-radius:0}
+html:root .company-lower .ledger-row{border-top:1px solid var(--border);padding:14px 6px;background:transparent}
+html:root .company-lower .ledger{gap:0}
+@media(min-width:901px){
+  html:root .company-lower .ledger-bar{position:absolute;top:14px;right:18px;margin:0}
+}
+
+/* Funds, Gold & silver, Currency and Plans use the Stocks table look. */
+html:root .flat-panel__actions{display:flex;justify-content:flex-end;margin:0 0 6px}
+html:root .flat-panel .fund-group{margin:0;border:0;border-radius:0;overflow:visible}
+html:root .flat-panel .fund-group__head{background:transparent;border:0;padding:10px 10px 4px}
+html:root .flat-panel .fund-group__head b{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;color:var(--muted-foreground)}
+html:root .flat-panel .fund-group__head small{display:inline;margin-left:8px}
+html:root .flat-panel .fund-table{font-size:13.5px}
+html:root .flat-panel .fund-table th{font-size:11px;letter-spacing:.08em;font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border)}
+html:root .flat-panel .fund-table td{padding:14px 10px;vertical-align:middle;border-top:0;border-bottom:1px solid var(--border)}
+html:root .flat-panel .fund-table tbody:last-child tr:last-child td{border-bottom:0}
+html:root .flat-panel .fund-table td:not(:first-child),html:root .flat-panel .fund-table th:not(:first-child){text-align:left}
+html:root .flat-panel .fund-table tbody tr:hover td{background:rgb(var(--ch-primary) / .05)}
+html:root .flat-panel .fund-table td b{font-size:14px;font-weight:600}
+html:root .flat-panel .fund-table td:not(:first-child){font-family:var(--font-geist-mono),monospace;font-variant-numeric:tabular-nums}
+html:root .flat-panel .fund-table td small{font-family:var(--font-geist-sans),sans-serif}
+
+/* Portfolio switcher: a card with the portfolio avatar, name, count and chevron. */
+html:root .pf-switch{display:flex!important;align-items:center;gap:12px;width:100%;max-width:none!important;height:56px!important;padding:0 12px!important;margin:0!important;border-radius:16px!important;border:1px solid var(--border)!important;background:var(--muted)!important;color:var(--foreground)!important;text-align:left;cursor:pointer;box-shadow:none!important}
+html:root .pf-switch:hover{border-color:rgb(var(--ch-primary) / .45)!important}
+html:root .pf-dots{display:inline-flex;align-items:center;flex:none;min-width:30px}
+html:root .pf-dots i{width:16px;height:16px;border-radius:50%;margin-left:-6px;border:2px solid var(--muted);background:var(--cat-1)}
+html:root .pf-dots i:first-child{margin-left:0}
+html:root .pf-dots i:nth-child(2){background:var(--cat-2)}
+html:root .pf-dots i:nth-child(3){background:var(--cat-3)}
+html:root .pf-dots.single{justify-content:center;width:30px;height:30px;border-radius:10px;background:var(--btn-grad);color:#fff;font-weight:700;font-size:13px}
+html:root .pf-text{display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.25}
+html:root .pf-text b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html:root .pf-text small{font-size:12px;color:var(--muted-foreground)}
+html:root .pf-chev{flex:none;color:var(--muted-foreground)}
+@media(max-width:760px){
+  html:root .pf-switch{height:44px!important;width:auto;max-width:170px!important;padding:0 10px!important;gap:8px}
+  html:root .pf-text small{display:none}
+}
+html:root .flat-panel .fund-group{margin:0!important}
+html:root .flat-panel .fund-group__head{padding:14px 10px 2px!important}
+html:root .flat-panel .fund-table th{padding:6px 10px}
+html:root .flat-panel .fund-table td{padding:11px 10px}
+
+/* Insights: tabs on one row, no intro text, tight spacing. */
+html:root .reports{padding:0 0 8px;display:flex;flex-direction:column;gap:14px}
+html:root .reports-intro{display:flex;flex-direction:column;gap:0;margin:0}
+html:root .reports-intro-header{display:none}
+html:root .reports-summary{display:none}
+html:root .reports>.reports-note,html:root .reports-intro>.reports-note{margin:0}
+html:root .reports-all{position:relative}
+html:root .reports-all>.reports-tabs{margin:0 0 14px!important}
+html:root .reports-tabs{position:static;top:auto;margin:0}
+html:root .reports>.reports-tabs[aria-label="Report section"]{order:-1;align-self:flex-end;margin:0}
+@media(min-width:901px){
+  html:root .reports-all>.reports:has(>.reports-tabs[aria-label="Report section"]){position:static}
+  html:root .reports-all>.reports>.reports-tabs[aria-label="Report section"]{position:absolute;top:0;right:0;z-index:2}
+  html:root .reports-all>.reports:has(>.reports-tabs[aria-label="Report section"]){padding-top:0}
+}
+html:root .reports-hero-stats.slab{padding:16px 6px;border-radius:18px}
+html:root .reports-hero-stats.slab .reports-priced-value strong{font-size:26px;margin:6px 0 4px}
+html:root .reports-grid{gap:14px}
+html:root .report-panel{padding:16px 18px}
+html:root .report-heading{margin-bottom:6px}
+html:root .report-heading h3{font-size:16px;font-weight:600;margin:2px 0 0}
+html:root .report-panel .chart-info{display:none}
+html:root .report-source{margin-top:8px;padding-top:8px;font-size:11.5px}
+
+/* Plan: tighter, closer to the mock. */
+html:root .plan-fresh{display:flex!important;flex-direction:column;gap:12px!important;padding:20px}
+html:root .plan-fresh>*{margin:0!important}
+html:root .plan-fresh .plan-fields{display:grid;grid-template-columns:1fr 1.3fr;gap:12px}
+html:root .plan-fresh .plan-fields label{display:grid;gap:6px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .plan-fresh .plan-fields input{height:44px;border-radius:12px}
+html:root .plan-fresh .plan-amount{height:64px;margin:0}
+html:root .plan-fresh .chip-row{display:flex;flex-wrap:wrap;gap:8px}
+html:root .plan-fresh .plan-generate{height:48px;margin-top:4px!important}
+html:root .plan-lower>.panel:last-child{padding:20px;min-height:0}
+html:root .plan-head{margin:0 0 14px}
+html:root .plan-hero{margin:0}
+
+html:root .hdr-search{margin-left:auto}
+html:root .company-dividends-card .expected-note{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--muted);font-size:12.5px}
+html:root .company-dividends-card .expected-note b{display:block;font-size:13.5px;color:var(--warn-ink,var(--foreground))}
+html:root .company-dividends-card .expected-note button{flex:none;height:36px;padding:0 14px;border-radius:10px;font-size:13px;width:auto}
+html:root .company-dividends-card .lbl{margin-bottom:6px}
+
+/* Monthly Picks setup: cards and tighter rhythm. */
+html:root .mp-setup{border-radius:20px}
+html:root .mp-shortlist{display:grid;gap:12px}
+html:root .mp-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+html:root .mp-picker>*{border-radius:14px;background:var(--muted);border:1px solid var(--border)}
+html:root .mp-search{border-radius:14px}
+html:root .mp-actionbar{border-radius:0 0 20px 20px}
+@media(max-width:760px){html:root .hdr-search{display:none}}

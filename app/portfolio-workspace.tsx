@@ -26,6 +26,14 @@ import {
 } from '@/components/ui/dialog';
 import { EncryptedRestoreDialog } from './vault-security';
 import { track } from './analytics';
+import { ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export type ImportRequest = {
   file: File;
@@ -216,30 +224,69 @@ export default function PortfolioWorkspace({
   }
   const selector =
     account.portfolios.length > 1 || draft || canCreate ? (
-      <select
-        className="header-portfolio-select"
-        aria-label="Select portfolio"
-        value={entry || draft ? selected : ALL_PORTFOLIOS}
-        disabled={busy}
-        onChange={(e) => {
-          if (e.target.value === NEW_PORTFOLIO) openCreate();
-          else choose(e.target.value);
-        }}
-      >
-        <option value={ALL_PORTFOLIOS}>All</option>
-        {account.portfolios.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-            {p.locked ? ' · locked' : ''}
-          </option>
-        ))}
-        {draft && !entry ? (
-          <option value={draft.id}>{draft.name}</option>
-        ) : null}
-        {canCreate ? (
-          <option value={NEW_PORTFOLIO}>+ Create new portfolio</option>
-        ) : null}
-      </select>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="header-portfolio-select pf-switch"
+          aria-label="Select portfolio"
+          disabled={busy}
+        >
+          {(() => {
+            const current = entry || draft ? selected : ALL_PORTFOLIOS;
+            const all = current === ALL_PORTFOLIOS;
+            const label = all
+              ? 'All portfolios'
+              : (account.portfolios.find((x) => x.id === current)?.name ?? draft?.name ?? 'Portfolio');
+            return (
+              <>
+                <span className={`pf-dots${all ? '' : ' single'}`} aria-hidden="true">
+                  {all ? (
+                    <>
+                      <i />
+                      <i />
+                      <i />
+                    </>
+                  ) : (
+                    label.slice(0, 1).toUpperCase()
+                  )}
+                </span>
+                <span className="pf-text">
+                  <b>{label}</b>
+                  <small>
+                    {all
+                      ? `${account.portfolios.length} portfolios`
+                      : 'Portfolio'}
+                  </small>
+                </span>
+                <ChevronDown size={16} className="pf-chev" aria-hidden="true" />
+              </>
+            );
+          })()}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="pf-menu">
+          <DropdownMenuItem onClick={() => choose(ALL_PORTFOLIOS)}>
+            All portfolios
+          </DropdownMenuItem>
+          {account.portfolios.map((p) => (
+            <DropdownMenuItem key={p.id} onClick={() => choose(p.id)}>
+              {p.name}
+              {p.locked ? ' · locked' : ''}
+            </DropdownMenuItem>
+          ))}
+          {draft && !entry ? (
+            <DropdownMenuItem onClick={() => choose(draft.id)}>
+              {draft.name}
+            </DropdownMenuItem>
+          ) : null}
+          {canCreate ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={openCreate}>
+                + Create new portfolio
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
     ) : (
       <span className="header-portfolio-label">All</span>
     );
