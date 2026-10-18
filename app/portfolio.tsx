@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/popover';
 import {
   Plus,
+  RefreshCw,
   Search,
   Briefcase,
   Upload,
@@ -825,6 +826,16 @@ function DashboardContent({
     planFromPathname(initialPathname),
   );
   useRouteMeta(tab, tab === 'company' ? companyTicker : undefined);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        document.getElementById('global-search')?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const side = useSidebar();
   function setTab(requested: string) {
     const next = allowTab(requested, isAdmin);
@@ -2878,6 +2889,7 @@ function DashboardContent({
                 <Wordmark />
               </button>
             </div>
+            {!hideTabs && tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
             {!hideTabs && (
               <AppNav
                 items={navItems}
@@ -2916,7 +2928,47 @@ function DashboardContent({
             )}
             </div>
             <div className="header-right">
-              {tab !== 'settings' && workspace?.selector}
+              {tab !== 'settings' && tab !== 'company' && (
+                <div className="page-id">
+                  <small>
+                    {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </small>
+                  <b>
+                    {tab === 'holdings'
+                      ? `${new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}${name ? `, ${name.split(' ')[0]}` : ''}`
+                      : (navItems.find((i) => i.tab === tab)?.label ?? '')}
+                  </b>
+                </div>
+              )}
+              {tab !== 'settings' && (
+                <label className="hdr-search">
+                  <Search size={15} aria-hidden="true" />
+                  <input
+                    id="global-search"
+                    type="search"
+                    value={holdingsQuery}
+                    placeholder="Search companies, funds"
+                    aria-label="Search companies"
+                    onChange={(e) => {
+                      setHoldingsQuery(e.target.value);
+                      if (tab !== 'holdings') setTab('holdings');
+                    }}
+                  />
+                  <kbd>Ctrl K</kbd>
+                </label>
+              )}
+              {tab !== 'settings' && (
+                <button
+                  type="button"
+                  data-slot="hdr"
+                  className="hdr-btn"
+                  disabled={busy}
+                  aria-label="Refresh prices"
+                  onClick={() => void refresh()}
+                >
+                  <RefreshCw size={18} />
+                </button>
+              )}
               {tab !== 'settings' && (
               <button
                 type="button"
@@ -2929,7 +2981,7 @@ function DashboardContent({
                 }
               >
                 <Plus size={18} />
-                <span className="hdr-label">Add transaction</span>
+                <span className="hdr-label">Add</span>
               </button>
               )}
               <Popover
@@ -3263,16 +3315,6 @@ function DashboardContent({
                     {tabNow === 'stocks' && (
                     <>
                     <div className="holdings-head holdings-head--inline">
-                      <label className="holdings-search">
-                        <Search size={15} aria-hidden="true" />
-                        <input
-                          type="search"
-                          value={holdingsQuery}
-                          placeholder="Search company, ticker or sector"
-                          aria-label="Search companies"
-                          onChange={(e) => setHoldingsQuery(e.target.value)}
-                        />
-                      </label>
                       <button
                         className="secondary compact holdings-add holdings-targets"
                         disabled={busy || locked}
@@ -3307,29 +3349,6 @@ function DashboardContent({
                         <Plus size={15} />{' '}
                         <span className="holdings-add__label">Add company</span>
                       </button>
-                      <select
-                        className="holdings-filter"
-                        aria-label="Filter companies"
-                        value={sectorFilter}
-                        onChange={(e) => setSectorFilter(e.target.value)}
-                      >
-                        <option value="">All sectors</option>
-                        <option value={SHORTLISTED}>Shortlisted only</option>
-                        {sectorsInUse.map((sector) => (
-                          <option key={sector} value={sector}>
-                            {sector}
-                          </option>
-                        ))}
-                      </select>
-                      {soldOut.length > 0 && (
-                        <label className="check-row holdings-soldout">
-                          <Checkbox
-                            checked={showSoldOut}
-                            onCheckedChange={(v) => setShowSoldOut(!!v)}
-                          />{' '}
-                          Show sold out ({soldOut.length})
-                        </label>
-                      )}
                     </div>
                     <div className="holdings-cards">
                       {displayedHoldings.map((h) => (

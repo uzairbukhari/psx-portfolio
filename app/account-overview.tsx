@@ -11,7 +11,6 @@ import {
   ASSET_CLASS_LABELS,
   type AssetClassKey,
 } from '@/lib/account-overview';
-import { ChartInfo } from './chart-info';
 import { daysBetween } from '@/lib/performance';
 import type { FxRateRow } from '@/lib/fx-rates';
 import type { MetalRateRow } from '@/lib/metal-rates';
@@ -67,37 +66,6 @@ function KseSpark({ points, up }: { points: { value: number }[]; up: boolean }) 
     <svg className="glance-spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">
       <polygon points={`0,56 ${coords.join(' ')} 300,56`} className={up ? 'area up' : 'area down'} />
       <polyline points={coords.join(' ')} className={up ? 'line up' : 'line down'} fill="none" />
-    </svg>
-  );
-}
-
-function MixDonut({ classes }: { classes: { key: AssetClassKey; label: string; share: number }[] }) {
-  const R = 52;
-  const C = 2 * Math.PI * R;
-  let offset = 0;
-  return (
-    <svg className="glance-donut" viewBox="0 0 128 128" role="img" aria-label={`Assets: ${classes.map((c) => `${c.label} ${c.share.toFixed(1)}%`).join(', ')}`}>
-      {classes.map((c) => {
-        const len = (Math.max(0, c.share) / 100) * C;
-        const el = (
-          <circle
-            key={c.key}
-            cx="64"
-            cy="64"
-            r={R}
-            fill="none"
-            stroke={CLASS_COLORS[c.key]}
-            strokeWidth="14"
-            strokeDasharray={`${Math.max(0, len - 1.5)} ${C}`}
-            strokeDashoffset={-offset}
-            transform="rotate(-90 64 64)"
-          />
-        );
-        offset += len;
-        return el;
-      })}
-      <text x="64" y="58" textAnchor="middle" className="donut-lbl">ASSETS</text>
-      <text x="64" y="78" textAnchor="middle" className="donut-num">{classes.length}</text>
     </svg>
   );
 }
@@ -347,16 +315,41 @@ export default function AccountOverview({
             </>
           )}
         </section>
-        <section className="card glance-mix" aria-label="Asset mix">
-          <MixDonut classes={o.classes} />
-          <ul>
-            {o.classes.map((c) => (
-              <li key={c.key}>
-                <span>
-                  <i aria-hidden="true" style={{ background: CLASS_COLORS[c.key] }} />
-                  {c.label}
-                </span>
-                <b className="num">{c.share.toFixed(1)}%</b>
+        <section className="card glance-pf" aria-label="Portfolios">
+          <ul className="overview-portfolios">
+            {o.portfolios.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="overview-portfolio" data-slot="portfolio"
+                  onClick={() => onOpenPortfolio(p.id)}
+                >
+                  <span className="overview-portfolio__top">
+                    <i className="pf-avatar" aria-hidden="true">
+                      {p.name.slice(0, 1).toUpperCase()}
+                    </i>
+                    <b>{p.name}</b>
+                    <span className="overview-portfolio__share">
+                      {p.share.toFixed(1)}%
+                    </span>
+                  </span>
+                  <span className="overview-portfolio__value amount">
+                    {moneyShort(p.value)}
+                  </span>
+                  <span className={`overview-portfolio__gain ${tone(p.gain)}`}>
+                    {p.gain === null
+                      ? 'Gain not known'
+                      : `${signed(p.gain)}${pct(p.gainPercent) ? ` · ${pct(p.gainPercent)}` : ''}`}
+                  </span>
+                  <span className="bar" aria-hidden="true">
+                    <i style={{ width: `${Math.min(100, p.share)}%` }} />
+                  </span>
+                  <small>
+                    {p.heldCount} {p.heldCount === 1 ? 'holding' : 'holdings'}
+                    {p.locked ? ' · locked' : ''}
+                    {p.missingPrice ? ` · ${p.missingPrice} need a price` : ''}
+                  </small>
+                </button>
               </li>
             ))}
           </ul>
@@ -367,16 +360,6 @@ export default function AccountOverview({
         <>
       <div className="overview-grid" data-cols={hasStocks ? 2 : 3}>
         <section className="panel overview-panel" aria-label="Asset mix">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">ASSET MIX</p>
-              <h3>
-                Where your money is
-                <ChartInfo text="Your net worth split by kind of asset: stocks, mutual funds, gold, silver and savings plans, at current value." />
-              </h3>
-            </div>
-            <span>By market value</span>
-          </div>
           {total.value > 0 ? (
             <div className="overview-mix">
               <EChart
@@ -427,106 +410,8 @@ export default function AccountOverview({
           )}
         </section>
 
-        {hasStocks && (
-          <section className="panel overview-panel" aria-label="Sectors">
-            <div className="report-heading">
-              <div>
-                <p className="eyebrow">DIVERSIFICATION</p>
-                <h3>
-                  Stocks by sector
-                  <ChartInfo text="How the value of your PSX stocks is spread across sectors. The five largest sectors are shown; the rest are grouped as Other." />
-                </h3>
-              </div>
-              <span>Across all portfolios</span>
-            </div>
-            {sectorData.length ? (
-              <ul className="overview-sectors">
-                {sectorData.map((s) => (
-                  <li key={s.sector}>
-                    <span>
-                      <i aria-hidden="true" style={{ background: s.fill }} />
-                      {s.sector}
-                    </span>
-                    <span className="bar" aria-hidden="true">
-                      <i
-                        style={{
-                          width: `${Math.min(100, s.share)}%`,
-                          background: s.fill,
-                        }}
-                      />
-                    </span>
-                    <b className="amount">{s.share.toFixed(1)}%</b>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="report-empty">
-                Add prices and sectors to see the split.
-              </p>
-            )}
-          </section>
-        )}
-        <section className="panel overview-panel" aria-label="Portfolios">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">PORTFOLIOS</p>
-              <h3>
-                Each portfolio
-                <ChartInfo text="What each of your portfolios is worth and its share of the total." />
-              </h3>
-            </div>
-            <span>Share of net worth</span>
-          </div>
-          <ul className="overview-portfolios">
-            {o.portfolios.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className="overview-portfolio" data-slot="portfolio"
-                  onClick={() => onOpenPortfolio(p.id)}
-                >
-                  <span className="overview-portfolio__top">
-                    <i className="pf-avatar" aria-hidden="true">
-                      {p.name.slice(0, 1).toUpperCase()}
-                    </i>
-                    <b>{p.name}</b>
-                    <span className="overview-portfolio__share">
-                      {p.share.toFixed(1)}%
-                    </span>
-                  </span>
-                  <span className="overview-portfolio__value amount">
-                    {moneyShort(p.value)}
-                  </span>
-                  <span className={`overview-portfolio__gain ${tone(p.gain)}`}>
-                    {p.gain === null
-                      ? 'Gain not known'
-                      : `${signed(p.gain)}${pct(p.gainPercent) ? ` · ${pct(p.gainPercent)}` : ''}`}
-                  </span>
-                  <span className="bar" aria-hidden="true">
-                    <i style={{ width: `${Math.min(100, p.share)}%` }} />
-                  </span>
-                  <small>
-                    {p.heldCount} {p.heldCount === 1 ? 'holding' : 'holdings'}
-                    {p.locked ? ' · locked' : ''}
-                    {p.missingPrice ? ` · ${p.missingPrice} need a price` : ''}
-                  </small>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
 
         <section className="panel overview-panel" aria-label="Invested">
-          <div className="report-heading">
-            <div>
-              <p className="eyebrow">INVESTING</p>
-              <h3>
-                Invested per month
-                <ChartInfo text="Money you put in each month over the last 12 months: stock buys, fund and plan payments and gold or silver purchases. Sales and redemptions are not subtracted." />
-              </h3>
-            </div>
-            <span>Last 12 months</span>
-          </div>
           {invested.months.some((m) => m.amount > 0) ? (
             <EChart
               className="overview-income"

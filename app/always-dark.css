@@ -44,7 +44,8 @@ html:root .landing.always-dark .float .sip-line span{font-weight:400;color:var(-
 @media (max-width:1024px){html:root .landing.always-dark .hero .lp-wrap{grid-template-columns:1fr}html:root .landing.always-dark h1{font-size:48px}html:root .landing.always-dark .visual{min-height:440px;max-width:560px}}
 @media (max-width:640px){html:root .landing.always-dark h1{font-size:38px}html:root .landing.always-dark .hero .lp-wrap{padding-top:16px}html:root .landing.always-dark .lp-nav .lp-wrap{height:60px}html:root .landing.always-dark .visual{min-height:0;display:grid;gap:12px}html:root .landing.always-dark .visual .nw-slab,html:root .landing.always-dark .float.sip,html:root .landing.always-dark .float.lock{position:static;max-width:none}}
 /* ---- loading screen ---- */
-html:root .app-loading.vault-stage{display:grid;place-items:center;min-height:100vh}
+html:root main.app-loading.vault-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:100%}
+html:root main.app-loading.vault-stage .boot{margin:0 auto}
 html:root .app-loading .boot{display:grid;justify-items:center;gap:14px;text-align:center}
 html:root .app-loading .boot-orb{position:relative;width:132px;height:132px;display:grid;place-items:center;margin-bottom:6px}
 html:root .app-loading .boot-ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid transparent;border-top-color:#6ea2ff;border-right-color:rgba(110,162,255,.25);animation:boot-spin 1.6s linear infinite;filter:drop-shadow(0 0 8px rgba(110,162,255,.7))}
