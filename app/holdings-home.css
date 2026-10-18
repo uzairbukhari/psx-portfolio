@@ -147,3 +147,12 @@ html:root .reports-summary article{border-radius:14px;background:var(--card)}
 html:root .report-panel{border-radius:18px;padding:20px}
 html:root .report-heading h3{font-size:18px}
 @media(max-width:760px){html:root .reports-hero-stats.slab{grid-template-columns:1fr 1fr;gap:14px}html:root .reports-hero-stats.slab .reports-priced-value{border-left:0;padding:4px 14px}}
+
+/* Plan */
+html:root .plan-hero{display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,1.6fr);gap:28px;align-items:stretch}
+html:root .plan-hero .plan-big{display:block;font:600 44px/1.1 var(--font-geist-mono),monospace;letter-spacing:-.02em;margin:10px 0 6px}
+html:root .plan-hero .mu{margin:0 0 14px;font-size:13px}
+html:root .plan-stair{width:100%;min-height:190px}
+html:root .plan-lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:16px;align-items:start;margin-top:16px}
+html:root .plan-lower>.panel{margin:0}
+@media(max-width:900px){html:root .plan-hero,html:root .plan-lower{grid-template-columns:1fr}}

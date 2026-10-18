@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { money, type Portfolio } from '@/lib/portfolio';
 import { moneyInFlows } from '@/lib/performance';
-import { timeSeriesOption } from '@/lib/chart-kit';
+import { barOption } from '@/lib/chart-kit';
 import { EChart } from './charts/echart';
 import { TickerTile } from './ui-kit';
 
@@ -42,52 +42,37 @@ export default function PlanPage({
         <p className="page-kicker">Monthly SIP</p>
         <h2>{monthName(month)}</h2>
       </div>
-      <section className="slab plan-slab" aria-label="This month">
-        <div className="slab-stats plan-stats">
-          <div>
-            <span className="lbl">Fresh money</span>
-            <b className="num slab-value">{money(fresh)}</b>
-          </div>
-          <div>
-            <span className="lbl">Put in this month</span>
-            <span className="num">{money(thisMonth)}</span>
-          </div>
-          <div>
-            <span className="lbl">Still to put in</span>
-            <span className="num">{money(left)}</span>
+      <section className="slab plan-slab plan-hero" aria-label="This month">
+        <div className="plan-hero-main">
+          <span className="lbl">This month</span>
+          <b className="num slab-value plan-big">{money(thisMonth)}</b>
+          <p className="mu">
+            of {money(fresh)} planned · <b>{money(left)} left</b>
+          </p>
+          <div className="plan-bar" role="img" aria-label={`${Math.round(share)}% of this month’s money is in`}>
+            <i style={{ width: `${share}%` }} />
           </div>
         </div>
-        <div className="plan-bar" role="img" aria-label={`${Math.round(share)}% of this month’s money is in`}>
-          <i style={{ width: `${share}%` }} />
+        <div className="plan-hero-chart">
+          <span className="lbl">Your staircase · last 12 months</span>
+          {stairs.length ? (
+            <EChart
+              className="plan-stair"
+              label={`Money put in each month, ${money(stairs[stairs.length - 1].total)} to date.`}
+              build={(t) =>
+                barOption(t, {
+                  cats: stairs.slice(-12).map((x) => MONTHS[Number(x.month.slice(5, 7)) - 1]),
+                  series: [{ name: 'Put in', data: stairs.slice(-12).map((x) => x.amount), color: t.primary }],
+                  valueFormat: money,
+                })
+              }
+            />
+          ) : (
+            <p className="mu">Record purchases to see your staircase.</p>
+          )}
         </div>
       </section>
-      <section className="panel">
-        <div className="between">
-          <h3>Money put in, month by month</h3>
-          <span className="muted-note">Each step is a month with a purchase</span>
-        </div>
-        {stairs.length ? (
-          <EChart
-            className="report-chart report-chart--trend"
-            label={`Cumulative money put in, ${money(stairs[stairs.length - 1].total)} to date.`}
-            build={(t) =>
-              timeSeriesOption(t, {
-                name: 'Put in',
-                data: stairs.map((s) => ({ x: monthName(s.month), y: s.total })),
-                categorical: true,
-                step: true,
-                area: true,
-                includeZero: true,
-                zoom: false,
-                valueFormat: money,
-                dateLabel: (x) => String(x),
-              })
-            }
-          />
-        ) : (
-          <p className="muted-note">Record purchases to see your staircase.</p>
-        )}
-      </section>
+      <div className="plan-lower">
       <section className="panel">
         <div className="between">
           <h3>Your shortlist</h3>
@@ -132,6 +117,7 @@ export default function PlanPage({
           <p className="muted-note">Run Monthly Picks to see where this month’s money could go.</p>
         )}
       </section>
+      </div>
     </div>
   );
 }
