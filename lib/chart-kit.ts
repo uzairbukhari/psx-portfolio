@@ -2,6 +2,8 @@
 // variables), so no hex literals live here and every theme is covered. Type-only import: this file never loads ECharts.
 import type { EChartsOption } from 'echarts';
 
+export type AssetKey = 'stocks' | 'gold' | 'silver' | 'plans' | 'funds' | 'currency';
+
 export type ChartTokens = {
   text: string;
   muted: string;
@@ -17,6 +19,8 @@ export type ChartTokens = {
   neutral: string;
   /** Categorical palette (--cat-1..7). */
   cat: string[];
+  /** One fixed colour per asset class (--asset-*), the same in every chart and legend. */
+  asset: Record<AssetKey, string>;
   /** "r g b" triplets, for translucent fills. */
   rgb: { primary: string; success: string; danger: string; line: string };
   font: string;
@@ -51,6 +55,14 @@ export const FALLBACK_TOKENS: ChartTokens = {
     'green',
     'slateblue',
   ],
+  asset: {
+    stocks: 'royalblue',
+    gold: 'goldenrod',
+    silver: 'slategray',
+    plans: 'teal',
+    funds: 'slateblue',
+    currency: 'steelblue',
+  },
   rgb: {
     primary: '37 99 235',
     success: '10 115 80',
@@ -82,6 +94,14 @@ export function readTokens(
     other: v('--chart-other', f.other),
     neutral: v('--chart-neutral', f.neutral),
     cat: [1, 2, 3, 4, 5, 6, 7].map((n, i) => v(`--cat-${n}`, f.cat[i])),
+    asset: {
+      stocks: v('--asset-stocks', f.asset.stocks),
+      gold: v('--asset-gold', f.asset.gold),
+      silver: v('--asset-silver', f.asset.silver),
+      plans: v('--asset-plans', f.asset.plans),
+      funds: v('--asset-funds', f.asset.funds),
+      currency: v('--asset-fx', f.asset.currency),
+    },
     rgb: {
       primary: v('--ch-primary', f.rgb.primary),
       success: v('--ch-chart-up', v('--ch-success', f.rgb.success)),
@@ -795,6 +815,428 @@ export function donutOption(t: ChartTokens, c: DonutCfg): EChartsOption {
           value: s.value,
           itemStyle: { color: s.color },
         })),
+      },
+    ],
+  } as EChartsOption;
+}
+
+/** The colour of an asset class, the same everywhere. */
+export const classColor = (t: ChartTokens, k: AssetKey) => t.asset[k];
+
+// ───────────────────────── sparkline ─────────────────────────
+
+/** A bare line for hero slabs and tiles: no axes, no tooltip, the newest point glows. */
+export function sparklineOption(
+  t: ChartTokens,
+  c: { values: number[]; color?: string; area?: boolean },
+): EChartsOption {
+  const color = c.color ?? t.primary;
+  const rgbOf =
+    color === t.success ? t.rgb.success : color === t.danger ? t.rgb.danger : t.rgb.primary;
+  const n = c.values.length;
+  return {
+    animationDuration: 500,
+    aria: { enabled: true, decal: { show: false } },
+    grid: { top: 4, right: 6, bottom: 4, left: 6 },
+    xAxis: { type: 'category', show: false, data: c.values.map((_, i) => i), boundaryGap: false },
+    yAxis: { type: 'value', show: false, scale: true },
+    series: [
+      {
+        type: 'line',
+        data: c.values,
+        showSymbol: false,
+        silent: true,
+        smooth: 0.2,
+        lineStyle: { width: 2, color, cap: 'round', join: 'round' },
+        areaStyle:
+          c.area === false
+            ? undefined
+            : {
+                color: {
+                  type: 'linear',
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    { offset: 0, color: rgba(rgbOf, 0.3) },
+                    { offset: 1, color: rgba(rgbOf, 0) },
+                  ],
+                },
+              },
+        markPoint:
+          n > 1
+            ? {
+                symbol: 'circle',
+                symbolSize: 8,
+                animation: false,
+                label: { show: false },
+                data: [
+                  {
+                    coord: [n - 1, c.values[n - 1]],
+                    itemStyle: { color, shadowBlur: 12, shadowColor: color },
+                  },
+                ],
+              }
+            : undefined,
+      },
+    ],
+  } as EChartsOption;
+}
+
+// ───────────────────────── stacked area ─────────────────────────
+
+export type StackedAreaCfg = {
+  /** ISO dates, one per point. */
+  dates: string[];
+  series: { name: string; data: number[]; color: string }[];
+  valueFormat: (n: number) => string;
+  dateLabel: (x: string, long: boolean) => string;
+  /** A dashed reference (for example today's value). */
+  refLine?: { y: number; label: string; color?: string };
+};
+
+export function stackedAreaOption(t: ChartTokens, c: StackedAreaCfg): EChartsOption {
+  const o = base(t, { top: 28, right: 12 });
+  const refLine =
+    c.refLine && Number.isFinite(c.refLine.y)
+      ? {
+          silent: true,
+          symbol: 'none',
+          animation: false,
+          lineStyle: { color: c.refLine.color ?? t.muted, type: 'dashed' as const, width: 1 },
+          label: {
+            formatter: c.refLine.label,
+            color: c.refLine.color ?? t.muted,
+            fontSize: 10,
+            position: 'insideStartTop' as const,
+          },
+          data: [{ yAxis: c.refLine.y }],
+        }
+      : undefined;
+  return {
+    ...o,
+    legend: {
+      top: 0,
+      icon: 'roundRect',
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: t.muted, fontSize: 11 },
+    },
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'axis',
+      axisPointer: { type: 'line', lineStyle: { color: t.muted, type: 'dashed' } },
+      formatter: (params: unknown) => {
+        const ps = (Array.isArray(params) ? params : [params]) as {
+          seriesName: string;
+          value: number;
+          color: string;
+          dataIndex: number;
+        }[];
+        if (!ps.length) return '';
+        const rows: TipRow[] = ps
+          .filter((p) => p.value)
+          .sort((a, b) => b.value - a.value)
+          .map((p) => ({ label: p.seriesName, value: c.valueFormat(p.value), color: p.color }));
+        rows.push({ label: 'Total', value: c.valueFormat(ps.reduce((a, p) => a + p.value, 0)) });
+        return tipHtml(t, c.dateLabel(c.dates[ps[0].dataIndex] ?? '', true), rows);
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: c.dates,
+      boundaryGap: false,
+      ...axisCommon(t),
+      axisLabel: {
+        color: t.muted,
+        fontSize: 11,
+        hideOverlap: true,
+        fontFamily: t.mono,
+        formatter: (v: string) => c.dateLabel(v, false),
+      },
+    },
+    yAxis: valueAxis(t, compact, { scale: false }),
+    series: c.series.map((s, i) => ({
+      name: s.name,
+      type: 'line' as const,
+      stack: 'all',
+      data: s.data,
+      showSymbol: false,
+      smooth: false,
+      sampling: 'lttb' as const,
+      lineStyle: { width: 1.5, color: s.color },
+      itemStyle: { color: s.color },
+      areaStyle: { color: s.color, opacity: 0.72 },
+      emphasis: { focus: 'series' as const },
+      markLine: i === c.series.length - 1 ? refLine : undefined,
+    })),
+  } as EChartsOption;
+}
+
+// ───────────────────────── combo: bars plus a cumulative line ─────────────────────────
+
+export type ComboCfg = {
+  cats: string[];
+  bars: { name: string; data: number[]; color: string };
+  line: { name: string; data: number[]; color: string };
+  valueFormat: (n: number) => string;
+  catTitle?: (cat: string) => string;
+};
+
+export function comboOption(t: ChartTokens, c: ComboCfg): EChartsOption {
+  const o = base(t, { top: 28, right: 12 });
+  return {
+    ...o,
+    legend: {
+      top: 0,
+      icon: 'roundRect',
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: t.muted, fontSize: 11 },
+    },
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'axis',
+      axisPointer: { type: 'shadow', shadowStyle: { color: rgba(t.rgb.line, 0.08) } },
+      formatter: (params: unknown) => {
+        const ps = (Array.isArray(params) ? params : [params]) as {
+          seriesName: string;
+          value: number;
+          color: string;
+          axisValue: string;
+        }[];
+        if (!ps.length) return '';
+        return tipHtml(
+          t,
+          c.catTitle ? c.catTitle(ps[0].axisValue) : ps[0].axisValue,
+          ps.map((p) => ({
+            label: p.seriesName,
+            value: c.valueFormat(p.value ?? 0),
+            color: typeof p.color === 'string' ? p.color : undefined,
+          })),
+        );
+      },
+    },
+    xAxis: { type: 'category', data: c.cats, ...axisCommon(t) },
+    yAxis: [
+      valueAxis(t, compact, { position: 'left' as const }),
+      valueAxis(t, compact, { splitLine: { show: false } }),
+    ],
+    series: [
+      {
+        name: c.bars.name,
+        type: 'bar',
+        data: c.bars.data,
+        barMaxWidth: 24,
+        itemStyle: { color: c.bars.color, borderRadius: [6, 6, 3, 3] },
+      },
+      {
+        name: c.line.name,
+        type: 'line',
+        yAxisIndex: 1,
+        data: c.line.data,
+        showSymbol: false,
+        smooth: false,
+        lineStyle: { width: 2.2, color: c.line.color, cap: 'round' },
+        itemStyle: { color: c.line.color },
+      },
+    ],
+  } as EChartsOption;
+}
+
+// ───────────────────────── waterfall ─────────────────────────
+
+export type WaterfallStep = {
+  label: string;
+  /** A delta for a step; the running total for a `total` bar. */
+  value: number;
+  kind: 'start' | 'step' | 'total';
+};
+export type WaterfallCfg = {
+  steps: WaterfallStep[];
+  valueFormat: (n: number) => string;
+};
+
+/** Bars from a running base: the base series is transparent, so gains float up and losses float down. */
+export function waterfallOption(t: ChartTokens, c: WaterfallCfg): EChartsOption {
+  const o = base(t, { top: 14, right: 12 });
+  let running = 0;
+  const baseData: number[] = [];
+  const up: (number | null)[] = [];
+  const down: (number | null)[] = [];
+  const total: (number | null)[] = [];
+  const startEnd: { from: number; to: number }[] = [];
+  for (const s of c.steps) {
+    if (s.kind === 'step') {
+      const from = running;
+      running += s.value;
+      startEnd.push({ from, to: running });
+      baseData.push(Math.min(from, running));
+      up.push(s.value >= 0 ? Math.abs(s.value) : null);
+      down.push(s.value < 0 ? Math.abs(s.value) : null);
+      total.push(null);
+    } else {
+      running = s.value;
+      startEnd.push({ from: 0, to: running });
+      baseData.push(0);
+      up.push(null);
+      down.push(null);
+      total.push(s.value);
+    }
+  }
+  return {
+    ...o,
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'axis',
+      axisPointer: { type: 'shadow', shadowStyle: { color: rgba(t.rgb.line, 0.08) } },
+      formatter: (params: unknown) => {
+        const ps = (Array.isArray(params) ? params : [params]) as { dataIndex: number }[];
+        const i = ps[0]?.dataIndex ?? 0;
+        const s = c.steps[i];
+        if (!s) return '';
+        const rows: TipRow[] =
+          s.kind === 'step'
+            ? [{ label: 'Change', value: c.valueFormat(s.value), tone: s.value >= 0 ? 'pos' : 'neg' }, { label: 'Running total', value: c.valueFormat(startEnd[i].to) }]
+            : [{ label: 'Total', value: c.valueFormat(s.value) }];
+        return tipHtml(t, s.label, rows);
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: c.steps.map((s) => s.label),
+      ...axisCommon(t),
+      axisLabel: { color: t.muted, fontSize: 10, interval: 0, width: 54, overflow: 'break', fontFamily: t.mono },
+    },
+    yAxis: valueAxis(t, compact, { scale: false }),
+    series: [
+      { name: 'base', type: 'bar', stack: 'wf', data: baseData, silent: true, itemStyle: { color: 'transparent' }, tooltip: { show: false } },
+      { name: 'Gain', type: 'bar', stack: 'wf', data: up, barMaxWidth: 34, itemStyle: { color: t.success, borderRadius: [6, 6, 0, 0] } },
+      { name: 'Loss', type: 'bar', stack: 'wf', data: down, barMaxWidth: 34, itemStyle: { color: t.danger, borderRadius: [0, 0, 6, 6] } },
+      { name: 'Total', type: 'bar', stack: 'wf', data: total, barMaxWidth: 34, itemStyle: { color: t.primary, borderRadius: [6, 6, 0, 0] } },
+    ],
+  } as EChartsOption;
+}
+
+// ───────────────────────── treemap ─────────────────────────
+
+export type TreeNode = {
+  name: string;
+  value?: number;
+  color?: string;
+  /** Set on a stock leaf so a click can open the company. */
+  ticker?: string;
+  children?: TreeNode[];
+};
+export type TreemapCfg = {
+  root: TreeNode[];
+  valueFormat: (n: number) => string;
+  total: number;
+};
+
+export function treemapOption(t: ChartTokens, c: TreemapCfg): EChartsOption {
+  const paint = (n: TreeNode, color?: string): Record<string, unknown> => {
+    const col = n.color ?? color ?? t.other;
+    return {
+      name: n.name,
+      value: n.value,
+      ticker: n.ticker,
+      itemStyle: { color: col },
+      children: n.children?.map((ch) => paint(ch, col)),
+    };
+  };
+  return {
+    animationDuration: 400,
+    textStyle: { fontFamily: t.font, color: t.muted },
+    aria: { enabled: true, decal: { show: false } },
+    tooltip: {
+      confine: true,
+      backgroundColor: t.popover,
+      borderColor: t.border,
+      borderWidth: 1,
+      padding: [8, 10],
+      textStyle: { color: t.text, fontSize: 12, fontFamily: t.font },
+      extraCssText: 'border-radius:10px;',
+      formatter: (p: { name: string; value: number; treePathInfo?: { name: string }[] }) => {
+        const path = (p.treePathInfo ?? []).map((x) => x.name).filter(Boolean);
+        return tipHtml(t, path.join(' › ') || p.name, [
+          { label: 'Value', value: c.valueFormat(p.value) },
+          { label: 'Share', value: `${c.total > 0 ? ((p.value / c.total) * 100).toFixed(1) : '0.0'}%` },
+        ]);
+      },
+    },
+    series: [
+      {
+        type: 'treemap',
+        roam: false,
+        nodeClick: 'zoomToNode',
+        breadcrumb: { show: false },
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        label: { show: true, color: t.text, fontSize: 11, fontWeight: 600, overflow: 'truncate' },
+        upperLabel: { show: true, height: 22, color: t.text, fontSize: 11, fontWeight: 700 },
+        itemStyle: { borderColor: t.popover, borderWidth: 2, gapWidth: 2, borderRadius: 6 },
+        levels: [
+          { itemStyle: { borderWidth: 0, gapWidth: 3 }, upperLabel: { show: false } },
+          { itemStyle: { borderColor: t.popover, borderWidth: 3, gapWidth: 2 }, upperLabel: { show: true } },
+          { colorSaturation: [0.55, 0.85], itemStyle: { borderWidth: 1, gapWidth: 1 } },
+        ],
+        data: c.root.map((n) => paint(n)),
+      },
+    ],
+  } as EChartsOption;
+}
+
+// ───────────────────────── calendar heatmap (years × months) ─────────────────────────
+
+export type HeatmapCfg = {
+  /** Column labels, for example the 12 months. */
+  cols: string[];
+  /** Row labels, for example the years. */
+  rows: string[];
+  /** [col, row, value] */
+  cells: [number, number, number][];
+  color: string;
+  valueFormat: (n: number) => string;
+  title?: (col: number, row: number) => string;
+};
+
+export function heatmapOption(t: ChartTokens, c: HeatmapCfg): EChartsOption {
+  const o = base(t, { top: 6, right: 8, bottom: 4, left: 4 });
+  const max = Math.max(1, ...c.cells.map((x) => x[2]));
+  const rgbOf =
+    c.color === t.success ? t.rgb.success : c.color === t.danger ? t.rgb.danger : t.rgb.primary;
+  return {
+    ...o,
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const [col, row, v] = (params as { value: [number, number, number] }).value;
+        return tipHtml(t, c.title ? c.title(col, row) : `${c.cols[col]} ${c.rows[row]}`, [
+          { label: 'Amount', value: c.valueFormat(v) },
+        ]);
+      },
+    },
+    xAxis: { type: 'category', data: c.cols, splitArea: { show: false }, ...axisCommon(t) },
+    yAxis: { type: 'category', data: c.rows, inverse: true, ...axisCommon(t) },
+    visualMap: {
+      show: false,
+      type: 'continuous',
+      min: 0,
+      max,
+      dimension: 2,
+      inRange: { color: [rgba(rgbOf, 0.06), rgba(rgbOf, 0.95)] },
+    },
+    series: [
+      {
+        type: 'heatmap',
+        data: c.cells,
+        itemStyle: { borderColor: t.popover, borderWidth: 2, borderRadius: 5 },
+        emphasis: { itemStyle: { borderColor: t.text } },
       },
     ],
   } as EChartsOption;

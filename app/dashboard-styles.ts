@@ -4,6 +4,7 @@ import './ledger.css';
 import './picks.css';
 import './ai-lab.css';
 import './reports.css';
+import './insights.css';
 import './account-overview.css';
 import './settings.css';
 import './always-dark.css';

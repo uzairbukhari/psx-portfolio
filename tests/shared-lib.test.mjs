@@ -12,6 +12,8 @@ const SHARED = [
   'portfolio',
   'portfolio-account',
   'account-overview',
+  'insights',
+  'asset-reports',
   'performance',
   'portfolio-reports',
   'allocation',

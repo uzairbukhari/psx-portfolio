@@ -1,0 +1,61 @@
+/* Insights: night-slab hero plus a bento grid of takeaway cards. Tokens only; loads before redesign.css. */
+html:root .ins{display:flex;flex-direction:column;gap:18px;padding:6px 0 12px}
+html:root .ins-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+html:root .ins-top .reports-tabs{margin:0;position:static}
+html:root .ins-hint{margin:0;color:var(--muted-foreground);font-size:13.5px;max-width:60ch}
+
+html:root .ins-hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:24px;align-items:stretch;padding:28px 30px}
+html:root .ins-hero-main{min-width:0}
+html:root .ins-hero-sub{margin:12px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px}
+html:root .ins-hero .slab-stats{margin:22px 0 0}
+html:root .ins-hero dl,html:root .ins-hero dd{margin:0}
+html:root .ins-spark{min-height:150px;height:100%;align-self:end;opacity:.95}
+
+html:root .ins-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+html:root .ic{grid-column:span 6;margin:0;padding:18px 20px 16px;border-radius:22px;display:flex;flex-direction:column;min-width:0}
+html:root .ic[data-size=wide]{grid-column:span 7}
+html:root .ic[data-size=third]{grid-column:span 5}
+html:root .ic-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+html:root .ic-head h3{margin:8px 0 0;font-size:17px;line-height:1.3;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+html:root .ic .chart-info{display:inline-flex}
+html:root .ic-body{flex:1;min-width:0}
+html:root .ic-source{margin:10px 0 0;padding-top:10px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-foreground)}
+html:root .ins-chart{height:280px;width:100%}
+html:root .ins-chart--tall{height:340px}
+html:root .ins-chart--cal{height:230px}
+html:root .ic-switch button{padding:6px 11px}
+
+html:root .ins-conc{display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding:8px 2px}
+html:root .ins-top5{list-style:none;margin:6px 0 0;padding:14px 0 0;border-top:1px solid var(--border);flex:1 1 100%;display:grid;gap:9px}
+html:root .ins-top5 li{display:grid;grid-template-columns:minmax(64px,110px) 1fr 38px;align-items:center;gap:10px;font-size:13px}
+html:root .ins-top5 span{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root .ins-top5 i{height:8px;border-radius:4px;background:var(--muted);position:relative;overflow:hidden}
+html:root .ins-top5 i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);border-radius:4px;background:var(--c,var(--primary))}
+html:root .ins-top5 b{text-align:right;font-size:12px;font-weight:600}
+html:root .ins-conc dl{margin:0;display:grid;gap:12px;min-width:0}
+html:root .ins-conc dd{margin:4px 0 0;font-size:17px;font-weight:600;overflow-wrap:anywhere}
+html:root .ins-conc small{font-size:12px;color:var(--muted-foreground);font-weight:500}
+
+html:root .ic-ring{--size:112px;--c:var(--primary);position:relative;display:grid;place-items:center;width:var(--size);height:var(--size);border-radius:50%;flex-shrink:0;
+  background:conic-gradient(var(--c) calc(var(--p)*1%),var(--muted) 0)}
+html:root .ic-ring::before{content:"";position:absolute;inset:11px;border-radius:50%;background:var(--card)}
+html:root .ic-ring .num{position:relative;font-size:22px;font-weight:600}
+html:root .ic-ring[data-tone=success]{--c:var(--success)}
+html:root .ic-ring[data-tone=warn]{--c:var(--warn-strong)}
+html:root .ic-ring[data-tone=danger]{--c:var(--danger)}
+
+@media (prefers-reduced-motion:no-preference){
+  html:root .ins-hero,html:root .ic{animation:ins-rise .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--ic-i,0)*45ms)}
+  @keyframes ins-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
+
+@media (max-width:1100px){
+  html:root .ic,html:root .ic[data-size=wide],html:root .ic[data-size=third]{grid-column:span 12}
+}
+@media (max-width:760px){
+  html:root .ins-hero{grid-template-columns:1fr;padding:22px 20px}
+  html:root .ins-spark{min-height:110px}
+  html:root .ic{padding:16px 16px 14px;border-radius:18px}
+  html:root .ins-chart{height:240px}
+  html:root .ins-chart--tall{height:300px}
+}

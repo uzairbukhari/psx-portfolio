@@ -8,6 +8,13 @@ import {
   donutOption,
   esc,
   hBarOption,
+  sparklineOption,
+  stackedAreaOption,
+  comboOption,
+  waterfallOption,
+  treemapOption,
+  heatmapOption,
+  classColor,
   rgba,
   timeSeriesOption,
   tipHtml,
@@ -21,6 +28,8 @@ test('chart code carries no colour literals: every colour comes from the theme t
     '../lib/chart-kit.ts',
     '../app/charts/echart.tsx',
     '../app/charts/day-charts.tsx',
+    '../app/insight-card.tsx',
+    '../app/insights-all.tsx',
   ]) {
     const src = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b/, `${file} has a hex colour`);
@@ -287,4 +296,81 @@ test('every builder draws without throwing, including a series that crosses zero
     }, name);
     chart.dispose();
   }
+});
+
+test('every asset class has its own colour token', () => {
+  const keys = ['stocks', 'gold', 'silver', 'plans', 'funds', 'currency'];
+  assert.equal(new Set(keys.map((k) => classColor(t, k))).size, keys.length);
+});
+
+test('sparkline has no axes and glows on the newest point', () => {
+  const o = sparklineOption(t, { values: [1, 3, 2, 5] });
+  assert.equal(o.xAxis.show, false);
+  assert.equal(o.series[0].markPoint.data[0].coord[0], 3);
+});
+
+test('waterfall: a transparent base, gains up, losses down, totals from zero', () => {
+  const o = waterfallOption(t, {
+    valueFormat: money,
+    steps: [
+      { label: 'A', value: 100, kind: 'step' },
+      { label: 'B', value: -30, kind: 'step' },
+      { label: 'Total', value: 70, kind: 'total' },
+    ],
+  });
+  const [base, gain, loss, total] = o.series.map((s) => s.data);
+  assert.deepEqual(base, [0, 70, 0]);
+  assert.deepEqual(gain, [100, null, null]);
+  assert.deepEqual(loss, [null, 30, null]);
+  assert.deepEqual(total, [null, null, 70]);
+  assert.equal(o.series[0].itemStyle.color, 'transparent');
+});
+
+test('treemap leaves keep their ticker for the click and take the parent colour', () => {
+  const o = treemapOption(t, {
+    total: 10,
+    valueFormat: money,
+    root: [{ name: 'Stocks', color: 'red', children: [{ name: 'MEBL', value: 10, ticker: 'MEBL' }] }],
+  });
+  const leaf = o.series[0].data[0].children[0];
+  assert.equal(leaf.ticker, 'MEBL');
+  assert.equal(leaf.itemStyle.color, 'red');
+});
+
+test('stacked area stacks every series and escapes nothing unsafe into the tooltip', () => {
+  const o = stackedAreaOption(t, {
+    dates: ['2026-01-31', '2026-02-28'],
+    series: [
+      { name: '<b>A</b>', data: [1, 2], color: 'red' },
+      { name: 'B', data: [1, 1], color: 'blue' },
+    ],
+    valueFormat: money,
+    dateLabel: (x) => x,
+  });
+  assert.ok(o.series.every((s) => s.stack === 'all'));
+  const html = o.tooltip.formatter([{ seriesName: '<b>A</b>', value: 1, color: 'red', dataIndex: 0 }]);
+  assert.ok(!html.includes('<b>A</b>'));
+});
+
+test('combo: bars on the left axis, the cumulative line on the right', () => {
+  const o = comboOption(t, {
+    cats: ['a'],
+    bars: { name: 'Month', data: [1], color: 'red' },
+    line: { name: 'Total', data: [1], color: 'blue' },
+    valueFormat: money,
+  });
+  assert.equal(o.series[1].yAxisIndex, 1);
+  assert.equal(o.yAxis.length, 2);
+});
+
+test('heatmap scales colour to the largest cell and handles an empty grid', () => {
+  const o = heatmapOption(t, {
+    cols: ['Jan', 'Feb'],
+    rows: ['2026'],
+    cells: [[0, 0, 5], [1, 0, 20]],
+    color: t.success,
+    valueFormat: money,
+  });
+  assert.equal(o.visualMap.max, 20);
+  assert.equal(heatmapOption(t, { cols: [], rows: [], cells: [], color: t.success, valueFormat: money }).visualMap.max, 1);
 });

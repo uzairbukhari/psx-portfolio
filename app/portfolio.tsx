@@ -113,7 +113,7 @@ import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
 import {
   PortfolioReports,
   AssetReports,
-  AllReports,
+  AllInsights,
   LedgerTimeline,
   MonthlyPicks,
   PlanPage,
@@ -3608,8 +3608,9 @@ function DashboardContent({
           </NavPanel>
           <NavPanel id="reports" tab={tab}>
             {isAll ? (
-              <AllReports
+              <AllInsights
                 portfolio={p}
+                parts={overviewParts ?? []}
                 assets={allAssets.map((o) => o.asset)}
                 metalRates={metalRates.rates}
                 fundNavs={fundData.navs}
