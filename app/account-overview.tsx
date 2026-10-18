@@ -223,6 +223,14 @@ export default function AccountOverview({
               <span className="hero-note">today</span>
             </div>
           )}
+          <small className="hero-scope">
+            {compact
+              ? `${o.holdingCount} ${o.holdingCount === 1 ? 'holding' : 'holdings'}`
+              : `${o.portfolios.length} portfolios · ${o.holdingCount} ${o.holdingCount === 1 ? 'holding' : 'holdings'}`}
+            {total.oldestQuoteDate
+              ? ` · oldest price ${dateLabel(total.oldestQuoteDate)}${staleDays && staleDays > 3 ? ' (stale)' : ''}`
+              : ''}
+          </small>
           {total.incomplete.length > 0 && (
             <output className="overview-incomplete">
               Incomplete: {total.incomplete.join(' ')}

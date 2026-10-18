@@ -14,16 +14,18 @@ test('Finqalab: a non-filer portfolio with its own holdings', async ({ app }) =>
 
 test('Savings & Gold: gold, savings plans and mutual funds each open', async ({ app }) => {
   await choosePortfolio(app, 'Savings & Gold');
-  await expect(app.getByRole('button', { name: /Gold and Silver/ })).toContainText('3 held');
-  await expect(app.getByRole('button', { name: /Savings plans/ })).toContainText('1 active');
+  // The Holdings card has one tab per kind of holding; each tab shows its own panel.
+  await app.getByRole('tab', { name: /Funds/ }).click();
   await expect(app.getByRole('button', { name: /Mutual funds/ })).toContainText('2 held');
-
   await app.getByRole('button', { name: /Mutual funds/ }).click();
   for (const fund of ['Test Money Market Fund', 'Test Equity Fund', 'Sample Income Fund']) await expect(app.getByText(fund).first()).toBeVisible();
 
+  await app.getByRole('tab', { name: /Gold & silver/ }).click();
+  await expect(app.getByRole('button', { name: /Gold and Silver/ })).toContainText('3 held');
   await app.getByRole('button', { name: /Gold and Silver/ }).click();
   for (const name of ['Wedding gold', '24k bar', 'Silver coins']) await expect(app.getByText(name).first()).toBeVisible();
 
+  await app.getByRole('tab', { name: /Currency/ }).click();
   await expect(app.getByRole('button', { name: /Foreign currency/ })).toContainText('2 held');
   await app.getByRole('button', { name: /Foreign currency/ }).click();
   for (const name of ['Dollars at home', 'Dirhams in the bank']) await expect(app.getByText(name).first()).toBeVisible();
@@ -34,6 +36,8 @@ test('Savings & Gold: gold, savings plans and mutual funds each open', async ({ 
   await expect(app.getByText('Held over time')).toBeVisible();
   await app.goBack();
 
+  await app.getByRole('tab', { name: /Plans/ }).click();
+  await expect(app.getByRole('button', { name: /Savings plans/ })).toContainText('1 active');
   await app.getByRole('button', { name: /Savings plans/ }).click();
   await expect(app.getByText('Mahana Bachat').first()).toBeVisible();
   expect(await pageText(app)).toContain('Old savings plan');
