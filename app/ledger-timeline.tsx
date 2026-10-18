@@ -207,9 +207,10 @@ export default function LedgerTimeline({
                         {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][Number(e.date.slice(5, 7)) - 1]}
                       </small>
                     </span>
-                    <span className={`ledger-type type-${e.type}`}>
-                      {e.label}
-                    </span>
+                    <span
+                      className={`ledger-type type-${e.type}`}
+                      aria-hidden="true"
+                    />
                     <div className="ledger-main">
                       <b className="ledger-title">{e.label}</b>
                       <span className="ledger-tk">
