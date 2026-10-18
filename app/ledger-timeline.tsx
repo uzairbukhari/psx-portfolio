@@ -201,11 +201,17 @@ export default function LedgerTimeline({
                     key={e.key}
                     className={'ledger-row' + (e.voided ? ' row-voided' : '')}
                   >
-                    <span className="ledger-date">{e.date.slice(8)}</span>
+                    <span className="ledger-date">
+                      {e.date.slice(8)}
+                      <small>
+                        {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][Number(e.date.slice(5, 7)) - 1]}
+                      </small>
+                    </span>
                     <span className={`ledger-type type-${e.type}`}>
                       {e.label}
                     </span>
                     <div className="ledger-main">
+                      <b className="ledger-title">{e.label}</b>
                       <span className="ledger-tk">
                         {!ticker && (
                           <button

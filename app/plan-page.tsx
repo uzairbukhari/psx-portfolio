@@ -1,8 +1,8 @@
 'use client';
 // Plan: this month’s fresh money, the staircase of money put in so far, the shortlist and the latest Monthly Picks
 // run. The run itself (and every shortlisted company) lives on the Monthly Picks page.
-import { useMemo } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowRight, ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import { money, type Portfolio } from '@/lib/portfolio';
 import { moneyInFlows } from '@/lib/performance';
 import { barOption } from '@/lib/chart-kit';
@@ -12,17 +12,36 @@ import { TickerTile } from './ui-kit';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1] ?? ''} ${m.slice(0, 4)}`;
 
+const shiftMonth = (m: string, by: number) => {
+  const d = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + by, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
 export default function PlanPage({
   portfolio: p,
   month,
+  setMonth,
+  feePct,
+  setFeePct,
+  busy,
   onOpenPicks,
   onOpenCompany,
+  onRecordBuy,
+  onSetBudget,
 }: {
   portfolio: Portfolio;
   month: string;
+  setMonth: (m: string) => void;
+  feePct: number;
+  setFeePct: (n: number) => void;
+  busy: boolean;
   onOpenPicks: () => void;
   onOpenCompany: (ticker: string) => void;
+  onRecordBuy: () => void;
+  onSetBudget: (amount: number) => Promise<unknown> | void;
 }) {
+  const [amountText, setAmountText] = useState('');
+  const [editing, setEditing] = useState(false);
   const fresh = p.budgets[month] ?? 100000;
   const shortlist = p.monthlyPicksShortlist ?? [];
   const run = (p.monthlyPicksRuns ?? []).find((r) => r.status === 'completed' && r.result);
@@ -38,9 +57,22 @@ export default function PlanPage({
   const share = Math.min(100, (thisMonth / Math.max(1, fresh)) * 100);
   return (
     <div className="plan-page">
-      <div className="page-head">
-        <p className="page-kicker">Monthly SIP</p>
-        <h2>{monthName(month)}</h2>
+      <div className="page-head plan-head">
+        <div>
+          <p className="page-kicker">Monthly SIP</p>
+          <div className="plan-month">
+            <button type="button" data-slot="icon" className="icon-btn" aria-label="Previous month" onClick={() => setMonth(shiftMonth(month, -1))}>
+              <ChevronLeft size={16} />
+            </button>
+            <h2>{monthName(month)}</h2>
+            <button type="button" data-slot="icon" className="icon-btn" aria-label="Next month" onClick={() => setMonth(shiftMonth(month, 1))}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+        <button type="button" data-slot="cta" className="plan-cta" disabled={busy} onClick={onRecordBuy}>
+          <Plus size={16} aria-hidden="true" /> Record a buy
+        </button>
       </div>
       <section className="slab plan-slab plan-hero" aria-label="This month">
         <div className="plan-hero-main">
@@ -73,13 +105,42 @@ export default function PlanPage({
         </div>
       </section>
       <div className="plan-lower">
-      <section className="panel">
-        <div className="between">
-          <h3>Your shortlist</h3>
-          <button type="button" data-slot="sw-link" className="sw-link" onClick={onOpenPicks}>
-            Open Monthly Picks <ArrowRight size={14} aria-hidden="true" />
-          </button>
+      <section className="panel plan-fresh">
+        <span className="lbl">Fresh money</span>
+        <label className="plan-amount">
+          <span>Rs</span>
+          <input
+            inputMode="numeric"
+            aria-label="Fresh money this month"
+            value={editing ? amountText : fresh.toLocaleString('en-PK')}
+            onFocus={() => {
+              setAmountText(String(fresh));
+              setEditing(true);
+            }}
+            onChange={(e) => setAmountText(e.target.value.replace(/[^\d]/g, ''))}
+            onBlur={() => {
+              setEditing(false);
+              const n = Number(amountText);
+              if (Number.isFinite(n) && n > 0 && n !== fresh) void onSetBudget(n);
+            }}
+          />
+        </label>
+        <div className="plan-fields">
+          <label>
+            <span>Est. fees</span>
+            <input
+              inputMode="decimal"
+              aria-label="Estimated fees percent"
+              value={feePct}
+              onChange={(e) => setFeePct(Number(e.target.value.replace(/[^\d.]/g, '')) || 0)}
+            />
+          </label>
+          <label>
+            <span>Month</span>
+            <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+          </label>
         </div>
+        <span className="lbl">Shortlist · {shortlist.length} of 15</span>
         {shortlist.length ? (
           <div className="chip-row">
             {shortlist.map((t) => (
@@ -91,6 +152,9 @@ export default function PlanPage({
         ) : (
           <p className="muted-note">No shortlist yet. Add up to 15 companies on the Monthly Picks page.</p>
         )}
+        <button type="button" data-slot="cta" className="plan-cta plan-generate" disabled={busy} onClick={onOpenPicks}>
+          <Sparkles size={16} aria-hidden="true" /> Generate picks
+        </button>
       </section>
       <section className="panel">
         <div className="between">
@@ -101,17 +165,28 @@ export default function PlanPage({
         </div>
         {picks.length ? (
           <ul className="pick-list">
-            {picks.map((pk, i) => (
-              <li key={pk.ticker}>
-                <span className="num muted-note">#{i + 1}</span>
-                <TickerTile ticker={pk.ticker} />
-                <div>
-                  <b>{pk.ticker}</b>
-                  <small>{pk.allocationPct}% of the month’s money</small>
-                </div>
-                <b className="num">{money(Math.floor((fresh * pk.allocationPct) / 100))}</b>
-              </li>
-            ))}
+            {picks.map((pk, i) => {
+              const co = p.companies.find((c) => c.ticker === pk.ticker);
+              const price = p.quotes[pk.ticker]?.price;
+              const amt = Math.floor((fresh * pk.allocationPct) / 100);
+              return (
+                <li key={pk.ticker}>
+                  <span className="num muted-note">{i + 1}</span>
+                  <TickerTile ticker={pk.ticker} />
+                  <div>
+                    <b>{pk.ticker}</b>
+                    <small>{co?.name ?? ''}{co?.sector ? ` · ${co.sector}` : ''}</small>
+                    <span className="pick-bar" aria-hidden="true">
+                      <i style={{ width: `${Math.min(100, pk.allocationPct)}%` }} />
+                    </span>
+                  </div>
+                  <span className="pick-amt">
+                    <b className="num">{money(amt)}</b>
+                    <small>{price ? `Buy ${Math.floor(amt / price)} sh @ ${money(price)}` : `${pk.allocationPct}% of the month’s money`}</small>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="muted-note">Run Monthly Picks to see where this month’s money could go.</p>

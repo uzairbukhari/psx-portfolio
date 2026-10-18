@@ -55,11 +55,12 @@ type Summary = {
 type History = { eod: PricePoint[]; intraday: PricePoint[] };
 
 const RANGES: [HistoryRange, string][] = [
-  ['today', 'Today'],
-  ['7d', '7D'],
+  ['today', '1D'],
+  ['7d', '1W'],
   ['1m', '1M'],
+  ['3m', '3M'],
+  ['6m', '6M'],
   ['1y', '1Y'],
-  ['3y', '3Y'],
   ['5y', '5Y'],
 ];
 
@@ -97,7 +98,7 @@ function PriceChart({
   holding: Holding | undefined;
   trades: Trade[];
 }) {
-  const [range, setRange] = useState<HistoryRange>('1m');
+  const [range, setRange] = useState<HistoryRange>('1y');
   const [attempt, setAttempt] = useState(0);
   // Keyed by request, so switching company (or retrying) never shows the previous
   // company's history or error while the next load runs.
@@ -212,7 +213,7 @@ function PriceChart({
               name: 'Price',
               data: points.map(([sec, price]) => ({ x: sec * 1000, y: price })),
               area: true,
-              color: up ? t.success : t.danger,
+              color: t.primary,
               valueFormat: (n) => money(n),
               axisFormat: (v) => v.toFixed(0),
               dateLabel: (x) => tickLabel(Number(x) / 1000, range),
@@ -462,7 +463,7 @@ export default function CompanyDetail({
             <span className="lbl">Your position</span>
             <div className="position-tiles">
               <div>
-                <span>Shares held</span>
+                <span>Shares</span>
                 <b className="num">{(holding?.shares ?? 0).toLocaleString()}</b>
               </div>
               <div>
@@ -472,13 +473,13 @@ export default function CompanyDetail({
                 </b>
               </div>
               <div>
-                <span>Market value</span>
+                <span>Value</span>
                 <b className="num">
                   {summary.value === null ? '—' : money(summary.value)}
                 </b>
               </div>
               <div>
-                <span>Profit / loss</span>
+                <span>Unrealised</span>
                 <b className={`num ${tone(summary.gain) ?? ''}`}>
                   {summary.gain === null ? '—' : money(summary.gain)}
                 </b>
@@ -498,6 +499,25 @@ export default function CompanyDetail({
               <span className="lbl">Dividends</span>
               <b className="num pos-text">+{money(dividendTotal)}</b>
             </div>
+            {received.length > 0 && (
+              <EChart
+                className="company-div-chart"
+                label={`Dividends received, ${received.length} payments.`}
+                build={(t) =>
+                  barOption(t, {
+                    cats: received.map(({ d }) => d.date.slice(0, 7)),
+                    series: [
+                      {
+                        name: 'Received',
+                        data: received.map(({ net }) => net),
+                        color: t.success,
+                      },
+                    ],
+                    valueFormat: (n) => money(n),
+                  })
+                }
+              />
+            )}
             <small className="position-note">
               {summary.dividendNet === null
                 ? 'Gross · set filer status for net'

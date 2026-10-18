@@ -3663,8 +3663,23 @@ function DashboardContent({
             <PlanPage
               portfolio={picksPortfolio ?? p}
               month={month}
+              setMonth={setMonth}
+              feePct={fees}
+              setFeePct={setFees}
+              busy={busy}
               onOpenPicks={() => setTab('sip')}
               onOpenCompany={openCompany}
+              onRecordBuy={() => openTx('buy')}
+              onSetBudget={async (amount) => {
+                const base = picksPortfolio ?? p;
+                const next = { ...base, budgets: { ...base.budgets, [month]: amount } };
+                if (!picksHome || workspace!.account.portfolios.length < 2) return save(next, 'Monthly budget saved.');
+                await save(
+                  { ...picksHome.portfolio, budgets: next.budgets },
+                  'Monthly budget saved.',
+                  { target: { id: picksHome.id }, reload: true },
+                );
+              }}
             />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>
