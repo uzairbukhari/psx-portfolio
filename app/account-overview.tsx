@@ -194,7 +194,7 @@ export default function AccountOverview({
               <span className="hero-pending">Prices needed</span>
             ) : (
               <>
-                <span className="rs">Rs</span>
+                <span className="rs">Rs</span>{' '}
                 {Math.round(total.value).toLocaleString('en-PK')}
               </>
             )}

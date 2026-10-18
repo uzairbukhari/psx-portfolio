@@ -3564,7 +3564,7 @@ function DashboardContent({
                         {displayedHoldings.length > HOLDINGS_PREVIEW ? (
                           <>
                             Showing {shownHoldings.length} of{' '}
-                            {displayedHoldings.length} ·{' '}
+                            {displayedHoldings.length} holdings ·{' '}
                             <button
                               type="button"
                               data-slot="link"
