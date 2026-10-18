@@ -73,7 +73,7 @@ export default function PicksResults({ run, portfolio, extraNames, onRefreshPric
 
   return (
     <>
-      <section className="mp-summary">
+      <section className="mp-summary slab">
         <div className="mp-summary__top">
           <div>
             <p className="eyebrow">{run.month} RECOMMENDATION</p>
