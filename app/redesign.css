@@ -46,7 +46,9 @@ html:root .side-tools,html:root .nav-badge{display:none}
 @media(min-width:761px){
   html:root{--side-w:248px}
   html:root[data-side=rail],html:root[data-side=auto]{--side-w:76px}
-  html:root .desk{max-width:none;margin:0;padding:0 36px 48px calc(var(--side-w) + 36px);transition:padding-left .18s ease}
+  /* Content stops at 1800px on very wide screens and centres in the space right of the sidebar. */
+  html:root{--desk-pad:max(36px,calc((100vw - var(--side-w) - 1800px) / 2))}
+  html:root .desk{max-width:none;margin:0;padding:0 var(--desk-pad) 48px calc(var(--side-w) + var(--desk-pad));transition:padding-left .18s ease}
   html:root .app-header{display:contents}
   html:root .app-header::before{content:none}
   html:root .side{position:fixed;inset:0 auto 0 0;width:var(--side-w);z-index:50;display:flex;flex-direction:column;gap:6px;padding:16px 12px;background:var(--card);border-right:1px solid var(--border);transition:width .18s ease,box-shadow .18s ease}
@@ -72,7 +74,7 @@ html:root .side-tools,html:root .nav-badge{display:none}
   html:root[data-side=rail] .side .app-nav-link,html:root[data-side=rail] .side .side-tool,html:root[data-side=auto] .side:not(:hover):not(:focus-within) :is(.app-nav-link,.side-tool){justify-content:center;padding:0}
   html:root[data-side=rail] .side .app-nav-link:hover::before{content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);padding:6px 10px;border-radius:8px;background:var(--popover);color:var(--foreground);border:1px solid var(--border);box-shadow:0 10px 28px -12px rgb(var(--ch-shadow) / .5);font-size:12.5px;white-space:nowrap;pointer-events:none;z-index:60}
   /* Top bar: portfolio picker on the left, actions on the right. */
-  html:root .header-right{position:sticky;top:0;z-index:30;height:68px;margin:0 -36px 8px -36px;padding:0 36px;gap:10px;background:color-mix(in srgb,var(--background) 86%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  html:root .header-right{position:sticky;top:0;z-index:30;height:68px;margin:0 calc(-1 * var(--desk-pad)) 8px calc(-1 * var(--desk-pad));padding:0 var(--desk-pad);gap:10px;background:color-mix(in srgb,var(--background) 86%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
   html:root .header-right>.hdr-btn:first-child,html:root .header-right>:not(.hdr-btn):first-child+.hdr-btn{margin-left:auto}
   html:root .header-right .header-portfolio-select,html:root .header-right .header-portfolio-label{margin-left:0}
   html:root .app-header ~ [data-slot=tabs-content]{padding-top:4px}
