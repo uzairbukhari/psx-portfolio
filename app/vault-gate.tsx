@@ -434,7 +434,7 @@ function Unlock({
   const [recovery, setRecovery] = useState('');
   const [again, setAgain] = useState('');
   const [typed, setTyped] = useState('');
-  const [keep, setKeep] = useState(false);
+  const [keep, setKeep] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const stageIndex = useStageIndex(busy, STAGES.length);
