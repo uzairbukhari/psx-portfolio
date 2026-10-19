@@ -8,7 +8,21 @@ html:root [data-class="currency"]{--c:var(--asset-fx,var(--asset-plans))}
 
 html:root .sp-page{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:980px;margin:0 auto;padding:0 16px 104px}
 html:root .sp-page>*{grid-column:1/-1;min-width:0;margin:0}
+@media(min-width:1240px){html:root .sp-page>*{grid-column:auto}}
 @media(min-width:900px){html:root .sp-page{padding-bottom:40px}}
+/* Wide screens: plan and habit side by side, hero and the projection across the full width. */
+@media(min-width:1240px){
+  html:root .sp-page{max-width:1480px;padding-left:24px;padding-right:24px;grid-template-columns:minmax(0,1.65fr) minmax(340px,1fr);grid-template-areas:"hero hero" "plan habit" "future future";align-items:start}
+  html:root .sp-page>.sp-hero{grid-area:hero}
+  html:root .sp-page>#sp-plan{grid-area:plan}
+  html:root .sp-page>.sp-habit{grid-area:habit;position:sticky;top:16px}
+  html:root .sp-page>.sp-future{grid-area:future}
+  html:root .sp-habit .sp-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html:root .sp-habit .sp-habit-chart{min-height:260px}
+  html:root .sp-future-grid{grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr)}
+  html:root .sp-future-canvas{min-height:280px}
+  html:root .sp-page>.sp-wizard{grid-column:1/-1;grid-row:1/-1;max-width:1180px;margin:0 auto;width:100%}
+}
 html:root .sp-page h2{font-size:18px;letter-spacing:-.2px;margin:0}
 html:root .sp-hint{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted-foreground)}
 html:root .sp-sub{margin:4px 0 0;font-size:13px;color:var(--muted-foreground)}

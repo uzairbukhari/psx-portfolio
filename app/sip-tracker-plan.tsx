@@ -516,7 +516,7 @@ export function SipHabit({ st }: { st: SipMonthState }) {
   const active = rows.filter((r) => r.target > 0);
   const avg = active.length ? active.reduce((n, r) => n + r.actual, 0) / active.length : 0;
   return (
-    <section className="panel sp-card" aria-labelledby="sp-habit-title">
+    <section className="panel sp-card sp-habit" aria-labelledby="sp-habit-title">
       <div className="sp-card-head">
         <div>
           <h2 id="sp-habit-title">Your habit</h2>
