@@ -135,8 +135,11 @@ html:root .vault-meter-bar[data-score="3"] i[data-on],html:root .vault-meter-bar
 html:root .vault-checks{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:13px;color:var(--muted-foreground)}
 html:root .vault-checks li::before{content:"○";margin-right:8px}
 html:root .vault-checks li[data-ok]{color:var(--success)}html:root .vault-checks li[data-ok]::before{content:"●"}
-html:root .vault-blocks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
-html:root .vault-blocks span{padding:10px 0;text-align:center;border-radius:12px;background:var(--muted);border:1px solid var(--border);font:600 15px var(--font-geist-mono),monospace;letter-spacing:.08em}
+html:root .vault-blocks{display:grid;gap:8px;margin:12px 0;padding:14px 16px;border-radius:12px;background:var(--muted);border:1px solid var(--border)}
+html:root .vault-blocks small{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .vault-blocks code{display:flex;flex-wrap:wrap;row-gap:4px;font:600 16px/1.6 var(--font-geist-mono),monospace;letter-spacing:.06em;color:var(--foreground);background:none;padding:0}
+html:root .vault-blocks code span{white-space:nowrap}
+html:root .vault-blocks code i{font-style:normal;color:var(--muted-foreground);padding:0 .15em}
 html:root .vault-stage .vault-recovery,html:root .vault-recovery[data-testid]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0}
 html:root .vault-danger-link{color:var(--danger)!important}
 @keyframes vshake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}

@@ -373,9 +373,15 @@ function RecoveryKey({ prepared, onDone, onBack }: { prepared: PreparedVault; on
       <p className="muted">If you forget your vault password, this key is the only way back in. We cannot recover it for you. Save it in a password manager or print it, and keep it away from this device’s backups.</p>
       <div className="vault-recovery" data-testid="recovery-key">{prepared.recoverySecret}</div>
       <div className="vault-blocks" aria-hidden="true">
-        {prepared.recoverySecret.replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.map((block, i) => (
-          <span key={i}>{block}</span>
-        ))}
+        <small>Your recovery key (one key, keep every part)</small>
+        <code>
+          {prepared.recoverySecret.split('-').map((block, i, all) => (
+            <span key={i}>
+              {block}
+              {i < all.length - 1 && <i>-</i>}
+            </span>
+          ))}
+        </code>
       </div>
       <div className="vault-actions">
         <button
