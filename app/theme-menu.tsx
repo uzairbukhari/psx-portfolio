@@ -27,6 +27,24 @@ function Swatch({ colors }: { colors: (typeof THEMES)[number]['swatch'] }) {
   );
 }
 
+/** A miniature dashboard drawn from the theme's own three colours: page, card and accent. */
+function ThemePreview({ colors }: { colors: (typeof THEMES)[number]['swatch'] }) {
+  return (
+    <span className="theme-preview" aria-hidden="true" style={{ background: colors[0], borderColor: colors[2] }}>
+      <span className="tp-slab">
+        <i />
+        <i />
+      </span>
+      <span className="tp-card" style={{ background: colors[1] }}>
+        <i style={{ background: colors[2] }} />
+        <i style={{ background: colors[2] }} />
+        <i style={{ background: colors[2] }} />
+        <i style={{ background: colors[2] }} />
+      </span>
+    </span>
+  );
+}
+
 export function ThemeMenuItems() {
   const { preference, setPreference } = useTheme();
   return (
@@ -85,9 +103,11 @@ export function ThemeSetting() {
           >
             <RadioGroupItem id={`theme-${o.id}`} value={o.id} />
             {o.swatch ? (
-              <Swatch colors={o.swatch} />
+              <ThemePreview colors={o.swatch} />
             ) : (
-              <Monitor size={18} aria-hidden="true" />
+              <span className="theme-preview theme-preview--system" aria-hidden="true">
+                <Monitor size={22} />
+              </span>
             )}
             <span>
               <strong>{o.label}</strong>

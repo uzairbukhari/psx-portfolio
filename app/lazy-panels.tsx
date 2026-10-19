@@ -58,6 +58,8 @@ function lazyNamed<M, P extends object>(
 export const PortfolioReports = lazyView(() => import('./portfolio-reports'));
 export const AssetReports = lazyView(() => import('./asset-reports'));
 export const AllReports = lazyNamed(() => import('./asset-reports'), (m) => m.AllReports);
+export const PortfolioInsights = lazyNamed(() => import('./insights-all'), (m) => m.PortfolioInsights);
+export const AllInsights = lazyNamed(() => import('./insights-all'), (m) => m.AllInsights);
 export const LedgerTimeline = lazyView(() => import('./ledger-timeline'));
 export const PlanPage = lazyView(() => import('./plan-page'));
 export const MonthlyPicks = lazyView(() => import('./monthly-picks'));

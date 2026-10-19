@@ -76,23 +76,22 @@ export default function SystemHealth() {
       {funds.message && <p role={funds.failed ? 'alert' : 'status'} className={funds.failed ? 'notice error' : 'notice'}>{funds.message}</p>}
 
       <h2 id="pipelines">Pipelines</h2>
-      <div className="table-wrap">
-        <table className="admin-table">
-          <thead><tr><th>Status</th><th>Pipeline</th><th>Last success</th><th>Last run</th><th>Expected</th><th>Last error</th><th><span className="sr-only">Actions</span></th></tr></thead>
-          <tbody>
-            {health.pipelines.map((p) => (
-              <tr key={p.id}>
-                <td><StatusPill status={p.status} /></td>
-                <td>{p.label}</td>
-                <td>{ago(p.lastSuccessAt, nowMs)}</td>
-                <td>{p.lastRun ? <>{ago(p.lastRun.at, nowMs)} <span className="muted">{p.lastRun.ok ? 'ok' : 'failed'}</span></> : <span className="muted">none yet</span>}</td>
-                <td className="muted">{p.expected}</td>
-                <td className="admin-error">{p.lastError ?? ''}</td>
-                <td>{action(p)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="pipe-grid">
+        {health.pipelines.map((p) => (
+          <article key={p.id} className="pipe-card" data-status={p.status}>
+            <header>
+              <h3>{p.label}</h3>
+              <StatusPill status={p.status} />
+            </header>
+            <dl>
+              <div><dt>Last success</dt><dd className="num">{ago(p.lastSuccessAt, nowMs)}</dd></div>
+              <div><dt>Last run</dt><dd className="num">{p.lastRun ? <>{ago(p.lastRun.at, nowMs)} <span className="muted">{p.lastRun.ok ? 'ok' : 'failed'}</span></> : <span className="muted">none yet</span>}</dd></div>
+            </dl>
+            <p className="muted pipe-expected">{p.expected}</p>
+            {p.lastError && <p className="admin-error pipe-error">{p.lastError}</p>}
+            <footer>{action(p)}</footer>
+          </article>
+        ))}
       </div>
 
       {history && (

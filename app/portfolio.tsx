@@ -101,7 +101,6 @@ import {
 import { addNotifications, dividendNotifications } from '@/lib/notifications';
 import { syncAutoDividends } from '@/lib/dividend-sync';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
-import { reportMode } from '@/lib/asset-reports';
 import PortfolioValueCard from './portfolio-value-card';
 import HoldingsHome, { MarketGlanceProvider, TodayPill } from './holdings-home';
 import { TickerTile, hueOf } from './ui-kit';
@@ -111,9 +110,8 @@ import { useFundCatalog, usePlanNavs, useTrackFunds } from './use-fund-data';
 import CollapsiblePanel from './collapsible-panel';
 import { AddAssetMenu, StartTiles, type AssetPick } from './add-asset-menu';
 import {
-  PortfolioReports,
-  AssetReports,
-  AllReports,
+  AllInsights,
+  PortfolioInsights,
   LedgerTimeline,
   MonthlyPicks,
   PlanPage,
@@ -3608,25 +3606,23 @@ function DashboardContent({
           </NavPanel>
           <NavPanel id="reports" tab={tab}>
             {isAll ? (
-              <AllReports
+              <AllInsights
                 portfolio={p}
+                parts={overviewParts ?? []}
                 assets={allAssets.map((o) => o.asset)}
                 metalRates={metalRates.rates}
                 fundNavs={fundData.navs}
                 planNavs={planNavs}
                 fx={fxData.data}
               />
-            ) : reportMode(p) !== 'stocks' ? (
-              <AssetReports
+            ) : (
+              <PortfolioInsights
                 portfolio={p}
                 fx={fxData.data}
-                mode={reportMode(p) as 'savings' | 'metal' | 'currency'}
                 metalRates={metalRates.rates}
                 fundNavs={fundData.navs}
                 planNavs={planNavs}
               />
-            ) : (
-              <PortfolioReports portfolio={p} />
             )}
           </NavPanel>
           <NavPanel id="sip-plan" tab={tab}>

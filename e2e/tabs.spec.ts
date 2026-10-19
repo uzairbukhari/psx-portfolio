@@ -2,8 +2,8 @@ import { expect, test } from './fixtures';
 
 // Every top-level page opens with its content (the seed keeps the vault unlocked in this tab across navigations).
 const PAGES: [string, RegExp][] = [
-  ['/reports', /priced market value/i],
-  ['/insights', /priced market value/i],
+  ['/reports', /net worth/i],
+  ['/insights', /net worth/i],
   ['/plan', /Your staircase/i],
   ['/sip', /Where should this month/],
   ['/monthly-picks', /Where should this month/],
@@ -23,7 +23,7 @@ for (const [path, marker] of PAGES)
 
 test('reports cover stocks, metals, mutual funds and foreign currency', async ({ app }) => {
   await app.goto('/reports');
-  for (const tab of ['Overview', 'Stocks', 'Gold & silver', 'Funds', 'Currency']) await expect(app.getByRole('tab', { name: tab }).or(app.getByRole('button', { name: tab, exact: true })).first()).toBeVisible();
+  for (const tab of ['Summary', 'Stocks', 'Gold & silver', 'Funds & plans', 'Currency']) await expect(app.getByRole('tab', { name: tab }).or(app.getByRole('button', { name: tab, exact: true })).first()).toBeVisible();
 });
 
 test('settings shows the super admin sections', async ({ app }) => {
