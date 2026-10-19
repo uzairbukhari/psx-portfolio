@@ -409,6 +409,25 @@ export function setAccountFilerStatus(
     })),
   };
 }
+/** Optional monthly spending, stored on every portfolio like the filer status (a setting, not a ledger record). */
+export function accountMonthlyExpenses(account: PortfolioAccount): number | null {
+  return account.portfolios[0]?.portfolio.monthlyExpenses ?? null;
+}
+export function setAccountMonthlyExpenses(
+  account: PortfolioAccount,
+  amount: number | null,
+): PortfolioAccount {
+  return {
+    ...account,
+    portfolios: account.portfolios.map((p) => {
+      const { monthlyExpenses: _old, ...rest } = p.portfolio;
+      return {
+        ...p,
+        portfolio: amount === null ? rest : { ...rest, monthlyExpenses: amount },
+      };
+    }),
+  };
+}
 export function assertAccountWritable(
   previous: PortfolioAccount,
   next: PortfolioAccount,
@@ -428,12 +447,14 @@ export function dashboardPortfolio(
   selected = ALL_PORTFOLIOS,
 ): Portfolio {
   const taxProfile = accountTaxProfile(account);
-  const withTax = (p: Portfolio): Portfolio => ({ ...p, taxProfile });
+  const monthlyExpenses = accountMonthlyExpenses(account) ?? undefined;
+  const withTax = (p: Portfolio): Portfolio => ({ ...p, taxProfile, monthlyExpenses });
   if (account.portfolios.length === 1) return account.portfolios[0].portfolio;
   if (selected !== ALL_PORTFOLIOS)
     return withTax(portfolioAt(account, { id: selected }));
   const result = blankPortfolio();
   result.taxProfile = taxProfile;
+  result.monthlyExpenses = monthlyExpenses;
   result[DISPLAY_PARTS] = account.portfolios;
   result.dividends = [];
   const companies = new Map<string, Portfolio['companies'][number]>();

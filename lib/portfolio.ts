@@ -248,6 +248,8 @@ export type Portfolio = {
   dividendTrackingFrom?: string;
   notifications?: AppNotification[];
   taxProfile?: TaxProfile;
+  /** What the person spends in a month, optional. Used only for friendly milestones on the device; never sent anywhere. */
+  monthlyExpenses?: number;
   research?: ResearchCompany[];
   researchSettings?: ResearchSettings;
   aiReview?: {
@@ -1605,6 +1607,14 @@ export function validate(p: Portfolio) {
     (!p.taxProfile || !(p.taxProfile.filerStatus in TAX_RATES))
   )
     throw new UserError('Invalid tax profile.');
+  if (
+    p.monthlyExpenses !== undefined &&
+    (typeof p.monthlyExpenses !== 'number' ||
+      !Number.isFinite(p.monthlyExpenses) ||
+      p.monthlyExpenses < 0 ||
+      p.monthlyExpenses > 1e9)
+  )
+    throw new UserError('Invalid monthly expenses.');
   try {
     validateAssets(p.assets, today());
   } catch (error) {

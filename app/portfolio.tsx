@@ -179,6 +179,7 @@ import {
   ALL_PORTFOLIOS,
   importMatches,
   setAccountFilerStatus,
+  setAccountMonthlyExpenses,
 } from '@/lib/portfolio-account';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
@@ -847,6 +848,7 @@ function DashboardContent({
     [message, setMessageState] = useState(''),
     [failed, setFailed] = useState(false),
     [month, setMonth] = useState(today().slice(0, 7)),
+    [picksHint, setPicksHint] = useState<{ avoid: string[] } | null>(null),
     [fees, setFees] = useState(0),
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
@@ -1943,6 +1945,22 @@ function DashboardContent({
         'AI model settings saved.',
       ),
     );
+  /** From Insights: open Monthly Picks leaving the heavy holdings out of this month's shortlist (memory only, never saved or sent). */
+  const balanceInPicks = (avoid: string[]) => {
+    setPicksHint({ avoid });
+    setTab('sip');
+  };
+  /** Optional monthly spending, written into every portfolio like the tax status. Stays inside the encrypted account. */
+  const saveMonthlyExpenses = (amount: number | null) =>
+    attempt(async () => {
+      await vault!.session.saveAccount(
+        setAccountMonthlyExpenses(vault!.session.account, amount),
+        revision,
+        { replaceAll: true },
+      );
+      await load();
+      notify(amount === null ? 'Monthly expenses cleared.' : 'Monthly expenses saved.');
+    });
   /** One tax status for the whole account: written into every portfolio, whichever view is open. */
   const saveFilerStatus = (filerStatus: 'filer' | 'non-filer') =>
     attempt(async () => {
@@ -3614,6 +3632,9 @@ function DashboardContent({
                 fundNavs={fundData.navs}
                 planNavs={planNavs}
                 fx={fxData.data}
+                monthlyExpenses={p.monthlyExpenses ?? null}
+                onSaveExpenses={saveMonthlyExpenses}
+                onBalance={balanceInPicks}
               />
             ) : (
               <PortfolioInsights
@@ -3622,6 +3643,9 @@ function DashboardContent({
                 metalRates={metalRates.rates}
                 fundNavs={fundData.navs}
                 planNavs={planNavs}
+                monthlyExpenses={p.monthlyExpenses ?? null}
+                onSaveExpenses={saveMonthlyExpenses}
+                onBalance={balanceInPicks}
               />
             )}
           </NavPanel>
@@ -3658,6 +3682,8 @@ function DashboardContent({
               </div>
             ) : (
               <MonthlyPicks
+                hint={picksHint}
+                onClearHint={() => setPicksHint(null)}
                 portfolio={picksPortfolio ?? p}
                 month={month}
                 setMonth={setMonth}

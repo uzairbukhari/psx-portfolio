@@ -5,6 +5,7 @@ import './picks.css';
 import './ai-lab.css';
 import './reports.css';
 import './insights.css';
+import './insights-guided.css';
 import './account-overview.css';
 import './settings.css';
 import './always-dark.css';
