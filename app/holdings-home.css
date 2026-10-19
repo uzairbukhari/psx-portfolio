@@ -40,7 +40,7 @@ html:root .glance-row .card{padding:22px;min-width:0}
 html:root .glance-row .lbl{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
 html:root .glance-big{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:24px;margin:6px 0 4px;letter-spacing:-.02em}
 html:root .glance-sip{display:flex;gap:22px;align-items:center;justify-content:center}
-html:root .glance-sip .sip-ring{width:clamp(104px,60%,150px);aspect-ratio:1;height:auto;flex:0 1 auto;max-height:100%}
+html:root .glance-sip .sip-ring{width:clamp(120px,55%,200px);aspect-ratio:1;height:auto;flex:0 1 auto;max-height:100%}
 html:root .glance-sip .ring-track{fill:none;stroke:var(--muted);stroke-width:11}
 html:root .glance-sip .ring-fill{fill:none;stroke:var(--primary);stroke-width:11;stroke-linecap:round}
 html:root .glance-sip .ring-text{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:20px;fill:var(--foreground)}

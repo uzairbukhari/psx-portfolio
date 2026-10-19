@@ -1,3 +1,4 @@
+import type { SipBlueprint } from './sip-blueprint.ts';
 import {
   blankPortfolio,
   DISPLAY_PARTS,
@@ -428,6 +429,25 @@ export function setAccountMonthlyExpenses(
     }),
   };
 }
+/** SIP Blueprint: one setting for the whole account, written into every portfolio like the filer status. */
+export function accountSipBlueprint(account: PortfolioAccount): SipBlueprint | null {
+  return account.portfolios[0]?.portfolio.sipBlueprint ?? null;
+}
+export function setAccountSipBlueprint(
+  account: PortfolioAccount,
+  blueprint: SipBlueprint | null,
+): PortfolioAccount {
+  return {
+    ...account,
+    portfolios: account.portfolios.map((p) => {
+      const { sipBlueprint: _old, ...rest } = p.portfolio;
+      return {
+        ...p,
+        portfolio: blueprint === null ? rest : { ...rest, sipBlueprint: blueprint },
+      };
+    }),
+  };
+}
 export function assertAccountWritable(
   previous: PortfolioAccount,
   next: PortfolioAccount,
@@ -448,13 +468,15 @@ export function dashboardPortfolio(
 ): Portfolio {
   const taxProfile = accountTaxProfile(account);
   const monthlyExpenses = accountMonthlyExpenses(account) ?? undefined;
-  const withTax = (p: Portfolio): Portfolio => ({ ...p, taxProfile, monthlyExpenses });
+  const sipBlueprint = accountSipBlueprint(account) ?? undefined;
+  const withTax = (p: Portfolio): Portfolio => ({ ...p, taxProfile, monthlyExpenses, sipBlueprint });
   if (account.portfolios.length === 1) return account.portfolios[0].portfolio;
   if (selected !== ALL_PORTFOLIOS)
     return withTax(portfolioAt(account, { id: selected }));
   const result = blankPortfolio();
   result.taxProfile = taxProfile;
   result.monthlyExpenses = monthlyExpenses;
+  result.sipBlueprint = sipBlueprint;
   result[DISPLAY_PARTS] = account.portfolios;
   result.dividends = [];
   const companies = new Map<string, Portfolio['companies'][number]>();

@@ -14,10 +14,10 @@ import {
 } from '../lib/theme.ts';
 import { validateEvent } from '../lib/analytics-events.ts';
 
-test('light is the default and unknown values fall back to it', () => {
-  assert.equal(DEFAULT_PREFERENCE, 'light');
+test('dark is the default and unknown values fall back to it', () => {
+  assert.equal(DEFAULT_PREFERENCE, 'dark');
   for (const bad of [null, undefined, '', 'blue', '__proto__', 7])
-    assert.equal(parseThemePreference(bad), 'light');
+    assert.equal(parseThemePreference(bad), 'dark');
   for (const ok of ['light', 'dark', 'midnight', 'paper', 'system'])
     assert.equal(parseThemePreference(ok), ok);
 });
@@ -78,9 +78,9 @@ test('init script applies the stored theme before paint', () => {
   });
   assert.equal(run('system', true).theme, 'dark');
   assert.equal(run('system', false).theme, 'light');
-  assert.equal(run(null, true).theme, 'light');
-  assert.equal(run('nonsense', true).theme, 'light');
-  assert.equal(run(null, false, true).theme, 'light'); // storage blocked (private mode)
+  assert.equal(run(null, true).theme, 'dark');
+  assert.equal(run('nonsense', true).theme, 'dark');
+  assert.equal(run(null, false, true).theme, 'dark'); // storage blocked (private mode)
 });
 
 test('init script constants match lib/theme.ts for every theme', () => {

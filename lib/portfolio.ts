@@ -3,6 +3,7 @@ import { dividendEntitlement, lastTradingDay } from './psx-calendar.ts';
 import { UserError } from './user-error.ts';
 import { faceValueFor, type FaceValueEvidence } from './face-values.ts';
 import { validateAssets, type Asset } from './assets.ts';
+import { validateBlueprint } from './sip-blueprint.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -250,6 +251,8 @@ export type Portfolio = {
   taxProfile?: TaxProfile;
   /** What the person spends in a month, optional. Used only for friendly milestones on the device; never sent anywhere. */
   monthlyExpenses?: number;
+  /** SIP Blueprint: monthly budget, split and checklist progress. Account-wide setting kept only inside the encrypted portfolio. */
+  sipBlueprint?: import('./sip-blueprint.ts').SipBlueprint;
   research?: ResearchCompany[];
   researchSettings?: ResearchSettings;
   aiReview?: {
@@ -1615,6 +1618,13 @@ export function validate(p: Portfolio) {
       p.monthlyExpenses > 1e9)
   )
     throw new UserError('Invalid monthly expenses.');
+  if (p.sipBlueprint !== undefined) {
+    try {
+      validateBlueprint(p.sipBlueprint);
+    } catch (error) {
+      throw new UserError(error instanceof Error ? error.message : 'Invalid SIP blueprint.');
+    }
+  }
   try {
     validateAssets(p.assets, today());
   } catch (error) {

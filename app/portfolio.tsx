@@ -115,6 +115,7 @@ import {
   LedgerTimeline,
   MonthlyPicks,
   PlanPage,
+  SipTracker,
   CompanyDetail,
   GoldSilverSection,
   ForeignCurrencySection,
@@ -180,7 +181,10 @@ import {
   importMatches,
   setAccountFilerStatus,
   setAccountMonthlyExpenses,
+  setAccountSipBlueprint,
 } from '@/lib/portfolio-account';
+import { withQuickEntry, type QuickEntry } from '@/lib/sip-blueprint-data';
+import type { SipBlueprint } from '@/lib/sip-blueprint';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
 import { canSaveCompany } from '@/lib/company-lookup-client';
@@ -209,6 +213,7 @@ const TAB_PATHS: Record<string, string> = {
   holdings: '/',
   reports: '/reports',
   'sip-plan': '/plan',
+  'sip-tracker': '/sip-tracker',
   sip: '/sip',
   history: '/activity',
   'research-desk': '/research-desk',
@@ -250,9 +255,9 @@ function companyFromPathname(pathname: string): string {
   const match = COMPANY_PATH.exec(pathname);
   return match ? match[1].toUpperCase() : '';
 }
-/** Non-admins never land on the Research desk, even via a direct URL or history entry. */
+/** Non-admins never land on the Research desk, AI Lab or Plan, even via a direct URL or history entry. */
 function allowTab(tab: string, isAdmin: boolean): string {
-  return (tab === 'research-desk' || tab === 'ai-lab') && !isAdmin
+  return (tab === 'research-desk' || tab === 'ai-lab' || tab === 'sip-plan') && !isAdmin
     ? 'holdings'
     : tab;
 }
@@ -1472,18 +1477,20 @@ function DashboardContent({
     quoteTicker,
   ]);
   const metalRates = useMetalRates(
-    !!(isAll
-      ? p?.[DISPLAY_PARTS]?.some((part) =>
-          part.portfolio.assets?.some((a) => a.kind === 'metal'),
-        )
-      : p?.assets?.some((a) => a.kind === 'metal')),
+    tab === 'sip-tracker' ||
+      !!(isAll
+        ? p?.[DISPLAY_PARTS]?.some((part) =>
+            part.portfolio.assets?.some((a) => a.kind === 'metal'),
+          )
+        : p?.assets?.some((a) => a.kind === 'metal')),
   );
   const fxData = useFxRates(
-    !!(isAll
-      ? p?.[DISPLAY_PARTS]?.some((part) =>
-          part.portfolio.assets?.some((a) => a.kind === 'currency'),
-        )
-      : p?.assets?.some((a) => a.kind === 'currency')),
+    tab === 'sip-tracker' ||
+      !!(isAll
+        ? p?.[DISPLAY_PARTS]?.some((part) =>
+            part.portfolio.assets?.some((a) => a.kind === 'currency'),
+          )
+        : p?.assets?.some((a) => a.kind === 'currency')),
   );
   const [holdingsTab, setHoldingsTab] = useState<HoldingsTab | null>(null);
   const [showAllHoldings, setShowAllHoldings] = useState(false);
@@ -1961,6 +1968,39 @@ function DashboardContent({
       await load();
       notify(amount === null ? 'Monthly expenses cleared.' : 'Monthly expenses saved.');
     });
+  /** SIP Blueprint: one setting for the whole account, written into every portfolio like the tax status. Rejects so the page can show why. */
+  const saveSipBlueprint = async (next: SipBlueprint, message: string) => {
+    await vault!.session.saveAccount(
+      setAccountSipBlueprint(vault!.session.account, next),
+      revision,
+      { replaceAll: true },
+    );
+    await load();
+    notify(message);
+  };
+  /** SIP Blueprint: add a purchase to one portfolio and save the ticked step in the same encrypted write. */
+  const logSipEntry = async (entry: QuickEntry, next: SipBlueprint) => {
+    const account = vault!.session.account;
+    const open = account.portfolios.filter((part) => !part.locked);
+    const chosen =
+      open.find((part) => part.id === workspace?.selected) ?? open[0];
+    if (!chosen) throw Error('Every portfolio is locked, so nothing can be added.');
+    const logged = withQuickEntry(chosen.portfolio, entry);
+    validate(logged);
+    const written = {
+      ...account,
+      portfolios: account.portfolios.map((part) =>
+        part.id === chosen.id ? { ...part, portfolio: logged } : part,
+      ),
+    };
+    await vault!.session.saveAccount(
+      setAccountSipBlueprint(written, next),
+      revision,
+      { replaceAll: true },
+    );
+    await load();
+    notify(`Purchase added to ${chosen.name} and step ticked.`);
+  };
   /** One tax status for the whole account: written into every portfolio, whichever view is open. */
   const saveFilerStatus = (filerStatus: 'filer' | 'non-filer') =>
     attempt(async () => {
@@ -2844,11 +2884,12 @@ function DashboardContent({
   const navItems: NavItem[] = [
     { tab: 'holdings', href: '/', label: 'Holdings', short: 'Holdings', icon: <Wallet className="tab-icon" aria-hidden="true" /> },
     { tab: 'reports', href: '/reports', label: 'Insights', short: 'Insights', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
+    ...(hasStocks && isAdmin
+      ? [{ tab: 'sip-plan', href: '/plan', label: 'Plan', short: 'Plan', icon: <TrendingUp className="tab-icon" aria-hidden="true" /> }]
+      : []),
+    { tab: 'sip-tracker', href: '/sip-tracker', label: 'SIP Blueprint', short: 'Blueprint', extra: true, icon: <Target className="tab-icon" aria-hidden="true" /> },
     ...(hasStocks
-      ? [
-          { tab: 'sip-plan', href: '/plan', label: 'Plan', short: 'Plan', icon: <TrendingUp className="tab-icon" aria-hidden="true" /> },
-          { tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> },
-        ]
+      ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
       : []),
     { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
     ...(isAdmin
@@ -3254,7 +3295,21 @@ function DashboardContent({
                     fundNavs={fundData.navs}
                     planNavs={planNavs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
-                    onOpenPlan={() => setTab('sip-plan')}
+                    onOpenPlan={isAdmin ? () => setTab('sip-plan') : undefined}
+                    sipBlueprint={p.sipBlueprint ?? null}
+                    sipParts={workspace?.account.portfolios ?? []}
+                    onOpenSip={(step) => {
+                      setTab('sip-tracker');
+                      // Land on the step that was tapped once the page has drawn it.
+                      if (step)
+                        window.setTimeout(
+                          () =>
+                            document
+                              .querySelector(`.sp-row[data-class="${step}"]`)
+                              ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+                          600,
+                        );
+                    }}
                     onFix={() =>
                       document
                         .getElementById('holdings-table')
@@ -3669,6 +3724,25 @@ function DashboardContent({
                   { target: { id: picksHome.id }, reload: true },
                 );
               }}
+            />
+          </NavPanel>
+          <NavPanel id="sip-tracker" tab={tab}>
+            <SipTracker
+              parts={workspace?.account.portfolios ?? []}
+              blueprint={p.sipBlueprint ?? null}
+              rates={{
+                metalRates: metalRates.rates,
+                fundNavs: fundData.navs,
+                planNavs,
+                fxRates: fxData.data.rates,
+              }}
+              busy={busy}
+              canLog={!!workspace?.account.portfolios.some((part) => !part.locked)}
+              hasStocks={hasStocks}
+              onSave={saveSipBlueprint}
+              onLog={logSipEntry}
+              onOpenPicks={() => setTab('sip')}
+              onOpenHoldings={() => setTab('holdings')}
             />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>

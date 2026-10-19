@@ -14,7 +14,7 @@ export const THEMES: readonly { id: Theme; label: string; hint: string; swatch: 
   { id: 'paper', label: 'Paper', hint: 'Warm, easy on the eyes', swatch: ['#f6f0e4', '#fffaf0', '#9a4412'] },
 ];
 
-export const DEFAULT_THEME: Theme = 'light';
+export const DEFAULT_THEME: Theme = 'dark';
 export const DEFAULT_PREFERENCE: ThemePreference = DEFAULT_THEME;
 
 /** Browser chrome colour (meta theme-color) and native control scheme for each theme. */
@@ -31,10 +31,10 @@ export function parseThemePreference(raw: unknown): ThemePreference {
   return typeof raw === 'string' && PREFERENCES.includes(raw) ? (raw as ThemePreference) : DEFAULT_PREFERENCE;
 }
 
-/** "system" follows the OS: dark only when the OS asks for dark, otherwise the default light theme. */
+/** "system" follows the OS: dark when the OS asks for dark, otherwise light. */
 export function resolveTheme(pref: ThemePreference, systemPrefersDark: boolean | null): Theme {
   if (pref !== 'system') return pref;
-  return systemPrefersDark ? 'dark' : DEFAULT_THEME;
+  return systemPrefersDark ? 'dark' : 'light';
 }
 
 interface ThemeDocument {
@@ -55,5 +55,5 @@ export function applyTheme(theme: Theme, doc: ThemeDocument) {
  * below must match THEME_STORAGE_KEY, DEFAULT_THEME and THEME_META, which tests/theme.test.mjs enforces.
  */
 export function themeInitScript(): string {
-  return "(function(){try{var k='sipwise.theme',m={light:['light','#f5f7fb'],dark:['dark','#05070d'],midnight:['dark','#000000'],paper:['light','#f6f0e4']},d='light',v=null;try{v=localStorage.getItem(k)}catch(e){}if(v!=='system'&&!m.hasOwnProperty(v))v=d;var t=v;if(v==='system'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':d}var e=document.documentElement;e.setAttribute('data-theme',t);e.style.colorScheme=m[t][0];var c=document.querySelector('meta[name=theme-color]');if(c)c.setAttribute('content',m[t][1]);var p=null;try{p=localStorage.getItem('sipwise.chart-palette')}catch(e){}if(p==='vibrant'||p==='accessible')e.setAttribute('data-chart-palette',p)}catch(e){}})();";
+  return "(function(){try{var k='sipwise.theme',m={light:['light','#f5f7fb'],dark:['dark','#05070d'],midnight:['dark','#000000'],paper:['light','#f6f0e4']},d='dark',v=null;try{v=localStorage.getItem(k)}catch(e){}if(v!=='system'&&!m.hasOwnProperty(v))v=d;var t=v;if(v==='system'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}var e=document.documentElement;e.setAttribute('data-theme',t);e.style.colorScheme=m[t][0];var c=document.querySelector('meta[name=theme-color]');if(c)c.setAttribute('content',m[t][1]);var p=null;try{p=localStorage.getItem('sipwise.chart-palette')}catch(e){}if(p==='vibrant'||p==='accessible')e.setAttribute('data-chart-palette',p)}catch(e){}})();";
 }

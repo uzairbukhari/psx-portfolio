@@ -10,6 +10,8 @@ import type { MetalRateRow } from '@/lib/metal-rates';
 import { moneyInFlows } from '@/lib/performance';
 import type { DisplayPart, Portfolio } from '@/lib/portfolio';
 import AccountOverview from './account-overview';
+import SipGlance from './sip-glance';
+import type { SipBlueprint, SipClass } from '@/lib/sip-blueprint';
 import { useMarketGlance, type MarketGlance } from './use-market-glance';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -66,6 +68,9 @@ export default function HoldingsHome({
   onOpenPlan,
   onFix,
   onOpenPortfolio,
+  sipBlueprint = null,
+  sipParts = [],
+  onOpenSip,
 }: {
   p: Portfolio;
   parts: DisplayPart[];
@@ -80,9 +85,14 @@ export default function HoldingsHome({
   fundNavs: FundNavRow[];
   planNavs: PlanNavRow[];
   chart: ReactNode;
-  onOpenPlan: () => void;
+  onOpenPlan?: () => void;
   onFix: () => void;
   onOpenPortfolio: (id: string) => void;
+  /** My SIP plan (account-wide). When set, the SIP card shows its steps instead of the stock-only Plan budget. */
+  sipBlueprint?: SipBlueprint | null;
+  /** Every portfolio, because My SIP covers the whole account whichever portfolio is on screen. */
+  sipParts?: DisplayPart[];
+  onOpenSip?: (step?: SipClass) => void;
 }) {
   const glance = useContext(GlanceContext) ?? EMPTY_GLANCE;
 
@@ -125,6 +135,18 @@ export default function HoldingsHome({
       today={today}
       toCheck={toCheck}
       sip={sip}
+      sipCard={
+        sipBlueprint && onOpenSip ? (
+          <SipGlance
+            b={sipBlueprint}
+            parts={sipParts}
+            rates={{ metalRates, fxRates, fundNavs, planNavs }}
+            asOf={asOf}
+            onOpen={onOpenSip}
+          />
+        ) : undefined
+      }
+      onSetupSip={!sipBlueprint && onOpenSip ? () => onOpenSip() : undefined}
       onOpenPlan={onOpenPlan}
       onFix={onFix}
       chart={chart}
