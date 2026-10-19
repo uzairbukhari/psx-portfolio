@@ -26,28 +26,28 @@ test('every preset adds up to 100', () => {
 
 test('setTarget keeps the total at 100 and never goes negative', () => {
   let t = presetTargets('balanced');
-  for (const [k, v] of [['stocks', 90], ['gold', 33], ['currency', 100], ['funds', 0], ['silver', 7]]) {
+  for (const [k, v] of [['stocks', 90], ['gold', 33], ['currency', 100], ['funds', 0]]) {
     t = setTarget(t, k, v);
     assert.equal(targetsTotal(t), 100, `${k}=${v}`);
     for (const c of SIP_CLASSES) assert.ok(t[c] >= 0);
   }
   // Everything else at zero: the room is shared out.
-  const only = setTarget({ stocks: 100, funds: 0, gold: 0, silver: 0, currency: 0 }, 'stocks', 40);
+  const only = setTarget({ stocks: 100, funds: 0, gold: 0, currency: 0 }, 'stocks', 40);
   assert.equal(targetsTotal(only), 100);
 });
 
 test('planMonth: amounts add up to the budget, strict follows the targets', () => {
   const t = presetTargets('balanced');
-  const strict = planMonth(50_000, t, { stocks: 10, funds: 10, gold: 70, silver: 5, currency: 5 }, true);
+  const strict = planMonth(50_000, t, { stocks: 10, funds: 10, gold: 70, currency: 5 }, true);
   assert.equal(sum(strict), 50_000);
   assert.equal(strict.stocks, 25_000);
   assert.equal(strict.funds, 15_000);
-  assert.equal(strict.gold, 5_000);
+  assert.equal(strict.gold, 7_500);
 });
 
 test('planMonth: money leans toward the class below target and never sells', () => {
   const t = presetTargets('balanced'); // gold 10
-  const weights = { stocks: 55, funds: 31, gold: 2, silver: 6, currency: 6 };
+  const weights = { stocks: 55, funds: 31, gold: 2, currency: 6 };
   const plan = planMonth(30_000, t, weights, false);
   const strict = planMonth(30_000, t, weights, true);
   assert.equal(sum(plan), 30_000);
@@ -60,7 +60,6 @@ test('planMonth: nothing held falls back to the plain split; zero targets stay z
   const t = presetTargets('aggressive');
   const plan = planMonth(10_000, t, null, false);
   assert.equal(sum(plan), 10_000);
-  assert.equal(plan.silver, 0);
   assert.equal(plan.currency, 0);
   const onTarget = planMonth(10_000, t, { ...t }, false);
   assert.deepEqual(onTarget, plan);
@@ -68,7 +67,7 @@ test('planMonth: nothing held falls back to the plain split; zero targets stay z
 
 test('planMonth: odd budgets still add up', () => {
   for (const budget of [1, 99, 100, 12_345, 33_333]) {
-    const plan = planMonth(budget, presetTargets('balanced'), { stocks: 20, funds: 20, gold: 20, silver: 20, currency: 20 }, false);
+    const plan = planMonth(budget, presetTargets('balanced'), { stocks: 20, funds: 20, gold: 20, currency: 20 }, false);
     assert.equal(sum(plan), budget, String(budget));
   }
 });
@@ -80,7 +79,7 @@ test('gramsFor uses the 24K rate and refuses without one', () => {
 });
 
 test('monthProgress caps each class at its plan', () => {
-  const plan = { stocks: 25_000, funds: 15_000, gold: 5_000, silver: 2_500, currency: 2_500 };
+  const plan = { stocks: 25_000, funds: 15_000, gold: 7_500, currency: 2_500 };
   const p = monthProgress(plan, { stocks: 30_000, funds: 10_000 });
   assert.equal(p.planned, 50_000);
   assert.equal(p.done, 35_000);
@@ -125,10 +124,10 @@ test('mergeActual takes the larger of ledger and tick, never the sum', () => {
 });
 
 test('startOfMonthWeights removes what went in this month', () => {
-  const w = startOfMonthWeights({ stocks: 60, funds: 30, gold: 10, silver: 0, currency: 0 }, { gold: 10 });
+  const w = startOfMonthWeights({ stocks: 60, funds: 30, gold: 10, currency: 0 }, { gold: 10 });
   assert.equal(Math.round(w.stocks), 67);
   assert.equal(w.gold, 0);
-  assert.equal(startOfMonthWeights({ stocks: 5, funds: 0, gold: 0, silver: 0, currency: 0 }, { stocks: 5 }), null);
+  assert.equal(startOfMonthWeights({ stocks: 5, funds: 0, gold: 0, currency: 0 }, { stocks: 5 }), null);
 });
 
 test('withQuickEntry adds to a matching holding or starts a new one, and the ledger still validates', () => {

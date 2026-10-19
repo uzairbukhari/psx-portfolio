@@ -1,13 +1,14 @@
 /* SIP Blueprint page. Theme tokens only (no colour literals), so all four themes work. */
-html:root .sb-page{display:grid;gap:16px;max-width:880px;margin:0 auto;padding:0 16px 96px}
+html:root .sb-page{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:880px;margin:0 auto;padding:0 16px 96px}
+html:root .sb-page>*{grid-column:1/-1;min-width:0;margin:0}
 @media(min-width:900px){html:root .sb-page{padding-bottom:32px}}
 html:root .sb-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0}
 html:root .sb-hero-main{min-width:0}
-html:root .sb-big{display:block;font:600 36px/1.1 var(--font-geist-mono),monospace;letter-spacing:-.02em;margin:10px 0 6px}
-html:root .sb-hero .mu{margin:0 0 8px;font-size:13px}
+html:root .sb-big{display:block;font:600 clamp(24px,6vw,36px)/1.15 var(--font-geist-mono),monospace;letter-spacing:-.02em;margin:10px 0 14px}
+html:root .sb-hero .mu{margin:0 0 10px;font-size:13px;line-height:1.5}
 html:root .sb-note{margin:0;font-size:13.5px;color:var(--soft-ink,var(--foreground))}
 html:root .sb-card{margin:0;display:grid;gap:14px}
-html:root .sb-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+html:root .sb-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;height:auto;border:0;padding:0}
 html:root .sb-head h2{margin:2px 0 0;font-size:18px}
 html:root .sb-field{display:grid;gap:6px;font-size:13px;color:var(--muted-foreground)}
 html:root .sb-field input{font:600 22px/1.2 var(--font-geist-mono),monospace}
@@ -29,7 +30,6 @@ html:root .sb-mix i{display:block;min-width:4px}
 html:root .sb-mix i[data-class="stocks"],html:root .sb-dot[data-class="stocks"],html:root .sb-track i[data-class="stocks"]{background:var(--asset-stocks)}
 html:root .sb-mix i[data-class="funds"],html:root .sb-dot[data-class="funds"],html:root .sb-track i[data-class="funds"]{background:var(--asset-funds)}
 html:root .sb-mix i[data-class="gold"],html:root .sb-dot[data-class="gold"],html:root .sb-track i[data-class="gold"]{background:var(--asset-gold)}
-html:root .sb-mix i[data-class="silver"],html:root .sb-dot[data-class="silver"],html:root .sb-track i[data-class="silver"]{background:var(--asset-silver)}
 html:root .sb-mix i[data-class="currency"],html:root .sb-dot[data-class="currency"],html:root .sb-track i[data-class="currency"]{background:var(--asset-fx,var(--asset-plans))}
 
 html:root .sb-split{display:grid;gap:10px}
@@ -44,16 +44,19 @@ html:root .sb-split-row input[type="range"]{width:100%;accent-color:var(--primar
 html:root .sb-split-row b{text-align:right}
 html:root .sb-sum{margin:0;font-size:12px}
 
-html:root .sb-check{display:flex;gap:12px;align-items:flex-start;font-size:13.5px;cursor:pointer}
-html:root .sb-check input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--primary)}
-html:root .sb-check small{display:block;margin-top:2px;font-size:12px;color:var(--muted-foreground)}
+html:root label.sb-check{display:flex;flex-direction:row;align-items:flex-start;gap:12px;font-size:13.5px;font-weight:500;cursor:pointer;margin:0}
+html:root .sb-check input{appearance:none;-webkit-appearance:none;flex:none;width:20px;height:20px;min-width:20px;padding:0;margin:1px 0 0;border:2px solid var(--muted-foreground);border-radius:6px;background:var(--field,var(--card));display:grid;place-items:center;cursor:pointer}
+html:root .sb-check input:checked{background:var(--primary);border-color:var(--primary)}
+html:root .sb-check input:checked::after{content:'';width:5px;height:10px;margin-top:-2px;border:solid var(--background);border-width:0 2px 2px 0;transform:rotate(45deg)}
+html:root .sb-check input:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+html:root .sb-check>span{display:block;min-width:0}
+html:root .sb-check small{display:block;margin-top:2px;font-size:12px;font-weight:400;color:var(--muted-foreground)}
 
 html:root .sb-steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 html:root .sb-step{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;padding:14px;border-radius:16px;border:1px solid var(--card-border);background:var(--card);border-left:4px solid var(--muted-foreground)}
 html:root .sb-step[data-class="stocks"]{border-left-color:var(--asset-stocks)}
 html:root .sb-step[data-class="funds"]{border-left-color:var(--asset-funds)}
 html:root .sb-step[data-class="gold"]{border-left-color:var(--asset-gold)}
-html:root .sb-step[data-class="silver"]{border-left-color:var(--asset-silver)}
 html:root .sb-step[data-class="currency"]{border-left-color:var(--asset-fx,var(--asset-plans))}
 html:root .sb-step[data-done]{background:var(--gain-bg,var(--muted))}
 html:root .sb-step [data-slot="sb-tick"]{display:grid;place-items:center;width:28px;height:28px;padding:0;border-radius:8px;border:2px solid var(--muted-foreground);background:var(--card);color:var(--success-ink,var(--success));cursor:pointer}

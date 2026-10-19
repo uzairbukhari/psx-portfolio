@@ -184,12 +184,12 @@ export default function SipTracker({
 
       {/* ── Step 1: the blueprint ── */}
       <section className="panel sb-card" aria-labelledby="sb-blueprint">
-        <header className="sb-head">
+        <div className="sb-head">
           <div>
             <p className="lbl">Step 1</p>
             <h2 id="sb-blueprint">Your SIP blueprint</h2>
           </div>
-        </header>
+        </div>
         <label className="sb-field">
           Total monthly budget (Rs)
           <input
@@ -284,7 +284,7 @@ export default function SipTracker({
         <>
           {/* ── Steps 2 and 3: the plan and the checklist ── */}
           <section className="panel sb-card" aria-labelledby="sb-month">
-            <header className="sb-head">
+            <div className="sb-head">
               <div>
                 <p className="lbl">Step 2 and 3</p>
                 <h2 id="sb-month">This month’s blueprint</h2>
@@ -292,7 +292,7 @@ export default function SipTracker({
               <span className="mu">
                 {blueprint.strict ? 'Strict split' : held.weights ? 'Adjusted for what you hold' : 'Nothing held yet, so the plain split'}
               </span>
-            </header>
+            </div>
             {blueprint.notify && !history.thisMonthMet && Number(asOf.slice(8)) >= 20 && progress.percent < STREAK_THRESHOLD * 100 && (
               <p className="notice" role="alert">
                 {progress.percent}% done and the month is nearly over. Finish {money(Math.max(0, Math.round(monthBudget * STREAK_THRESHOLD) - progress.done))} more to keep your streak.
@@ -371,7 +371,7 @@ export default function SipTracker({
                 ? `${history.streak}-month streak${history.thisMonthMet ? '' : ' (finish this month to extend it)'}`
                 : 'Your streak starts with this month'
             }
-            info={`A month counts when at least ${Math.round(STREAK_THRESHOLD * 100)}% of its budget went in, across stocks, funds, gold, silver and currency. The running month never breaks a streak until it ends.`}
+            info={`A month counts when at least ${Math.round(STREAK_THRESHOLD * 100)}% of its budget went in, across stocks, funds, gold and currency. The running month never breaks a streak until it ends.`}
             size="wide"
             source={`Longest streak ${history.longest} month${history.longest === 1 ? '' : 's'}. Months before your blueprint began are not judged.`}
           >
@@ -427,11 +427,11 @@ function suggestion(k: SipClass, amount: number, rates: SipRates, asOf: string):
   if (amount <= 0) return 'Nothing planned this month.';
   if (k === 'stocks') return 'Buy from your shortlist, or pick the strongest names in Monthly Picks.';
   if (k === 'funds') return 'A money market or income fund (low risk), or a savings plan.';
-  if (k === 'gold' || k === 'silver') {
-    const rate = chooseRate(rates.metalRates ?? [], k, asOf);
+  if (k === 'gold') {
+    const rate = chooseRate(rates.metalRates ?? [], 'gold', asOf);
     const grams = gramsFor(amount, rate?.pkrPerGram);
-    if (!rate || grams === null) return `${money(amount)} in ${k}. The price is not available right now.`;
-    return `${money(amount)} ≈ ${grams.toFixed(grams < 1 ? 3 : 2)} g of 24K ${k} at ${money(rate.pkrPerGram)}/g${rate.stale ? ' (rate is old)' : ''}.`;
+    if (!rate || grams === null) return `${money(amount)} in gold. The price is not available right now.`;
+    return `${money(amount)} ≈ ${grams.toFixed(grams < 1 ? 3 : 2)} g of 24K gold at ${money(rate.pkrPerGram)}/g${rate.stale ? ' (rate is old)' : ''}.`;
   }
   const usd = chooseFxRate(rates.fxRates ?? [], 'USD', asOf);
   return usd
@@ -462,7 +462,7 @@ function LogDialog({
   onMark: (amount: number, date: string) => Promise<unknown>;
   onLog: (entry: QuickEntry, amount: number) => Promise<unknown>;
 }) {
-  const loggable = canLog && (klass === 'gold' || klass === 'silver' || klass === 'currency');
+  const loggable = canLog && (klass === 'gold' || klass === 'currency');
   const [mode, setMode] = useState<'log' | 'mark'>(loggable ? 'log' : 'mark');
   const [amountText, setAmountText] = useState(String(Math.max(0, Math.round(planned - already)) || planned));
   const [date, setDate] = useState(asOf);
@@ -471,7 +471,7 @@ function LogDialog({
   const [error, setError] = useState('');
   const amount = digits(amountText);
   const rate =
-    klass === 'gold' || klass === 'silver' ? chooseRate(rates.metalRates ?? [], klass, asOf)?.pkrPerGram : chooseFxRate(rates.fxRates ?? [], currency, asOf)?.pkrPerUnit;
+    klass === 'gold' ? chooseRate(rates.metalRates ?? [], 'gold', asOf)?.pkrPerGram : chooseFxRate(rates.fxRates ?? [], currency, asOf)?.pkrPerUnit;
   const suggested = klass === 'currency' ? (rate ? amount / rate : null) : gramsFor(amount, rate);
   const quantity = quantityText === '' ? (suggested ?? 0) : Number(quantityText);
 
@@ -486,7 +486,7 @@ function LogDialog({
       const entry: QuickEntry =
         klass === 'currency'
           ? { class: 'currency', date, currency, units: Math.round(quantity * 1e4) / 1e4, pkr: amount }
-          : { class: klass as 'gold' | 'silver', date, grams: Math.round(quantity * 1e6) / 1e6, amount };
+          : { class: 'gold', date, grams: Math.round(quantity * 1e6) / 1e6, amount };
       await onLog(entry, amount);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save.');

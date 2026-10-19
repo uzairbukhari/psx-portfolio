@@ -2,13 +2,12 @@
 // Pure and self-contained (no imports), so the ledger can validate it without a cycle and the phone can bundle it.
 // Everything here runs on the device; the blueprint is stored only inside the encrypted portfolio.
 
-export type SipClass = 'stocks' | 'funds' | 'gold' | 'silver' | 'currency';
-export const SIP_CLASSES: SipClass[] = ['stocks', 'funds', 'gold', 'silver', 'currency'];
+export type SipClass = 'stocks' | 'funds' | 'gold' | 'currency';
+export const SIP_CLASSES: SipClass[] = ['stocks', 'funds', 'gold', 'currency'];
 export const SIP_CLASS_LABELS: Record<SipClass, string> = {
   stocks: 'PSX stocks',
   funds: 'Funds and savings plans',
   gold: 'Gold',
-  silver: 'Silver',
   currency: 'Foreign currency',
 };
 
@@ -19,18 +18,18 @@ export const SIP_PRESETS: Record<
 > = {
   balanced: {
     label: 'Balanced Wealth Builder',
-    blurb: 'Half in stocks, a third in steady funds, the rest in gold, silver and dollars.',
-    targets: { stocks: 50, funds: 30, gold: 10, silver: 5, currency: 5 },
+    blurb: 'Half in stocks, a third in steady funds, the rest in gold and dollars.',
+    targets: { stocks: 50, funds: 30, gold: 15, currency: 5 },
   },
   aggressive: {
     label: 'Aggressive Growth',
     blurb: 'Mostly stocks and equity funds, with some income and gold.',
-    targets: { stocks: 70, funds: 20, gold: 10, silver: 0, currency: 0 },
+    targets: { stocks: 70, funds: 20, gold: 10, currency: 0 },
   },
   conservative: {
     label: 'Conservative',
     blurb: 'Protect your capital: mostly low-risk funds and savings plans, a core of dividend stocks, gold as a hedge.',
-    targets: { stocks: 20, funds: 60, gold: 20, silver: 0, currency: 0 },
+    targets: { stocks: 20, funds: 60, gold: 20, currency: 0 },
   },
 };
 export const SIP_PRESET_ORDER: SipPresetKey[] = ['balanced', 'aggressive', 'conservative', 'custom'];

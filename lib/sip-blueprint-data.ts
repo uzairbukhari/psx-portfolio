@@ -105,7 +105,7 @@ export function totalsByMonth(byClass: Record<string, Partial<Record<SipClass, n
 }
 
 export type QuickEntry =
-  | { class: 'gold' | 'silver'; date: string; grams: number; amount: number }
+  | { class: 'gold'; date: string; grams: number; amount: number }
   | { class: 'currency'; date: string; currency: CurrencyCode; units: number; pkr: number };
 
 const LOG_NOTE = 'Logged from SIP Blueprint';
@@ -132,7 +132,7 @@ export function withQuickEntry(portfolio: Portfolio, e: QuickEntry): Portfolio {
     return { ...portfolio, assets };
   }
   const entry: MetalEntry = { id: newAssetId(), date: e.date, type: 'buy', grams: e.grams, amount: e.amount, note: LOG_NOTE };
-  const at = assets.findIndex((a) => a.kind === 'metal' && a.metal === e.class && a.karat === 24);
+  const at = assets.findIndex((a) => a.kind === 'metal' && a.metal === 'gold' && a.karat === 24);
   if (at >= 0) {
     const a = assets[at] as MetalAsset;
     assets[at] = { ...a, entries: [...a.entries, entry] };
@@ -140,8 +140,8 @@ export function withQuickEntry(portfolio: Portfolio, e: QuickEntry): Portfolio {
     assets.push({
       id: newAssetId(),
       kind: 'metal',
-      name: e.class === 'gold' ? 'Gold 24K' : 'Silver',
-      metal: e.class,
+      name: 'Gold 24K',
+      metal: 'gold',
       karat: 24,
       note: '',
       entries: [entry],
