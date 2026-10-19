@@ -246,3 +246,32 @@ html:root .sp-slider b{text-align:right}
 html:root .sp-switches{display:grid;gap:14px;padding-top:4px}
 html:root .sp-dialog{max-width:640px!important}
 html:root .sp-dialog .sp-editor{margin:16px 0}
+
+/* ───────── Holdings dashboard: SIP card ───────── */
+html:root .glance-sip.sg{display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:16px;container-type:inline-size}
+html:root .sg-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px}
+html:root .sg-meta{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--muted-foreground)}
+html:root .sg-meta[data-tone="warn"]{color:var(--warn-ink,var(--foreground))}
+html:root .sg-meta[data-tone="good"]{color:var(--success)}
+html:root .sg-main{display:grid;grid-template-columns:clamp(104px,34%,136px) minmax(0,1fr);align-items:center;gap:22px}
+@container (max-width:330px){html:root .sg-main{grid-template-columns:96px minmax(0,1fr);gap:14px}}
+html:root .sg-ring{width:100%;height:auto;aspect-ratio:1;display:block}
+html:root .sg-track{fill:none;stroke:var(--muted);stroke-width:9}
+html:root .sg-fill{fill:none;stroke:var(--c);stroke-width:9;transition:stroke-dasharray .5s ease}
+html:root .sg-slice{cursor:pointer}
+html:root .sg-slice:hover .sg-fill,html:root .sg-slice:hover .sg-track{stroke-width:11}
+html:root .sg-pct{font-family:var(--font-geist-mono),monospace;font-weight:600;font-size:21px;fill:var(--foreground);letter-spacing:-.02em}
+html:root .sg-steps{font-size:9px;fill:var(--muted-foreground)}
+html:root .sg-body{display:grid;gap:2px;min-width:0}
+html:root .sg-body .glance-big{margin:0;line-height:1.1}
+html:root .sg-of{display:block;font-size:12.5px;color:var(--muted-foreground)}
+html:root .sg-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:1px}
+html:root [data-slot="sg-step"]{display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;height:auto;margin:0 -6px;padding:5px 6px;border:0;border-radius:8px;background:transparent;color:var(--foreground);font-size:13px;font-weight:500;text-align:left;cursor:pointer;box-sizing:content-box}
+html:root [data-slot="sg-step"]:hover{background:rgb(var(--ch-tint) / .06)}
+html:root [data-slot="sg-step"]>i{width:8px;height:8px;border-radius:999px;background:var(--c)}
+html:root .sg-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root .sg-amt{display:inline-flex;align-items:center;gap:4px;font:500 12px/1 var(--font-geist-mono),monospace;color:var(--muted-foreground);font-variant-numeric:tabular-nums;white-space:nowrap}
+html:root .sg-amt.is-done{color:var(--success)}
+html:root .sg-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+html:root .sg-cta{width:auto;height:36px;padding:0 16px;border-radius:11px;font-size:13px;gap:6px}
+html:root .sg-next{font-size:13px;font-weight:500;color:var(--success)}

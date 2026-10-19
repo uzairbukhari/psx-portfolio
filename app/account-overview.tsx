@@ -107,6 +107,8 @@ export default function AccountOverview({
   today,
   toCheck,
   sip,
+  sipCard,
+  onSetupSip,
   onOpenPlan,
   onFix,
 }: {
@@ -128,6 +130,9 @@ export default function AccountOverview({
   /** Holdings whose cost is unknown. */
   toCheck: number;
   sip: { label: string; fresh: number; put: number };
+  /** The My SIP card, when a plan exists; replaces the stock-only ring. */
+  sipCard?: ReactNode;
+  onSetupSip?: () => void;
   onOpenPlan?: () => void;
   onFix: () => void;
 }) {
@@ -257,6 +262,7 @@ export default function AccountOverview({
       </section>
 
       <div className="glance-row">
+        {sipCard ?? (
         <section className="card glance-sip" aria-label="This month">
           <svg className="sip-ring" viewBox="0 0 104 104" aria-hidden="true">
             <circle cx="52" cy="52" r="44" className="ring-track" />
@@ -281,8 +287,14 @@ export default function AccountOverview({
                 Open the plan →
               </button>
             )}
+            {onSetupSip && (
+              <button type="button" data-slot="link" className="sw-link" onClick={onSetupSip}>
+                Set up My SIP →
+              </button>
+            )}
           </div>
         </section>
+        )}
         <section className="card glance-kse" aria-label="KSE-100">
           <div className="between">
             <span className="lbl">

@@ -3296,6 +3296,20 @@ function DashboardContent({
                     planNavs={planNavs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
                     onOpenPlan={isAdmin ? () => setTab('sip-plan') : undefined}
+                    sipBlueprint={p.sipBlueprint ?? null}
+                    sipParts={workspace?.account.portfolios ?? []}
+                    onOpenSip={(step) => {
+                      setTab('sip-tracker');
+                      // Land on the step that was tapped once the page has drawn it.
+                      if (step)
+                        window.setTimeout(
+                          () =>
+                            document
+                              .querySelector(`.sp-row[data-class="${step}"]`)
+                              ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+                          600,
+                        );
+                    }}
                     onFix={() =>
                       document
                         .getElementById('holdings-table')
