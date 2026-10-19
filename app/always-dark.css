@@ -119,7 +119,6 @@ html:root .vault-stage .vault-top-note .signin-link{display:inline-block}
 html:root .vault-stage .vault-top{border:0;background:none;position:static;backdrop-filter:none}
 html:root .vault-stage .vault-card-wide{max-width:560px;padding:32px}
 html:root .vault-stage .vault-card:not(.vault-card-center)>.vault-kicker{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
-html:root .vault-stage .vault-blocks{grid-template-columns:repeat(4,1fr)}
 html:root .vault-stage .vault-actions{display:flex;gap:10px}
 html:root .vault-stage .vault-actions button{flex:1;background:rgba(255,255,255,.05);border:1px solid #24304f;color:var(--foreground);border-radius:14px;height:44px;box-shadow:none}
 html:root .vault-stage .vault-layout .vault-card.vault-card-wide{max-width:560px}
