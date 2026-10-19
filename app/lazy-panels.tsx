@@ -62,7 +62,8 @@ export const PortfolioInsights = lazyNamed(() => import('./insights-all'), (m) =
 export const AllInsights = lazyNamed(() => import('./insights-all'), (m) => m.AllInsights);
 export const LedgerTimeline = lazyView(() => import('./ledger-timeline'));
 export const PlanPage = lazyView(() => import('./plan-page'));
-export const MonthlyPicks = lazyView(() => import('./monthly-picks'));
+export const SipTracker = lazyView(() => import('./sip-tracker'));
+export const MonthlyPicks =lazyView(() => import('./monthly-picks'));
 export const CompanyDetail = lazyView(() => import('./company-detail'));
 export const GoldSilverSection = lazyView(() => import('./gold-silver'));
 export const ForeignCurrencySection = lazyView(() => import('./foreign-currency'));
@@ -89,6 +90,7 @@ export function preloadTab(tab: string) {
     history: LedgerTimeline,
     sip: MonthlyPicks,
     'sip-plan': PlanPage,
+    'sip-tracker': SipTracker,
     settings: SettingsView,
   };
   views[tab]?.preload();

@@ -55,6 +55,7 @@ const SHARED = [
   'portfolio-view',
   'assets',
   'plans',
+  'sip-blueprint',
   'fund-payouts',
   'funds',
   'mufap',
