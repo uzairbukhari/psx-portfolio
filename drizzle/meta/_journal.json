@@ -267,6 +267,13 @@
       "when": 1792246710182,
       "tag": "0037_friendly_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1792410900992,
+      "tag": "0038_app_users_profile",
+      "breakpoints": true
     }
   ]
 }

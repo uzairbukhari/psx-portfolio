@@ -384,12 +384,12 @@ export default function SettingsView({
                 description="Help improve Sipwise by sharing which screens and features you use."
               >
                 <Row
-                  label="Share anonymous usage stats"
-                  hint="Feature and screen names only, on this device. Never holdings, tickers, amounts or notes."
+                  label="Share usage stats"
+                  hint="Feature and screen names only, tied to your account for support. Never holdings, tickers, amounts or notes."
                 >
                   <Switch
                     checked={shareStats}
-                    aria-label="Share anonymous usage stats"
+                    aria-label="Share usage stats"
                     onCheckedChange={(on) => {
                       setShareStats(on);
                       setAnalyticsEnabled(on);

@@ -1,6 +1,6 @@
 'use client';
 // Usage analytics for the web app: queues catalog events (lib/analytics-events.ts: feature and screen names only, never
-// tickers or amounts) and sends them in batches to /api/events. Honours the "Share anonymous usage stats" switch in
+// tickers or amounts) and sends them in batches to /api/events. Honours the "Share usage stats" switch in
 // Settings (on by default, stored on this device).
 import { validateEvent, type EventName, type EventProps } from '@/lib/analytics-events';
 import type { IncomingEvent } from '@/lib/analytics-events';

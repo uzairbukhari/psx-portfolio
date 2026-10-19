@@ -51,13 +51,15 @@ export default function Page() {
         </p>
         <h2>Usage statistics</h2>
         <p>
-          To learn which screens and features are used, the app records
-          anonymous usage events: the name of a screen or feature (for example
+          To learn which screens and features are used, the app records usage
+          events: the name of a screen or feature (for example
           &ldquo;Reports opened&rdquo; or &ldquo;Import completed&rdquo;), the
           platform and the app version. These events never include tickers,
           amounts, holdings, notes or anything you type, and they are stored in
-          our own database, not sent to an analytics provider. They are linked
-          to your account only through a one-way code, and are deleted with
+          our own database, not sent to an analytics provider. Each event is
+          stored under a one-way code instead of your email, but the Sipwise
+          team can work out which account a code belongs to, to help with
+          support and to see where people get stuck. Events are deleted with
           your account. You can switch this off in Settings under &ldquo;Usage
           stats&rdquo;. The public pages (home, privacy, terms) also use
           Cloudflare Web Analytics, which counts page views without cookies.

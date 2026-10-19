@@ -7,9 +7,16 @@ import { cleanVersion, type EventBatch, type IncomingEvent, type Platform } from
 export const RETENTION_DAYS = 180;
 
 export async function userKey(email: string, secret: string): Promise<string> {
+  return (await userKeys([email], secret))[0];
+}
+
+/** Keys for many emails with one key import (the People view hashes every account). Same output as `userKey`. */
+export async function userKeys(emails: string[], secret: string): Promise<string[]> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`analytics:${email.trim().toLowerCase()}`));
-  return [...new Uint8Array(sig)].slice(0, 16).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return Promise.all(emails.map(async (email) => {
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`analytics:${email.trim().toLowerCase()}`));
+    return [...new Uint8Array(sig)].slice(0, 16).map((b) => b.toString(16).padStart(2, '0')).join('');
+  }));
 }
 
 export type EventContext = {
@@ -53,16 +60,21 @@ export async function noteSignIn(
   secret: string,
   isAdmin: boolean,
   now = new Date(),
+  profile: { name?: string | null; picture?: string | null } = {},
 ): Promise<void> {
   try {
     const addr = email.trim().toLowerCase();
     const ts = now.toISOString();
+    // The caller passes a picture already checked by safeGooglePicture; a missing value keeps what is stored.
+    const name = profile.name?.trim().slice(0, 100) || null;
+    const picture = profile.picture && profile.picture.length <= 500 ? profile.picture : null;
     const existing = await db.prepare('SELECT 1 AS x FROM app_users WHERE email=?').bind(addr).first();
     if (!existing) {
-      await db.prepare('INSERT OR IGNORE INTO app_users (email,first_seen_at,first_platform,last_seen_at,last_platform,origin) VALUES (?,?,?,?,?,?)')
-        .bind(addr, ts, platform, ts, platform, 'unknown').run();
+      await db.prepare('INSERT OR IGNORE INTO app_users (email,first_seen_at,first_platform,last_seen_at,last_platform,origin,name,picture) VALUES (?,?,?,?,?,?,?,?)')
+        .bind(addr, ts, platform, ts, platform, 'unknown', name, picture).run();
     } else {
-      await db.prepare('UPDATE app_users SET last_seen_at=?, last_platform=? WHERE email=?').bind(ts, platform, addr).run();
+      await db.prepare('UPDATE app_users SET last_seen_at=?, last_platform=?, name=COALESCE(?,name), picture=COALESCE(?,picture) WHERE email=?')
+        .bind(ts, platform, name, picture, addr).run();
     }
     const key = await userKey(addr, secret);
     await insertEvents(db, { sessionId: crypto.randomUUID(), userKey: key, platform, isAdmin }, [{ event: 'signed_in', props: { platform } }], now);
@@ -104,15 +116,15 @@ export async function purgeOldEvents(db: D1Database, now = new Date()) {
 
 export type UsageReport = ReturnType<typeof shapeReport>;
 
-const NOISE = ['account_state', 'screen_viewed', 'app_opened', 'signed_in', 'signed_up', 'landing_viewed', 'sign_in_clicked', 'client_error'];
+export const NOISE = ['account_state', 'screen_viewed', 'app_opened', 'signed_in', 'signed_up', 'landing_viewed', 'sign_in_clicked', 'client_error'];
 
-const HEX_KEY = /^[0-9a-f]{32}$/;
+export const HEX_KEY = /^[0-9a-f]{32}$/;
 /** SQL to leave internal accounts' events (by HMAC key) out of a query; keys are hex we computed, so they are inlined. */
-const excludeKeys = (keys: string[]) => {
+export const excludeKeys = (keys: string[]) => {
   const safe = keys.filter((k) => HEX_KEY.test(k)).slice(0, 200);
   return safe.length ? ` AND (user_key IS NULL OR user_key NOT IN (${safe.map((k) => `'${k}'`).join(',')}))` : '';
 };
-const INTERNAL_EMAILS = "SELECT lower(email) FROM user_roles WHERE role IN ('super_admin','tester')";
+export const INTERNAL_EMAILS = "SELECT lower(email) FROM user_roles WHERE role IN ('super_admin','tester')";
 
 /**
  * All dashboard numbers for the super admin. Internal accounts (super admins and test accounts) are left out unless

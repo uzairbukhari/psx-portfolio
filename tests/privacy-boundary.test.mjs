@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as c from '../lib/vault-client.ts';
 import * as v from '../lib/vault-crypto.ts';
@@ -27,7 +27,7 @@ const LEGACY_ALLOWED = new Set([
 test('no server, worker or scraper code reads or writes the legacy plaintext portfolio table', () => {
   const files = ['app/api', 'lib', 'workers', 'scripts'].flatMap((dir) => walk(join(root, dir))).filter((f) => /\.(ts|tsx|mjs)$/.test(f));
   for (const file of files) {
-    const rel = relative(root, file);
+    const rel = relative(root, file).split(sep).join('/');
     if (LEGACY_ALLOWED.has(rel) || rel.startsWith('scripts/reset-')) continue;
     const text = read(file);
     assert.ok(!/(FROM|INTO|UPDATE|JOIN)\s+portfolios\b/i.test(text), `${rel} touches the portfolios table`);
@@ -39,7 +39,7 @@ test('only the vault routes are bound to the private database, and no Worker or 
   const usesVault = ['app', 'lib', 'workers', 'scripts'].flatMap((dir) => walk(join(root, dir)))
     .filter((f) => /\.(ts|tsx|mjs)$/.test(f))
     .filter((f) => /\.VAULT_DB|vaultDb\(/.test(read(f)))
-    .map((f) => relative(root, f))
+    .map((f) => relative(root, f).split(sep).join('/'))
     .sort();
   const allowed = ['app/api/me/route.ts', 'app/api/v3/portfolio/route.ts', 'app/api/vault/route.ts', 'lib/server.ts'];
   assert.deepEqual(usesVault, allowed);
@@ -97,7 +97,7 @@ test('the gold and silver rate route takes no input and no asset field is ever s
 });
 
 test('the admin console never touches the vault or the decrypted portfolio', () => {
-  const files = [...walk(join(root, 'app/api/admin')), ...walk(join(root, 'app/admin')), ...['app/admin-console.tsx', 'app/admin-accounts.tsx', 'lib/internal-accounts.ts'].map((f) => join(root, f))];
+  const files = [...walk(join(root, 'app/api/admin')), ...walk(join(root, 'app/admin')), ...['app/admin-console.tsx', 'app/admin-accounts.tsx', 'app/admin-users.tsx', 'lib/internal-accounts.ts', 'lib/admin-users-store.ts', 'lib/user-lifecycle.ts'].map((f) => join(root, f))];
   assert.ok(files.length >= 6);
   for (const file of files) assert.ok(!/vaultDb|VAULT_DB|vault-client|vault-store|portfolio-view|vault-gate/.test(read(file)), `${relative(root, file)} reaches the vault`);
 });
