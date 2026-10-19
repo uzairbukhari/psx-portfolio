@@ -1,32 +1,43 @@
 /* Guided Insights: plain-English cards. Tokens only; loads after insights.css. */
 html:root .g-stack{display:flex;flex-direction:column;gap:16px;min-width:0}
 html:root .g-mode{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+html:root .g-hero{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);grid-template-areas:"left habit" "foot foot";gap:22px 28px}
+html:root .g-hero-left{grid-area:left;min-width:0}
+html:root .g-journey{margin-top:20px}
+html:root .g-journey p{display:flex;justify-content:space-between;gap:10px;margin:0 0 7px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .g-journey i,html:root .g-budget i{display:block;height:8px;border-radius:4px;background:rgb(var(--ch-tint) / .14);position:relative;overflow:hidden}
+html:root .g-journey i::after,html:root .g-budget i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--p);border-radius:4px;background:linear-gradient(90deg,var(--primary),var(--success))}
+html:root .g-habit{grid-area:habit;align-self:stretch;padding:18px 20px;border-radius:18px;background:rgb(var(--ch-tint) / .06);border:1px solid rgb(var(--ch-tint) / .12);display:flex;flex-direction:column;gap:10px;min-width:0}
+html:root .g-streak{margin:0;font-size:44px;font-weight:600;line-height:1}
+html:root .g-streak small{font-size:14px;font-weight:500;color:var(--muted-foreground)}
+html:root .g-strip{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+html:root .g-strip li{display:grid;justify-items:center;gap:4px}
+html:root .g-strip i{display:block;width:100%;max-width:22px;aspect-ratio:1;border-radius:7px;border:1.5px dashed rgb(var(--ch-tint) / .28)}
+html:root .g-strip li[data-done] i{border:0;background:var(--success)}
+html:root .g-strip li[data-current] i{outline:2px solid var(--primary);outline-offset:2px}
+html:root .g-strip span{font-size:10.5px;color:var(--muted-foreground)}
+html:root .g-badge-sub{margin:0;font-size:13.5px;line-height:1.5}
+html:root .g-budget p{display:flex;justify-content:space-between;margin:0 0 6px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .g-budget b{color:var(--foreground)}
+html:root .g-budget small{display:block;margin-top:5px;font-size:11.5px}
+html:root .g-mile{grid-area:foot;padding-top:16px;border-top:1px solid rgb(var(--ch-tint) / .14)}
+html:root .g-mile ul{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:10px}
+html:root .g-mile li{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;font-size:13.5px;line-height:1.4;background:rgb(var(--ch-success) / .14);color:var(--foreground)}
+html:root .g-mile li:has(.g-exp-btn){padding:0;background:none}
+html:root .g-tick{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--success);color:var(--background);font-size:11px;font-weight:700;flex-shrink:0}
+html:root .g-exp-btn{min-height:36px;padding:8px 14px;border-radius:999px;border:1px dashed rgb(var(--ch-tint) / .32);background:none;color:var(--muted-foreground);font-size:13px}
+html:root .g-exp{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+html:root .g-exp label{flex:1 1 100%;margin:0;font-size:13px}
+html:root .g-exp input{max-width:200px;padding:8px 10px;font-size:15px}
+html:root .g-exp .g-hint{flex:1 1 100%}
 html:root .g-mode .mu{font-size:13px;color:var(--muted-foreground)}
 html:root .g-hint{margin:8px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted-foreground)}
 
-html:root .g-hero{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
-html:root .g-badge{align-self:stretch;padding:18px 20px;border-radius:18px;background:rgb(var(--ch-tint) / .06);border:1px solid rgb(var(--ch-tint) / .12);display:flex;flex-direction:column;gap:6px}
-html:root .g-streak{margin:0;font-size:40px;font-weight:600;line-height:1.1}
-html:root .g-streak small{font-size:14px;font-weight:500;color:var(--muted-foreground)}
-html:root .g-badge-sub{margin:0;font-size:13.5px;line-height:1.5}
-html:root .g-budget{display:flex;align-items:center;gap:14px;margin-top:10px;font-size:13px;color:var(--muted-foreground)}
-html:root .g-budget .ic-ring{--size:64px}
-html:root .g-budget .ic-ring::before{inset:7px}
-html:root .g-budget .ic-ring .num{font-size:14px}
 
 html:root .g-welcome{padding:20px 22px;border-radius:22px}
 html:root .g-welcome h3{margin:0 0 6px;font-size:17px}
 html:root .g-welcome p{margin:0;font-size:14px;line-height:1.6}
 
-html:root .g-mile{padding:16px 20px;border-radius:22px}
-html:root .g-mile ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:8px}
-html:root .g-mile li{position:relative;padding-left:22px;font-size:15px;line-height:1.5;color:var(--foreground)}
-html:root .g-mile li::before{content:"";position:absolute;left:3px;top:.55em;width:9px;height:9px;border-radius:50%;background:var(--success)}
-html:root .g-exp{margin-top:12px}
-html:root .g-exp form{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-html:root .g-exp label{flex:1 1 100%;margin:0;font-size:13px}
-html:root .g-exp input{max-width:200px;padding:8px 10px;font-size:15px}
-html:root .g-exp .g-hint{flex:1 1 100%}
 
 html:root .g-seg{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--muted);gap:2px}
 html:root .g-seg i{width:var(--w);background:var(--c);min-width:4px}
@@ -135,7 +146,8 @@ html:root .g-power b{font-size:16px}
   html:root .g-split{grid-template-columns:1fr}
 }
 @media (max-width:760px){
-  html:root .g-hero{grid-template-columns:1fr}
+  html:root .g-hero{grid-template-columns:1fr;grid-template-areas:"left" "habit" "foot"}
+  html:root .g-streak{font-size:38px}
   html:root .g-tax{grid-template-columns:1fr}
   html:root .g-hold{grid-template-columns:minmax(0,1fr) auto}
   html:root .g-race li{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l v" "b b" "r r"}

@@ -241,3 +241,18 @@ test('monthly expenses are stored on every portfolio, shown in the All view and 
     assert.throws(() => validatePortfolio({ ...base, monthlyExpenses: bad }), /monthly expenses/i);
   assert.doesNotThrow(() => validatePortfolio({ ...base, monthlyExpenses: 0 }));
 });
+
+test('month strip marks months with money in and the open month', async () => {
+  const { monthStrip, nextMoneyStep } = await import('../lib/insights-guided.ts');
+  const dots = monthStrip([flow('2026-08-03'), flow('2026-10-02')], TODAY, 4);
+  assert.deepEqual(dots.map((d) => d.month), ['2026-07', '2026-08', '2026-09', '2026-10']);
+  assert.deepEqual(dots.map((d) => d.done), [false, true, false, true]);
+  assert.equal(dots[3].current, true);
+  assert.equal(dots[0].label, 'J');
+  assert.deepEqual(nextMoneyStep(0), { reached: null, next: 10_000, progress: 0 });
+  const s = nextMoneyStep(1_492_902);
+  assert.equal(s.reached, 1_000_000);
+  assert.equal(s.next, 2_500_000);
+  assert.ok(s.progress > 0.32 && s.progress < 0.33);
+  assert.equal(nextMoneyStep(99_000_000).next, null);
+});

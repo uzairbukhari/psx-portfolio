@@ -22,6 +22,8 @@ import {
   incomeRunRate,
   milestones,
   moneyInEvents,
+  monthStrip,
+  nextMoneyStep,
   monthlyPace,
   rcaSummary,
   sipStreak,
@@ -193,11 +195,13 @@ export function GuidedSummary({
   });
   const total = overview.total;
   const young = streak.monthsActive < 3;
+  const step = nextMoneyStep(data.paidIn);
+  const strip = monthStrip(events, asOf, 12);
 
   return (
     <div className="g-stack">
-      <section className="slab ins-hero g-hero" aria-label="Portfolio health">
-        <div className="ins-hero-main">
+      <section className="slab ins-hero g-hero" aria-label="Your investing journey">
+        <div className="g-hero-left">
           <p className="lbl">Your net worth</p>
           <p className="slab-value num">{money(total.value)}</p>
           <p className="ins-hero-sub">
@@ -210,7 +214,7 @@ export function GuidedSummary({
                 <span className="mu">
                   {total.gain >= 0
                     ? 'more than you put in'
-                    : 'below what you put in. This is a paper loss: it only becomes real if you sell.'}
+                    : 'below what you put in. A paper loss: it only becomes real if you sell.'}
                 </span>
               </>
             ) : (
@@ -219,28 +223,48 @@ export function GuidedSummary({
           </p>
           <dl className="slab-stats">
             <div>
-              <dt className="lbl">Money from your pocket</dt>
+              <dt className="lbl">Put in</dt>
               <dd className="num">{data.paidIn > 0 ? moneyShort(data.paidIn) : '—'}</dd>
             </div>
             <div>
-              <dt className="lbl">Average gain per year</dt>
+              <dt className="lbl">Gain per year</dt>
               <dd className="num">{rate === null ? '—' : pct(rate * 100)}</dd>
             </div>
             <div>
-              <dt className="lbl">Income this tax year</dt>
+              <dt className="lbl">Income this year</dt>
               <dd className="num">{moneyShort(overview.income.received)}</dd>
             </div>
           </dl>
           {rate === null && overview.returns.reason === 'too-short' && (
-            <p className="g-hint">A yearly figure needs about 3 months of history. It will appear as you keep investing.</p>
+            <p className="g-hint">A yearly figure needs about 3 months of history.</p>
           )}
+          <div className="g-journey">
+            <p>
+              <span>{step.reached ? `${moneyShort(step.reached)} reached` : 'Your journey starts here'}</span>
+              <span>{step.next ? `Next goal ${moneyShort(step.next)}` : 'Every goal reached'}</span>
+            </p>
+            <i
+              role="img"
+              aria-label={`Progress to the next goal: ${Math.round(step.progress * 100)}%`}
+              style={{ '--p': `${step.progress * 100}%` } as CSSProperties}
+            />
+          </div>
         </div>
-        <div className="g-badge" role="group" aria-label="Investing discipline">
+
+        <div className="g-habit" role="group" aria-label="Investing habit">
           <p className="lbl">Investing habit</p>
           <p className="g-streak num">
             {streak.current}
             <small> {streak.current === 1 ? 'month' : 'months'} in a row</small>
           </p>
+          <ol className="g-strip" aria-label="Last 12 months. A filled square means you invested that month.">
+            {strip.map((d) => (
+              <li key={d.month} data-done={d.done || undefined} data-current={d.current || undefined} title={d.month}>
+                <i />
+                <span>{d.label}</span>
+              </li>
+            ))}
+          </ol>
           <p className="g-badge-sub">
             {streak.monthsActive === 0
               ? 'Your first monthly investment starts the streak.'
@@ -252,15 +276,27 @@ export function GuidedSummary({
           </p>
           {data.budget.average !== null && (
             <div className="g-budget">
-              <Ring
-                percent={data.budget.average * 100}
-                label="Monthly budget completed"
-                tone={data.budget.average >= 0.9 ? 'success' : data.budget.average >= 0.5 ? 'warn' : 'danger'}
+              <p>
+                <span>Monthly budget invested</span>
+                <b className="num">{Math.round(data.budget.average * 100)}%</b>
+              </p>
+              <i
+                role="img"
+                aria-label={`Monthly budget invested: ${Math.round(data.budget.average * 100)}%`}
+                style={{ '--p': `${data.budget.average * 100}%` } as CSSProperties}
               />
-              <span>of your monthly budget invested (last {data.budget.months.length} months)</span>
+              <small>
+                {data.budget.months.length === 1 ? 'This month' : `Last ${data.budget.months.length} months`}
+              </small>
             </div>
           )}
         </div>
+
+        <MilestoneChips
+          marks={marks.filter((m) => m.key !== 'money-in')}
+          monthlyExpenses={monthlyExpenses}
+          onSaveExpenses={onSaveExpenses}
+        />
       </section>
 
       {young && (
@@ -272,8 +308,6 @@ export function GuidedSummary({
           </p>
         </section>
       )}
-
-      <MilestoneCard marks={marks} monthlyExpenses={monthlyExpenses} onSaveExpenses={onSaveExpenses} />
 
       <div className="ins-grid">
         <InsightCard
@@ -504,7 +538,7 @@ function IncomeStrip({ months }: { months: { month: string; amount: number }[] }
   );
 }
 
-function MilestoneCard({
+function MilestoneChips({
   marks,
   monthlyExpenses,
   onSaveExpenses,
@@ -519,52 +553,54 @@ function MilestoneCard({
   const parsed = Number(draft);
   const valid = draft.trim() === '' || (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1e9);
   return (
-    <section className="panel g-mile" aria-label="Milestones">
-      <p className="lbl">Milestones</p>
-      {marks.length > 0 ? (
-        <ul>
-          {marks.slice(0, 3).map((m) => (
-            <li key={m.key}>{m.text}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mu">Your first milestone is close. Keep investing every month.</p>
-      )}
-      {onSaveExpenses && (
-        <div className="g-exp">
-          {!editing ? (
-            <button type="button" data-slot="pill" onClick={() => setEditing(true)}>
-              {monthlyExpenses ? `Monthly expenses: ${money(monthlyExpenses)} (change)` : 'Add your monthly expenses to see how many months your savings cover'}
+    <div className="g-mile" aria-label="Milestones">
+      <ul>
+        {marks.slice(0, 3).map((m) => (
+          <li key={m.key}>
+            <span aria-hidden className="g-tick">
+              ✓
+            </span>
+            {m.text}
+          </li>
+        ))}
+        {onSaveExpenses && !editing && (
+          <li>
+            <button type="button" data-slot="pill" className="g-exp-btn" onClick={() => setEditing(true)}>
+              {monthlyExpenses
+                ? `Monthly expenses ${money(monthlyExpenses)} · change`
+                : '+ Add monthly expenses to see how many months your savings cover'}
             </button>
-          ) : (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!valid) return;
-                await onSaveExpenses(draft.trim() === '' ? null : Math.round(parsed));
-                setEditing(false);
-              }}
-            >
-              <label htmlFor="g-exp-input">What do you spend in a typical month? (Rs)</label>
-              <input
-                id="g-exp-input"
-                inputMode="numeric"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                aria-invalid={!valid}
-              />
-              <button type="submit" data-slot="pill" disabled={!valid}>
-                Save
-              </button>
-              <button type="button" data-slot="pill" onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-              <p className="g-hint">Saved inside your encrypted account. Only you can read it.</p>
-            </form>
-          )}
-        </div>
+          </li>
+        )}
+      </ul>
+      {onSaveExpenses && editing && (
+        <form
+          className="g-exp"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!valid) return;
+            await onSaveExpenses(draft.trim() === '' ? null : Math.round(parsed));
+            setEditing(false);
+          }}
+        >
+          <label htmlFor="g-exp-input">What do you spend in a typical month? (Rs)</label>
+          <input
+            id="g-exp-input"
+            inputMode="numeric"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            aria-invalid={!valid}
+          />
+          <button type="submit" data-slot="pill" disabled={!valid}>
+            Save
+          </button>
+          <button type="button" data-slot="pill" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+          <p className="g-hint">Saved inside your encrypted account. Only you can read it.</p>
+        </form>
       )}
-    </section>
+    </div>
   );
 }
 

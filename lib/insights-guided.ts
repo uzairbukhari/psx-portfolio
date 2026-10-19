@@ -609,3 +609,30 @@ export function heldInReference(
   }
   return round(units * priceNow);
 }
+
+// ───────────────────────── habit strip and journey ─────────────────────────
+
+export type MonthDot = { month: string; label: string; done: boolean; current: boolean };
+const MONTH_INITIALS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
+/** The last `count` months, oldest first, each marked when any money went in. */
+export function monthStrip(flows: CashFlow[], asOf: string, count = 12): MonthDot[] {
+  const done = new Set(flows.filter((f) => f.amount > 0 && f.date <= asOf).map((f) => monthOf(f.date)));
+  const now = monthOf(asOf);
+  const dots: MonthDot[] = [];
+  let m = now;
+  for (let i = 0; i < count; i++) {
+    dots.push({ month: m, label: MONTH_INITIALS[Number(m.slice(5, 7)) - 1], done: done.has(m), current: m === now });
+    m = prevMonth(m);
+  }
+  return dots.reverse();
+}
+
+/** Last money-in step reached and the next one, with progress between them (0 to 1). */
+export function nextMoneyStep(moneyIn: number): { reached: number | null; next: number | null; progress: number } {
+  const reached = [...MONEY_STEPS].reverse().find((s) => moneyIn >= s) ?? null;
+  const next = MONEY_STEPS.find((s) => moneyIn < s) ?? null;
+  if (next === null) return { reached, next, progress: 1 };
+  const from = reached ?? 0;
+  return { reached, next, progress: Math.max(0, Math.min(1, (moneyIn - from) / (next - from))) };
+}
