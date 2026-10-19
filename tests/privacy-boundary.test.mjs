@@ -97,7 +97,7 @@ test('the gold and silver rate route takes no input and no asset field is ever s
 });
 
 test('the admin console never touches the vault or the decrypted portfolio', () => {
-  const files = [...walk(join(root, 'app/api/admin')), ...walk(join(root, 'app/admin')), ...['app/admin-console.tsx', 'app/admin-accounts.tsx', 'lib/internal-accounts.ts'].map((f) => join(root, f))];
+  const files = [...walk(join(root, 'app/api/admin')), ...walk(join(root, 'app/admin')), ...['app/admin-console.tsx', 'app/admin-accounts.tsx', 'app/admin-users.tsx', 'lib/internal-accounts.ts', 'lib/admin-users-store.ts', 'lib/user-lifecycle.ts'].map((f) => join(root, f))];
   assert.ok(files.length >= 6);
   for (const file of files) assert.ok(!/vaultDb|VAULT_DB|vault-client|vault-store|portfolio-view|vault-gate/.test(read(file)), `${relative(root, file)} reaches the vault`);
 });

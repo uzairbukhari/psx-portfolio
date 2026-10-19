@@ -78,7 +78,7 @@ async function handleCallback(req: Request): Promise<Response> {
     picture,
   );
 
-  await noteSignIn(env.DB, email, 'web', env.SESSION_SECRET, isInternal(await getUserRole(email)));
+  await noteSignIn(env.DB, email, 'web', env.SESSION_SECRET, isInternal(await getUserRole(email)), new Date(), { name, picture });
 
   const headers = new Headers({
     Location: new URL(returnTo, url.origin).toString(),

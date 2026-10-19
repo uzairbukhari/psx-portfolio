@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const sid = await createMobileSession(identity.email, body.deviceName, body.platform);
     const token = await signMobileToken({ ...identity, sid }, env.SESSION_SECRET);
     const role = await getUserRole(identity.email);
-    await noteSignIn(env.DB, identity.email, cleanPlatform(body.platform), env.SESSION_SECRET, isInternal(role));
+    await noteSignIn(env.DB, identity.email, cleanPlatform(body.platform), env.SESSION_SECRET, isInternal(role), new Date(), { name: identity.name, picture: identity.picture });
     return Response.json(
       {
         token,

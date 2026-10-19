@@ -621,6 +621,9 @@ export const appUsers = sqliteTable('app_users', {
   lastSeenAt: text('last_seen_at').notNull(),
   lastPlatform: text('last_platform').notNull(),
   origin: text('origin').notNull(),
+  // Google profile, refreshed at each sign-in; shown in the admin People view only.
+  name: text('name'),
+  picture: text('picture'),
 });
 
 // Usage events: feature/screen names and closed-enum props only (lib/analytics-events.ts). `user_key` is an HMAC of the
