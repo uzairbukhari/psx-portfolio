@@ -5,7 +5,7 @@ const PAGES: [string, RegExp][] = [
   ['/reports', /net worth/i],
   ['/insights', /net worth/i],
   ['/plan', /Your staircase/i],
-  ['/sip-tracker', /Your SIP blueprint/],
+  ['/sip-tracker', /A plan you can follow every month|This month’s plan/],
   ['/sip', /Where should this month/],
   ['/monthly-picks', /Where should this month/],
   ['/activity', /Every trade, dividend and asset entry/],

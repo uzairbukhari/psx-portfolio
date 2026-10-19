@@ -6,7 +6,7 @@ export type SipClass = 'stocks' | 'funds' | 'gold' | 'currency';
 export const SIP_CLASSES: SipClass[] = ['stocks', 'funds', 'gold', 'currency'];
 export const SIP_CLASS_LABELS: Record<SipClass, string> = {
   stocks: 'PSX stocks',
-  funds: 'Funds and savings plans',
+  funds: 'Funds & savings',
   gold: 'Gold',
   currency: 'Foreign currency',
 };
@@ -17,18 +17,18 @@ export const SIP_PRESETS: Record<
   { label: string; blurb: string; targets: Record<SipClass, number> }
 > = {
   balanced: {
-    label: 'Balanced Wealth Builder',
+    label: 'Balanced',
     blurb: 'Half in stocks, a third in steady funds, the rest in gold and dollars.',
     targets: { stocks: 50, funds: 30, gold: 15, currency: 5 },
   },
   aggressive: {
-    label: 'Aggressive Growth',
-    blurb: 'Mostly stocks and equity funds, with some income and gold.',
+    label: 'Growth',
+    blurb: 'Mostly stocks. Bigger swings, more growth over the years.',
     targets: { stocks: 70, funds: 20, gold: 10, currency: 0 },
   },
   conservative: {
-    label: 'Conservative',
-    blurb: 'Protect your capital: mostly low-risk funds and savings plans, a core of dividend stocks, gold as a hedge.',
+    label: 'Steady',
+    blurb: 'Mostly low-risk funds and savings plans, some dividend stocks, gold as a hedge.',
     targets: { stocks: 20, funds: 60, gold: 20, currency: 0 },
   },
 };
@@ -45,8 +45,16 @@ export type SipMonth = {
   plan: Record<SipClass, number>;
   /** Classes the person marked done by hand (the ledger is read too, so a logged purchase counts without a tick). */
   done: Partial<Record<SipClass, SipDone>>;
+  /** The person moved money between rows by hand this month. */
+  edited?: true;
 };
 export type SipBlueprint = {
+  /** Day of the month the person invests (1 to 28). Optional: older blueprints have none and use the 1st. */
+  day?: number;
+  /** Yearly increase of the monthly amount used in the projection, percent. */
+  stepUp?: number;
+  /** The person's own expected yearly return per class, percent, for the projection. */
+  returns?: Partial<Record<SipClass, number>>;
   budget: number;
   preset: SipPresetKey;
   /** Target share per class in percent; always sums to 100. */
@@ -235,14 +243,178 @@ export function validateBlueprint(b: unknown): asserts b is SipBlueprint {
   if (Math.abs(sum - 100) > 0.001) bad('targets must add up to 100');
   if (typeof x.strict !== 'boolean' || typeof x.notify !== 'boolean') bad('switches');
   if (typeof x.since !== 'string' || !MONTH.test(x.since)) bad('start month');
+  if (x.day !== undefined && (!Number.isInteger(x.day) || x.day < 1 || x.day > 28)) bad('SIP day');
+  if (x.stepUp !== undefined && (!finite(x.stepUp) || x.stepUp < 0 || x.stepUp > 50)) bad('step-up');
+  if (x.returns !== undefined) {
+    if (!x.returns || typeof x.returns !== 'object') bad('returns');
+    for (const [k, v] of Object.entries(x.returns ?? {}))
+      if (!SIP_CLASSES.includes(k as SipClass) || !finite(v) || v < -50 || v > 100) bad('return assumption');
+  }
   if (!x.months || typeof x.months !== 'object') return bad('months');
   for (const [month, m] of Object.entries(x.months)) {
     if (!MONTH.test(month)) bad('month key');
     if (!finite(m?.budget) || m.budget < 0 || m.budget > MAX_SIP_BUDGET) bad('month budget');
     for (const k of SIP_CLASSES) if (!finite(m.plan?.[k]) || m.plan[k] < 0 || m.plan[k] > MAX_SIP_BUDGET) bad('month plan');
+    if (m.edited !== undefined && m.edited !== true) bad('month edited flag');
     for (const [k, d] of Object.entries(m.done ?? {})) {
       if (!SIP_CLASSES.includes(k as SipClass)) bad('done class');
       if (!finite(d?.amount) || d.amount < 0 || d.amount > MAX_SIP_BUDGET || !DATE.test(d.date)) bad('done entry');
     }
   }
+}
+
+// ───────────────────────── this month's rows ─────────────────────────
+
+/**
+ * Sets one row of this month's plan and moves the difference across the other rows (in proportion to what they hold,
+ * or to their targets when they hold nothing), so the plan still adds up to the budget. Rounded to Rs 100.
+ */
+export function rebalanceEdit(
+  plan: Record<SipClass, number>,
+  key: SipClass,
+  amount: number,
+  budget: number,
+  targets: Record<SipClass, number>,
+  /** Rows that must not move (already done this month). */
+  locked: SipClass[] = [],
+): Record<SipClass, number> {
+  const fixed = locked.filter((k) => k !== key).reduce((n, k) => n + plan[k], 0);
+  const total = Math.max(0, Math.round(budget) - fixed);
+  const out = { ...plan };
+  const others = SIP_CLASSES.filter((k) => k !== key && !locked.includes(k) && (targets[k] > 0 || plan[k] > 0));
+  out[key] = others.length ? Math.min(total, Math.max(0, roundTo(amount, 100))) : total;
+  for (const k of SIP_CLASSES) if (k !== key && !locked.includes(k) && !others.includes(k)) out[k] = 0;
+  if (!others.length) return out;
+  const room = total - out[key];
+  const held = others.reduce((n, k) => n + plan[k], 0);
+  const weigh = (k: SipClass) => (held > 0 ? plan[k] : targets[k] || 1);
+  const base = others.reduce((n, k) => n + weigh(k), 0);
+  let used = 0;
+  for (const k of others) {
+    out[k] = Math.max(0, roundTo((weigh(k) / base) * room, 100));
+    used += out[k];
+  }
+  // Rounding remainder: add to the largest row, or take from the largest rows that can give it.
+  let diff = room - used;
+  const order = [...others].sort((a, b) => out[b] - out[a]);
+  for (const k of order) {
+    if (!diff) break;
+    const next = Math.max(0, out[k] + diff);
+    diff -= next - out[k];
+    out[k] = next;
+  }
+  return out;
+}
+
+const zeroRow = () => Object.fromEntries(SIP_CLASSES.map((k) => [k, 0])) as Record<SipClass, number>;
+
+/** Shares (0 to 100) of what is held now and after this month's plan is bought. `now` is null when nothing is held. */
+export function mixAfter(
+  values: Record<SipClass, number>,
+  plan: Record<SipClass, number>,
+): { now: Record<SipClass, number> | null; after: Record<SipClass, number> } {
+  const share = (row: Record<SipClass, number>) => {
+    const total = SIP_CLASSES.reduce((n, k) => n + row[k], 0);
+    return total > 0
+      ? (Object.fromEntries(SIP_CLASSES.map((k) => [k, (row[k] / total) * 100])) as Record<SipClass, number>)
+      : null;
+  };
+  const after = Object.fromEntries(SIP_CLASSES.map((k) => [k, (values[k] ?? 0) + (plan[k] ?? 0)])) as Record<SipClass, number>;
+  return { now: share(values), after: share(after) ?? zeroRow() };
+}
+
+/** The next SIP day on or after `asOf` and how many days away it is. */
+export function nextSipDay(asOf: string, day = 1): { date: string; days: number } {
+  const [y, m, d] = asOf.split('-').map(Number);
+  const [py, pm] = d <= day ? [y, m] : m === 12 ? [y + 1, 1] : [y, m + 1];
+  const date = `${py}-${String(pm).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const days = Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${asOf}T00:00:00Z`)) / 86_400_000);
+  return { date, days };
+}
+
+export type HabitState = 'met' | 'partial' | 'missed' | 'current' | 'before';
+/** One dot per month for the habit strip. The running month is 'current' until it is met. */
+export function habitStrip(rows: MonthRow[], asOfMonth: string): { month: string; state: HabitState; row: MonthRow }[] {
+  return rows.map((r) => ({
+    month: r.month,
+    row: r,
+    state: r.met
+      ? 'met'
+      : r.month === asOfMonth
+        ? 'current'
+        : r.target <= 0
+          ? 'before'
+          : r.actual > 0
+            ? 'partial'
+            : 'missed',
+  }));
+}
+
+// ───────────────────────── future you ─────────────────────────
+
+/** Default expected yearly returns used by the projection, percent. An illustration the person can change. */
+export const DEFAULT_RETURNS: Record<SipClass, number> = { stocks: 14, funds: 10, gold: 10, currency: 6 };
+
+/** Yearly return of the whole mix, percent: each class's assumption weighted by its target. */
+export function blendedReturn(
+  targets: Record<SipClass, number>,
+  returns: Partial<Record<SipClass, number>> = {},
+): number {
+  const tt = targetsTotal(targets) || 100;
+  return SIP_CLASSES.reduce((n, k) => n + (targets[k] / tt) * (returns[k] ?? DEFAULT_RETURNS[k]), 0);
+}
+
+export type ProjectionPoint = { year: number; invested: number; value: number; realInvested: number; realValue: number };
+
+/**
+ * Money put in at the start of every month, growing at `annualPct` a year (compounded monthly). The monthly amount
+ * rises by `stepUpPct` each year. `real*` figures are in today's rupees, deflated by `inflationPct`. Year 0 is zero.
+ */
+export function projectSip(o: {
+  monthly: number;
+  years: number;
+  annualPct: number;
+  stepUpPct?: number;
+  inflationPct?: number;
+}): ProjectionPoint[] {
+  const r = Math.pow(1 + o.annualPct / 100, 1 / 12) - 1;
+  const inf = Math.pow(1 + (o.inflationPct ?? 0) / 100, 1 / 12) - 1;
+  const points: ProjectionPoint[] = [{ year: 0, invested: 0, value: 0, realInvested: 0, realValue: 0 }];
+  let value = 0;
+  let invested = 0;
+  let realInvested = 0;
+  for (let y = 1; y <= Math.max(0, Math.round(o.years)); y++) {
+    const c = Math.max(0, o.monthly) * Math.pow(1 + (o.stepUpPct ?? 0) / 100, y - 1);
+    for (let m = 0; m < 12; m++) {
+      value = (value + c) * (1 + r);
+      invested += c;
+      realInvested += c / Math.pow(1 + inf, (y - 1) * 12 + m);
+    }
+    points.push({ year: y, invested, value, realInvested, realValue: value / Math.pow(1 + inf, y * 12) });
+  }
+  return points;
+}
+
+/** What one month's amount skipped today would have grown to after `years`. */
+export function skipCost(monthly: number, years: number, annualPct: number): number {
+  return Math.max(0, monthly) * Math.pow(1 + annualPct / 100, Math.max(0, years));
+}
+
+/** First year each level is reached, or null when it is not reached within the projection. */
+export function milestones(
+  points: { year: number; value: number }[],
+  levels: number[] = [1e6, 5e6, 1e7],
+): { level: number; year: number | null }[] {
+  return levels.map((level) => ({ level, year: points.find((p) => p.year > 0 && p.value >= level)?.year ?? null }));
+}
+
+/** Rupees the way people say them here: "Rs 12,500", "Rs 4.5 lakh", "Rs 1.2 crore". */
+export function lakh(n: number): string {
+  const v = Math.round(n);
+  const sign = v < 0 ? '−' : '';
+  const a = Math.abs(v);
+  const trim = (x: number, d: number) => String(Number(x.toFixed(d)));
+  if (a < 100_000) return `${sign}Rs ${a.toLocaleString('en-US')}`;
+  if (a < 10_000_000) return `${sign}Rs ${trim(a / 100_000, a < 1_000_000 ? 2 : 1)} lakh`;
+  return `${sign}Rs ${trim(a / 10_000_000, a < 100_000_000 ? 2 : 1)} crore`;
 }

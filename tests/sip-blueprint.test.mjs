@@ -164,3 +164,115 @@ test('validateBlueprint rejects a split that is not 100 and bad months', () => {
     /done class/,
   );
 });
+
+import {
+  blendedReturn,
+  habitStrip,
+  lakh,
+  milestones,
+  mixAfter,
+  nextSipDay,
+  projectSip,
+  rebalanceEdit,
+  skipCost,
+} from '../lib/sip-blueprint.ts';
+import { sipMonthState, LONG_RUN_INFLATION } from '../lib/sip-blueprint-data.ts';
+
+test('projectSip: zero return is the sum of what went in; step-up applies once a year', () => {
+  const flat = projectSip({ monthly: 10_000, years: 3, annualPct: 0 });
+  assert.equal(flat.length, 4);
+  assert.equal(Math.round(flat[3].value), 360_000);
+  const stepped = projectSip({ monthly: 10_000, years: 2, annualPct: 0, stepUpPct: 10 });
+  assert.equal(Math.round(stepped[2].invested), 120_000 + 132_000);
+  const grown = projectSip({ monthly: 10_000, years: 10, annualPct: 12, inflationPct: 8 });
+  assert.ok(grown[10].value > grown[10].invested);
+  assert.ok(grown[10].realValue < grown[10].value);
+});
+
+test('blendedReturn weighs each class by its target', () => {
+  assert.equal(blendedReturn({ stocks: 50, funds: 50, gold: 0, currency: 0 }, { stocks: 20, funds: 10 }), 15);
+  assert.equal(blendedReturn({ stocks: 100, funds: 0, gold: 0, currency: 0 }), 14);
+});
+
+test('rebalanceEdit keeps the total at the budget and never goes negative', () => {
+  const t = { stocks: 50, funds: 30, gold: 15, currency: 5 };
+  let plan = { stocks: 12_500, funds: 7_500, gold: 3_700, currency: 1_300 };
+  for (const [k, v] of [['stocks', 13_000], ['gold', 0], ['funds', 25_000], ['currency', 999_999], ['stocks', -50]]) {
+    plan = rebalanceEdit(plan, k, v, 25_000, t);
+    assert.equal(Object.values(plan).reduce((a, b) => a + b, 0), 25_000, `${k}=${v}`);
+    for (const x of Object.values(plan)) assert.ok(x >= 0);
+  }
+  // A class with no target and nothing planned stays at zero.
+  const aggr = rebalanceEdit({ stocks: 17_500, funds: 5_000, gold: 2_500, currency: 0 }, 'stocks', 10_000, 25_000, { stocks: 70, funds: 20, gold: 10, currency: 0 });
+  assert.equal(aggr.currency, 0);
+});
+
+test('skipCost and milestones', () => {
+  assert.ok(skipCost(25_000, 15, 12) > 25_000);
+  const pts = projectSip({ monthly: 25_000, years: 15, annualPct: 12 });
+  const [ten, fifty] = milestones(pts, [1e6, 5e7]);
+  assert.ok(ten.year >= 1 && ten.year <= 4);
+  assert.equal(fifty.year, null);
+});
+
+test('lakh formats the way people say amounts here', () => {
+  assert.equal(lakh(25_000), 'Rs 25,000');
+  assert.equal(lakh(450_000), 'Rs 4.5 lakh');
+  assert.equal(lakh(1_250_000), 'Rs 12.5 lakh');
+  assert.equal(lakh(11_800_000), 'Rs 1.18 crore');
+});
+
+test('nextSipDay rolls into next month (and next year)', () => {
+  assert.deepEqual(nextSipDay('2026-10-03', 5), { date: '2026-10-05', days: 2 });
+  assert.deepEqual(nextSipDay('2026-10-05', 5), { date: '2026-10-05', days: 0 });
+  assert.equal(nextSipDay('2026-12-20', 5).date, '2027-01-05');
+});
+
+test('habitStrip labels each month', () => {
+  const rows = [
+    { month: '2026-07', target: 0, actual: 0, met: false },
+    { month: '2026-08', target: 10, actual: 9, met: true },
+    { month: '2026-09', target: 10, actual: 2, met: false },
+    { month: '2026-10', target: 10, actual: 0, met: false },
+  ];
+  assert.deepEqual(habitStrip(rows, '2026-10').map((s) => s.state), ['before', 'met', 'partial', 'current']);
+  assert.equal(habitStrip([{ month: '2026-09', target: 10, actual: 0, met: false }], '2026-10')[0].state, 'missed');
+});
+
+test('mixAfter adds the plan to what is held', () => {
+  const m = mixAfter({ stocks: 100, funds: 0, gold: 0, currency: 0 }, { stocks: 0, funds: 100, gold: 0, currency: 0 });
+  assert.equal(m.now.stocks, 100);
+  assert.equal(m.after.funds, 50);
+  assert.equal(mixAfter({ stocks: 0, funds: 0, gold: 0, currency: 0 }, { stocks: 0, funds: 0, gold: 0, currency: 0 }).now, null);
+});
+
+test('sipMonthState: a month snapshot wins and ticks count once', () => {
+  const p = withQuickEntry(blankPortfolio(), { class: 'gold', date: '2026-10-02', grams: 1, amount: 4_000 });
+  const b = {
+    ...blankBlueprint('2026-10', 10_000),
+    months: { '2026-10': { budget: 10_000, plan: { stocks: 5_000, funds: 3_000, gold: 1_500, currency: 500 }, done: { funds: { amount: 3_000, date: '2026-10-03' } } } },
+  };
+  const st = sipMonthState(b, [{ id: 'a', name: 'A', portfolio: p }], '2026-10-19');
+  assert.equal(st.plan.stocks, 5_000);
+  assert.equal(st.done.gold, true);
+  assert.equal(st.done.funds, true);
+  assert.equal(st.done.stocks, false);
+  assert.equal(st.progress.done, 4_500);
+  assert.ok(LONG_RUN_INFLATION > 0);
+});
+
+test('validateBlueprint accepts the old shape and the new optional fields', () => {
+  const ok = blankBlueprint('2026-05');
+  validateBlueprint({ ...ok, day: 5, stepUp: 10, returns: { stocks: 15 } });
+  assert.throws(() => validateBlueprint({ ...ok, day: 31 }), /SIP day/);
+  assert.throws(() => validateBlueprint({ ...ok, returns: { bonds: 5 } }), /return assumption/);
+});
+
+test('rebalanceEdit leaves done rows alone', () => {
+  const t = { stocks: 50, funds: 30, gold: 15, currency: 5 };
+  const plan = { stocks: 13_100, funds: 9_400, gold: 1_900, currency: 600 };
+  const next = rebalanceEdit(plan, 'gold', 3_900, 25_000, t, ['stocks']);
+  assert.equal(next.stocks, 13_100);
+  assert.equal(next.gold, 3_900);
+  assert.equal(Object.values(next).reduce((a, b) => a + b, 0), 25_000);
+});

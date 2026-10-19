@@ -36,6 +36,8 @@ const wrangler = (...args) =>
   execFileSync('npx', ['wrangler', ...args, '--local', '--config', CONFIG, '--persist-to', STATE], {
     cwd: root,
     stdio: 'inherit',
+    // Windows only finds npx (npx.cmd) through a shell.
+    shell: process.platform === 'win32',
     env: { ...process.env, WRANGLER_LOG_PATH: path.join(SANDBOX_DIR, 'logs'), WRANGLER_SEND_METRICS: 'false' },
   });
 

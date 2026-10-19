@@ -11,7 +11,20 @@ import { moneyInFlows } from './performance.ts';
 import type { PlanNavRow } from './plans.ts';
 import { CURRENCY_NAMES } from './fx-rates.ts';
 import type { DisplayPart, Portfolio } from './portfolio.ts';
-import { SIP_CLASSES, type SipClass, type SipMonth } from './sip-blueprint.ts';
+import { CPI_YOY_BY_YEAR } from './pk-benchmarks.ts';
+import {
+  SIP_CLASSES,
+  habitStrip,
+  mixAfter,
+  monthProgress,
+  planMonth,
+  sipHistory,
+  type MonthProgress,
+  type SipBlueprint,
+  type SipClass,
+  type SipHistory,
+  type SipMonth,
+} from './sip-blueprint.ts';
 
 export type SipRates = {
   metalRates?: MetalRateRow[];
@@ -147,4 +160,73 @@ export function withQuickEntry(portfolio: Portfolio, e: QuickEntry): Portfolio {
       entries: [entry],
     });
   return { ...portfolio, assets };
+}
+
+/** Long-run inflation for "today's rupees": the average of the last ten calendar years in the public CPI table. */
+export const LONG_RUN_INFLATION = (() => {
+  const last = CPI_YOY_BY_YEAR.slice(-10);
+  return last.length ? last.reduce((n, [, v]) => n + v, 0) / last.length : 8;
+})();
+
+export type SipMonthState = {
+  month: string;
+  budget: number;
+  plan: Record<SipClass, number>;
+  /** Plan before any hand edits this month (what the blueprint alone suggests). */
+  suggested: Record<SipClass, number>;
+  /** What went in this month per class (ledger, or a larger hand tick). */
+  actual: Partial<Record<SipClass, number>>;
+  done: Record<SipClass, boolean>;
+  progress: MonthProgress;
+  history: SipHistory;
+  strip: ReturnType<typeof habitStrip>;
+  values: Record<SipClass, number>;
+  weights: Record<SipClass, number> | null;
+  mix: ReturnType<typeof mixAfter>;
+  /** This calendar year: money put in and months that met the target. */
+  year: { invested: number; monthsMet: number };
+};
+
+/** Everything the page shows for the running month, worked out once. */
+export function sipMonthState(
+  b: SipBlueprint,
+  parts: (DisplayPart & { locked?: boolean })[],
+  asOf: string,
+  rates: SipRates = {},
+): SipMonthState {
+  const month = asOf.slice(0, 7);
+  const held = classWeights(parts, asOf, rates);
+  const ledger = moneyInByMonth(parts, asOf, rates);
+  const snapshot = b.months[month];
+  const suggested = planMonth(b.budget, b.targets, startOfMonthWeights(held.values, ledger[month]), b.strict);
+  const plan = snapshot?.plan ?? suggested;
+  const budget = snapshot?.budget ?? b.budget;
+  const merged = mergeActual(ledger, b.months);
+  const actual = merged[month] ?? {};
+  const done = Object.fromEntries(
+    SIP_CLASSES.map((k) => [k, !!snapshot?.done[k] || (plan[k] > 0 && (actual[k] ?? 0) >= plan[k] * 0.95)]),
+  ) as Record<SipClass, boolean>;
+  const totals = totalsByMonth(merged);
+  const history = sipHistory(b, totals, month);
+  const yearPrefix = asOf.slice(0, 4);
+  return {
+    month,
+    budget,
+    plan,
+    suggested,
+    actual,
+    done,
+    progress: monthProgress(plan, actual),
+    history,
+    strip: habitStrip(history.rows, month),
+    values: held.values,
+    weights: held.weights,
+    mix: mixAfter(held.values, plan),
+    year: {
+      invested: Object.entries(totals)
+        .filter(([m]) => m.startsWith(yearPrefix))
+        .reduce((n, [, v]) => n + v, 0),
+      monthsMet: history.rows.filter((r) => r.met && r.month.startsWith(yearPrefix)).length,
+    },
+  };
 }
