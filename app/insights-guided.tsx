@@ -40,8 +40,6 @@ import type { MetalRateRow } from '@/lib/metal-rates';
 import type { PricePoint } from '@/lib/price-history';
 import {
   holdings,
-  money,
-  moneyShort,
   taxYearOf,
   today,
   TAX_RATES,
@@ -131,6 +129,11 @@ export function useKse100(): PricePoint[] | null {
   return points;
 }
 
+// Whole rupees: nobody needs paise on a figure this size. Small prices (a share at Rs 5.43) keep them.
+const WHOLE = new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 });
+const PAISE = new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 2 });
+const money = (n: number | null) => (n === null ? 'Unknown' : Math.abs(n) < 100 ? PAISE.format(n) : WHOLE.format(n));
+const moneyShort = money;
 const pct = (n: number, digits = 1) => `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(digits)}%`;
 const signedMoney = (n: number) => `${n >= 0 ? '+' : '−'}${moneyShort(Math.abs(n))}`;
 const BUCKET_COLOR: Record<BucketKey, string> = {
@@ -529,11 +532,27 @@ function IncomeStrip({ months }: { months: { month: string; amount: number }[] }
   const last = months.slice(-12);
   const max = Math.max(1, ...last.map((m) => m.amount));
   if (!last.some((m) => m.amount > 0)) return <div className="report-empty">No dividends or profit received in the last 12 months.</div>;
+  const best = last.reduce((b, m) => (m.amount > b.amount ? m : b), last[0]);
+  const initial = (month: string) => 'JFMAMJJASOND'[Number(month.slice(5, 7)) - 1];
   return (
-    <div className="g-income" role="img" aria-label={`Income received per month over the last 12 months, total ${money(last.reduce((n, m) => n + m.amount, 0))}`}>
-      {last.map((m) => (
-        <i key={m.month} title={`${m.month}: ${money(m.amount)}`} style={{ '--h': `${(m.amount / max) * 100}%` } as CSSProperties} />
-      ))}
+    <div className="g-income-wrap">
+      <div
+        className="g-income"
+        role="img"
+        aria-label={`Income received per month over the last 12 months, total ${money(last.reduce((n, m) => n + m.amount, 0))}`}
+      >
+        {last.map((m) => (
+          <i key={m.month} title={`${m.month}: ${money(m.amount)}`} style={{ '--h': `${(m.amount / max) * 100}%` } as CSSProperties} />
+        ))}
+      </div>
+      <ol className="g-income-x" aria-hidden>
+        {last.map((m) => (
+          <li key={m.month}>{initial(m.month)}</li>
+        ))}
+      </ol>
+      <p className="g-hint">
+        Best month: {money(best.amount)} in {best.month}
+      </p>
     </div>
   );
 }
@@ -955,6 +974,23 @@ export function GuidedFunds({
             <ul>
               {projection.map((p) => (
                 <li key={p.years}>
+                  <div className="g-col-wrap">
+                    <div
+                      className="g-col"
+                      role="img"
+                      aria-label={`After ${p.years} years: you put in ${money(p.contributed)}, estimated growth ${money(Math.max(0, p.base - p.contributed))}`}
+                      style={
+                        {
+                          '--h': `${(p.base / Math.max(1, projection[projection.length - 1].base)) * 100}%`,
+                          '--in': Math.max(0.0001, Math.min(p.contributed, p.base)),
+                          '--gain': Math.max(0.0001, p.base - p.contributed),
+                        } as CSSProperties
+                      }
+                    >
+                      <i className="g-col-in" />
+                      <i className="g-col-gain" />
+                    </div>
+                  </div>
                   <span className="lbl">{p.years} years</span>
                   <b className="num">{moneyShort(p.base)}</b>
                   <small className="num">
@@ -964,6 +1000,10 @@ export function GuidedFunds({
                 </li>
               ))}
             </ul>
+            <p className="g-legend">
+              <span data-k="in">You put in</span>
+              <span data-k="gain">Estimated growth</span>
+            </p>
           </div>
         </InsightCard>
       </div>
