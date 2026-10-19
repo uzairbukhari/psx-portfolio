@@ -40,6 +40,14 @@ import { useOpenCompany } from './ticker-link';
 import { InsightCard, PillSwitch, Ring } from './insight-card';
 import PortfolioReports from './portfolio-reports';
 import AssetReports from './asset-reports';
+import {
+  GuidedFunds,
+  GuidedHedge,
+  GuidedStocks,
+  GuidedSummary,
+  ModeSwitch,
+  useInsightsMode,
+} from './insights-guided';
 
 const NO_FX: FxRatesResponse = { rates: [], history: [] };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -79,6 +87,9 @@ export function AllInsights({
   fundNavs,
   planNavs,
   fx = NO_FX,
+  monthlyExpenses = null,
+  onSaveExpenses,
+  onBalance,
 }: {
   portfolio: Portfolio;
   parts: DisplayPart[];
@@ -87,8 +98,12 @@ export function AllInsights({
   fundNavs: FundNavRow[];
   planNavs: PlanNavRow[];
   fx?: FxRatesResponse;
+  monthlyExpenses?: number | null;
+  onSaveExpenses?: (amount: number | null) => void | Promise<void>;
+  onBalance?: (avoid: string[]) => void;
 }) {
   const asOf = today();
+  const [mode, setMode] = useInsightsMode();
   const openCompany = useOpenCompany();
   const [view, setView] = useState<'summary' | Kind>('summary');
   const [calendar, setCalendar] = useState<'income' | 'invested'>('income');
@@ -172,15 +187,31 @@ export function AllInsights({
             </button>
           ))}
         </div>
-        {view === 'summary' && (
+        <ModeSwitch mode={mode} onChange={setMode} />
+        {view === 'summary' && mode === 'advanced' && (
           <p className="ins-hint">
             Everything across your portfolios in a few charts. Open a class for its detailed reports.
           </p>
         )}
       </div>
 
-      {view === 'stocks' && <PortfolioReports portfolio={merged} />}
-      {view === 'metals' && (
+      {mode === 'guided' && view === 'stocks' && <GuidedStocks portfolio={merged} />}
+      {mode === 'guided' && (view === 'metals' || view === 'currency') && (
+        <GuidedHedge parts={parts} options={options} metalRates={metalRates} fx={fx} />
+      )}
+      {mode === 'guided' && view === 'funds' && <GuidedFunds parts={parts} options={options} />}
+      {mode === 'guided' && view === 'summary' && (
+        <GuidedSummary
+          parts={parts}
+          options={options}
+          monthlyExpenses={monthlyExpenses}
+          onSaveExpenses={onSaveExpenses}
+          onBalance={onBalance}
+        />
+      )}
+
+      {mode === 'advanced' && view === 'stocks' && <PortfolioReports portfolio={merged} />}
+      {mode === 'advanced' && view === 'metals' && (
         <AssetReports
           portfolio={merged}
           mode="metal"
@@ -190,7 +221,7 @@ export function AllInsights({
           fx={fx}
         />
       )}
-      {view === 'funds' && (
+      {mode === 'advanced' && view === 'funds' && (
         <AssetReports
           portfolio={merged}
           mode="savings"
@@ -200,7 +231,7 @@ export function AllInsights({
           fx={fx}
         />
       )}
-      {view === 'currency' && (
+      {mode === 'advanced' && view === 'currency' && (
         <AssetReports
           portfolio={merged}
           mode="currency"
@@ -211,7 +242,7 @@ export function AllInsights({
         />
       )}
 
-      {view === 'summary' && (
+      {mode === 'advanced' && view === 'summary' && (
         <>
           <section className="slab ins-hero" aria-label="Net worth">
             <div className="ins-hero-main">
@@ -484,35 +515,68 @@ export function PortfolioInsights({
   fundNavs,
   planNavs,
   fx = NO_FX,
+  monthlyExpenses = null,
+  onSaveExpenses,
+  onBalance,
 }: {
   portfolio: Portfolio;
   metalRates: MetalRateRow[];
   fundNavs: FundNavRow[];
   planNavs: PlanNavRow[];
   fx?: FxRatesResponse;
+  monthlyExpenses?: number | null;
+  onSaveExpenses?: (amount: number | null) => void | Promise<void>;
+  onBalance?: (avoid: string[]) => void;
 }) {
   const classes = reportClasses(portfolio);
-  const [picked, setPicked] = useState<ReportMode | null>(null);
-  const mode = picked && classes.includes(picked) ? picked : classes[0];
+  const [mode, setMode] = useInsightsMode();
+  const [picked, setPicked] = useState<ReportMode | 'summary' | null>(null);
+  const choices: (ReportMode | 'summary')[] = mode === 'guided' ? ['summary', ...classes] : classes;
+  const view = picked && choices.includes(picked) ? picked : choices[0];
+  const detailed = view === 'summary' ? classes[0] : view;
+  const parts = useMemo<DisplayPart[]>(() => [{ id: 'single', name: 'Portfolio', portfolio }], [portfolio]);
+  const options = useMemo(
+    () => ({ metalRates, fundNavs, planNavs, fxRates: fx.rates }),
+    [metalRates, fundNavs, planNavs, fx.rates],
+  );
   return (
     <div className="ins">
-      {classes.length > 1 && (
-        <div className="ins-top">
+      <div className="ins-top">
+        {choices.length > 1 && (
           <PillSwitch
-            label="Asset class"
-            value={mode}
+            label="Insights view"
+            value={view}
             onChange={setPicked}
-            options={classes.map((k) => ({ key: k, label: MODE_LABELS[k] }))}
+            options={choices.map((k) => ({ key: k, label: k === 'summary' ? 'Summary' : MODE_LABELS[k] }))}
           />
+        )}
+        <ModeSwitch mode={mode} onChange={setMode} />
+        {mode === 'advanced' && classes.length > 1 && (
           <p className="ins-hint">This portfolio holds more than one asset class. Pick one to see its charts.</p>
-        </div>
-      )}
-      {mode === 'stocks' ? (
+        )}
+      </div>
+      {mode === 'guided' ? (
+        view === 'summary' ? (
+          <GuidedSummary
+            parts={parts}
+            options={options}
+            monthlyExpenses={monthlyExpenses}
+            onSaveExpenses={onSaveExpenses}
+            onBalance={onBalance}
+          />
+        ) : view === 'stocks' ? (
+          <GuidedStocks portfolio={portfolio} />
+        ) : view === 'savings' ? (
+          <GuidedFunds parts={parts} options={options} />
+        ) : (
+          <GuidedHedge parts={parts} options={options} metalRates={metalRates} fx={fx} />
+        )
+      ) : detailed === 'stocks' ? (
         <PortfolioReports portfolio={portfolio} />
       ) : (
         <AssetReports
           portfolio={portfolio}
-          mode={mode}
+          mode={detailed}
           metalRates={metalRates}
           fundNavs={fundNavs}
           planNavs={planNavs}

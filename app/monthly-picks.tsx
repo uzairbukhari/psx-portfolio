@@ -22,12 +22,15 @@ type Props = {
   onManualPrice: (ticker: string) => void;
   onRecordBuys?: (picks: { ticker: string; shares: number; price: number | null }[], month: string) => void;
   onOpenCompany: (ticker: string) => void;
+  /** Set when the person came from Insights to balance a heavy holding: these tickers sit out this run. Held in memory only. */
+  hint?: { avoid: string[] } | null;
+  onClearHint?: () => void;
 };
 
 const STATUS_LABEL: Record<string, string> = { completed: 'Done', failed: 'Failed' };
 
 export default function MonthlyPicks({
-  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys,
+  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys, hint, onClearHint,
 }: Props) {
   type Entry = { ticker: string; name: string };
   // The list is its own thing. Until the person edits it for the first time it mirrors their saved companies.
@@ -41,6 +44,12 @@ export default function MonthlyPicks({
   const [amount, setAmount] = useState(portfolio.budgets[month] ?? 100000);
   const [starting, setStarting] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // Coming from Insights to balance the portfolio: leave the heavy holdings out of this month's shortlist.
+  const [appliedHint, setAppliedHint] = useState<Props['hint']>(null);
+  if (hint && hint !== appliedHint) {
+    setAppliedHint(hint);
+    setShortlist((current) => current.filter((t) => !hint.avoid.includes(t)));
+  }
   const recs = useRecommendations({ portfolio, tickers: shortlist, onSave });
   const { current } = recs;
 
@@ -169,6 +178,15 @@ export default function MonthlyPicks({
   if (!recs.loaded)
     return (
       <div className="monthly-picks">
+      {hint?.avoid.length ? (
+        <output className="reports-note">
+          To balance your portfolio, {hint.avoid.join(', ')} {hint.avoid.length === 1 ? 'is' : 'are'} left out of this month&apos;s
+          shortlist, so your budget goes to your other picks. Add {hint.avoid.length === 1 ? 'it' : 'them'} back any time.{' '}
+          <button type="button" data-slot="pill" onClick={onClearHint}>
+            Dismiss
+          </button>
+        </output>
+      ) : null}
         <TabLoader label="Loading Monthly Picks…" />
       </div>
     );

@@ -1,0 +1,170 @@
+/* Guided Insights: plain-English cards. Tokens only; loads after insights.css. */
+html:root .g-stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+html:root .g-mode{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+html:root .g-hero{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);grid-template-areas:"left habit" "foot foot";gap:22px 28px}
+html:root .g-hero-left{grid-area:left;min-width:0}
+html:root .g-journey{margin-top:20px}
+html:root .g-journey p{display:flex;justify-content:space-between;gap:10px;margin:0 0 7px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .g-journey i,html:root .g-budget i{display:block;height:8px;border-radius:4px;background:rgb(var(--ch-tint) / .14);position:relative;overflow:hidden}
+html:root .g-journey i::after,html:root .g-budget i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--p);border-radius:4px;background:linear-gradient(90deg,var(--primary),var(--success))}
+html:root .g-habit{grid-area:habit;align-self:stretch;padding:18px 20px;border-radius:18px;background:rgb(var(--ch-tint) / .06);border:1px solid rgb(var(--ch-tint) / .12);display:flex;flex-direction:column;gap:10px;min-width:0}
+html:root .g-streak{margin:0;font-size:44px;font-weight:600;line-height:1}
+html:root .g-streak small{font-size:14px;font-weight:500;color:var(--muted-foreground)}
+html:root .g-strip{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+html:root .g-strip li{display:grid;justify-items:center;gap:4px}
+html:root .g-strip i{display:block;width:100%;max-width:22px;aspect-ratio:1;border-radius:7px;border:1.5px dashed rgb(var(--ch-tint) / .28)}
+html:root .g-strip li[data-done] i{border:0;background:var(--success)}
+html:root .g-strip li[data-current] i{outline:2px solid var(--primary);outline-offset:2px}
+html:root .g-strip span{font-size:10.5px;color:var(--muted-foreground)}
+html:root .g-badge-sub{margin:0;font-size:13.5px;line-height:1.5}
+html:root .g-budget p{display:flex;justify-content:space-between;margin:0 0 6px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .g-budget b{color:var(--foreground)}
+html:root .g-budget small{display:block;margin-top:5px;font-size:11.5px}
+html:root .g-mile{grid-area:foot;padding-top:16px;border-top:1px solid rgb(var(--ch-tint) / .14)}
+html:root .g-mile ul{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:10px}
+html:root .g-mile li{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;font-size:13.5px;line-height:1.4;background:rgb(var(--ch-success) / .14);color:var(--foreground)}
+html:root .g-mile li:has(.g-exp-btn){padding:0;background:none}
+html:root .g-tick{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--success);color:var(--background);font-size:11px;font-weight:700;flex-shrink:0}
+html:root .g-exp-btn{min-height:36px;padding:8px 14px;border-radius:999px;border:1px dashed rgb(var(--ch-tint) / .32);background:none;color:var(--muted-foreground);font-size:13px}
+html:root .g-exp{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+html:root .g-exp label{flex:1 1 100%;margin:0;font-size:13px}
+html:root .g-exp input{max-width:200px;padding:8px 10px;font-size:15px}
+html:root .g-exp .g-hint{flex:1 1 100%}
+html:root .g-mode .mu{font-size:13px;color:var(--muted-foreground)}
+html:root .g-hint{margin:8px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted-foreground)}
+
+
+html:root .g-welcome{padding:20px 22px;border-radius:22px}
+html:root .g-welcome h3{margin:0 0 6px;font-size:17px}
+html:root .g-welcome p{margin:0;font-size:14px;line-height:1.6}
+
+
+html:root .g-seg{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--muted);gap:2px}
+html:root .g-seg i{width:var(--w);background:var(--c);min-width:4px}
+html:root .g-bucket-grid{display:grid;gap:10px;margin-top:14px}
+html:root .g-bucket{border:1px solid var(--border);border-radius:14px;padding:0;background:rgb(var(--ch-tint) / .02)}
+html:root .g-bucket summary{display:grid;grid-template-columns:14px 1fr auto auto;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;list-style:none;min-height:44px}
+html:root .g-bucket summary::-webkit-details-marker{display:none}
+html:root .g-bucket summary:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:12px}
+html:root .g-dot{width:12px;height:12px;border-radius:4px;background:var(--c)}
+html:root .g-bucket-name{font-weight:600}
+html:root .g-bucket-val{color:var(--muted-foreground);font-size:13px}
+html:root .g-role{margin:0;padding:0 14px 8px;font-size:13px;color:var(--muted-foreground)}
+html:root .g-empty-line{padding:0 14px 12px;margin:0;font-size:13px}
+html:root .g-group{padding:4px 14px 10px}
+html:root .g-group-head{display:flex;justify-content:space-between;gap:10px;margin:0 0 4px;font-size:12px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .g-group ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+html:root .g-group li{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+html:root .g-group li span:first-child{overflow-wrap:anywhere}
+
+html:root .g-conc{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+html:root .g-conc-text{margin:0;font-size:14.5px;line-height:1.55;color:var(--foreground)}
+html:root .g-cta{padding:10px 16px;min-height:44px;border-radius:999px;font-weight:600;background:var(--primary);color:var(--primary-foreground);border:0}
+html:root .g-cta:hover{filter:brightness(1.08)}
+
+html:root .g-race ol{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:12px}
+html:root .g-race li{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr) auto;grid-template-areas:"l b v" ". r r";align-items:center;column-gap:12px;row-gap:2px}
+html:root .g-race-label{grid-area:l;font-size:14px}
+html:root .g-race li i{grid-area:b;display:block;height:14px;width:var(--w);border-radius:7px;background:var(--chart-neutral);min-width:6px}
+html:root .g-race li[data-you] i{background:var(--primary)}
+html:root .g-race li b{grid-area:v;font-size:14px;text-align:right}
+html:root .g-race li .mu{grid-area:r;font-size:12px;color:var(--muted-foreground)}
+
+html:root .g-income{display:grid;grid-template-columns:repeat(12,1fr);align-items:end;gap:5px;flex:1;min-height:140px;padding-top:6px}
+html:root .g-income i{display:block;height:max(var(--h),3px);border-radius:4px 4px 0 0;background:var(--success)}
+
+html:root .g-paper p{margin:0}
+html:root .g-paper .num{font-size:34px;font-weight:600;margin-bottom:8px}
+html:root .g-tax{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0}
+html:root .g-tax dd{margin:4px 0 0;font-size:20px;font-weight:600}
+
+html:root .g-rca,html:root .g-holdings,html:root .g-fundlist{padding:18px 20px;border-radius:22px}
+html:root .g-rca h3,html:root .g-fundlist h3,html:root .g-holdings h3{margin:6px 0 12px;font-size:17px}
+html:root .g-rca ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+html:root .g-rca li{display:grid;gap:8px;padding:12px 14px;border:1px solid var(--border);border-radius:14px}
+html:root .g-link{padding:0;background:none;border:0;font-weight:700;font-size:15px;color:var(--primary);text-align:left;justify-self:start}
+html:root .g-rca-copy{margin:0;font-size:13px;line-height:1.5;color:var(--muted-foreground)}
+html:root .g-range{position:relative;height:34px}
+html:root .g-range::before{content:"";position:absolute;left:0;right:0;top:15px;height:4px;border-radius:2px;background:var(--muted)}
+html:root .g-range-span{position:absolute;top:13px;height:8px;left:var(--a);width:calc(var(--b) - var(--a));min-width:4px;border-radius:4px;background:rgb(var(--ch-primary) / .35)}
+html:root .g-range-pin{position:absolute;top:8px;left:var(--x);width:4px;height:18px;margin-left:-2px;border-radius:2px}
+html:root .g-range-pin::after{content:attr(data-label);position:absolute;top:-1px;left:50%;transform:translate(-50%,-100%);font-size:10.5px;font-style:normal;white-space:nowrap;color:var(--muted-foreground)}
+html:root .g-range-avg{background:var(--primary)}
+html:root .g-range-now{background:var(--success)}
+html:root .g-range-now::after{top:auto;bottom:-1px;transform:translate(-50%,100%)}
+
+html:root .g-holdings-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+html:root .g-hold-list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+html:root .g-hold{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.3fr) auto auto;align-items:center;gap:12px;width:100%;padding:12px 14px;min-height:56px;text-align:left;border:1px solid var(--border);border-radius:14px;background:rgb(var(--ch-tint) / .02);color:var(--foreground)}
+html:root .g-hold:hover{border-color:var(--primary)}
+html:root .g-hold-main b{display:block;font-size:15px}
+html:root .g-hold-main small{display:block;font-size:12px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root .g-hold-tags{display:flex;gap:6px;flex-wrap:wrap}
+html:root .g-hold-tags em{font-style:normal;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(var(--ch-primary) / .14);color:var(--soft-ink)}
+html:root .g-hold-tags em[data-tag="Dividend payer"]{background:rgb(var(--ch-success) / .14);color:var(--success-ink)}
+html:root .g-hold-tags em[data-tag=Growth]{background:rgb(var(--ch-violet) / .14);color:var(--violet-ink)}
+html:root .g-hold-num{text-align:right;font-weight:600;white-space:nowrap}
+html:root .g-hold-num small{display:block;font-size:11px;font-weight:500;color:var(--muted-foreground)}
+html:root .g-more{margin-top:12px;min-height:44px}
+
+html:root .g-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+html:root .g-split .ic{grid-column:auto}
+html:root .g-spectrum{display:grid;gap:14px}
+html:root .g-spec-head{display:flex;justify-content:space-between;margin:0 0 6px;font-size:14px}
+html:root .g-spectrum i{display:block;height:10px;border-radius:5px;background:var(--muted);position:relative;overflow:hidden}
+html:root .g-spectrum i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:var(--success);border-radius:5px}
+html:root .g-spectrum [data-band=medium] i::after{background:var(--warn-strong)}
+html:root .g-spectrum [data-band=high] i::after{background:var(--danger)}
+html:root .g-spectrum [data-empty]{opacity:.65}
+html:root .g-spectrum .mu{margin:6px 0 0;font-size:12.5px}
+html:root .g-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+html:root .g-chips span{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--muted)}
+
+html:root .g-proj label{display:block;margin:0 0 6px;font-size:13.5px}
+html:root .g-proj input[type=range]{width:100%;padding:0;border:0;background:none;accent-color:var(--primary);min-height:32px}
+html:root .g-proj{display:flex;flex-direction:column;height:100%}
+html:root .g-proj ul{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;flex:1}
+html:root .g-proj li{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--border);border-radius:12px}
+html:root .g-col-wrap{flex:1;min-height:110px;position:relative;margin-bottom:8px}
+html:root .g-col{position:absolute;left:0;right:0;bottom:0;height:max(var(--h),6%);display:flex;flex-direction:column-reverse;border-radius:8px;overflow:hidden}
+html:root .g-col i{display:block}
+html:root .g-col-in{flex:var(--in) 1 0;background:rgb(var(--ch-primary) / .55)}
+html:root .g-col-gain{flex:var(--gain) 1 0;background:var(--success)}
+html:root .g-legend{display:flex;gap:16px;margin:10px 0 0;font-size:12px;color:var(--muted-foreground)}
+html:root .g-legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:rgb(var(--ch-primary) / .55)}
+html:root .g-legend span[data-k=gain]::before{background:var(--success)}
+html:root .g-income-wrap{display:flex;flex-direction:column;height:100%;min-height:210px}
+html:root .g-income-x{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:repeat(12,1fr);gap:5px;text-align:center;font-size:10.5px;color:var(--muted-foreground)}
+html:root .ic-body:has(.g-income-wrap),html:root .ic-body:has(.g-proj){display:flex;flex-direction:column}
+html:root .ic-body:has(.g-income-wrap)>*,html:root .ic-body:has(.g-proj)>*{flex:1}
+html:root .g-proj li b{font-size:18px}
+html:root .g-proj li small{font-size:11.5px}
+
+html:root .g-fundlist ul{list-style:none;margin:0;padding:0;display:grid}
+html:root .g-fundlist li{display:grid;grid-template-columns:minmax(0,1.6fr) auto minmax(0,1fr);gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+html:root .g-fundlist li:first-child{border-top:0}
+html:root .g-fundlist li span:first-child b{display:block}
+html:root .g-fundlist li small{display:block;font-size:12px;color:var(--muted-foreground)}
+html:root .g-fundlist li>span:last-child{text-align:right;font-size:13px}
+
+html:root .g-hedge{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+html:root .g-hedge .ic-ring{--size:120px}
+html:root .g-guide{margin:0 0 4px;font-size:15px}
+html:root .g-power{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+html:root .g-power li{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;font-size:14px}
+html:root .g-power li[data-you]{border-color:var(--primary)}
+html:root .g-power b{font-size:16px}
+
+@media (max-width:1100px){
+  html:root .g-split{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  html:root .g-hero{grid-template-columns:1fr;grid-template-areas:"left" "habit" "foot"}
+  html:root .g-streak{font-size:38px}
+  html:root .g-tax{grid-template-columns:1fr}
+  html:root .g-hold{grid-template-columns:minmax(0,1fr) auto}
+  html:root .g-race li{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l v" "b b" "r r"}
+  html:root .g-proj ul{grid-template-columns:1fr}
+  html:root .g-fundlist li{grid-template-columns:minmax(0,1fr) auto}
+  html:root .g-fundlist li>span:last-child{grid-column:1/-1;text-align:left}
+}

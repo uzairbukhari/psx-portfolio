@@ -136,6 +136,7 @@ function ahlCore(today: string, now: Date): Portfolio {
     dividends,
     dividendTrackingFrom: d(30),
     taxProfile: { filerStatus: 'filer' },
+    monthlyExpenses: 80_000,
     brokerFileHashes: ['a'.repeat(64)],
     brokerFormats: [{ broker: 'Fictional Securities', signature: 'date|scrip|side|qty|rate', report: 'trades', dateStyle: 'iso', columns: { ticker: 1, date: 0, side: 2, shares: 3, price: 4, fees: null, reference: null } }],
     monthlyPicksShortlist: ['MEBL', 'LUCK', 'FFC', 'TRG'],
