@@ -128,7 +128,7 @@ export default function AccountOverview({
   /** Holdings whose cost is unknown. */
   toCheck: number;
   sip: { label: string; fresh: number; put: number };
-  onOpenPlan: () => void;
+  onOpenPlan?: () => void;
   onFix: () => void;
 }) {
   const o = useMemo(
@@ -276,9 +276,11 @@ export default function AccountOverview({
             <span className="lbl">{sip.label} SIP</span>
             <div className="num glance-big">{money(sip.put).replace(/\.\d+$/, '')}</div>
             <small>of {money(sip.fresh).replace(/\.\d+$/, '')} planned</small>
-            <button type="button" data-slot="link" className="sw-link" onClick={onOpenPlan}>
-              Open the plan →
-            </button>
+            {onOpenPlan && (
+              <button type="button" data-slot="link" className="sw-link" onClick={onOpenPlan}>
+                Open the plan →
+              </button>
+            )}
           </div>
         </section>
         <section className="card glance-kse" aria-label="KSE-100">

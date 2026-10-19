@@ -255,9 +255,9 @@ function companyFromPathname(pathname: string): string {
   const match = COMPANY_PATH.exec(pathname);
   return match ? match[1].toUpperCase() : '';
 }
-/** Non-admins never land on the Research desk, even via a direct URL or history entry. */
+/** Non-admins never land on the Research desk, AI Lab or Plan, even via a direct URL or history entry. */
 function allowTab(tab: string, isAdmin: boolean): string {
-  return (tab === 'research-desk' || tab === 'ai-lab') && !isAdmin
+  return (tab === 'research-desk' || tab === 'ai-lab' || tab === 'sip-plan') && !isAdmin
     ? 'holdings'
     : tab;
 }
@@ -2884,13 +2884,13 @@ function DashboardContent({
   const navItems: NavItem[] = [
     { tab: 'holdings', href: '/', label: 'Holdings', short: 'Holdings', icon: <Wallet className="tab-icon" aria-hidden="true" /> },
     { tab: 'reports', href: '/reports', label: 'Insights', short: 'Insights', icon: <BarChart3 className="tab-icon" aria-hidden="true" /> },
-    ...(hasStocks
-      ? [
-          { tab: 'sip-plan', href: '/plan', label: 'Plan', short: 'Plan', icon: <TrendingUp className="tab-icon" aria-hidden="true" /> },
-          { tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> },
-        ]
+    ...(hasStocks && isAdmin
+      ? [{ tab: 'sip-plan', href: '/plan', label: 'Plan', short: 'Plan', icon: <TrendingUp className="tab-icon" aria-hidden="true" /> }]
       : []),
     { tab: 'sip-tracker', href: '/sip-tracker', label: 'SIP Blueprint', short: 'Blueprint', extra: true, icon: <Target className="tab-icon" aria-hidden="true" /> },
+    ...(hasStocks
+      ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
+      : []),
     { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
     ...(isAdmin
       ? [
@@ -3295,7 +3295,7 @@ function DashboardContent({
                     fundNavs={fundData.navs}
                     planNavs={planNavs}
                     onOpenPortfolio={(id) => workspace?.choose(id)}
-                    onOpenPlan={() => setTab('sip-plan')}
+                    onOpenPlan={isAdmin ? () => setTab('sip-plan') : undefined}
                     onFix={() =>
                       document
                         .getElementById('holdings-table')

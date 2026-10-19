@@ -80,7 +80,7 @@ export default function HoldingsHome({
   fundNavs: FundNavRow[];
   planNavs: PlanNavRow[];
   chart: ReactNode;
-  onOpenPlan: () => void;
+  onOpenPlan?: () => void;
   onFix: () => void;
   onOpenPortfolio: (id: string) => void;
 }) {
