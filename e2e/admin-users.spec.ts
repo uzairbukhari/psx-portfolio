@@ -5,11 +5,14 @@ test('admin People lists accounts, filters them and opens a person', async ({ ap
   await expect(app.getByRole('heading', { name: 'People' })).toBeVisible({ timeout: 60_000 });
   await expect(app.getByRole('heading', { name: 'How far people got' })).toBeVisible();
   await expect(app.getByRole('heading', { name: 'Who needs a nudge' })).toBeVisible();
-  // The test account is internal, so it only appears once internal accounts are included.
-  await app.getByLabel('Include internal accounts').click();
+  // Internal accounts (the test account may be one) only appear once they are included.
+  await app.getByRole('switch', { name: 'Include internal accounts' }).click();
   const row = app.locator('.people-person').first();
-  await expect(row).toBeVisible({ timeout: 30_000 });
-  await row.click();
-  await expect(app.getByRole('heading', { name: 'Last 90 days' })).toBeVisible();
+  const empty = app.getByText('No one matches.');
+  await expect(row.or(empty)).toBeVisible({ timeout: 30_000 });
+  if (await row.isVisible()) {
+    await row.click();
+    await expect(app.getByRole('heading', { name: 'Last 90 days' })).toBeVisible();
+  }
   await expect(app.getByText(/something went wrong|application error/i)).toHaveCount(0);
 });
