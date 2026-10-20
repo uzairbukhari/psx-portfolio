@@ -1,6 +1,7 @@
 // Key statistics for the company page, from public data only (cached PSX company facts, payout announcements and
 // face values). Anything we cannot support with data is null so the card shows a dash instead of an invented value.
 import type { PayoutAnnouncement } from './psx-payouts.ts';
+import type { FaceValueEvidence } from './face-values.ts';
 
 export type CompanyStats = {
   ticker: string;
@@ -10,29 +11,33 @@ export type CompanyStats = {
   marketCap: number | null;
   week52Low: number | null;
   week52High: number | null;
-  /** Cash dividends (rupees per share) declared in the last 12 months; the page divides by its live price. */
-  dividendPerShare12m: number | null;
+  /** Payouts announced in the last 13 months and the verified face values, so the page can work out the yield with its own face value and live price. */
+  payouts: StatsPayout[];
+  faceValues: FaceValueEvidence[];
 };
 
 const DAY = 86_400_000;
 
+export type StatsPayout = Pick<
+  PayoutAnnouncement,
+  'kind' | 'percent' | 'perShareRs' | 'bookClosureStart'
+>;
+
 /**
- * Trailing 12 months of declared cash dividends, rupees per share. Payouts quoted in percent of face value need a
- * verified face value; without one the total is unknown rather than guessed. No payout in the window is a genuine 0.
+ * Trailing 12 months of declared cash dividends, rupees per share. Payouts quoted in percent of face value need the
+ * face value in force on that date (`faceValueAt`, the account's own value or verified evidence); without one the
+ * total is unknown rather than guessed. No payout in the window is a genuine 0.
  */
 export function trailingDividendPerShare(
-  announcements: Pick<
-    PayoutAnnouncement,
-    'kind' | 'percent' | 'perShareRs' | 'bookClosureStart'
-  >[],
-  faceValue: number | null,
+  payouts: StatsPayout[],
+  faceValueAt: (date: string) => number | null,
   todayIso: string,
 ): number | null {
   const since = new Date(Date.parse(`${todayIso}T00:00:00Z`) - 365 * DAY)
     .toISOString()
     .slice(0, 10);
   let perShare = 0;
-  for (const a of announcements) {
+  for (const a of payouts) {
     if (
       a.kind !== 'cash' ||
       a.bookClosureStart < since ||
@@ -41,6 +46,7 @@ export function trailingDividendPerShare(
       continue;
     if (a.perShareRs !== null) perShare += a.perShareRs;
     else if (a.percent !== null) {
+      const faceValue = faceValueAt(a.bookClosureStart);
       if (!faceValue) return null;
       perShare += (a.percent / 100) * faceValue;
     }

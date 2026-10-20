@@ -1,11 +1,7 @@
 import { db, failure, identity } from '@/lib/server';
 import { readFacts } from '@/lib/company-facts-store';
-import { readFaceValues } from '@/lib/face-values';
-import { today } from '@/lib/portfolio';
-import {
-  trailingDividendPerShare,
-  type CompanyStats,
-} from '@/lib/company-stats';
+import { readFaceValues, type FaceValueEvidence } from '@/lib/face-values';
+import type { CompanyStats } from '@/lib/company-stats';
 import { tickerOK } from '@/lib/research-jobs';
 import { UserError } from '@/lib/user-error';
 import type { PayoutAnnouncement } from '@/lib/psx-payouts';
@@ -21,7 +17,9 @@ export async function GET(req: Request) {
     const d = db();
     const [[entry], faces, payouts] = await Promise.all([
       readFacts(d, [ticker]),
-      readFaceValues(d, [ticker]).catch(() => ({}) as Record<string, never[]>),
+      readFaceValues(d, [ticker]).catch(
+        () => ({}) as Record<string, FaceValueEvidence[]>,
+      ),
       d
         .prepare(
           `SELECT kind,percent,per_share_rs,book_closure_start FROM dividend_announcements WHERE ticker=? AND book_closure_start>=?`,
@@ -40,12 +38,6 @@ export async function GET(req: Request) {
         .catch(() => []),
     ]);
     const facts = entry?.facts ?? null;
-    const verified = (faces[ticker] ?? []).filter(
-      (f) => f.status === 'verified' || f.status === 'ai',
-    );
-    const faceValue = verified.length
-      ? verified[verified.length - 1].faceValue
-      : null;
     const stats: CompanyStats = {
       ticker,
       peTtm: facts?.peTtm ?? null,
@@ -55,16 +47,13 @@ export async function GET(req: Request) {
           : null,
       week52Low: facts?.week52.low ?? null,
       week52High: facts?.week52.high ?? null,
-      dividendPerShare12m: trailingDividendPerShare(
-        payouts.map((p) => ({
-          kind: p.kind,
-          percent: p.percent,
-          perShareRs: p.per_share_rs,
-          bookClosureStart: p.book_closure_start,
-        })),
-        faceValue,
-        today(),
-      ),
+      payouts: payouts.map((p) => ({
+        kind: p.kind,
+        percent: p.percent,
+        perShareRs: p.per_share_rs,
+        bookClosureStart: p.book_closure_start,
+      })),
+      faceValues: faces[ticker] ?? [],
     };
     return Response.json(
       { stats },
