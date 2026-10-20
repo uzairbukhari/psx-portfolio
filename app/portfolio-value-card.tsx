@@ -128,6 +128,8 @@ export default function PortfolioValueCard({
   );
   const points = series ? sliceValueRange(series.points, range) : [];
   const data = points;
+  const last = data[data.length - 1];
+  const loss = last !== undefined && last.cost !== null && last.value < last.cost;
   const rangeLabel =
     range === 'all' ? 'all time' : RANGES.find(([v]) => v === range)![1];
 
@@ -136,7 +138,7 @@ export default function PortfolioValueCard({
       <div className="value-chart-head">
         <div className="legend">
           <span>
-            <i className="swatch" />
+            <i className={`swatch${loss ? ' loss' : ''}`} />
             Value
           </span>
           <span>
@@ -190,7 +192,7 @@ export default function PortfolioValueCard({
               name: 'Value',
               zoom: false,
               data: data.map((d) => ({ x: d.date, y: d.value })),
-              color: t.success,
+              color: loss ? t.danger : t.success,
               area: true,
               extra: [
                 {

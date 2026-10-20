@@ -29,6 +29,7 @@ html:root .value-chart-head{display:flex;justify-content:space-between;align-ite
 html:root .value-chart .legend{display:flex;gap:16px;font-size:12.5px;color:var(--slab-mu)}
 html:root .value-chart .legend span{display:inline-flex;align-items:center;gap:7px}
 html:root .value-chart .swatch{display:inline-block;width:14px;height:3px;border-radius:2px;background:#2ee6a6}
+html:root .value-chart .swatch.loss{background:var(--danger)}
 html:root .value-chart .swatch.dash{background:none;border-top:2px dashed var(--slab-mu);height:0}
 html:root .value-chart-canvas{flex:1;min-height:260px;width:100%}
 html:root .value-chart-note{margin:0;font-size:11.5px;color:var(--slab-mu)}
