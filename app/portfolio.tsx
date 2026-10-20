@@ -1,6 +1,8 @@
 'use client';
 import './dashboard-styles';
 import { ownedKey } from './asset-keys';
+import GlobalSearch from './global-search';
+import type { SearchItem } from '@/lib/global-search';
 import { webMcpEnabled } from './webmcp-pref';
 import { cachedHoldings, cachedTaxSummary } from './portfolio-memo';
 import { useConfirm } from '@/components/confirm-dialog';
@@ -47,7 +49,6 @@ import {
 import {
   Plus,
   RefreshCw,
-  Search,
   Briefcase,
   Upload,
   Wallet,
@@ -951,7 +952,6 @@ function DashboardContent({
       dir: 'asc' | 'desc';
     } | null>(null),
     [sectorFilter, setSectorFilter] = useState<string>(''),
-    [holdingsQuery, setHoldingsQuery] = useState(''),
     [showSoldOut, setShowSoldOut] = useState(false),
     [targetsOpen, setTargetsOpen] = useState(false);
   // Status messages surface as toasts instead of an inline banner: errors
@@ -2050,6 +2050,13 @@ function DashboardContent({
     o.asset.kind === 'fund' ? [{ ...o, asset: o.asset }] : [],
   );
   const hasAssets = allAssets.length > 0;
+  const searchItems: SearchItem[] = [
+    ...p.companies.map((c) => ({ kind: 'company' as const, key: c.ticker, label: c.name || c.ticker, sub: [c.ticker, c.sector].filter(Boolean).join(' · '), owned: true })),
+    ...ownedFunds.map((o) => ({ kind: 'fund' as const, key: ownedKey(o), label: o.asset.name, sub: [o.asset.amc, o.asset.category, o.portfolioName].filter(Boolean).join(' · '), haystack: o.asset.fundName, owned: true })),
+    ...ownedMetals.map((o) => ({ kind: 'metal' as const, key: ownedKey(o), label: o.asset.name, sub: [o.asset.metal === 'silver' ? 'Silver' : 'Gold', o.portfolioName].filter(Boolean).join(' · '), haystack: `${o.asset.metal} gold silver`, owned: true })),
+    ...ownedCurrencies.map((o) => ({ kind: 'currency' as const, key: ownedKey(o), label: o.asset.name, sub: [o.asset.currency, o.portfolioName].filter(Boolean).join(' · '), haystack: o.asset.currency, owned: true })),
+    ...ownedPlans.map((o) => ({ kind: 'plan' as const, key: ownedKey(o), label: o.asset.name, sub: ['Savings plan', o.portfolioName].filter(Boolean).join(' · '), owned: true })),
+  ];
   // Monthly Picks is stock-only, so the tab shows once any portfolio holds a stock.
   const hasStocks = workspace
     ? workspace.account.portfolios.some((part) => part.portfolio.companies.length > 0)
@@ -2075,13 +2082,7 @@ function DashboardContent({
       : sectorFilter === SHORTLISTED
         ? rowsBase.filter((h) => h.target > 0)
         : rowsBase.filter((h) => h.sector === sectorFilter),
-    rowsFiltered = holdingsQuery.trim()
-      ? rowsBySector.filter((h) =>
-          `${h.ticker} ${h.name} ${h.sector ?? ''}`
-            .toLowerCase()
-            .includes(holdingsQuery.trim().toLowerCase()),
-        )
-      : rowsBySector,
+    rowsFiltered = rowsBySector,
     holdingsSortAccessor: Record<
       HoldingsSortKey,
       (h: (typeof hs)[number]) => number | string
@@ -2367,6 +2368,12 @@ function DashboardContent({
     if (window.location.pathname !== path)
       window.history.pushState(null, '', path);
     window.scrollTo({ top: 0 });
+  }
+  function openSearchResult(item: SearchItem) {
+    if (item.kind === 'company') return openCompany(item.key);
+    if (item.kind === 'fund') return openFund(item.key);
+    const owned = item.kind === 'metal' ? ownedMetals : item.kind === 'currency' ? ownedCurrencies : ownedPlans;
+    openOwnedAsset(item.kind, item.key, owned.find((o) => ownedKey(o) === item.key));
   }
   function openFund(key: string) {
     // From the All view a fund opens inside its own portfolio, where it can be edited.
@@ -3051,21 +3058,7 @@ function DashboardContent({
                 </div>
               )}
               {tab !== 'settings' && (
-                <label className="hdr-search">
-                  <Search size={15} aria-hidden="true" />
-                  <input
-                    id="global-search"
-                    type="search"
-                    value={holdingsQuery}
-                    placeholder="Search companies, funds"
-                    aria-label="Search companies"
-                    onChange={(e) => {
-                      setHoldingsQuery(e.target.value);
-                      if (tab !== 'holdings') setTab('holdings');
-                    }}
-                  />
-                  <kbd>Ctrl K</kbd>
-                </label>
+                <GlobalSearch items={searchItems} onPick={openSearchResult} />
               )}
               {tab !== 'settings' && (
                 <button
