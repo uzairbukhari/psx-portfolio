@@ -9,7 +9,7 @@
 //
 // Companies the free extractor finds nothing for then go to the AI lookup (lib/ai-face-value.ts), which needs
 // OPENAI_API_KEY (or ANTHROPIC_API_KEY with AI_RESEARCH_PROVIDER=anthropic) and is capped by
-// FACE_VALUE_AI_MONTHLY_CAP_USD (default $1). Without a key the step is skipped. --no-ai skips it.
+// OPENAI_API_KEY; it has no spend cap of its own (the admin console shows what it costs). Without a key the step is skipped. --no-ai skips it.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission); D1_DATABASE_ID to target staging.
 import { readFileSync } from 'node:fs';
@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { resolveConfig } from '../lib/ai-research/models.ts';
 import { createProvider } from '../lib/ai-research/provider.ts';
 import { fetchPageText } from '../lib/ai-research/fetch-text.ts';
-import { DEFAULT_MONTHLY_CAP_USD, runAiFaceValues } from '../lib/ai-face-value.ts';
+import { runAiFaceValues } from '../lib/ai-face-value.ts';
 
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const dryRun = process.argv.includes('--dry-run');
@@ -49,14 +49,12 @@ async function aiLookup(tickers) {
   const have = new Set((await d1('SELECT DISTINCT ticker FROM security_face_values')).map((r) => String(r.ticker)));
   const missing = tickers.filter((t) => !have.has(t));
   if (!missing.length) return null;
-  const capEnv = Number(process.env.FACE_VALUE_AI_MONTHLY_CAP_USD);
-  const capUsd = Number.isFinite(capEnv) && capEnv > 0 ? capEnv : DEFAULT_MONTHLY_CAP_USD;
   const provider = await createProvider(config, { openaiKey: process.env.OPENAI_API_KEY, anthropicKey: process.env.ANTHROPIC_API_KEY });
   const runId = randomUUID();
   if (!dryRun) await d1("INSERT INTO ai_research_runs (id,started_at,status,provider,models,cost_usd) VALUES (?,?, 'running',?,?,0)", [runId, new Date().toISOString(), config.provider, `face-value:${config.models.read}`]);
   let report;
   try {
-    report = await runAiFaceValues({ d1, provider, config, fetchText: fetchPageText, log: (m) => console.log(m) }, { tickers: missing, dryRun, capUsd });
+    report = await runAiFaceValues({ d1, provider, config, fetchText: fetchPageText, log: (m) => console.log(m) }, { tickers: missing, dryRun });
   } catch (error) {
     if (!dryRun) await d1("UPDATE ai_research_runs SET status='failed', error=?, finished_at=? WHERE id=?", [String(error).slice(0, 300), new Date().toISOString(), runId]);
     throw error;
