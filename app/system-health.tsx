@@ -153,6 +153,12 @@ export default function SystemHealth() {
           </div>
         ))}
       </div>
+      <h3>Face-value finder</h3>
+      <div className="admin-spend">
+        <div className="admin-kpi"><small>Spent this month</small><strong>{usd(health.aiSpend.faceValue.usd)}</strong><span className="muted">{usd(health.aiSpend.faceValue.allTimeUsd)} all time</span></div>
+        <div className="admin-kpi"><small>Lookups this month</small><strong>{health.aiSpend.faceValue.lookups}</strong><span className="muted">{health.aiSpend.faceValue.runs} runs, {health.aiSpend.faceValue.found} values found</span></div>
+        <div className="admin-kpi"><small>Cost per lookup</small><strong>{health.aiSpend.faceValue.avgUsd === null ? '–' : usd(health.aiSpend.faceValue.avgUsd)}</strong><span className="muted">spent ÷ lookups</span></div>
+      </div>
       <div className="table-wrap">
         <table className="admin-table">
           <thead><tr><th>Month</th>{health.aiSpend.months.map((m) => <th key={m.month}>{m.month}</th>)}</tr></thead>

@@ -30,7 +30,7 @@ test('admin health rates every pipeline from its own table and surfaces failures
   run("INSERT INTO facts_requests (ticker,requested_at,attempted_at,error) VALUES ('LUCK','2026-10-14T05:00:00Z','2026-10-14T05:05:00Z','PSX answered 520')");
   run("INSERT INTO refresh_requests (kind,ticker,status,requested_at,attempts) VALUES ('history','OGDC','queued','2026-10-14T06:00:00Z',1)");
   run("INSERT INTO ai_research_runs (id,started_at,status,provider,models,cost_usd) VALUES ('r1','2026-10-03T04:00:00Z','completed','openai','m',1.5)");
-  run("INSERT INTO ai_research_runs (id,started_at,status,provider,models,cost_usd) VALUES ('r2','2026-10-05T04:00:00Z','completed','openai','face-value:m',0.9)");
+  run("INSERT INTO ai_research_runs (id,started_at,status,provider,models,cost_usd,stats) VALUES ('r2','2026-10-05T04:00:00Z','completed','openai','face-value:m',0.9,?)", JSON.stringify({ perTicker: [{ ticker: 'A', stored: 1, rejected: [] }, { ticker: 'B', stored: 0, rejected: [] }, { ticker: 'C', stored: 0, rejected: [], skipped: 'tried within 30 days' }] }));
   const health = await adminHealth(db, { now, faceValueCapUsd: 1 });
   const by = Object.fromEntries(health.pipelines.map((p) => [p.id, p]));
   assert.equal(by.quotes.status, 'ok');
@@ -43,6 +43,7 @@ test('admin health rates every pipeline from its own table and surfaces failures
   assert.equal(health.queues.stuck[0].ticker, 'OGDC');
   assert.deepEqual(health.aiSpend.sources.map((s) => [s.id, s.usd]), [['research-desk', 0], ['ai-lab', 1.5], ['face-value', 0.9]]);
   assert.equal(health.aiSpend.months.at(-1).usd, 2.4);
+  assert.deepEqual(health.aiSpend.faceValue, { runs: 1, lookups: 2, found: 1, usd: 0.9, avgUsd: 0.45, allTimeUsd: 0.9 });
   const attention = buildAttention(health, await overviewMetrics(db, false, now, []));
   assert.equal(attention[0].level, 'failing');
   assert.ok(attention.some((a) => /Company facts/.test(a.text)));

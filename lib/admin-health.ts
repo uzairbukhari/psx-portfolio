@@ -13,8 +13,10 @@ export type PipelineRow = {
 export type QueueItem = { kind: string; ticker: string; status: string; requestedAt: string; attempts: number; error: string | null };
 export type Queues = { counts: { kind: string; status: string; n: number }[]; stuck: QueueItem[]; stuckCount: number; aiQueued: number };
 export type AiSource = { id: 'research-desk' | 'ai-lab' | 'face-value'; label: string; usd: number; capUsd: number | null };
+/** The face-value finder's own numbers: what each lookup costs and what it found. */
+export type FaceValueSpend = { runs: number; lookups: number; found: number; usd: number; avgUsd: number | null; allTimeUsd: number };
 export type AiSpend = {
-  month: string; sources: AiSource[]; totalUsd: number;
+  month: string; sources: AiSource[]; totalUsd: number; faceValue: FaceValueSpend;
   months: { month: string; usd: number }[];
   recentRuns: { startedAt: string; status: string; models: string; costUsd: number; error: string | null }[];
 };
@@ -103,6 +105,18 @@ export async function aiSpend(db: D1Database, now: Date, opts: AdminHealthOption
   const desk = (await first<{ s: number }>(db, "SELECT COALESCE(SUM(cost_usd),0) AS s FROM ai_usage WHERE created_at>=?", start))?.s ?? 0;
   const lab = (await first<{ s: number }>(db, "SELECT COALESCE(SUM(cost_usd),0) AS s FROM ai_research_runs WHERE started_at>=? AND models NOT LIKE 'face-value:%'", start))?.s ?? 0;
   const face = (await first<{ s: number }>(db, "SELECT COALESCE(SUM(cost_usd),0) AS s FROM ai_research_runs WHERE started_at>=? AND models LIKE 'face-value:%'", start))?.s ?? 0;
+  const faceRuns = await rows<{ stats: string | null }>(db, "SELECT stats FROM ai_research_runs WHERE started_at>=? AND models LIKE 'face-value:%'", start);
+  let lookups = 0, found = 0;
+  for (const r of faceRuns) {
+    try {
+      for (const t of (JSON.parse(r.stats ?? '{}') as { perTicker?: { skipped?: string; stored?: number }[] }).perTicker ?? []) {
+        if (!t.skipped) lookups++;
+        found += t.stored ?? 0;
+      }
+    } catch { /* a run without stats */ }
+  }
+  const faceAll = (await first<{ s: number }>(db, "SELECT COALESCE(SUM(cost_usd),0) AS s FROM ai_research_runs WHERE models LIKE 'face-value:%'"))?.s ?? 0;
+  const faceValue: FaceValueSpend = { runs: faceRuns.length, lookups, found, usd: face, avgUsd: lookups ? face / lookups : null, allTimeUsd: faceAll };
   const sources: AiSource[] = [
     { id: 'research-desk', label: 'Research desk', usd: desk, capUsd: null },
     { id: 'ai-lab', label: 'AI Lab research', usd: lab, capUsd: opts.aiLabCapUsd ?? null },
@@ -119,7 +133,7 @@ export async function aiSpend(db: D1Database, now: Date, opts: AdminHealthOption
   const recent = await rows<{ started_at: string; status: string; models: string; cost_usd: number; error: string | null }>(
     db, 'SELECT started_at,status,models,cost_usd,error FROM ai_research_runs ORDER BY started_at DESC LIMIT 10');
   return {
-    month, sources, totalUsd: desk + lab + face, months,
+    month, sources, totalUsd: desk + lab + face, faceValue, months,
     recentRuns: recent.map((r) => ({ startedAt: r.started_at, status: r.status, models: r.models, costUsd: r.cost_usd, error: cut(r.error) })),
   };
 }
