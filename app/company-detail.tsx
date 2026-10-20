@@ -556,52 +556,52 @@ export default function CompanyDetail({
             eod={priceHistory?.eod ?? []}
             intraday={priceHistory?.intraday ?? []}
           />
-          <section className="card company-dividends-card">
-            <div className="between">
-              <span className="lbl">Dividends</span>
-              <b className="num pos-text">+{money(dividendTotal)}</b>
-            </div>
-            {received.length > 0 && (
-              <EChart
-                className="company-div-chart"
-                label={`Dividends received, ${received.length} payments.`}
-                build={(t) =>
-                  barOption(t, {
-                    cats: received.map(({ d }) => d.date.slice(0, 7)),
-                    series: [
-                      {
-                        name: 'Received',
-                        data: received.map(({ net }) => net),
-                        color: t.success,
-                      },
-                    ],
-                    valueFormat: (n) => money(n),
-                  })
-                }
-              />
-            )}
-            <small className="position-note">
-              {summary.dividendNet === null
-                ? 'Gross · set filer status for net'
-                : 'Net of tax'}
-            </small>
-            {expectedDividends.length > 0 && (
-              <div className="expected-note">
-                <div>
-                  <b>{money(Math.round(expectedTotal))} expected</b>
-                  <small>Book closure {expectedDividends[0].date}</small>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onConfirmDividend(expectedDividends[0])}
-                >
-                  Mark received
-                </button>
-              </div>
-            )}
-          </section>
         </div>
+        <section className="card company-dividends-card">
+          <div className="between">
+            <span className="lbl">Dividends</span>
+            <b className="num pos-text">+{money(dividendTotal)}</b>
+          </div>
+          {received.length > 0 && (
+            <EChart
+              className="company-div-chart"
+              label={`Dividends received, ${received.length} payments.`}
+              build={(t) =>
+                barOption(t, {
+                  cats: received.map(({ d }) => d.date.slice(0, 7)),
+                  series: [
+                    {
+                      name: 'Received',
+                      data: received.map(({ net }) => net),
+                      color: t.success,
+                    },
+                  ],
+                  valueFormat: (n) => money(n),
+                })
+              }
+            />
+          )}
+          <small className="position-note">
+            {summary.dividendNet === null
+              ? 'Gross · set filer status for net'
+              : 'Net of tax'}
+          </small>
+          {expectedDividends.length > 0 && (
+            <div className="expected-note">
+              <div>
+                <b>{money(Math.round(expectedTotal))} expected</b>
+                <small>Book closure {expectedDividends[0].date}</small>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onConfirmDividend(expectedDividends[0])}
+              >
+                Mark received
+              </button>
+            </div>
+          )}
+        </section>
       </div>
 
       <section className="card company-lower">
