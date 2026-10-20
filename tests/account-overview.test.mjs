@@ -236,3 +236,20 @@ test('a fund with no price yet is left out of cost and gain instead of blanking 
   assert.equal(withFund.total.cost, without.total.cost);
   assert.ok(withFund.total.incomplete.some((m) => m.includes('fund price')));
 });
+
+test('the return leaves out a holding with no known cost instead of blocking', () => {
+  const unknown = ledger({
+    companies: [company('HUBC')],
+    trades: [trade('1', 'HUBC', 'buy', 10, null, '2025-01-01')],
+    quotes: { HUBC: quote(100) },
+  });
+  const base = accountOverview(parts, '2026-10-06');
+  const o = accountOverview(
+    [...parts, { id: 'x', name: 'X', portfolio: unknown }],
+    '2026-10-06',
+  );
+  assert.equal(o.returns.blockedBy, null);
+  assert.equal(o.returns.skippedCount, 1);
+  assert.ok(o.returns.rate !== null);
+  assert.ok(Math.abs(o.returns.rate - base.returns.rate) < 1e-9);
+});

@@ -15,7 +15,7 @@ import {
   type MoneyWeightedReturn,
 } from './performance.ts';
 import { consolidatedAccount } from './portfolio-account.ts';
-import { round, taxYearOf, type DisplayPart } from './portfolio.ts';
+import { round, taxYearOf, type DisplayPart, type Portfolio } from './portfolio.ts';
 
 export type AssetClassKey = 'stocks' | 'gold' | 'silver' | 'plans' | 'funds' | 'currency';
 export const ASSET_CLASS_LABELS: Record<AssetClassKey, string> = {
@@ -111,6 +111,8 @@ export type AccountOverview = {
   returns: MoneyWeightedReturn & {
     blockedBy: string | null;
     includesIncome: true;
+    /** Holdings whose cost is unknown, left out of this return. */
+    skippedCount: number;
   };
 };
 
@@ -370,22 +372,41 @@ export function accountOverview(
       ? null
       : round(total - totalCost);
 
+  // Holdings with no known cost are left out of the return (their trades and their value) instead of blocking it.
+  const skipTickers = new Set(summary.unknownCost);
+  for (const entry of consolidated.breakdown)
+    for (const t of moneyInFlows(entry.portfolio).unknownCost)
+      skipTickers.add(t);
+  const stockFlows = (portfolio: Portfolio) =>
+    moneyInFlows(
+      skipTickers.size
+        ? {
+            ...portfolio,
+            trades: portfolio.trades.filter((t) => !skipTickers.has(t.ticker)),
+          }
+        : portfolio,
+    ).flows;
+  const skippedAssets = assetValues.filter(
+    (m) => m.v.unknownCost && !unpricedFund(m),
+  );
+  const skippedValue = round(
+    consolidated.positions
+      .filter((h) => skipTickers.has(h.ticker))
+      .reduce((n, h) => n + (h.value ?? 0), 0) +
+      skippedAssets.reduce((n, m) => n + (m.v.value ?? 0), 0),
+  );
+  const skippedCount = skipTickers.size + skippedAssets.length;
   const flows: CashFlow[] = [
-    ...consolidated.breakdown.flatMap(
-      (entry) => moneyInFlows(entry.portfolio).flows,
-    ),
-    ...assetValues.filter((m) => !unpricedFund(m)).flatMap((m) => m.v.flows),
+    ...consolidated.breakdown.flatMap((entry) => stockFlows(entry.portfolio)),
+    ...assetValues
+      .filter((m) => !unpricedFund(m) && !m.v.unknownCost)
+      .flatMap((m) => m.v.flows),
     ...dividendFlows,
   ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  const unknownCostFlows = consolidated.breakdown.some(
-    (entry) => moneyInFlows(entry.portfolio).unknownCost.length > 0,
-  );
   const blockedBy =
     summary.missingPrice.length || metalMissing.some((m) => !unpricedFund(m))
       ? 'Needs a price for every holding.'
-      : unknownCostFlows || summary.unknownCost.length || metalUnknown.length
-        ? 'Needs the cost of every holding.'
-        : null;
+      : null;
   const classKeys = ['stocks', 'gold', 'silver', 'plans', 'funds', 'currency'] as const;
   const investedByMonth = new Map(
     months.map((m) => [m, { stocks: 0, gold: 0, silver: 0, plans: 0, funds: 0, currency: 0 }]),
@@ -412,7 +433,7 @@ export function accountOverview(
       amount: round(classKeys.reduce((n, k) => n + row[k], 0)),
     };
   });
-  const mwr = moneyWeightedReturn(flows, total, asOf);
+  const mwr = moneyWeightedReturn(flows, round(total - skippedValue), asOf);
 
   return {
     asOf,
@@ -457,6 +478,7 @@ export function accountOverview(
         : mwr),
       blockedBy,
       includesIncome: true,
+      skippedCount,
     },
   };
 }
