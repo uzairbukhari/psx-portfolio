@@ -69,6 +69,6 @@ test('overview metrics compare today with a week ago and leave internal accounts
 test('delta and spending caps', () => {
   assert.deepEqual(delta(5, 3), { sign: 'up', amount: 2 });
   assert.deepEqual(delta(2, 2), { sign: 'flat', amount: 0 });
-  assert.deepEqual(spendCaps({}), { aiLabCapUsd: null, faceValueCapUsd: 1 });
+  assert.deepEqual(spendCaps({}), { aiLabCapUsd: null, faceValueCapUsd: null });
   assert.deepEqual(spendCaps({ AI_RESEARCH_MONTHLY_CAP_USD: '5', FACE_VALUE_AI_MONTHLY_CAP_USD: '2' }), { aiLabCapUsd: 5, faceValueCapUsd: 2 });
 });

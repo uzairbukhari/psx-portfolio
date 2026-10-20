@@ -22,7 +22,7 @@ export type CronBeat = { lastBeatAt: string | null; status: PipelineStatus };
 export type PlatformPill = { status: PipelineStatus; headline: string };
 export type AdminHealth = DataHealth & { pipelines: PipelineRow[]; queues: Queues; aiSpend: AiSpend; cron: CronBeat; platform: PlatformPill };
 
-export type AdminHealthOptions = { now?: Date; aiLabCapUsd?: number | null; faceValueCapUsd?: number; platform?: PlatformOptions };
+export type AdminHealthOptions = { now?: Date; aiLabCapUsd?: number | null; faceValueCapUsd?: number | null; platform?: PlatformOptions };
 
 const STUCK_MINUTES = 15;
 const cut = (text: string | null) => (text ? text.slice(0, 300) : null);
@@ -106,7 +106,7 @@ export async function aiSpend(db: D1Database, now: Date, opts: AdminHealthOption
   const sources: AiSource[] = [
     { id: 'research-desk', label: 'Research desk', usd: desk, capUsd: null },
     { id: 'ai-lab', label: 'AI Lab research', usd: lab, capUsd: opts.aiLabCapUsd ?? null },
-    { id: 'face-value', label: 'Face-value finder', usd: face, capUsd: opts.faceValueCapUsd ?? 1 },
+    { id: 'face-value', label: 'Face-value finder', usd: face, capUsd: opts.faceValueCapUsd ?? null },
   ];
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1)).toISOString();
   const byMonth = new Map<string, number>();
@@ -131,9 +131,9 @@ export async function adminHealth(db: D1Database, opts: AdminHealthOptions = {})
   return { ...base, pipelines, queues, aiSpend: spend, cron, platform: { status: plat.status, headline: plat.headline } };
 }
 
-/** Caps from Worker settings: AI Lab has none unless set; the face-value finder defaults to $1. */
+/** Caps from Worker settings: AI Lab has none unless set; neither has one unless set. */
 export function spendCaps(env: { AI_RESEARCH_MONTHLY_CAP_USD?: string; FACE_VALUE_AI_MONTHLY_CAP_USD?: string }): AdminHealthOptions {
   const lab = Number(env.AI_RESEARCH_MONTHLY_CAP_USD);
   const face = Number(env.FACE_VALUE_AI_MONTHLY_CAP_USD);
-  return { aiLabCapUsd: Number.isFinite(lab) && lab > 0 ? lab : null, faceValueCapUsd: Number.isFinite(face) && face > 0 ? face : 1 };
+  return { aiLabCapUsd: Number.isFinite(lab) && lab > 0 ? lab : null, faceValueCapUsd: Number.isFinite(face) && face > 0 ? face : null };
 }

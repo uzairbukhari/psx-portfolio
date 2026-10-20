@@ -9,7 +9,7 @@
 //
 // Companies the free extractor finds nothing for then go to the AI lookup (lib/ai-face-value.ts), which needs
 // OPENAI_API_KEY (or ANTHROPIC_API_KEY with AI_RESEARCH_PROVIDER=anthropic) and is capped by
-// FACE_VALUE_AI_MONTHLY_CAP_USD (default $1). Without a key the step is skipped. --no-ai skips it.
+// FACE_VALUE_AI_MONTHLY_CAP_USD (optional; no cap when unset). Without a key the step is skipped. --no-ai skips it.
 //
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission); D1_DATABASE_ID to target staging.
 import { readFileSync } from 'node:fs';
@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { resolveConfig } from '../lib/ai-research/models.ts';
 import { createProvider } from '../lib/ai-research/provider.ts';
 import { fetchPageText } from '../lib/ai-research/fetch-text.ts';
-import { DEFAULT_MONTHLY_CAP_USD, runAiFaceValues } from '../lib/ai-face-value.ts';
+import { runAiFaceValues } from '../lib/ai-face-value.ts';
 
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const dryRun = process.argv.includes('--dry-run');
@@ -50,7 +50,7 @@ async function aiLookup(tickers) {
   const missing = tickers.filter((t) => !have.has(t));
   if (!missing.length) return null;
   const capEnv = Number(process.env.FACE_VALUE_AI_MONTHLY_CAP_USD);
-  const capUsd = Number.isFinite(capEnv) && capEnv > 0 ? capEnv : DEFAULT_MONTHLY_CAP_USD;
+  const capUsd = Number.isFinite(capEnv) && capEnv > 0 ? capEnv : null;
   const provider = await createProvider(config, { openaiKey: process.env.OPENAI_API_KEY, anthropicKey: process.env.ANTHROPIC_API_KEY });
   const runId = randomUUID();
   if (!dryRun) await d1("INSERT INTO ai_research_runs (id,started_at,status,provider,models,cost_usd) VALUES (?,?, 'running',?,?,0)", [runId, new Date().toISOString(), config.provider, `face-value:${config.models.read}`]);
