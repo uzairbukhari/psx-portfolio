@@ -520,7 +520,7 @@ html:root .header-right .plan-month-nav b{font-family:var(--font-geist-sans),san
 html:root .company-keystats{padding:18px;border-radius:18px;background:var(--card);border:1px solid var(--border)}
 html:root .keystats-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:6px}
 html:root .keystats-cols dl{margin:0}
-html:root .keystats-cols dl>div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
+html:root .keystats-cols dl>div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
 html:root .keystats-cols dl>div:last-child{border-bottom:0}
 html:root .keystats-cols dt{font-size:12.5px;color:var(--muted-foreground)}
 html:root .keystats-cols dd{margin:0;font-size:13.5px;font-weight:600;color:var(--foreground);text-align:right}
@@ -541,5 +541,5 @@ html:root .company-keystats dl{display:flex;flex-direction:column;justify-conten
 html:root .company-keystats dl>div{flex:1;align-items:center}
 @media (min-width:901px){
   html:root .company-grid{align-items:stretch}
-  html:root .company-grid .company-chart{height:250px;max-height:none}
+  html:root .company-grid .company-chart{height:190px;max-height:none}
 }
