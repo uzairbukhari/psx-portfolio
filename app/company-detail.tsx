@@ -482,126 +482,122 @@ export default function CompanyDetail({
       </div>
 
       <div className="company-grid">
-        <div className="company-main">
-          <PriceChart
-            key={ticker}
-            ticker={ticker}
-            holding={holding}
-            trades={trades}
-            onHistory={onHistory}
-          />
-          <section className="card company-dividends-card">
-            <div className="between">
-              <span className="lbl">Dividends</span>
-              <b className="num pos-text">+{money(dividendTotal)}</b>
-            </div>
-            {received.length > 0 && (
-              <EChart
-                className="company-div-chart"
-                label={`Dividends received, ${received.length} payments.`}
-                build={(t) =>
-                  barOption(t, {
-                    cats: received.map(({ d }) => d.date.slice(0, 7)),
-                    series: [
-                      {
-                        name: 'Received',
-                        data: received.map(({ net }) => net),
-                        color: t.success,
-                      },
-                    ],
-                    valueFormat: (n) => money(n),
-                  })
+        <PriceChart
+          key={ticker}
+          ticker={ticker}
+          holding={holding}
+          trades={trades}
+          onHistory={onHistory}
+        />
+        <CompanyKeyStats
+          ticker={ticker}
+          day={
+            todayRow || holding?.quote
+              ? {
+                  high: todayRow?.high ?? null,
+                  low: todayRow?.low ?? null,
+                  volume: todayRow?.volume ?? null,
+                  previousClose: todayRow?.previousClose ?? null,
+                  price: todayRow?.price ?? holding?.quote?.price ?? null,
                 }
-              />
-            )}
-            <small className="position-note">
-              {summary.dividendNet === null
-                ? 'Gross · set filer status for net'
-                : 'Net of tax'}
-            </small>
-            {expectedDividends.length > 0 && (
-              <div className="expected-note">
-                <div>
-                  <b>{money(Math.round(expectedTotal))} expected</b>
-                  <small>Book closure {expectedDividends[0].date}</small>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onConfirmDividend(expectedDividends[0])}
-                >
-                  Mark received
-                </button>
-              </div>
-            )}
-          </section>
-        </div>
-        <div className="company-side">
-          <section className="card company-position">
-            <span className="lbl">Your position</span>
-            <div className="position-tiles">
+              : undefined
+          }
+          eod={priceHistory?.eod ?? []}
+          intraday={priceHistory?.intraday ?? []}
+        />
+        <section className="card company-dividends-card">
+          <div className="between">
+            <span className="lbl">Dividends</span>
+            <b className="num pos-text">+{money(dividendTotal)}</b>
+          </div>
+          {received.length > 0 && (
+            <EChart
+              className="company-div-chart"
+              label={`Dividends received, ${received.length} payments.`}
+              build={(t) =>
+                barOption(t, {
+                  cats: received.map(({ d }) => d.date.slice(0, 7)),
+                  series: [
+                    {
+                      name: 'Received',
+                      data: received.map(({ net }) => net),
+                      color: t.success,
+                    },
+                  ],
+                  valueFormat: (n) => money(n),
+                })
+              }
+            />
+          )}
+          <small className="position-note">
+            {summary.dividendNet === null
+              ? 'Gross · set filer status for net'
+              : 'Net of tax'}
+          </small>
+          {expectedDividends.length > 0 && (
+            <div className="expected-note">
               <div>
-                <span>Shares</span>
-                <b className="num">{(holding?.shares ?? 0).toLocaleString()}</b>
+                <b>{money(Math.round(expectedTotal))} expected</b>
+                <small>Book closure {expectedDividends[0].date}</small>
               </div>
-              <div>
-                <span>Avg cost</span>
-                <b className="num">
-                  {holding?.average == null ? '—' : money(holding.average)}
-                </b>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onConfirmDividend(expectedDividends[0])}
+              >
+                Mark received
+              </button>
+            </div>
+          )}
+        </section>
+        <section className="card company-position">
+          <span className="lbl">Your position</span>
+          <div className="position-tiles">
+            <div>
+              <span>Shares</span>
+              <b className="num">{(holding?.shares ?? 0).toLocaleString()}</b>
+            </div>
+            <div>
+              <span>Avg cost</span>
+              <b className="num">
+                {holding?.average == null ? '—' : money(holding.average)}
+              </b>
+            </div>
+            <div>
+              <span>Value</span>
+              <b className="num">
+                {summary.value === null ? '—' : money(summary.value)}
+              </b>
+            </div>
+            <div>
+              <span>Unrealised</span>
+              <b className={`num ${tone(summary.gain) ?? ''}`}>
+                {summary.gain === null ? '—' : money(summary.gain)}
+              </b>
+              {summary.gainPercent !== null && (
+                <small className={tone(summary.gainPercent)}>
+                  {pct(summary.gainPercent)}
+                </small>
+              )}
+            </div>
+          </div>
+          {summary.gain === null && (
+            <p className="position-note">
+              Needs cost and price for profit / loss.
+            </p>
+          )}
+          {weight !== null && (
+            <div className="position-weight">
+              <div className="between">
+                <span>Weight in stocks</span>
+                <b className="num">{(weight * 100).toFixed(1)}%</b>
               </div>
-              <div>
-                <span>Value</span>
-                <b className="num">
-                  {summary.value === null ? '—' : money(summary.value)}
-                </b>
-              </div>
-              <div>
-                <span>Unrealised</span>
-                <b className={`num ${tone(summary.gain) ?? ''}`}>
-                  {summary.gain === null ? '—' : money(summary.gain)}
-                </b>
-                {summary.gainPercent !== null && (
-                  <small className={tone(summary.gainPercent)}>
-                    {pct(summary.gainPercent)}
-                  </small>
-                )}
+              <div className="bar-track" aria-hidden="true">
+                <i style={{ width: `${Math.min(100, weight * 100)}%` }} />
               </div>
             </div>
-            {summary.gain === null && (
-              <p className="position-note">
-                Needs cost and price for profit / loss.
-              </p>
-            )}
-            {weight !== null && (
-              <div className="position-weight">
-                <div className="between">
-                  <span>Weight in stocks</span>
-                  <b className="num">{(weight * 100).toFixed(1)}%</b>
-                </div>
-                <div className="bar-track" aria-hidden="true">
-                  <i style={{ width: `${Math.min(100, weight * 100)}%` }} />
-                </div>
-              </div>
-            )}
-          </section>
-          <CompanyKeyStats
-            ticker={ticker}
-            day={
-              todayRow || holding?.quote
-                ? {
-                    high: todayRow?.high ?? null,
-                    low: todayRow?.low ?? null,
-                    volume: todayRow?.volume ?? null,
-                    previousClose: todayRow?.previousClose ?? null,
-                    price: todayRow?.price ?? holding?.quote?.price ?? null,
-                  }
-                : undefined
-            }
-            eod={priceHistory?.eod ?? []}
-            intraday={priceHistory?.intraday ?? []}
-          />
-        </div>
+          )}
+        </section>
       </div>
 
       <section className="card company-lower">
