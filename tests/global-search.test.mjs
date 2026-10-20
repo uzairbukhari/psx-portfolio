@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { tickersNeedingFaceValue } from '../lib/payout-bootstrap.ts';
 import { searchItems } from '../lib/global-search.ts';
 import {
   trailingDividendPerShare,
@@ -98,4 +99,14 @@ test('compact numbers', () => {
   assert.equal(compactNumber(103_600_000), '103.6M');
   assert.equal(compactNumber(5.2e12), '5.2T');
   assert.equal(compactNumber(null), '—');
+});
+test('face values are requested only for companies with none on file and no lookup on record', () => {
+  const status = {
+    tickers: ['MEBL', 'LUCK', 'HUBC'],
+    evidence: { MEBL: [{ faceValue: 10 }], LUCK: [], HUBC: [] },
+    states: [{ ticker: 'HUBC', state: 'queued' }],
+    dispatchEnabled: true,
+  };
+  assert.deepEqual(tickersNeedingFaceValue(status), ['LUCK']);
+  assert.deepEqual(tickersNeedingFaceValue({ ...status, dispatchEnabled: false }), []);
 });

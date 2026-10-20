@@ -199,8 +199,8 @@ import { QUOTE_MESSAGES } from '@/lib/quote-jobs';
 import type { QuotesResponse } from '@/lib/api-types';
 import { readJson } from '@/lib/safe-json';
 import { historicalTickers } from '@/lib/dividend-history';
-import { tickersNeedingFirstFetch } from '@/lib/payout-bootstrap';
-import type { DividendRefreshResponse } from '@/lib/api-types';
+import { tickersNeedingFaceValue, tickersNeedingFirstFetch } from '@/lib/payout-bootstrap';
+import type { DividendRefreshResponse, FaceValuesResponse } from '@/lib/api-types';
 import { pktDate, type PricePoint } from '@/lib/price-history';
 import type {
   PriceHistoryRequestResponse,
@@ -1140,6 +1140,21 @@ function DashboardContent({
       /* a background aid: the next open tries again */
     }
   }
+  /** Asks once per tab for the verified face value of companies that have none, so a new company's payouts and yield resolve without waiting for the weekly job. */
+  const faceValuesAsked = useRef(new Set<string>());
+  async function fetchFirstFaceValues(tickers: string[]) {
+    try {
+      const fresh = tickers.filter((t) => !faceValuesAsked.current.has(t)).slice(0, 40);
+      if (!fresh.length) return;
+      const status = (await readJson(await fetch(`/api/face-values?tickers=${encodeURIComponent(fresh.join(','))}`))) as FaceValuesResponse;
+      fresh.forEach((t) => faceValuesAsked.current.add(t));
+      const need = tickersNeedingFaceValue(status);
+      if (!need.length) return;
+      await fetch('/api/face-values', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers: need }) });
+    } catch {
+      /* a background aid: the next open tries again */
+    }
+  }
   async function load() {
     setBusy(true);
     try {
@@ -1167,6 +1182,7 @@ function DashboardContent({
           d.faceValues ?? {},
         );
         void fetchFirstPayouts(historicalTickers(d.portfolio));
+        void fetchFirstFaceValues(historicalTickers(d.portfolio));
       }
     } catch (e) {
       // A lock mid-load is not an error to show: the unlock screen takes over.
