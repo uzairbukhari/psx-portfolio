@@ -211,38 +211,36 @@ function PriceChart({
             : 'Price history has not been collected for this company yet. The scheduled PSX history job fills it in.'}
         </p>
       ) : (
-        <div className="company-chart-wrap">
-          <EChart
-            className="company-chart"
-            label={`${ticker} price, ${RANGES.find(([v]) => v === range)![1]}. ${points.length} points, latest ${money(points[points.length - 1][1])}.`}
-            build={(t) =>
-              timeSeriesOption(t, {
-                name: 'Price',
-                data: points.map(([sec, price]) => ({
-                  x: sec * 1000,
-                  y: price,
-                })),
-                area: true,
-                color: t.primary,
-                valueFormat: (n) => money(n),
-                axisFormat: (v) => v.toFixed(0),
-                dateLabel: (x) => tickLabel(Number(x) / 1000, range),
-                refLines:
-                  holding?.average != null &&
-                  holding.average >= lo - pad &&
-                  holding.average <= hi + pad
-                    ? [{ y: holding.average, label: 'Avg. cost' }]
-                    : undefined,
-                markers: markers.map(({ t: tr, x }) => ({
-                  x: x * 1000,
-                  y: tr.price!,
-                  color: tr.kind === 'sell' ? t.danger : t.success,
-                  label: `${tr.kind === 'sell' ? 'Sold' : 'Bought'} ${tr.shares} at ${money(tr.price!)} · ${tr.date}`,
-                })),
-              })
-            }
-          />
-        </div>
+        <EChart
+          className="company-chart"
+          label={`${ticker} price, ${RANGES.find(([v]) => v === range)![1]}. ${points.length} points, latest ${money(points[points.length - 1][1])}.`}
+          build={(t) =>
+            timeSeriesOption(t, {
+              name: 'Price',
+              data: points.map(([sec, price]) => ({
+                x: sec * 1000,
+                y: price,
+              })),
+              area: true,
+              color: t.primary,
+              valueFormat: (n) => money(n),
+              axisFormat: (v) => v.toFixed(0),
+              dateLabel: (x) => tickLabel(Number(x) / 1000, range),
+              refLines:
+                holding?.average != null &&
+                holding.average >= lo - pad &&
+                holding.average <= hi + pad
+                  ? [{ y: holding.average, label: 'Avg. cost' }]
+                  : undefined,
+              markers: markers.map(({ t: tr, x }) => ({
+                x: x * 1000,
+                y: tr.price!,
+                color: tr.kind === 'sell' ? t.danger : t.success,
+                label: `${tr.kind === 'sell' ? 'Sold' : 'Bought'} ${tr.shares} at ${money(tr.price!)} · ${tr.date}`,
+              })),
+            })
+          }
+        />
       )}
       <div className="company-legend">
         <span>
@@ -484,13 +482,60 @@ export default function CompanyDetail({
       </div>
 
       <div className="company-grid">
-        <PriceChart
-          key={ticker}
-          ticker={ticker}
-          holding={holding}
-          trades={trades}
-          onHistory={onHistory}
-        />
+        <div className="company-main">
+          <PriceChart
+            key={ticker}
+            ticker={ticker}
+            holding={holding}
+            trades={trades}
+            onHistory={onHistory}
+          />
+          <section className="card company-dividends-card">
+            <div className="between">
+              <span className="lbl">Dividends</span>
+              <b className="num pos-text">+{money(dividendTotal)}</b>
+            </div>
+            {received.length > 0 && (
+              <EChart
+                className="company-div-chart"
+                label={`Dividends received, ${received.length} payments.`}
+                build={(t) =>
+                  barOption(t, {
+                    cats: received.map(({ d }) => d.date.slice(0, 7)),
+                    series: [
+                      {
+                        name: 'Received',
+                        data: received.map(({ net }) => net),
+                        color: t.success,
+                      },
+                    ],
+                    valueFormat: (n) => money(n),
+                  })
+                }
+              />
+            )}
+            <small className="position-note">
+              {summary.dividendNet === null
+                ? 'Gross · set filer status for net'
+                : 'Net of tax'}
+            </small>
+            {expectedDividends.length > 0 && (
+              <div className="expected-note">
+                <div>
+                  <b>{money(Math.round(expectedTotal))} expected</b>
+                  <small>Book closure {expectedDividends[0].date}</small>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onConfirmDividend(expectedDividends[0])}
+                >
+                  Mark received
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
         <div className="company-side">
           <section className="card company-position">
             <span className="lbl">Your position</span>
@@ -557,51 +602,6 @@ export default function CompanyDetail({
             intraday={priceHistory?.intraday ?? []}
           />
         </div>
-        <section className="card company-dividends-card">
-          <div className="between">
-            <span className="lbl">Dividends</span>
-            <b className="num pos-text">+{money(dividendTotal)}</b>
-          </div>
-          {received.length > 0 && (
-            <EChart
-              className="company-div-chart"
-              label={`Dividends received, ${received.length} payments.`}
-              build={(t) =>
-                barOption(t, {
-                  cats: received.map(({ d }) => d.date.slice(0, 7)),
-                  series: [
-                    {
-                      name: 'Received',
-                      data: received.map(({ net }) => net),
-                      color: t.success,
-                    },
-                  ],
-                  valueFormat: (n) => money(n),
-                })
-              }
-            />
-          )}
-          <small className="position-note">
-            {summary.dividendNet === null
-              ? 'Gross · set filer status for net'
-              : 'Net of tax'}
-          </small>
-          {expectedDividends.length > 0 && (
-            <div className="expected-note">
-              <div>
-                <b>{money(Math.round(expectedTotal))} expected</b>
-                <small>Book closure {expectedDividends[0].date}</small>
-              </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onConfirmDividend(expectedDividends[0])}
-              >
-                Mark received
-              </button>
-            </div>
-          )}
-        </section>
       </div>
 
       <section className="card company-lower">
