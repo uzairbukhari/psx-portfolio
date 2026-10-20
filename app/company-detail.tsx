@@ -563,21 +563,33 @@ export default function CompanyDetail({
                 {holding?.average == null ? '—' : money(holding.average)}
               </b>
             </div>
-            <div>
-              <span>Value</span>
-              <b className="num">
-                {summary.value === null ? '—' : money(summary.value)}
-              </b>
-              <small className={tone(summary.gain)}>
-                {summary.gain === null
-                  ? 'Unrealised —'
-                  : `${summary.gain >= 0 ? '+' : '−'}${money(Math.abs(summary.gain))}${summary.gainPercent === null ? '' : ` · ${pct(summary.gainPercent)}`} unrealised`}
-              </small>
+            <div className="position-returns">
+              <div>
+                <span>Value</span>
+                <b className="num">
+                  {summary.value === null ? '—' : money(summary.value)}
+                </b>
+              </div>
+              <div>
+                <span>
+                  Unrealised
+                  {summary.gainPercent !== null && (
+                    <em className={tone(summary.gainPercent)}>
+                      {pct(summary.gainPercent)}
+                    </em>
+                  )}
+                </span>
+                <b className={`num ${tone(summary.gain) ?? ''}`}>
+                  {summary.gain === null ? '—' : money(summary.gain)}
+                </b>
+              </div>
             </div>
             <div className="position-returns">
               <div>
                 <span>Realised profit</span>
-                <b className={`num ${tone(realisedProfit) ?? ''}`}>
+                <b
+                  className={`num ${realisedProfit === 0 ? '' : (tone(realisedProfit) ?? '')}`}
+                >
                   {realisedProfit === null ? '—' : money(realisedProfit)}
                 </b>
               </div>

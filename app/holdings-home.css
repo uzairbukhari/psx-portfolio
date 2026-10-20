@@ -550,3 +550,4 @@ html:root .position-returns{display:grid;gap:8px;align-content:center}
 html:root .position-returns>div{display:grid;gap:2px;padding:0}
 html:root .position-returns>div+div{padding-top:8px;border-top:1px solid var(--border)}
 html:root .position-returns span{font-size:12.5px;color:var(--muted-foreground)}
+html:root .position-returns span em{font-style:normal;font-weight:600;font-size:11.5px;margin-left:8px}
