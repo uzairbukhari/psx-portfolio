@@ -380,11 +380,6 @@ export default function CompanyDetail({
   );
   const dividendTotal =
     summary.dividendNet === null ? summary.dividendGross : summary.dividendNet;
-  const expectedTotal = expectedDividends.reduce(
-    (sum, d) =>
-      sum + (byId.get(d.id)?.netAmount ?? byId.get(d.id)?.grossAmount ?? 0),
-    0,
-  );
 
   return (
     <div className="company-page">
@@ -534,21 +529,6 @@ export default function CompanyDetail({
               ? 'Gross · set filer status for net'
               : 'Net of tax'}
           </small>
-          {expectedDividends.length > 0 && (
-            <div className="expected-note">
-              <div>
-                <b>{money(Math.round(expectedTotal))} expected</b>
-                <small>Book closure {expectedDividends[0].date}</small>
-              </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onConfirmDividend(expectedDividends[0])}
-              >
-                Mark received
-              </button>
-            </div>
-          )}
         </section>
         <section className="card company-position">
           <span className="lbl">Your position</span>

@@ -534,7 +534,7 @@ html:root .search-panel [role=option] b{font-size:13.5px;font-weight:600}
 html:root .search-panel [role=option] small{font-size:12px;color:var(--muted-foreground)}
 html:root .search-empty{margin:0;padding:14px 10px;font-size:13px;color:var(--muted-foreground)}
 @media(max-width:760px){html:root .hdr-search-wrap:focus-within{flex:1}html:root .search-panel{width:calc(100vw - 32px);position:fixed;left:16px;top:70px}}
-html:root .company-dividends-card .company-div-chart{height:110px}
+html:root .company-dividends-card .company-div-chart{height:180px}
 html:root .company-keystats{display:flex;flex-direction:column}
 html:root .company-keystats .keystats-cols{flex:1}
 html:root .company-keystats dl{display:flex;flex-direction:column;justify-content:space-between}
