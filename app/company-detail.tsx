@@ -13,6 +13,7 @@ import { EChart } from './charts/echart';
 import { barOption, timeSeriesOption } from '@/lib/chart-kit';
 import {
   money,
+  realizedSales,
   type Dividend,
   type Portfolio,
   type StockSplit,
@@ -378,6 +379,20 @@ export default function CompanyDetail({
   const [lowerTab, setLowerTab] = useState<'activity' | 'dividends'>(
     'activity',
   );
+  // Profit on shares already sold; unknown when any sale has no cost basis.
+  const realisedProfit = useMemo(() => {
+    try {
+      const sales = realizedSales(portfolio).filter((x) => x.ticker === ticker);
+      if (!sales.length) return 0;
+      return sales.some((x) => x.realizedGain === null)
+        ? null
+        : Math.round(
+            sales.reduce((a, x) => a + (x.realizedGain ?? 0), 0) * 100,
+          ) / 100;
+    } catch {
+      return null;
+    }
+  }, [portfolio, ticker]);
   const dividendTotal =
     summary.dividendNet === null ? summary.dividendGross : summary.dividendNet;
 
@@ -486,6 +501,11 @@ export default function CompanyDetail({
         />
         <CompanyKeyStats
           ticker={ticker}
+          company={(() => {
+            const c = portfolio.companies.find((x) => x.ticker === ticker);
+            // An "assume Rs 10" face value is the account's own guess, so it never feeds a published-looking yield.
+            return c?.faceValueAssumed ? undefined : c;
+          })()}
           day={
             todayRow || holding?.quote
               ? {
@@ -543,22 +563,40 @@ export default function CompanyDetail({
                 {holding?.average == null ? '—' : money(holding.average)}
               </b>
             </div>
-            <div>
-              <span>Value</span>
-              <b className="num">
-                {summary.value === null ? '—' : money(summary.value)}
-              </b>
+            <div className="position-returns">
+              <div>
+                <span>Value</span>
+                <b className="num">
+                  {summary.value === null ? '—' : money(summary.value)}
+                </b>
+              </div>
+              <div>
+                <span>
+                  Unrealised
+                  {summary.gainPercent !== null && (
+                    <em className={tone(summary.gainPercent)}>
+                      {pct(summary.gainPercent)}
+                    </em>
+                  )}
+                </span>
+                <b className={`num ${tone(summary.gain) ?? ''}`}>
+                  {summary.gain === null ? '—' : money(summary.gain)}
+                </b>
+              </div>
             </div>
-            <div>
-              <span>Unrealised</span>
-              <b className={`num ${tone(summary.gain) ?? ''}`}>
-                {summary.gain === null ? '—' : money(summary.gain)}
-              </b>
-              {summary.gainPercent !== null && (
-                <small className={tone(summary.gainPercent)}>
-                  {pct(summary.gainPercent)}
-                </small>
-              )}
+            <div className="position-returns">
+              <div>
+                <span>Realised profit</span>
+                <b
+                  className={`num ${realisedProfit === 0 ? '' : (tone(realisedProfit) ?? '')}`}
+                >
+                  {realisedProfit === null ? '—' : money(realisedProfit)}
+                </b>
+              </div>
+              <div>
+                <span>Dividends received</span>
+                <b className="num pos-text">+{money(dividendTotal)}</b>
+              </div>
             </div>
           </div>
           {summary.gain === null && (

@@ -4,7 +4,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PricePoint } from '@/lib/price-history';
 import { pktDate } from '@/lib/price-history';
-import { compactNumber, type CompanyStats } from '@/lib/company-stats';
+import {
+  compactNumber,
+  trailingDividendPerShare,
+  type CompanyStats,
+} from '@/lib/company-stats';
+import { faceValueFor } from '@/lib/face-values';
 import { readJson } from '@/lib/safe-json';
 
 type Day = {
@@ -28,8 +33,11 @@ export default function CompanyKeyStats({
   day,
   eod,
   intraday,
+  company,
 }: {
   ticker: string;
+  /** The account's own company record: its face value wins over scraped evidence. */
+  company: { faceValue?: number } | undefined;
   day: Day | undefined;
   eod: PricePoint[];
   intraday: PricePoint[];
@@ -76,7 +84,17 @@ export default function CompanyKeyStats({
       ? { low: Math.min(...closes), high: Math.max(...closes) }
       : { low: null, high: null };
   }, [stats, eod]);
-  const dps = stats?.dividendPerShare12m ?? null;
+  const dps = useMemo(
+    () =>
+      stats
+        ? trailingDividendPerShare(
+            stats.payouts,
+            (date) => faceValueFor(company, stats.faceValues, date),
+            new Date().toISOString().slice(0, 10),
+          )
+        : null,
+    [stats, company],
+  );
   const price = day?.price ?? null;
   const yieldPct = dps !== null && price ? (dps / price) * 100 : null;
 
