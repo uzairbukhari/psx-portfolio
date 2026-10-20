@@ -226,7 +226,9 @@ export default function AccountOverview({
                       (returns.reason === 'too-short'
                         ? 'Shown after 90 days of history'
                         : 'Not enough history yet'))
-                    : 'Money-weighted, after dividends received'
+                    : returns.skippedCount > 0
+                      ? `Money-weighted, after dividends received. Leaves out ${returns.skippedCount} ${returns.skippedCount === 1 ? 'holding' : 'holdings'} with no known cost.`
+                      : 'Money-weighted, after dividends received'
                 }
               >
                 {returns.rate !== null ? pct(returns.rate * 100) : '—'}

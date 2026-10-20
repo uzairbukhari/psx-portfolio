@@ -238,6 +238,11 @@ export function GuidedSummary({
               <dd className="num">{moneyShort(overview.income.received)}</dd>
             </div>
           </dl>
+          {rate !== null && overview.returns.skippedCount > 0 && (
+            <p className="g-hint">
+              Gain per year leaves out {overview.returns.skippedCount} {overview.returns.skippedCount === 1 ? 'holding' : 'holdings'} with no known cost.
+            </p>
+          )}
           {rate === null && overview.returns.reason === 'too-short' && (
             <p className="g-hint">A yearly figure needs about 3 months of history.</p>
           )}
