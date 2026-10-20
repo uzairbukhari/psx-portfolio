@@ -15,8 +15,10 @@ export type Queues = { counts: { kind: string; status: string; n: number }[]; st
 export type AiSource = { id: 'research-desk' | 'ai-lab' | 'face-value'; label: string; usd: number; capUsd: number | null };
 /** The face-value finder's own numbers: what each lookup costs and what it found. */
 export type FaceValueSpend = { runs: number; lookups: number; found: number; usd: number; avgUsd: number | null; allTimeUsd: number };
+/** One AI workflow's cost: this month, all time, how many runs it made and when it last ran. */
+export type WorkflowCost = { id: string; label: string; monthUsd: number; allTimeUsd: number; runs: number; lastAt: string | null };
 export type AiSpend = {
-  month: string; sources: AiSource[]; totalUsd: number; faceValue: FaceValueSpend;
+  month: string; sources: AiSource[]; totalUsd: number; faceValue: FaceValueSpend; workflows: WorkflowCost[];
   months: { month: string; usd: number }[];
   recentRuns: { startedAt: string; status: string; models: string; costUsd: number; error: string | null }[];
 };
@@ -24,7 +26,7 @@ export type CronBeat = { lastBeatAt: string | null; status: PipelineStatus };
 export type PlatformPill = { status: PipelineStatus; headline: string };
 export type AdminHealth = DataHealth & { pipelines: PipelineRow[]; queues: Queues; aiSpend: AiSpend; cron: CronBeat; platform: PlatformPill };
 
-export type AdminHealthOptions = { now?: Date; aiLabCapUsd?: number | null; faceValueCapUsd?: number | null; platform?: PlatformOptions };
+export type AdminHealthOptions = { now?: Date; aiLabCapUsd?: number | null; platform?: PlatformOptions };
 
 const STUCK_MINUTES = 15;
 const cut = (text: string | null) => (text ? text.slice(0, 300) : null);
@@ -117,10 +119,20 @@ export async function aiSpend(db: D1Database, now: Date, opts: AdminHealthOption
   }
   const faceAll = (await first<{ s: number }>(db, "SELECT COALESCE(SUM(cost_usd),0) AS s FROM ai_research_runs WHERE models LIKE 'face-value:%'"))?.s ?? 0;
   const faceValue: FaceValueSpend = { runs: faceRuns.length, lookups, found, usd: face, avgUsd: lookups ? face / lookups : null, allTimeUsd: faceAll };
+  const deskRows = await rows<{ source: string; month: number; total: number; calls: number; last: string | null }>(
+    db, 'SELECT source, SUM(CASE WHEN created_at>=? THEN cost_usd ELSE 0 END) AS month, SUM(cost_usd) AS total, SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END) AS calls, MAX(created_at) AS last FROM ai_usage GROUP BY source', start, start);
+  const runRows = await rows<{ face: number; month: number; total: number; runs: number; last: string | null }>(
+    db, "SELECT models LIKE 'face-value:%' AS face, SUM(CASE WHEN started_at>=? THEN cost_usd ELSE 0 END) AS month, SUM(cost_usd) AS total, SUM(CASE WHEN started_at>=? THEN 1 ELSE 0 END) AS runs, MAX(started_at) AS last FROM ai_research_runs GROUP BY face", start, start);
+  const runRow = (face: boolean) => runRows.find((r) => !!r.face === face);
+  const workflows: WorkflowCost[] = [
+    ...deskRows.map((r) => ({ id: `research-desk:${r.source}`, label: `Research desk (${r.source})`, monthUsd: r.month, allTimeUsd: r.total, runs: r.calls, lastAt: r.last })),
+    { id: 'ai-lab', label: 'AI Lab research', monthUsd: runRow(false)?.month ?? 0, allTimeUsd: runRow(false)?.total ?? 0, runs: runRow(false)?.runs ?? 0, lastAt: runRow(false)?.last ?? null },
+    { id: 'face-value', label: 'Face-value finder', monthUsd: runRow(true)?.month ?? 0, allTimeUsd: runRow(true)?.total ?? 0, runs: runRow(true)?.runs ?? 0, lastAt: runRow(true)?.last ?? null },
+  ];
   const sources: AiSource[] = [
     { id: 'research-desk', label: 'Research desk', usd: desk, capUsd: null },
     { id: 'ai-lab', label: 'AI Lab research', usd: lab, capUsd: opts.aiLabCapUsd ?? null },
-    { id: 'face-value', label: 'Face-value finder', usd: face, capUsd: opts.faceValueCapUsd ?? null },
+    { id: 'face-value', label: 'Face-value finder', usd: face, capUsd: null },
   ];
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1)).toISOString();
   const byMonth = new Map<string, number>();
@@ -133,7 +145,7 @@ export async function aiSpend(db: D1Database, now: Date, opts: AdminHealthOption
   const recent = await rows<{ started_at: string; status: string; models: string; cost_usd: number; error: string | null }>(
     db, 'SELECT started_at,status,models,cost_usd,error FROM ai_research_runs ORDER BY started_at DESC LIMIT 10');
   return {
-    month, sources, totalUsd: desk + lab + face, faceValue, months,
+    month, sources, totalUsd: desk + lab + face, faceValue, workflows, months,
     recentRuns: recent.map((r) => ({ startedAt: r.started_at, status: r.status, models: r.models, costUsd: r.cost_usd, error: cut(r.error) })),
   };
 }
@@ -145,9 +157,8 @@ export async function adminHealth(db: D1Database, opts: AdminHealthOptions = {})
   return { ...base, pipelines, queues, aiSpend: spend, cron, platform: { status: plat.status, headline: plat.headline } };
 }
 
-/** Caps from Worker settings: AI Lab has none unless set; neither has one unless set. */
-export function spendCaps(env: { AI_RESEARCH_MONTHLY_CAP_USD?: string; FACE_VALUE_AI_MONTHLY_CAP_USD?: string }): AdminHealthOptions {
+/** Caps from Worker settings: only the AI Lab can have one (none unless set); the other AI workflows have none. */
+export function spendCaps(env: { AI_RESEARCH_MONTHLY_CAP_USD?: string }): AdminHealthOptions {
   const lab = Number(env.AI_RESEARCH_MONTHLY_CAP_USD);
-  const face = Number(env.FACE_VALUE_AI_MONTHLY_CAP_USD);
-  return { aiLabCapUsd: Number.isFinite(lab) && lab > 0 ? lab : null, faceValueCapUsd: Number.isFinite(face) && face > 0 ? face : null };
+  return { aiLabCapUsd: Number.isFinite(lab) && lab > 0 ? lab : null };
 }

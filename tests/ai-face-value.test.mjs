@@ -63,7 +63,7 @@ test('the AI run stores a confirmed value, spends within the cap, skips tickers 
   const seen = [];
   const report = await runAiFaceValues(
     { d1, provider: provider([cand()], seen), config, fetchText: async () => PAGE, now: () => NOW },
-    { tickers: ['AAAA'], capUsd: 1 },
+    { tickers: ['AAAA'] },
   );
   assert.equal(report.perTicker[0].stored, 1);
   assert.ok(report.costUsd > 0 && report.costUsd < 0.1);
@@ -85,9 +85,6 @@ test('an unsupported answer stores nothing, is not retried for 30 days, and the 
   assert.equal(raw.sqlite.prepare("SELECT COUNT(*) AS n FROM security_face_values").get().n, 0);
   const retry = await runAiFaceValues(io([cand()]), { tickers: ['AAAA'] });
   assert.equal(retry.perTicker[0].skipped, 'tried within 30 days');
-  const capped = await runAiFaceValues(io([cand()]), { tickers: ['BBBB'], capUsd: 0.0001 });
-  assert.equal(capped.capped, true);
-  assert.equal(capped.perTicker[0].stored, 0);
 });
 
 test('the AI lookup code never reads accounts, holdings or the vault', () => {

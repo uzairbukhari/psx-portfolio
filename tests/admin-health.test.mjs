@@ -31,7 +31,7 @@ test('admin health rates every pipeline from its own table and surfaces failures
   run("INSERT INTO refresh_requests (kind,ticker,status,requested_at,attempts) VALUES ('history','OGDC','queued','2026-10-14T06:00:00Z',1)");
   run("INSERT INTO ai_research_runs (id,started_at,status,provider,models,cost_usd) VALUES ('r1','2026-10-03T04:00:00Z','completed','openai','m',1.5)");
   run("INSERT INTO ai_research_runs (id,started_at,status,provider,models,cost_usd,stats) VALUES ('r2','2026-10-05T04:00:00Z','completed','openai','face-value:m',0.9,?)", JSON.stringify({ perTicker: [{ ticker: 'A', stored: 1, rejected: [] }, { ticker: 'B', stored: 0, rejected: [] }, { ticker: 'C', stored: 0, rejected: [], skipped: 'tried within 30 days' }] }));
-  const health = await adminHealth(db, { now, faceValueCapUsd: 1 });
+  const health = await adminHealth(db, { now, aiLabCapUsd: 1.6 });
   const by = Object.fromEntries(health.pipelines.map((p) => [p.id, p]));
   assert.equal(by.quotes.status, 'ok');
   assert.equal(by.facts.status, 'failing'); // five weekdays old
@@ -47,7 +47,7 @@ test('admin health rates every pipeline from its own table and surfaces failures
   const attention = buildAttention(health, await overviewMetrics(db, false, now, []));
   assert.equal(attention[0].level, 'failing');
   assert.ok(attention.some((a) => /Company facts/.test(a.text)));
-  assert.ok(attention.some((a) => /Face-value finder is at 90%/.test(a.text)));
+  assert.ok(attention.some((a) => /AI Lab research is at 94%/.test(a.text)));
   assert.ok(attention.some((a) => /queued over 15 minutes/.test(a.text)));
 });
 
@@ -70,6 +70,6 @@ test('overview metrics compare today with a week ago and leave internal accounts
 test('delta and spending caps', () => {
   assert.deepEqual(delta(5, 3), { sign: 'up', amount: 2 });
   assert.deepEqual(delta(2, 2), { sign: 'flat', amount: 0 });
-  assert.deepEqual(spendCaps({}), { aiLabCapUsd: null, faceValueCapUsd: null });
-  assert.deepEqual(spendCaps({ AI_RESEARCH_MONTHLY_CAP_USD: '5', FACE_VALUE_AI_MONTHLY_CAP_USD: '2' }), { aiLabCapUsd: 5, faceValueCapUsd: 2 });
+  assert.deepEqual(spendCaps({}), { aiLabCapUsd: null });
+  assert.deepEqual(spendCaps({ AI_RESEARCH_MONTHLY_CAP_USD: '5', }), { aiLabCapUsd: 5 });
 });

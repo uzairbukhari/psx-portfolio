@@ -5,7 +5,7 @@
 //   - the quoted sentence is on the page and names the value next to "face value" / "par value" / "Rs X each"
 //     (stored `ai`, always labelled "found by AI").
 // Only the ticker and the public company name go to the model: no account, holding or amount (tests/privacy-boundary).
-import { Ledger, CapReachedError } from './ai-research/ledger.ts';
+import { Ledger } from './ai-research/ledger.ts';
 import { costOf, estimateTokens, outputCeiling, worstCaseCost, type AiConfig } from './ai-research/models.ts';
 import type { AiProvider, AiRequest } from './ai-research/provider.ts';
 import { SOURCE_ALLOWLIST } from './ai-research/prompts.ts';
@@ -89,7 +89,7 @@ export type AiFaceIo = {
   log?: (message: string) => void;
   now?: () => string;
 };
-export type AiFaceOptions = { tickers: string[]; dryRun?: boolean; capUsd?: number | null };
+export type AiFaceOptions = { tickers: string[]; dryRun?: boolean;  };
 export type AiFaceReport = {
   costUsd: number;
   capped: boolean;
@@ -109,9 +109,7 @@ export async function runAiFaceValues(io: AiFaceIo, options: AiFaceOptions): Pro
   const now = io.now ?? (() => new Date().toISOString());
   const log = io.log ?? (() => {});
   const monthStart = now().slice(0, 7) + '-01T00:00:00.000Z';
-  const cap = options.capUsd ?? null;
-  const ledger = new Ledger(cap, await faceValueSpent(io.d1, monthStart));
-  const globalCap = io.config.monthlyCapUsd;
+  const ledger = new Ledger(null, await faceValueSpent(io.d1, monthStart));
   const report: AiFaceReport = { costUsd: 0, capped: false, perTicker: [] };
   const model = io.config.models.read;
 
@@ -139,12 +137,7 @@ export async function runAiFaceValues(io: AiFaceIo, options: AiFaceOptions): Pro
         maxOutputTokens: 1200, webSearch: { maxUses: 3, domains: FACE_VALUE_DOMAINS },
       };
       const worst = worstCaseCost(model, estimateTokens(SYSTEM + input), outputCeiling(io.config, 'read', request.maxOutputTokens), 3);
-      if (globalCap !== null && globalCap !== undefined && ledger.spentUsd + worst > globalCap) { report.capped = true; log('AI Lab cap reached: face-value lookups stop.'); break; }
-      let settle: (usd: number | null) => void;
-      try { settle = ledger.reserve(worst); } catch (error) {
-        if (error instanceof CapReachedError) { report.capped = true; log(`Face-value AI cap $${cap?.toFixed(2)} reached: remaining companies are left for the user.`); break; }
-        throw error;
-      }
+      const settle = ledger.reserve(worst);
       let response;
       try { response = await io.provider.call(request); settle(costOf(response.model, response.usage)); } catch (error) { settle(null); throw error; }
       const raw = (response.json as { values?: unknown }).values;

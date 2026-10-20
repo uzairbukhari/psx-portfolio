@@ -48,7 +48,6 @@ jobs:
           AI_LAB_ENABLED: ${{ vars.AI_LAB_ENABLED }}
           AI_RESEARCH_MODEL_READ: ${{ vars.AI_RESEARCH_MODEL_READ }}
           AI_RESEARCH_MONTHLY_CAP_USD: ${{ vars.AI_RESEARCH_MONTHLY_CAP_USD }}
-          FACE_VALUE_AI_MONTHLY_CAP_USD: ${{ vars.FACE_VALUE_AI_MONTHLY_CAP_USD }}
       - name: Open or update a failure issue
         if: failure()
         env:

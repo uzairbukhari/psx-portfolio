@@ -149,9 +149,21 @@ export default function SystemHealth() {
         {health.aiSpend.sources.map((s) => (
           <div key={s.id} className="admin-kpi">
             <small>{s.label}</small><strong>{usd(s.usd)}</strong>
-            {s.capUsd ? (<><span className="muted">of {usd(s.capUsd)} monthly cap</span><div className="admin-meter" data-level={s.usd >= s.capUsd * 0.9 ? 'high' : s.usd >= s.capUsd * 0.7 ? 'mid' : 'low'}><span style={{ width: `${Math.min(100, (s.usd / s.capUsd) * 100)}%` }} /></div></>) : <span className="muted">No cap set</span>}
+            {s.capUsd ? (<><span className="muted">of {usd(s.capUsd)} monthly cap</span><div className="admin-meter" data-level={s.usd >= s.capUsd * 0.9 ? 'high' : s.usd >= s.capUsd * 0.7 ? 'mid' : 'low'}><span style={{ width: `${Math.min(100, (s.usd / s.capUsd) * 100)}%` }} /></div></>) : <span className="muted">No cap</span>}
           </div>
         ))}
+      </div>
+      <h3>Cost by workflow</h3>
+      <div className="table-wrap">
+        <table className="admin-table">
+          <thead><tr><th>Workflow</th><th>This month</th><th>All time</th><th>Runs this month</th><th>Per run</th><th>Last run</th></tr></thead>
+          <tbody>
+            {health.aiSpend.workflows.map((w) => (
+              <tr key={w.id}><td>{w.label}</td><td>{usd(w.monthUsd)}</td><td>{usd(w.allTimeUsd)}</td><td>{w.runs}</td><td>{w.runs ? usd(w.monthUsd / w.runs) : '–'}</td><td>{w.lastAt ? ago(w.lastAt, nowMs) : 'never'}</td></tr>
+            ))}
+            <tr><td><strong>Total</strong></td><td><strong>{usd(health.aiSpend.workflows.reduce((a, w) => a + w.monthUsd, 0))}</strong></td><td><strong>{usd(health.aiSpend.workflows.reduce((a, w) => a + w.allTimeUsd, 0))}</strong></td><td colSpan={3} /></tr>
+          </tbody>
+        </table>
       </div>
       <h3>Face-value finder</h3>
       <div className="admin-spend">

@@ -77,11 +77,9 @@ export default {
           const sync = await syncPlatformMetrics(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, ['psx-portfolio-sip', 'psx-portfolio-sip-quote-refresh'], new Date(controller.scheduledTime)).catch((e: unknown) => ({ stored: 0, error: e instanceof Error ? e.message : 'sync failed' }));
           await recordJobRun(env.DB, { job: 'platform', source: 'cron', startedAt, ok: !sync.error, detail: sync.error ?? `${sync.stored} Workers` }).catch(() => {});
           const lab = Number(env.AI_RESEARCH_MONTHLY_CAP_USD);
-          const face = Number(env.FACE_VALUE_AI_MONTHLY_CAP_USD);
           const result = await sendAdminAlerts(env.DB, {
             now: new Date(controller.scheduledTime),
             aiLabCapUsd: Number.isFinite(lab) && lab > 0 ? lab : null,
-            faceValueCapUsd: Number.isFinite(face) && face > 0 ? face : 1,
             fcmServiceAccount: env.FCM_SERVICE_ACCOUNT_JSON,
           });
           if (result.sent) console.log('Admin alert sent', result);
