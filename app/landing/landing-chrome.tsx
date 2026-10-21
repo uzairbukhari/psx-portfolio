@@ -2,7 +2,6 @@
 import { LogoMark, Wordmark } from '@/components/logo';
 import { UsageBeacon } from '../usage-beacon';
 import '../landing.css';
-import '../always-dark.css';
 
 // Plain anchors on purpose: the landing page is mounted inside the app shell,
 // so a full page load is the reliable way to reach /privacy and /terms.

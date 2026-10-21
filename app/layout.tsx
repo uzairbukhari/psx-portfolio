@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { env } from 'cloudflare:workers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+// Imported once, here: the landing, error and dashboard pages all use it, and importing it from several modules made the
+// bundler emit an empty shared script that the page preloaded (a 404 on every load).
+import './always-dark.css';
 import { StaleBuildReload } from './stale-build-reload';
 import { DEFAULT_THEME, THEME_META, themeInitScript } from '@/lib/theme';
 
