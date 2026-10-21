@@ -92,3 +92,9 @@ fun monthTitle(
     val name = parsed.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
     return if (withYear) "$name ${parsed.year}" else name
 }
+
+/** "Oct" for a `YYYY-MM` month key: the axis label of a by-month chart. */
+fun monthShort(month: String): String {
+    val parsed = runCatching { YearMonth.parse(month) }.getOrNull() ?: return month
+    return parsed.month.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+}

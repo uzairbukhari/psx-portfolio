@@ -35,7 +35,8 @@ class MainActivity : FragmentActivity() {
                     Appearance.LIGHT -> false
                     Appearance.DARK -> true
                 }
-            SipwiseTheme(darkTheme = dark) {
+            val chartPalette by preferences.chartPalette.collectAsStateWithLifecycle()
+            SipwiseTheme(darkTheme = dark, chartPalette = chartPalette) {
                 // One themed surface under every screen, so text outside a Scaffold still follows light and dark.
                 Surface(Modifier.fillMaxSize()) { SipwiseRoot() }
             }

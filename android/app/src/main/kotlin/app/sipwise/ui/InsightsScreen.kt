@@ -216,6 +216,7 @@ private val TRACK_HEIGHT = 180.dp
 private fun rangeLabel(range: TrackRange) =
     when (range) {
         TrackRange.MONTH -> R.string.insights_range_1m
+        TrackRange.QUARTER -> R.string.range_3m
         TrackRange.HALF -> R.string.insights_range_6m
         TrackRange.YEAR -> R.string.insights_range_1y
         TrackRange.ALL -> R.string.insights_range_all

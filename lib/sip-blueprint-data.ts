@@ -5,18 +5,24 @@ import { accountOverview } from './account-overview.ts';
 import { newAssetId, valueAsset, type Asset, type MetalAsset, type MetalEntry } from './assets.ts';
 import type { CurrencyAsset, CurrencyEntry } from './currency.ts';
 import type { CurrencyCode, FxRateRow } from './fx-rates.ts';
-import type { MetalRateRow } from './metal-rates.ts';
+import { TOLA_GRAMS, chooseRate, type MetalRateRow } from './metal-rates.ts';
 import type { FundNavRow } from './mufap.ts';
 import { moneyInFlows } from './performance.ts';
 import type { PlanNavRow } from './plans.ts';
-import { CURRENCY_NAMES } from './fx-rates.ts';
+import { CURRENCY_NAMES, chooseFxRate } from './fx-rates.ts';
 import type { DisplayPart, Portfolio } from './portfolio.ts';
 import { CPI_YOY_BY_YEAR } from './pk-benchmarks.ts';
 import {
   SIP_CLASSES,
+  SIP_CLASS_LABELS,
+  STREAK_THRESHOLD,
+  encouragement,
+  gramsFor,
   habitStrip,
+  lakh,
   mixAfter,
   monthProgress,
+  nextSipDay,
   planMonth,
   sipHistory,
   type MonthProgress,
@@ -228,5 +234,153 @@ export function sipMonthState(
         .reduce((n, [, v]) => n + v, 0),
       monthsMet: history.rows.filter((r) => r.met && r.month.startsWith(yearPrefix)).length,
     },
+  };
+}
+
+// ───────────────────────── the whole screen, in words ─────────────────────────
+// Everything the SIP Blueprint shows, worked out once: the month, each class row with what to do next, the habit and
+// the hero wording. Shared by the web page and the phone so both say the same thing. Pure: `asOf` comes from the caller.
+
+/** What a class row offers: pick stocks, add to a fund, log a purchase here, or only tick it off. */
+export type SipRowAction = 'picks' | 'holdings' | 'log' | 'mark';
+
+export type SipRow = {
+  key: SipClass;
+  label: string;
+  /** What to buy, in plain words ("≈ 0.25 g of 24K at Rs 3.45 lakh/tola"). */
+  hint: string;
+  amount: number;
+  /** The static split for this class this month, for the "above / below target" tag. */
+  target: number;
+  /** amount − target, rounded to Rs 100; shown when at least Rs 100. */
+  diff: number;
+  actual: number;
+  done: boolean;
+  /** The tick came from the person, so it can be undone (a logged purchase is read from the ledger instead). */
+  manual: boolean;
+  action: SipRowAction;
+  /** The public rate used by "Log it" (rupees per gram of 24K, or per unit of currency); null without one. */
+  rate: number | null;
+};
+
+export type SipHero = {
+  month: string;
+  /** "Done for October", "Today is your SIP day", "SIP day in 3 days", "SIP day was the 1st". */
+  status: string;
+  complete: boolean;
+  left: number;
+  /** The next SIP day and how far away it is. */
+  next: { date: string; days: number };
+  streak: number;
+  encouragement: string;
+  /** Set when the month is behind and the person asked to be reminded. */
+  nudge: string | null;
+};
+
+export type SipView = {
+  hero: SipHero;
+  rows: SipRow[];
+  state: SipMonthState;
+  /** The person hand-edited this month's plan. */
+  edited: boolean;
+  strict: boolean;
+  day: number;
+};
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export const monthLong = (month: string) => MONTH_NAMES[Number(month.slice(5, 7)) - 1] ?? month;
+export const ordinal = (n: number) =>
+  `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
+
+/** The first day of next month, so a finished month points at the next SIP day. */
+function nextMonthStart(asOf: string): string {
+  const [y, m] = asOf.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+}
+
+/** What to buy, in plain words. Grams and dollars use the public rate the app already has. */
+export function rowHint(k: SipClass, amount: number, rates: SipRates, asOf: string): string {
+  if (k === 'stocks') return 'From your shortlist or Monthly Picks';
+  if (k === 'funds') return 'Money market or income fund, or a savings plan';
+  if (k === 'gold') {
+    const rate = chooseRate(rates.metalRates ?? [], 'gold', asOf);
+    const g = gramsFor(amount, rate?.pkrPerGram);
+    return rate && g !== null && amount > 0 ? `≈ ${g.toFixed(g < 1 ? 2 : 1)} g of 24K at ${lakh(rate.pkrPerGram * TOLA_GRAMS)}/tola` : '24K coins or bars';
+  }
+  const usd = chooseFxRate(rates.fxRates ?? [], 'USD', asOf);
+  return usd && amount > 0 ? `≈ $${Math.round(amount / usd.pkrPerUnit).toLocaleString('en-US')} as a cash reserve` : 'Dollars, dirhams or riyals as a reserve';
+}
+
+/** The public rate "Log it" fills the form from: rupees per gram of 24K gold, or per unit of a currency. */
+export function logRate(k: SipClass, rates: SipRates, asOf: string, currency: CurrencyCode = 'USD'): number | null {
+  if (k === 'gold') return chooseRate(rates.metalRates ?? [], 'gold', asOf)?.pkrPerGram ?? null;
+  if (k === 'currency') return chooseFxRate(rates.fxRates ?? [], currency, asOf)?.pkrPerUnit ?? null;
+  return null;
+}
+
+/**
+ * The whole SIP Blueprint screen for the running month. `canLog` is false when every portfolio is locked (nothing can
+ * be written), `hasStocks` false when no company is held yet, so the stocks row offers Holdings instead of Picks.
+ */
+export function sipView(
+  b: SipBlueprint,
+  parts: (DisplayPart & { locked?: boolean })[],
+  asOf: string,
+  rates: SipRates = {},
+  options: { canLog?: boolean; hasStocks?: boolean } = {},
+): SipView {
+  const st = sipMonthState(b, parts, asOf, rates);
+  const snapshot = b.months[st.month];
+  const canLog = options.canLog ?? parts.some((p) => !p.locked);
+  const hasStocks = options.hasStocks ?? parts.some((p) => p.portfolio.companies.length > 0);
+  const day = b.day ?? 1;
+  const dayOfMonth = Number(asOf.slice(8));
+  const left = Math.max(0, st.progress.planned - st.progress.done);
+  const complete = st.progress.planned > 0 && left === 0;
+  const status = complete
+    ? `Done for ${monthLong(st.month)}`
+    : dayOfMonth === day
+      ? 'Today is your SIP day'
+      : dayOfMonth < day
+        ? `SIP day in ${day - dayOfMonth} day${day - dayOfMonth === 1 ? '' : 's'}`
+        : `SIP day was the ${ordinal(day)}`;
+  const behind = b.notify && dayOfMonth >= day + 3 && st.progress.percent < STREAK_THRESHOLD * 100;
+  const rows: SipRow[] = SIP_CLASSES.filter((k) => st.plan[k] > 0 || b.targets[k] > 0).map((k) => {
+    const amount = st.plan[k];
+    const target = Math.round((st.budget * b.targets[k]) / 100 / 100) * 100;
+    const done = st.done[k];
+    const loggable = canLog && (k === 'gold' || k === 'currency');
+    return {
+      key: k,
+      label: SIP_CLASS_LABELS[k],
+      hint: rowHint(k, amount, rates, asOf),
+      amount,
+      target,
+      diff: amount - target,
+      actual: st.actual[k] ?? 0,
+      done,
+      manual: !!snapshot?.done[k],
+      action: done ? 'mark' : k === 'stocks' ? (hasStocks ? 'picks' : 'holdings') : k === 'funds' ? 'holdings' : loggable ? 'log' : 'mark',
+      rate: logRate(k, rates, asOf),
+    };
+  });
+  return {
+    hero: {
+      month: st.month,
+      status,
+      complete,
+      left,
+      next: nextSipDay(complete ? nextMonthStart(asOf) : asOf, day),
+      streak: st.history.streak,
+      encouragement: encouragement(st.history.streak, st.history.thisMonthMet, st.progress.percent),
+      nudge: behind
+        ? `Your SIP day was the ${ordinal(day)}. Invest ${lakh(Math.max(0, Math.round(st.budget * STREAK_THRESHOLD) - st.progress.done))} more this month to keep your streak.`
+        : null,
+    },
+    rows,
+    state: st,
+    edited: !!snapshot?.edited,
+    strict: b.strict,
+    day,
   };
 }

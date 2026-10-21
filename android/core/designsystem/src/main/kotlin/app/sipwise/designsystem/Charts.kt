@@ -47,6 +47,12 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.sipwise.model.compactAxis
+import app.sipwise.model.nearestIndex
+import app.sipwise.model.niceTicks
+import app.sipwise.model.paddedRange
+import app.sipwise.model.treemap
+import app.sipwise.model.valueAt
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -76,15 +82,15 @@ data class ChartMarker(
     val color: Color,
 )
 
-private const val ANIMATION_MS = 450
-private const val LABEL_SP = 10
-private const val GRID_TICKS = 3
-private const val X_LABELS = 5
-private const val FILL_TOP_ALPHA = 0.30f
-private const val DOT_HALO_ALPHA = 0.22f
-private const val GRID_DASH = 4f
+internal const val ANIMATION_MS = 450
+internal const val LABEL_SP = 10
+internal const val GRID_TICKS = 3
+internal const val X_LABELS = 5
+internal const val FILL_TOP_ALPHA = 0.30f
+internal const val DOT_HALO_ALPHA = 0.22f
+internal const val GRID_DASH = 4f
 
-private fun smooth(points: List<Offset>): Path =
+internal fun smooth(points: List<Offset>): Path =
     Path().apply {
         if (points.isEmpty()) return@apply
         moveTo(points[0].x, points[0].y)
@@ -104,7 +110,7 @@ private fun smooth(points: List<Offset>): Path =
         }
     }
 
-private fun stepped(points: List<Offset>): Path =
+internal fun stepped(points: List<Offset>): Path =
     Path().apply {
         if (points.isEmpty()) return@apply
         moveTo(points[0].x, points[0].y)
@@ -115,7 +121,7 @@ private fun stepped(points: List<Offset>): Path =
     }
 
 /** A tag pill with centred text, drawn at [topLeft]; the text is dark or light depending on [fill]. */
-private fun DrawScope.tag(
+internal fun DrawScope.tag(
     measurer: TextMeasurer,
     text: String,
     topLeft: Offset,
@@ -134,10 +140,10 @@ private fun DrawScope.tag(
     drawText(measurer, text, Offset(topLeft.x + padding, topLeft.y + padding / 2), style.copy(color = ink))
 }
 
-private const val INK_THRESHOLD = 0.4f
+internal const val INK_THRESHOLD = 0.4f
 
 /** The chart's frame: where the plot sits on the canvas and how data maps onto it. */
-private class Plot(
+internal class Plot(
     val left: Float,
     val right: Float,
     val top: Float,
@@ -153,7 +159,7 @@ private class Plot(
 }
 
 /** Colours and text styles of one chart, resolved once from the theme. */
-private class ChartInk(
+internal class ChartInk(
     val grid: Color,
     val label: Color,
     val bubble: Color,
@@ -162,7 +168,7 @@ private class ChartInk(
     val bubbleStyle: TextStyle,
 )
 
-private fun DrawScope.drawAxes(
+internal fun DrawScope.drawAxes(
     plot: Plot,
     ink: ChartInk,
     measurer: TextMeasurer,
@@ -187,7 +193,7 @@ private fun DrawScope.drawAxes(
     }
 }
 
-private fun DrawScope.drawSeries(
+internal fun DrawScope.drawSeries(
     plot: Plot,
     series: List<ChartSeries>,
     progress: Float,
@@ -215,7 +221,7 @@ private fun DrawScope.drawSeries(
     }
 }
 
-private fun DrawScope.drawScrub(
+internal fun DrawScope.drawScrub(
     plot: Plot,
     ink: ChartInk,
     measurer: TextMeasurer,
@@ -261,17 +267,7 @@ fun AreaChart(
 ) {
     val all = series.flatMap { it.points }
     if (all.size < 2) return
-    val scheme = MaterialTheme.colorScheme
-    val labelColor = if (onSlab) SlabColors.muted else scheme.onSurfaceVariant
-    val ink =
-        ChartInk(
-            grid = if (onSlab) Color.White.copy(alpha = GRID_SLAB_ALPHA) else scheme.outlineVariant,
-            label = labelColor,
-            bubble = if (onSlab) Color(0xFFF4F7FF) else scheme.onSurface,
-            surface = if (onSlab) SlabColors.bottom else scheme.surface,
-            labelStyle = TextStyle(fontFamily = GeistMonoFamily, fontSize = LABEL_SP.sp, color = labelColor),
-            bubbleStyle = TextStyle(fontFamily = GeistMonoFamily, fontSize = 11.sp, color = scheme.surface),
-        )
+    val ink = chartInk(onSlab)
     val measurer = rememberTextMeasurer()
     val haptic = LocalHapticFeedback.current
     val motion = rememberMotionEnabled()
@@ -368,9 +364,9 @@ fun AreaChart(
     }
 }
 
-private const val GRID_SLAB_ALPHA = 0.08f
-private const val BUBBLE_ROOM = 24
-private const val X_AXIS_ROOM = 16
+internal const val GRID_SLAB_ALPHA = 0.08f
+internal const val BUBBLE_ROOM = 24
+internal const val X_AXIS_ROOM = 16
 
 /** One slice of a [DonutChart]; [fraction] is 0 to 1. */
 data class DonutSlice(

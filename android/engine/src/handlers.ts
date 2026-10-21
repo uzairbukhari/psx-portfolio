@@ -20,12 +20,12 @@ import {
 } from '../../../lib/portfolio-account.ts';
 import { openPositions, priceTickers, safeHoldings, soldOutPositions, totals, type Holding } from '../../../mobile/src/data/derive.ts';
 import { filterBySector, holdingFlags, sectorsOf, sortHoldings, weightOf, type HoldingSort } from '../../../mobile/src/data/holdings-view.ts';
-import { SECTORS, blankPortfolio, today } from '../../../lib/portfolio.ts';
+import { SECTORS, blankPortfolio, money, today } from '../../../lib/portfolio.ts';
 import { contentsLabel, portfolioContents } from '../../../mobile/src/data/scope.ts';
 import { activityEntries, companyDividends, readOnlyReason } from '../../../mobile/src/data/derive.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
-import { mutateAccount } from './mutate.ts';
+import { mutateAccount, mutateBlueprint } from './mutate.ts';
 import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-form.ts';
 import { buildPlan, currentMonth, monthBuys, unifiedPlanSource } from '../../../mobile/src/data/sip.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
@@ -62,6 +62,32 @@ import { parsePublicAnalysis, pollIntervalMs } from '../../../lib/api-validate.t
 import { WEIGHT_CAP } from '../../../lib/portfolio.ts';
 import { monthProgress, nextActions, returnBreakdown } from '../../../mobile/src/data/today.ts';
 import { accountOverview } from '../../../lib/account-overview.ts';
+import { dividendPayments, realisedProfit, tradeMarkers, weightInStocks } from '../../../lib/company-view.ts';
+import { formatStat, keyStats, type CompanyStats } from '../../../lib/company-stats.ts';
+import { faceValueFor } from '../../../lib/face-values.ts';
+import { accountSipBlueprint } from '../../../lib/portfolio-account.ts';
+import {
+  DEFAULT_RETURNS,
+  SIP_CLASSES,
+  SIP_CLASS_LABELS,
+  SIP_BUDGET_PILLS,
+  SIP_PRESETS,
+  SIP_PRESET_ORDER,
+  STREAK_THRESHOLD,
+  blankBlueprint,
+  blendedReturn,
+  lakh,
+  milestones,
+  mixAfter,
+  planMonth,
+  presetTargets,
+  projectSip,
+  rebalanceEdit,
+  skipCost,
+  targetsTotal,
+  type SipClass,
+} from '../../../lib/sip-blueprint.ts';
+import { LONG_RUN_INFLATION, classWeights, rowHint, sipView } from '../../../lib/sip-blueprint-data.ts';
 import { describePieces, valueMetal, type MetalAsset } from '../../../lib/assets.ts';
 import { valueCurrency, type CurrencyAsset } from '../../../lib/currency.ts';
 import type { FxRateRow } from '../../../lib/fx-rates.ts';
@@ -70,7 +96,7 @@ import { dueEntries, planValue, type PlanAsset } from '../../../lib/plans.ts';
 import { tolaFromGrams, type MetalRateRow } from '../../../lib/metal-rates.ts';
 import type { FundNavRow } from '../../../lib/mufap.ts';
 
-export const ENGINE_API_VERSION = 1;
+export const ENGINE_API_VERSION = 2;
 
 type Args = Record<string, unknown>;
 type Handler = (args: Args) => unknown;
@@ -121,6 +147,16 @@ function scopeParts(args: Args) {
   const account = viewAccount();
   return scope === ALL_PORTFOLIOS ? account.portfolios : account.portfolios.filter((x) => x.id === scope);
 }
+
+/** Projection milestones with the level already in words, so the phone needs no rupee formatter of its own. */
+const marked = (points: { year: number; value: number }[], levels: number[]) =>
+  milestones(points, levels).map((m) => ({ ...m, label: lakh(m.level) }));
+
+/** The public gold, fund, plan and currency rates the SIP Blueprint values the ledger with. */
+const sipRates = () => ({ metalRates, fundNavs, fxRates });
+
+/** An `asOf` the caller passed, or today when it was left out or is not a date. */
+const isoOr = (value: unknown, fallback: string): string => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback);
 
 const text = (args: Args, key: string): string => {
   const value = args[key];
@@ -493,7 +529,38 @@ const handlers: Record<string, Handler> = {
         .map((x) => ({ id: x.id, name: x.name, locked: Boolean(x.locked) })),
       dividends: companyDividends(portfolio, ticker),
       entries: activityEntries(portfolio, ticker),
+      held: h.shares > 0,
+      weight: weightInStocks(portfolio, h.value),
+      realisedProfit: realisedProfit(portfolio, ticker),
+      payments: dividendPayments(portfolio, ticker),
+      markers: tradeMarkers(portfolio.trades, ticker, 0, Number.MAX_SAFE_INTEGER, money),
     };
+  },
+
+  /**
+   * The key-statistics card from public data only: the `/api/company-stats` answer, the day quote the market summary
+   * gave, and the price history already loaded. Values come back formatted, so the phone prints what the web prints.
+   */
+  'company.stats': (args) => {
+    const stats = args.stats ? (JSON.parse(text(args, 'stats')) as { stats?: CompanyStats }).stats ?? null : null;
+    const day = args.day ? (JSON.parse(text(args, 'day')) as Parameters<typeof keyStats>[0]['day']) : undefined;
+    const history = args.history ? (JSON.parse(text(args, 'history')) as { eod?: number[][]; intraday?: number[][] }) : {};
+    const ticker = text(args, 'ticker').toUpperCase();
+    // An "assume Rs 10" face value is the account's own guess, so it never feeds a published-looking yield.
+    const company = viewAccount()
+      .portfolios.flatMap((x) => x.portfolio.companies)
+      .find((c) => c.ticker === ticker && !c.faceValueAssumed);
+    const { left, right } = keyStats({
+      stats,
+      day,
+      eod: parseEod(history.eod ?? []) as unknown as [number, number][],
+      intraday: parseIntraday(history.intraday ?? []) as unknown as [number, number][],
+      company,
+      faceValueAt: faceValueFor,
+      todayIso: today(),
+    });
+    const rows = (list: typeof left) => list.map((row) => ({ label: row.label, value: formatStat(row) }));
+    return { left: rows(left), right: rows(right) };
   },
 
   // A price-history response cut to one chart range, with its change over the range.
@@ -534,6 +601,164 @@ const handlers: Record<string, Handler> = {
       plan: result,
       buys,
       bought: monthBuys(portfolio, month),
+    };
+  },
+
+  // ───────────────────────── SIP Blueprint (the new Plan tab) ─────────────────────────
+
+  /**
+   * The whole SIP Blueprint screen for the running month: hero wording, one row per class with what to do next, the
+   * habit strip and the month's figures — exactly what the web page shows. `setup: true` while no plan exists yet,
+   * with what the wizard needs to open.
+   */
+  'sip.view': (args) => {
+    const account = viewAccount();
+    const parts = account.portfolios;
+    const asOf = isoOr(args.asOf, today());
+    const b = accountSipBlueprint(account);
+    const canLog = parts.some((p) => !p.locked);
+    if (!b) {
+      return {
+        setup: true,
+        asOf,
+        month: asOf.slice(0, 7),
+        canLog,
+        classes: SIP_CLASSES,
+        labels: SIP_CLASS_LABELS,
+        budgetPills: SIP_BUDGET_PILLS,
+        presets: SIP_PRESET_ORDER.map((key) => {
+          const preset = key === 'custom' ? null : SIP_PRESETS[key];
+          const targets = presetTargets(key, SIP_PRESETS.balanced.targets);
+          return {
+            key,
+            label: preset?.label ?? 'Custom',
+            blurb: preset?.blurb ?? 'Set your own split.',
+            targets,
+            annual: blendedReturn(targets),
+          };
+        }),
+        blank: blankBlueprint(asOf.slice(0, 7)),
+      };
+    }
+    const view = sipView(b, parts, asOf, sipRates(), { canLog });
+    return {
+      setup: false,
+      asOf,
+      canLog,
+      classes: SIP_CLASSES,
+      labels: SIP_CLASS_LABELS,
+      budgetPills: SIP_BUDGET_PILLS,
+      streakThreshold: STREAK_THRESHOLD,
+      blueprint: b,
+      annual: blendedReturn(b.targets, { ...DEFAULT_RETURNS, ...b.returns }),
+      hero: view.hero,
+      rows: view.rows,
+      state: view.state,
+      edited: view.edited,
+      strict: view.strict,
+      day: view.day,
+    };
+  },
+
+  /**
+   * The live answer under the setup wizard and the edit sheet for a draft that is not saved yet: this month's split,
+   * the mix it would leave, the blended return and where ten years of it lands.
+   */
+  'sip.preview': (args) => {
+    const asOf = isoOr(args.asOf, today());
+    const draft = JSON.parse(text(args, 'draft')) as { budget: number; targets: Record<SipClass, number>; strict?: boolean };
+    const targets = {} as Record<SipClass, number>;
+    for (const k of SIP_CLASSES) targets[k] = Number(draft.targets?.[k] ?? 0);
+    const budget = Number(draft.budget) || 0;
+    const held = classWeights(viewAccount().portfolios, asOf, sipRates());
+    const plan = planMonth(budget, targets, held.weights, draft.strict === true);
+    const total = targetsTotal(targets);
+    const annual = blendedReturn(targets);
+    const decade = projectSip({ monthly: budget, years: 10, annualPct: annual, stepUpPct: 10 });
+    const in10 = decade[decade.length - 1] ?? null;
+    return {
+      plan,
+      total,
+      valid: budget > 0 && total === 100,
+      annual,
+      mix: mixAfter(held.values, plan),
+      held: { values: held.values, weights: held.weights, total: held.total },
+      in10: in10 ? { invested: in10.invested, value: in10.value, label: lakh(in10.value) } : null,
+      hints: Object.fromEntries(SIP_CLASSES.map((k) => [k, rowHint(k, plan[k], sipRates(), asOf)])),
+    };
+  },
+
+  /**
+   * "Future you": where this plan lands, in money of the day and in today's money, with the milestones it passes and
+   * what skipping one month a year costs.
+   */
+  'sip.project': (args) => {
+    const account = viewAccount();
+    const b = accountSipBlueprint(account);
+    const nOr = (key: string, fallback: number) => {
+      const v = args[key];
+      const n = typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : NaN;
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const monthly = nOr('monthly', b?.budget ?? SIP_BUDGET_PILLS[1]);
+    const years = Math.max(1, Math.round(nOr('years', 15)));
+    const stepUp = nOr('stepUp', b?.stepUp ?? 10);
+    const returns = { ...DEFAULT_RETURNS, ...b?.returns } as Record<SipClass, number>;
+    if (args.returns) {
+      const typed = JSON.parse(text(args, 'returns')) as Record<string, number>;
+      for (const k of SIP_CLASSES) if (Number.isFinite(typed[k])) returns[k] = typed[k];
+    }
+    const targets = b?.targets ?? blankBlueprint(today().slice(0, 7)).targets;
+    const annual = blendedReturn(targets, returns);
+    const points = projectSip({ monthly, years, annualPct: annual, stepUpPct: stepUp, inflationPct: LONG_RUN_INFLATION });
+    const last = points[points.length - 1];
+    const levels = [1e6, 5e6, 1e7, 2.5e7, 5e7, 1e8];
+    return {
+      monthly,
+      years,
+      stepUp,
+      returns,
+      annual,
+      inflation: LONG_RUN_INFLATION,
+      defaults: DEFAULT_RETURNS,
+      points,
+      last,
+      marks: {
+        nominal: marked(points.map((p) => ({ year: p.year, value: p.value })), levels),
+        real: marked(points.map((p) => ({ year: p.year, value: p.realValue })), levels),
+      },
+      skip: {
+        nominal: skipCost(monthly, years, annual),
+        real: skipCost(monthly, years, annual) / Math.pow(1 + LONG_RUN_INFLATION / 100, years),
+      },
+    };
+  },
+
+  /**
+   * One stepper move on this month's plan: the amount the person set for a class, with the difference spread over the
+   * rows that are not ticked off yet. Returns the next plan and the mix it leaves, for the sheet to show before saving.
+   */
+  'sip.rebalance': (args) => {
+    const account = viewAccount();
+    const b = accountSipBlueprint(account);
+    if (!b) throw new Error('Set up your SIP first.');
+    const asOf = isoOr(args.asOf, today());
+    const key = text(args, 'class') as SipClass;
+    if (!SIP_CLASSES.includes(key)) throw new Error('Which class?');
+    const amount = Number(text(args, 'amount'));
+    if (!Number.isFinite(amount) || amount < 0) throw new Error('Enter an amount.');
+    const st = sipView(b, account.portfolios, asOf, sipRates()).state;
+    const current = args.plan ? (JSON.parse(text(args, 'plan')) as Record<SipClass, number>) : st.plan;
+    const locked = SIP_CLASSES.filter((c) => st.done[c]);
+    const plan = rebalanceEdit(current, key, amount, st.budget, b.targets, locked);
+    return {
+      plan,
+      locked,
+      budget: st.budget,
+      suggested: st.suggested,
+      total: SIP_CLASSES.reduce((n, k) => n + plan[k], 0),
+      mix: mixAfter(st.values, plan),
+      hints: Object.fromEntries(SIP_CLASSES.map((k) => [k, rowHint(k, plan[k], sipRates(), asOf)])),
     };
   },
 
@@ -787,6 +1012,8 @@ const handlers: Record<string, Handler> = {
       return { account: JSON.stringify(setAccountFilerStatus(requireAccount(), status)) };
     }
     if (op === 'inbox') return { account: JSON.stringify(changeInbox(requireAccount(), params)) };
+    // Every SIP Blueprint change (the plan itself, a month's ticks and stepper edits) goes through one op family.
+    if (op.startsWith('sip.')) return { account: JSON.stringify(mutateBlueprint(requireAccount(), op.slice(4), params)) };
     const id = typeof params.id === 'string' ? params.id : '';
     const account = requireAccount();
     if (op === 'portfolio.add') {

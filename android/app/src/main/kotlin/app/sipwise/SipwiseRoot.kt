@@ -110,6 +110,8 @@ import app.sipwise.ui.RecoveryKeyScreen
 import app.sipwise.ui.ScopeViewModel
 import app.sipwise.ui.SettingsViewModel
 import app.sipwise.ui.SignInScreen
+import app.sipwise.ui.SipScreen
+import app.sipwise.ui.SipViewModel
 import app.sipwise.ui.TargetsScreen
 import app.sipwise.ui.TargetsViewModel
 import app.sipwise.ui.TodayScreen
@@ -130,7 +132,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable object Portfolio
 
-@Serializable object Plan
+@Serializable object Sip
+
+/** The older per-company monthly plan, now reached from More. */
+@Serializable object TargetPlan
 
 @Serializable object Activity
 
@@ -161,13 +166,13 @@ private fun routeFor(target: DeepLinkTarget): Any =
     when (target) {
         DeepLinkTarget.Today -> Today
         DeepLinkTarget.Portfolio -> Portfolio
-        DeepLinkTarget.Plan -> Plan
+        DeepLinkTarget.Plan -> Sip
         DeepLinkTarget.Activity -> Activity
         DeepLinkTarget.More -> More
         DeepLinkTarget.Inbox -> Inbox
         DeepLinkTarget.Insights -> Insights
         DeepLinkTarget.Targets -> Targets
-        DeepLinkTarget.Picks -> Plan
+        DeepLinkTarget.Picks -> Sip
         is DeepLinkTarget.Company -> CompanyRoute(target.ticker)
     }
 
@@ -177,7 +182,8 @@ private fun screenName(destination: NavDestination?): String? =
         destination == null -> null
         destination.hasRoute(Today::class) -> "today"
         destination.hasRoute(Portfolio::class) -> "portfolio"
-        destination.hasRoute(Plan::class) -> "plan"
+        destination.hasRoute(Sip::class) -> "plan"
+        destination.hasRoute(TargetPlan::class) -> "plan"
         destination.hasRoute(Activity::class) -> "activity"
         destination.hasRoute(More::class) -> "more"
         destination.hasRoute(CompanyRoute::class) -> "company"
@@ -192,7 +198,7 @@ private val barItems =
     listOf(
         TopLevel(Today, R.string.nav_today, Icons.Outlined.Home),
         TopLevel(Portfolio, R.string.nav_portfolio, Icons.Outlined.PieChart),
-        TopLevel(Plan, R.string.nav_plan, Icons.Outlined.Timeline),
+        TopLevel(Sip, R.string.nav_sip, Icons.Outlined.Timeline),
         TopLevel(Activity, R.string.nav_activity, Icons.Outlined.List),
     )
 
@@ -200,7 +206,7 @@ private val topLevel =
     listOf(
         TopLevel(Today, R.string.nav_today, Icons.Outlined.Home),
         TopLevel(Portfolio, R.string.nav_portfolio, Icons.Outlined.PieChart),
-        TopLevel(Plan, R.string.nav_plan, Icons.Outlined.Timeline),
+        TopLevel(Sip, R.string.nav_sip, Icons.Outlined.Timeline),
         TopLevel(Activity, R.string.nav_activity, Icons.Outlined.List),
         TopLevel(More, R.string.nav_more, Icons.Outlined.MoreHoriz),
     )
@@ -417,7 +423,7 @@ private fun MainShell(
                         title = { Text(stringResource(top.label), style = MaterialTheme.typography.headlineSmall, maxLines = 1, softWrap = false) },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                         actions = {
-                            if (top.route != More && top.route != Plan) ScopeChooser(scopes)
+                            if (top.route != More && top.route != Sip) ScopeChooser(scopes)
                             InboxBell(inboxUi.counts.unread) { nav.navigate(Inbox) }
                             if (top.route != More) AvatarButton(user) { nav.navigate(More) { launchSingleTop = true } }
                         },
@@ -476,7 +482,7 @@ private fun MainShell(
                         }
                     },
                     onOpenPlan = {
-                        nav.navigate(Plan) {
+                        nav.navigate(Sip) {
                             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
@@ -485,7 +491,22 @@ private fun MainShell(
                 )
             }
             composable<Portfolio> { HoldingsScreen(holdings, onOpenCompany = { nav.navigate(CompanyRoute(it)) }, onOpenInsights = { nav.navigate(Insights) }) }
-            composable<Plan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
+            composable<Sip> {
+                val sip: SipViewModel =
+                    viewModel(key = "SipViewModel-$gen", factory = viewModelFactory { initializer { SipViewModel(unlocked.ledger) } })
+                SipScreen(
+                    sip,
+                    onOpenPicks = { nav.navigate(Picks(it)) },
+                    onOpenHoldings = {
+                        nav.navigate(Portfolio) {
+                            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+            composable<TargetPlan> { PlanScreen(plan, onEditTargets = { nav.navigate(Targets) }, onOpenPicks = { nav.navigate(Picks(it)) }) }
             composable<Insights> {
                 val insights: InsightsViewModel =
                     viewModel(key = "InsightsViewModel-$gen", factory = viewModelFactory { initializer { InsightsViewModel(unlocked.ledger, api) } })
@@ -516,7 +537,20 @@ private fun MainShell(
                 val settings: SettingsViewModel =
                     viewModel(key = "SettingsViewModel-$gen", factory = viewModelFactory { initializer { SettingsViewModel(context.applicationContext as Application, unlocked.ledger) } })
                 val push: PushViewModel = viewModel()
-                MoreScreen(settings, push, vault, unlocked.session, user, onLock, onSignOut, onAccountDeleted, onManagePortfolios = { nav.navigate(Portfolios) }, updates = updates)
+                MoreScreen(
+                    settings,
+                    push,
+                    vault,
+                    unlocked.session,
+                    user,
+                    onLock,
+                    onSignOut,
+                    onAccountDeleted,
+                    onManagePortfolios = { nav.navigate(Portfolios) },
+                    onOpenTargetPlan = { nav.navigate(TargetPlan) },
+                    onEditTargets = { nav.navigate(Targets) },
+                    updates = updates,
+                )
             }
             composable<CompanyRoute> { backStack ->
                 val ticker = backStack.toRoute<CompanyRoute>().ticker
@@ -575,6 +609,7 @@ private fun subScreenTitle(
     when {
         destination.hasRoute(CompanyRoute::class) -> entry?.toRoute<CompanyRoute>()?.ticker.orEmpty()
         destination.hasRoute(Targets::class) -> stringResource(R.string.targets_title)
+        destination.hasRoute(TargetPlan::class) -> stringResource(R.string.settings_targets_plan)
         destination.hasRoute(Portfolios::class) -> stringResource(R.string.portfolios_title)
         destination.hasRoute(Picks::class) -> stringResource(R.string.picks_title)
         destination.hasRoute(Inbox::class) -> stringResource(R.string.inbox_title)

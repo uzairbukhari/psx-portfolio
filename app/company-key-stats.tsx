@@ -3,30 +3,15 @@
 // (live day quote, today's ticks, cached PSX company facts, payout announcements); a field with no data shows a dash.
 import { useEffect, useMemo, useState } from 'react';
 import type { PricePoint } from '@/lib/price-history';
-import { pktDate } from '@/lib/price-history';
 import {
-  compactNumber,
-  trailingDividendPerShare,
+  formatStat,
+  keyStats,
   type CompanyStats,
+  type DayQuote,
 } from '@/lib/company-stats';
 import { faceValueFor } from '@/lib/face-values';
 import { readJson } from '@/lib/safe-json';
 
-type Day = {
-  high: number | null;
-  low: number | null;
-  volume: number | null;
-  previousClose: number | null;
-  price: number | null;
-};
-
-const rs = (n: number | null) =>
-  n === null
-    ? '—'
-    : n.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
 
 export default function CompanyKeyStats({
   ticker,
@@ -38,7 +23,7 @@ export default function CompanyKeyStats({
   ticker: string;
   /** The account's own company record: its face value wins over scraped evidence. */
   company: { faceValue?: number } | undefined;
-  day: Day | undefined;
+  day: DayQuote | undefined;
   eod: PricePoint[];
   intraday: PricePoint[];
 }) {
@@ -62,66 +47,29 @@ export default function CompanyKeyStats({
     };
   }, [ticker]);
   const stats = loaded?.ticker === ticker ? loaded.stats : null;
-
-  // The first tick of the latest session is the opening print.
-  const open = useMemo(() => {
-    const first = intraday[0];
-    const last = intraday.at(-1);
-    return first && last && pktDate(first[0]) === pktDate(last[0])
-      ? first[1]
-      : null;
-  }, [intraday]);
-  // PSX's own 52-week range when scraped; otherwise the range of the last year's daily closes.
-  const range = useMemo(() => {
-    if (stats?.week52High != null && stats.week52Low != null)
-      return { low: stats.week52Low, high: stats.week52High };
-    const last = eod.at(-1);
-    if (!last) return { low: null, high: null };
-    const closes = eod
-      .filter(([t]) => t >= last[0] - 365 * 86_400)
-      .map(([, p]) => p);
-    return closes.length
-      ? { low: Math.min(...closes), high: Math.max(...closes) }
-      : { low: null, high: null };
-  }, [stats, eod]);
-  const dps = useMemo(
+  const { left, right } = useMemo(
     () =>
-      stats
-        ? trailingDividendPerShare(
-            stats.payouts,
-            (date) => faceValueFor(company, stats.faceValues, date),
-            new Date().toISOString().slice(0, 10),
-          )
-        : null,
-    [stats, company],
+      keyStats({
+        stats,
+        day,
+        eod,
+        intraday,
+        company,
+        faceValueAt: faceValueFor,
+        todayIso: new Date().toISOString().slice(0, 10),
+      }),
+    [stats, day, eod, intraday, company],
   );
-  const price = day?.price ?? null;
-  const yieldPct = dps !== null && price ? (dps / price) * 100 : null;
-
-  const left: [string, string][] = [
-    ['Open', rs(open)],
-    ["Day's high", rs(day?.high ?? null)],
-    ["Day's low", rs(day?.low ?? null)],
-    ['52 wk high', rs(range.high)],
-    ['52 wk low', rs(range.low)],
-  ];
-  const right: [string, string][] = [
-    ['Volume', compactNumber(day?.volume ?? null)],
-    ['Market cap', compactNumber(stats?.marketCap ?? null)],
-    ['PE ratio', stats?.peTtm != null ? stats.peTtm.toFixed(2) : '—'],
-    ['Dividend yield', yieldPct === null ? '—' : `${yieldPct.toFixed(2)}%`],
-    ['Prev. close', rs(day?.previousClose ?? null)],
-  ];
   return (
     <section className="card company-keystats" aria-label="Key statistics">
       <span className="lbl">Key statistics</span>
       <div className="keystats-cols">
         {[left, right].map((col, i) => (
           <dl key={i}>
-            {col.map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd className="num">{value}</dd>
+            {col.map((row) => (
+              <div key={row.label}>
+                <dt>{row.label}</dt>
+                <dd className="num">{formatStat(row)}</dd>
               </div>
             ))}
           </dl>

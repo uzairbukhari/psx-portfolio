@@ -2,6 +2,7 @@ package app.sipwise.data
 
 import android.content.Context
 import androidx.core.content.edit
+import app.sipwise.designsystem.ChartPalette
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +21,7 @@ enum class Appearance(val wire: String) {
 
 private const val PREFS = "sipwise_prefs"
 private const val KEY_APPEARANCE = "appearance"
+private const val KEY_CHART_PALETTE = "chartPalette"
 private const val KEY_PUSH = "pushEnabled"
 private const val KEY_ANALYTICS = "analyticsEnabled"
 
@@ -28,6 +30,16 @@ class Preferences(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val _appearance = MutableStateFlow(Appearance.parse(prefs.getString(KEY_APPEARANCE, null)))
     val appearance: StateFlow<Appearance> = _appearance.asStateFlow()
+
+    private val _chartPalette = MutableStateFlow(ChartPalette.parse(prefs.getString(KEY_CHART_PALETTE, null)))
+
+    /** Chart colour set, like the web's per-device choice. */
+    val chartPalette: StateFlow<ChartPalette> = _chartPalette.asStateFlow()
+
+    fun setChartPalette(value: ChartPalette) {
+        prefs.edit { putString(KEY_CHART_PALETTE, value.wire) }
+        _chartPalette.value = value
+    }
 
     private val _pushEnabled = MutableStateFlow(prefs.getBoolean(KEY_PUSH, false))
     val pushEnabled: StateFlow<Boolean> = _pushEnabled.asStateFlow()

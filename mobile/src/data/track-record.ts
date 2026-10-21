@@ -18,14 +18,15 @@ import { signedAmountLabel, signedPercentLabel } from './a11y.ts';
 import { shortDate, signedMoney, signedPercent } from './format.ts';
 
 export const INDEX_TICKER = 'KSE100';
-export type TrackRange = '1m' | '6m' | '1y' | 'all';
+export type TrackRange = '1m' | '3m' | '6m' | '1y' | 'all';
 export const TRACK_RANGES: { key: TrackRange; label: string; spoken: string }[] = [
   { key: '1m', label: '1M', spoken: 'One month' },
+  { key: '3m', label: '3M', spoken: 'Three months' },
   { key: '6m', label: '6M', spoken: 'Six months' },
   { key: '1y', label: '1Y', spoken: 'One year' },
   { key: 'all', label: 'All', spoken: 'All time' },
 ];
-const RANGE_DAYS: Record<Exclude<TrackRange, 'all'>, number> = { '1m': 31, '6m': 183, '1y': 366 };
+const RANGE_DAYS: Record<Exclude<TrackRange, 'all'>, number> = { '1m': 31, '3m': 92, '6m': 183, '1y': 366 };
 
 /** The history endpoint takes at most 60 symbols; the index rides in the first batch. */
 export function historyBatches(tickers: string[], size = 59): string[][] {

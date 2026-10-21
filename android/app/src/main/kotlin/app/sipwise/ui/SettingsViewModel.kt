@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.sipwise.SipwiseApp
 import app.sipwise.data.Appearance
+import app.sipwise.designsystem.ChartPalette
 import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
 import app.sipwise.model.SettingsView
@@ -44,6 +45,7 @@ class SettingsViewModel(
     private val _ui = MutableStateFlow(SettingsUi())
     val ui: StateFlow<SettingsUi> = _ui.asStateFlow()
     val appearance: StateFlow<Appearance> = container.preferences.appearance
+    val chartPalette: StateFlow<ChartPalette> = container.preferences.chartPalette
 
     init {
         viewModelScope.launch { ledger.version.collect { loadSettings() } }
@@ -51,6 +53,8 @@ class SettingsViewModel(
     }
 
     fun setAppearance(value: Appearance) = container.preferences.setAppearance(value)
+
+    fun setChartPalette(value: ChartPalette) = container.preferences.setChartPalette(value)
 
     private suspend fun loadSettings() {
         try {
