@@ -2,7 +2,7 @@
 // pure mutation, and returns the whole next account as JSON. Nothing is stored here: the app saves it (revisioned,
 // encrypted) and only then loads it back, so a failed save never changes what the screens show.
 import { replacePortfolio, portfolioAt, type PortfolioAccount } from '../../../lib/portfolio-account.ts';
-import { validate } from '../../../lib/portfolio.ts';
+import { renameTicker, validate } from '../../../lib/portfolio.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
 import { applyTargets } from '../../../lib/targets.ts';
 import { setBudget } from '../../../mobile/src/data/sip.ts';
@@ -162,6 +162,22 @@ function apply(portfolio: Parameters<typeof recordTrade>[0], op: string, p: Para
       if (!isValidSymbol(ticker)) throw new Error('Enter a valid PSX symbol (2-12 letters or digits).');
       return addCompany(portfolio, { ticker, name: str(p, 'name'), sector: str(p, 'sector') }, p.quote as Parameters<typeof addCompany>[2]);
     }
+    case 'company.edit': {
+      // The name and sector of a company already held. The symbol is changed by 'company.symbol' instead, because
+      // that has to move every entry with it.
+      const company = portfolio.companies.find((c) => c.ticker === ticker);
+      if (!company) throw new Error(`${ticker} is not in this portfolio.`);
+      const name = str(p, 'name').trim();
+      if (!name) throw new Error('Enter the company name.');
+      const sector = str(p, 'sector').trim();
+      return {
+        ...portfolio,
+        companies: portfolio.companies.map((c) => (c.ticker === ticker ? { ...c, name, sector: sector || c.sector } : c)),
+      };
+    }
+    case 'company.symbol':
+      // PSX renamed the company: every trade, dividend, split and notice moves to the new symbol in one save.
+      return renameTicker(portfolio, ticker, str(p, 'to').trim().toUpperCase());
     default:
       throw new Error(`Unknown ledger change: ${op}`);
   }

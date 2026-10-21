@@ -15,8 +15,8 @@ fun timeLabel(range: HistoryRange): (Double) -> String {
     val pattern =
         when (range) {
             HistoryRange.DAY -> HOUR_MINUTE
-            HistoryRange.WEEK, HistoryRange.MONTH -> DAY_MONTH
-            HistoryRange.YEAR, HistoryRange.YEARS3, HistoryRange.YEARS5 -> MONTH_YEAR
+            HistoryRange.WEEK, HistoryRange.MONTH, HistoryRange.MONTHS3 -> DAY_MONTH
+            HistoryRange.MONTHS6, HistoryRange.YEAR, HistoryRange.YEARS3, HistoryRange.YEARS5 -> MONTH_YEAR
         }
     val zone = ZoneId.systemDefault()
     return { seconds -> pattern.format(Instant.ofEpochSecond(seconds.toLong()).atZone(zone)) }
