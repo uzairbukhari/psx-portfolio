@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -477,6 +478,7 @@ fun HabitStrip(
 }
 
 /** The rows behind a chart, for anyone who would rather read the numbers (and for TalkBack). */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChartTableSheet(
     table: ChartTable,
