@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -380,6 +381,7 @@ private fun FutureSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val chart = SipwiseTheme.chart
+            val context = LocalContext.current
             StackedAreaChart(
                 layers =
                     listOf(
@@ -399,7 +401,7 @@ private fun FutureSheet(
                         ),
                     ),
                 description = stringResource(R.string.sip_future_chart),
-                xLabel = { stringResource(R.string.sip_future_year, it.toInt()) },
+                xLabel = { context.getString(R.string.sip_future_year, it.toInt()) },
                 yLabel = { moneyShort(it) },
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
