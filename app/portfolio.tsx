@@ -52,6 +52,7 @@ import {
   Briefcase,
   Upload,
   Wallet,
+  LifeBuoy,
   LogOut,
   Settings,
   ChevronDown,
@@ -142,6 +143,8 @@ import { CompanyNavProvider } from './ticker-link';
 import { LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import { ThemeMenuItems } from './theme-menu';
+import { HelpPanel } from './help-panel';
+import { MoreSheet } from './more-sheet';
 import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import { MAX_WATCH_TICKERS } from '@/lib/market-watch';
@@ -779,6 +782,8 @@ function DashboardContent({
   );
   const initialPathname = usePathname();
   const [bellOpen, setBellOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(
     null,
   );
@@ -2923,6 +2928,12 @@ function DashboardContent({
         ]
       : []),
   ];
+  function signOut() {
+    track('signed_out');
+    void flushAnalytics().finally(() => {
+      window.location.href = '/api/auth/logout';
+    });
+  }
   const accountMenu = (withName: boolean) => email ? (
     <DropdownMenu>
       <DropdownMenuTrigger className="account-trigger">
@@ -2963,6 +2974,14 @@ function DashboardContent({
             <ShieldCheck size={15} /> Admin console
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem
+          onClick={() => {
+            track('help_opened', { item: 'panel' });
+            setHelpOpen(true);
+          }}
+        >
+          <LifeBuoy size={15} /> Help
+        </DropdownMenuItem>
         <ThemeMenuItems />
         {vault && (
           <DropdownMenuItem onClick={vault.lock}>
@@ -2972,12 +2991,7 @@ function DashboardContent({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
-          onClick={() => {
-            track('signed_out');
-            void flushAnalytics().finally(() => {
-              window.location.href = '/api/auth/logout';
-            });
-          }}
+          onClick={signOut}
         >
           <LogOut size={15} /> Sign out
         </DropdownMenuItem>
@@ -2988,6 +3002,28 @@ function DashboardContent({
   return (
     <CompanyNavProvider value={openCompany}>
       <main className="desk">
+        <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
+        {email && (
+          <MoreSheet
+            open={moreOpen}
+            onOpenChange={setMoreOpen}
+            items={navItems.filter((i) => i.extra)}
+            active={tab}
+            onNavigate={setTab}
+            onSettings={() => setTab('settings')}
+            onHelp={() => {
+              track('help_opened', { item: 'panel' });
+              setHelpOpen(true);
+            }}
+            onLock={vault?.lock}
+            onSignOut={signOut}
+            onAdmin={isAdmin ? () => window.location.assign('/admin') : undefined}
+            name={name}
+            email={email}
+            picture={picture}
+            unlocked={!!vault}
+          />
+        )}
         <ImportRequestRunner
           request={workspace?.importRequest ?? null}
           busy={busy}
@@ -2999,7 +3035,7 @@ function DashboardContent({
           }}
         />
         <div className="flex flex-col gap-2">
-          <header className={'app-header' + (chromeless ? ' chromeless' : '')}>
+          <header className={'app-header' + (chromeless ? ' chromeless' : '') + (emptyStart ? ' no-nav' : '')}>
             <div className="side">
             <div className="header-brand-group">
               <button
@@ -3024,6 +3060,8 @@ function DashboardContent({
                 onNavigate={setTab}
                 onAdd={() => openTx('buy', tab === 'company' ? companyTicker : '')}
                 addDisabled={busy}
+                onMore={email ? () => setMoreOpen(true) : undefined}
+                moreActive={moreOpen}
               />
             )}
             {(

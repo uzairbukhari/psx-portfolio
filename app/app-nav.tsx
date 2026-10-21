@@ -3,7 +3,7 @@
 // ARIA tabs): new-tab and middle-click work, screen readers hear "link, current page". Plain clicks are still
 // handled in-app, so the page does not reload and the vault stays unlocked.
 import { Fragment, useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import { Ellipsis, Plus } from 'lucide-react';
 import { flushSync } from 'react-dom';
 import { preloadTab } from './lazy-panels';
 
@@ -57,6 +57,8 @@ export function AppNav({
   onNavigate,
   onAdd,
   addDisabled,
+  onMore,
+  moreActive,
 }: {
   items: NavItem[];
   active: string;
@@ -64,6 +66,9 @@ export function AppNav({
   /** The raised add button in the middle of the phone's bottom bar. */
   onAdd?: () => void;
   addDisabled?: boolean;
+  /** The phone's "More" slot at the end of the bottom bar: opens the pages and account actions that do not fit. */
+  onMore?: () => void;
+  moreActive?: boolean;
 }) {
   function onClick(e: MouseEvent<HTMLAnchorElement>, tab: string) {
     // New-tab and new-window gestures belong to the browser.
@@ -111,6 +116,19 @@ export function AppNav({
           </Fragment>
         );
       })}
+      {onMore && (
+        <button
+          type="button"
+          data-slot="nav-more"
+          className="nav-more"
+          aria-haspopup="dialog"
+          aria-expanded={moreActive ? true : undefined}
+          onClick={onMore}
+        >
+          <Ellipsis className="tab-icon" aria-hidden="true" />
+          <span>More</span>
+        </button>
+      )}
     </nav>
   );
 }

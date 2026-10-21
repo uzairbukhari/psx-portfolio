@@ -1,0 +1,48 @@
+/* Help sheet, phone "More" slot and More sheet. Tokens only: no colour literals. */
+html:root .nav-more[data-slot]{display:none}
+html:root .help-panel{width:min(440px,100vw);gap:0;background:var(--card);color:var(--foreground);border-color:var(--border)}
+html:root .help-panel[data-side=bottom]{width:auto;max-height:86dvh;border-radius:24px 24px 0 0}
+html:root .help-title{font:600 22px/1.2 var(--font-geist-sans),sans-serif}
+html:root .help-body{display:grid;gap:26px;padding:4px 16px 16px;overflow-y:auto;flex:1}
+html:root .help-h{display:flex;align-items:center;gap:8px;margin:0 0 6px;font:600 11.5px/1 var(--font-geist-sans),sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .help-answer{margin:0;color:var(--muted-foreground);font-size:13.5px;line-height:1.55}
+html:root .help-keys{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13.5px}
+html:root .help-kbd{display:inline-block;min-width:44px;margin-right:8px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:var(--muted);font:500 11.5px/1.3 var(--font-geist-mono),monospace;text-align:center;color:var(--muted-foreground)}
+/* Keyboard shortcuts do not apply on a phone. */
+@media(max-width:760px){html:root .help-keys-section{display:none}}
+html:root .help-foot{display:flex;gap:18px;padding:14px 20px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--border);font-size:13px}
+html:root .help-foot a{color:var(--muted-foreground);text-decoration:underline;text-underline-offset:3px}
+
+@media(max-width:760px){
+  /* The profile button moves into More. It stays in the header only where the bottom bar is not shown. */
+  html:root .account-phone{display:none}
+  html:root .app-header:is(.chromeless,.no-nav) .account-phone{display:block}
+  html:root .app-header .app-nav .nav-more[data-slot]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex:1;height:52px;border:0;border-radius:16px;background:transparent;color:var(--muted-foreground);font:500 11px/1 var(--font-geist-sans),sans-serif;cursor:pointer}
+  html:root .app-header .app-nav .nav-more[aria-expanded=true]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
+  html:root .app-header .app-nav .nav-more .tab-icon{width:22px;height:22px}
+  /* The portfolio switcher spans the header, so its width no longer pushes the bell and search off the screen. */
+  html:root .app-header .side-portfolio{grid-column:1/-1;grid-row:2}
+  html:root .app-header{grid-template-columns:auto minmax(0,1fr)}
+  html:root .app-header .header-brand-group{min-width:max-content}
+  html:root .app-header .header-right{width:auto}
+  /* A row of holding-type tabs scrolls inside its own box instead of widening the page. */
+  html:root .holdings-bar{min-width:0}
+  html:root .holdings-tabs{max-width:100%;overflow-x:auto;scrollbar-width:none}
+  html:root .holdings-bar__end{min-width:0;max-width:100%;flex-wrap:wrap}
+}
+
+html:root .more-sheet{gap:0;padding:6px 16px calc(14px + env(safe-area-inset-bottom));max-height:90dvh;overflow-y:auto;background:var(--card);color:var(--foreground);border-color:var(--border);border-radius:24px 24px 0 0}
+html:root .more-head{flex-direction:row;align-items:center;gap:12px;padding:14px 4px}
+html:root .more-name{font:600 16px/1.2 var(--font-geist-sans),sans-serif}
+html:root .more-group{display:grid;gap:2px;padding:8px 0;border-top:1px solid var(--border)}
+html:root .more-group .lbl{margin:4px 4px 6px}
+html:root .more-row{display:flex;align-items:center;gap:14px;min-height:48px;padding:0 10px;border:0;border-radius:12px;background:transparent;color:var(--foreground);font:500 15px/1 var(--font-geist-sans),sans-serif;text-align:left;text-decoration:none;cursor:pointer;width:100%}
+html:root .more-row svg{width:20px;height:20px;flex:none;color:var(--muted-foreground)}
+html:root .more-row[aria-current=page]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
+html:root .more-row:hover{background:var(--muted)}
+html:root .more-badge{display:inline-block;margin-left:auto}
+html:root .more-signout{margin-top:6px;border-top:1px solid var(--border);border-radius:0 0 12px 12px;color:var(--danger)}
+html:root .more-signout svg{color:var(--danger)}
+html:root .more-theme{display:flex;width:100%}
+html:root .more-theme button{flex:1;padding:10px 4px}
+html:root .more-theme button[aria-pressed=true]{background:var(--card);color:var(--foreground);box-shadow:var(--shadow-card,none)}

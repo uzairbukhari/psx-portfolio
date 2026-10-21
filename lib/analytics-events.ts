@@ -61,6 +61,8 @@ export const EVENT_CATALOG = {
   notifications_enabled: {},
   theme_changed: { theme: ['light', 'dark', 'midnight', 'paper', 'system'] },
   chart_range_changed: { range: ['1w', '1m', '3m', '6m', '1y', 'all'] },
+  // Onboarding and help
+  help_opened: { item: ['panel', 'tour', 'checklist', 'tips', 'faq', 'shortcuts', 'privacy', 'terms', 'contact'] },
   // Errors for the super-admin audit log (category, code and screen only: no message text, no stack)
   client_error: { area: ERROR_AREAS, code: ERROR_CODES, screen: SCREENS },
 } as const satisfies Record<string, Record<string, readonly string[]>>;
