@@ -60,3 +60,34 @@ test('checklist stays through the day it was finished, then leaves', () => {
   // Not finished: nothing is stamped.
   assert.equal(withDoneDay(blank(), checklistItems(blank(), none), '2026-10-21').doneOn, undefined);
 });
+
+import { shouldOfferTour } from '../lib/onboarding.ts';
+import { stepsToShow, TOUR_STEPS, TOUR_STEP_IDS } from '../lib/tour-steps.ts';
+import { EVENT_CATALOG } from '../lib/analytics-events.ts';
+
+test('tour is offered once, to a fresh device with something to look at', () => {
+  const facts = { hasHolding: true, onHoldings: true };
+  const fresh = { ...blank(), fresh: '2026-10-21' };
+  assert.equal(shouldOfferTour(fresh, facts), true);
+  assert.equal(shouldOfferTour(blank(), facts), false);
+  assert.equal(shouldOfferTour({ ...fresh, tour: 'declined' }, facts), false);
+  assert.equal(shouldOfferTour(fresh, { ...facts, hasHolding: false }), false);
+  assert.equal(shouldOfferTour(fresh, { ...facts, onHoldings: false }), false);
+});
+
+test('tour outcome survives a round trip and junk is dropped', () => {
+  assert.equal(parseOnboarding(JSON.stringify({ v: 1, tour: 'skipped', ticks: {} })).tour, 'skipped');
+  assert.equal(parseOnboarding(JSON.stringify({ v: 1, tour: 'bogus', ticks: {} })).tour, undefined);
+});
+
+test('tour steps: ids match the analytics catalog and missing targets are skipped', () => {
+  assert.deepEqual(TOUR_STEPS.map((s) => s.id), [...TOUR_STEP_IDS]);
+  const allowed = EVENT_CATALOG.tour_step_viewed.step;
+  for (const id of TOUR_STEP_IDS) assert.ok(allowed.includes(id));
+  const steps = stepsToShow((id) => id !== 'bell', (href) => href !== '/sip');
+  assert.ok(!steps.some((s) => s.id === 'bell'));
+  const pages = steps.find((s) => s.id === 'pages');
+  assert.ok(pages.items.some((i) => i.name === 'Insights'));
+  assert.ok(!pages.items.some((i) => i.name === 'Monthly Picks'));
+  for (const s of TOUR_STEPS) assert.ok(s.body || s.items?.length, s.id);
+});

@@ -2,7 +2,7 @@
 // Help: short answers, shortcuts and the policy links, in a sheet that opens from the profile menu (desktop) or More
 // (phone). The tour, checklist and tips are added to the "Get started" group as they are built.
 import { useEffect, useState } from 'react';
-import { BookOpen, Keyboard } from 'lucide-react';
+import { BookOpen, Keyboard, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { HELP_FAQ, HELP_SHORTCUTS } from '@/lib/help-content';
@@ -21,7 +21,16 @@ function usePhoneWidth() {
   return phone;
 }
 
-export function HelpPanel({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function HelpPanel({
+  open,
+  onOpenChange,
+  onTour,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Replays the tour. Left out where there is nothing to point at yet (an empty account). */
+  onTour?: () => void;
+}) {
   const phone = usePhoneWidth();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -35,6 +44,25 @@ export function HelpPanel({ open, onOpenChange }: { open: boolean; onOpenChange:
           <SheetDescription>Quick answers about Sipwise.</SheetDescription>
         </SheetHeader>
         <div className="help-body">
+          {onTour && (
+            <section aria-labelledby="help-start">
+              <h3 id="help-start" className="help-h">
+                <PlayCircle size={14} aria-hidden="true" /> Get started
+              </h3>
+              <button
+                type="button"
+                data-slot="help-row"
+                className="help-row"
+                onClick={() => {
+                  track('help_opened', { item: 'tour' });
+                  onTour();
+                }}
+              >
+                <b>Take the tour</b>
+                <small>Where everything lives · about a minute</small>
+              </button>
+            </section>
+          )}
           <section aria-labelledby="help-faq">
             <h3 id="help-faq" className="help-h">
               <BookOpen size={14} aria-hidden="true" /> How Sipwise works

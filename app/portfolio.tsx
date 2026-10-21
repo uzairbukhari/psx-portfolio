@@ -146,8 +146,10 @@ import { UserAvatar } from './user-avatar';
 import { ThemeMenuItems } from './theme-menu';
 import { HelpPanel } from './help-panel';
 import { ChecklistStrip, StartScreen } from './onboarding-ui';
+import { ProductTour, TourOffer } from './product-tour';
 import { useOnboarding } from './use-onboarding';
-import { checklistItems, showChecklist, type ChecklistId } from '@/lib/onboarding';
+import { checklistItems, shouldOfferTour, showChecklist, type ChecklistId } from '@/lib/onboarding';
+import type { TourStepId } from '@/lib/tour-steps';
 import { MoreSheet } from './more-sheet';
 import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
@@ -788,8 +790,17 @@ function DashboardContent({
   const [bellOpen, setBellOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [tourSource, setTourSource] = useState<'auto' | 'help' | null>(null);
   const onb = useOnboarding();
-  const { markFresh, tick: tickOnboarding } = onb;
+  const { markFresh, tick: tickOnboarding, setTour } = onb;
+  const endTour = useCallback(
+    (outcome: 'completed' | 'skipped', atStep: TourStepId) => {
+      track('tour_finished', { outcome, at_step: atStep });
+      if (tourSource === 'auto') setTour(outcome);
+      setTourSource(null);
+    },
+    [tourSource, setTour],
+  );
   const markFreshToday = useCallback(() => markFresh(today()), [markFresh]);
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(
     null,
@@ -3033,7 +3044,30 @@ function DashboardContent({
   return (
     <CompanyNavProvider value={openCompany}>
       <main className="desk">
-        <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
+        <HelpPanel
+          open={helpOpen}
+          onOpenChange={setHelpOpen}
+          onTour={
+            emptyStart
+              ? undefined
+              : () => {
+                  setHelpOpen(false);
+                  setTab('holdings');
+                  window.setTimeout(() => setTourSource('help'), 450);
+                }
+          }
+        />
+        {tourSource && <ProductTour source={tourSource} onClose={endTour} />}
+        {!tourSource &&
+          shouldOfferTour(onb.state, { hasHolding: p.companies.length > 0 || hasAssets, onHoldings: tab === 'holdings' }) && (
+            <TourOffer
+              onStart={() => setTourSource('auto')}
+              onDecline={() => {
+                track('tour_finished', { outcome: 'declined', at_step: 'offer' });
+                setTour('declined');
+              }}
+            />
+          )}
         {email && (
           <MoreSheet
             open={moreOpen}
@@ -3083,7 +3117,7 @@ function DashboardContent({
                 <Wordmark />
               </button>
             </div>
-            {!emptyStart && tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
+            {!emptyStart && tab !== 'settings' && <div className="side-portfolio" data-tour="portfolios">{workspace?.selector}</div>}
             {!emptyStart && (
               <AppNav
                 items={navItems}
@@ -3123,7 +3157,7 @@ function DashboardContent({
                 </button>
               </div>
             )}
-            {email && <div className="side-user">{accountMenu(true)}</div>}
+            {email && <div className="side-user" data-tour="profile">{accountMenu(true)}</div>}
             </div>
             <div className="header-right">
               {tab === 'sip-plan' && <PlanMonthNav month={month} setMonth={setMonth} />}
@@ -3171,6 +3205,7 @@ function DashboardContent({
               >
                 <PopoverTrigger
                   className="bell-trigger hdr-btn"
+                  data-tour="bell"
                   aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
                 >
                   <Bell size={18} />
@@ -3271,6 +3306,7 @@ function DashboardContent({
                 type="button"
                 data-slot="hdr"
                 className="hdr-btn"
+                data-tour="add"
                 disabled={busy}
                 aria-label="Add transaction"
                 onClick={() =>

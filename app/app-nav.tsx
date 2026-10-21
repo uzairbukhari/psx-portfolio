@@ -77,7 +77,7 @@ export function AppNav({
     withViewTransition(() => onNavigate(tab));
   }
   return (
-    <nav data-slot="tabs-list" className="app-nav" aria-label="Main">
+    <nav data-slot="tabs-list" className="app-nav" aria-label="Main" data-tour="pages">
       {items.map((item, i) => {
         const current = item.tab === active;
         return (
@@ -87,6 +87,7 @@ export function AppNav({
                 type="button"
                 data-slot="nav-add"
                 className="nav-add"
+                data-tour="add"
                 aria-label="Add transaction"
                 disabled={addDisabled}
                 onClick={onAdd}
@@ -121,6 +122,7 @@ export function AppNav({
           type="button"
           data-slot="nav-more"
           className="nav-more"
+          data-tour="profile"
           aria-haspopup="dialog"
           aria-expanded={moreActive ? true : undefined}
           onClick={onMore}

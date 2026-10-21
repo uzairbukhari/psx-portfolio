@@ -5,6 +5,9 @@ html:root .help-panel[data-side=bottom]{width:auto;max-height:86dvh;border-radiu
 html:root .help-title{font:600 22px/1.2 var(--font-geist-sans),sans-serif}
 html:root .help-body{display:grid;gap:26px;padding:4px 16px 16px;overflow-y:auto;flex:1}
 html:root .help-h{display:flex;align-items:center;gap:8px;margin:0 0 6px;font:600 11.5px/1 var(--font-geist-sans),sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
+html:root .help-row[data-slot]{display:grid;gap:2px;width:100%;margin-top:4px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--muted);color:var(--foreground);text-align:left;cursor:pointer}
+html:root .help-row[data-slot]:hover{border-color:var(--primary)}
+html:root .help-row small{color:var(--muted-foreground);font-size:12.5px}
 html:root .help-answer{margin:0;color:var(--muted-foreground);font-size:13.5px;line-height:1.55}
 html:root .help-keys{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13.5px}
 html:root .help-kbd{display:inline-block;min-width:44px;margin-right:8px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:var(--muted);font:500 11.5px/1.3 var(--font-geist-mono),monospace;text-align:center;color:var(--muted-foreground)}
@@ -128,3 +131,30 @@ html:root .ob-strip-act{display:flex;align-items:center;gap:14px}
   html:root .ob-strip-act{width:100%}
   html:root .ob-chips{display:none}
 }
+
+/* ───────── Product tour ───────── */
+html:root .tour-root{position:fixed;inset:0;z-index:70;pointer-events:none}
+html:root .tour-block{position:fixed;inset:0;pointer-events:auto;background:transparent}
+html:root .tour-block--dim{background:rgb(var(--ch-shadow) / .72)}
+html:root .tour-spot{position:fixed;border-radius:16px;pointer-events:none;box-shadow:0 0 0 3px var(--primary),0 0 0 9999px rgb(var(--ch-shadow) / .72);transition:left .22s ease,top .22s ease,width .22s ease,height .22s ease}
+html:root .tour-root[data-reduce] .tour-spot{transition:none}
+html:root .tour-pop,html:root .tour-offer{position:fixed;inset:auto;margin:0;max-width:none;pointer-events:auto;width:min(360px,calc(100vw - 28px));padding:18px 20px 14px;border:1px solid var(--border);border-radius:18px;background:var(--popover);color:var(--foreground);box-shadow:0 30px 80px -20px rgb(var(--ch-shadow) / .8)}
+html:root .tour-pop h3,html:root .tour-offer h3{margin:8px 0 6px;font:600 17px/1.3 var(--font-geist-sans),sans-serif;outline:none}
+html:root .tour-step,html:root .tour-offer-kicker{margin:0;font:600 11px/1 var(--font-geist-sans),sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--primary)}
+html:root .tour-offer-kicker{color:var(--success)}
+html:root .tour-copy p,html:root .tour-offer p{margin:0;color:var(--muted-foreground);font-size:13.5px;line-height:1.55}
+html:root .tour-copy ul{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:13px;color:var(--muted-foreground)}
+html:root .tour-copy li b{color:var(--foreground);font-weight:600}
+html:root .tour-copy .tour-note{margin-top:10px;font-size:12px}
+html:root .tour-act{display:flex;align-items:center;gap:8px;margin-top:16px}
+html:root .tour-dots{display:flex;gap:5px;margin-right:auto}
+html:root .tour-dots i{width:6px;height:6px;border-radius:9px;background:var(--border)}
+html:root .tour-dots i[data-on]{width:16px;background:var(--primary)}
+html:root .tour-btn[data-slot]{border:0;border-radius:11px;padding:10px 15px;background:var(--btn-grad,var(--primary));color:#fff;font:600 13px/1 var(--font-geist-sans),sans-serif;cursor:pointer}
+html:root .tour-btn--ghost[data-slot]{background:transparent;color:var(--muted-foreground)}
+html:root .tour-btn--lg[data-slot]{padding:12px 18px;font-size:14px}
+html:root .tour-skip[data-slot]{display:block;margin-top:10px;border:0;background:none;padding:0;color:var(--muted-foreground);font:500 12px/1.4 var(--font-geist-sans),sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+html:root .tour-offer{left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 28px));padding:28px 28px 22px}
+html:root .tour-offer h3{font-size:24px;margin:10px 0 8px}
+html:root .tour-offer p{font-size:14.5px}
+html:root .tour-offer small{display:block;margin-top:16px;font-size:12px;color:var(--muted-foreground)}

@@ -9,6 +9,9 @@ export const CHECKLIST_IDS = ['vault', 'first_holding', 'tax', 'backup', 'sip_bu
 export type ChecklistId = (typeof CHECKLIST_IDS)[number];
 
 /** Steps the person confirms or does outside the portfolio data, so they are remembered on this device. */
+export type TourOutcome = 'completed' | 'skipped' | 'declined';
+const TOUR_OUTCOMES: readonly string[] = ['completed', 'skipped', 'declined'];
+
 export type TickId = 'tax' | 'backup' | 'insights';
 
 export type OnboardingState = {
@@ -17,6 +20,8 @@ export type OnboardingState = {
   fresh?: string;
   /** The person hid the checklist. */
   hidden?: true;
+  /** How the first-visit tour ended (or was turned down). Absent until then; the tour is then offered once. */
+  tour?: TourOutcome;
   ticks: Partial<Record<TickId, true>>;
   /** PKT day on which every item was first done, so the card can leave a day later. */
   doneOn?: string;
@@ -36,6 +41,7 @@ export function parseOnboarding(raw: string | null): OnboardingState {
       v: ONBOARDING_VERSION,
       ...(typeof x.fresh === 'string' ? { fresh: x.fresh } : {}),
       ...(x.hidden === true ? { hidden: true as const } : {}),
+      ...(typeof x.tour === 'string' && TOUR_OUTCOMES.includes(x.tour) ? { tour: x.tour } : {}),
       ticks,
       ...(typeof x.doneOn === 'string' ? { doneOn: x.doneOn } : {}),
     };
@@ -98,4 +104,12 @@ export function showChecklist(state: OnboardingState, items: ChecklistItem[], to
 export function withDoneDay(state: OnboardingState, items: ChecklistItem[], today: string): OnboardingState {
   if (state.doneOn || checklistProgress(items).next) return state;
   return { ...state, doneOn: today };
+}
+
+/**
+ * Whether to offer the tour on this visit: a fresh device, never offered before, with something to look at, on the
+ * Holdings page. (The component also waits until no dialog is open.)
+ */
+export function shouldOfferTour(state: OnboardingState, facts: { hasHolding: boolean; onHoldings: boolean }): boolean {
+  return !!state.fresh && !state.tour && facts.hasHolding && facts.onHoldings;
 }

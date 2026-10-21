@@ -3,7 +3,14 @@
 // hidden, and whether this device counts as a new account's first. localStorage only, like the theme and sidebar; if
 // storage is blocked the flags simply last for this visit.
 import { useCallback, useState } from 'react';
-import { EMPTY_ONBOARDING, ONBOARDING_STORAGE_KEY, parseOnboarding, type OnboardingState, type TickId } from '@/lib/onboarding';
+import {
+  EMPTY_ONBOARDING,
+  ONBOARDING_STORAGE_KEY,
+  parseOnboarding,
+  type OnboardingState,
+  type TickId,
+  type TourOutcome,
+} from '@/lib/onboarding';
 import { track } from './analytics';
 
 function read(): OnboardingState {
@@ -62,9 +69,10 @@ export function useOnboarding() {
       }),
     [update],
   );
+  const setTour = useCallback((outcome: TourOutcome) => update((s) => (s.tour === outcome ? s : { ...s, tour: outcome })), [update]);
   const stampDone = useCallback((day: string) => update((s) => (s.doneOn ? s : { ...s, doneOn: day })), [update]);
 
-  return { state, markFresh, tick, hide, show, stampDone };
+  return { state, setTour, markFresh, tick, hide, show, stampDone };
 }
 
 export type Onboarding = ReturnType<typeof useOnboarding>;
