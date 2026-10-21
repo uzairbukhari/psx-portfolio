@@ -3194,6 +3194,9 @@ function DashboardContent({
                   </div>
                 </PopoverContent>
               </Popover>
+              {tab === 'holdings' && !isAll && !locked && !emptyStart && (p.companies.length > 0 || hasAssets) && (
+                <AddAssetMenu onPick={pickAsset} disabled={busy} header />
+              )}
               {tab !== 'settings' && (
               <button
                 type="button"
@@ -3285,8 +3288,9 @@ function DashboardContent({
                     </button>
                   </p>
                 )}
-                {!isAll && !locked && (
-                  <div className="add-asset">
+                {!isAll && !locked && (p.companies.length > 0 || hasAssets) && (
+                  // Phones: the header has no room, so Add asset stays above the dashboard there.
+                  <div className="add-asset add-asset--phone">
                     <AddAssetMenu onPick={pickAsset} disabled={busy} />
                   </div>
                 )}

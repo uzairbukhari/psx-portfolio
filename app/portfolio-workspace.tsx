@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { EncryptedRestoreDialog } from './vault-security';
 import { track } from './analytics';
+import { portfolioColor } from './portfolio-color';
 import { Check, ChevronDown, Plus } from 'lucide-react';
 import {
   DropdownMenu,
@@ -222,6 +223,12 @@ export default function PortfolioWorkspace({
       setError(e instanceof Error ? e.message : String(e));
     }
   }
+  // One dot per portfolio, in each portfolio's own colour.
+  const allDots = account.portfolios.map((x, i) => <i key={x.id} style={{ background: portfolioColor(i) }} />);
+  const colorIndex = (id: string) => {
+    const i = account.portfolios.findIndex((x) => x.id === id);
+    return i < 0 ? account.portfolios.length : i;
+  };
   const selector =
     account.portfolios.length > 1 || draft || canCreate ? (
       <DropdownMenu>
@@ -238,16 +245,12 @@ export default function PortfolioWorkspace({
               : (account.portfolios.find((x) => x.id === current)?.name ?? draft?.name ?? 'Portfolio');
             return (
               <>
-                <span className={`pf-dots${all ? '' : ' single'}`} aria-hidden="true">
-                  {all ? (
-                    <>
-                      <i />
-                      <i />
-                      <i />
-                    </>
-                  ) : (
-                    label.slice(0, 1).toUpperCase()
-                  )}
+                <span
+                  className={`pf-dots${all ? '' : ' single'}`}
+                  aria-hidden="true"
+                  style={all ? undefined : { background: portfolioColor(colorIndex(current)) }}
+                >
+                  {all ? allDots : label.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="pf-text">
                   <b>{label}</b>
@@ -278,16 +281,12 @@ export default function PortfolioWorkspace({
             ];
             return rows.map((r) => (
               <DropdownMenuItem key={r.id} className="pf-item" data-current={r.id === current || undefined} onClick={() => choose(r.id)}>
-                <span className={`pf-dots${r.all ? '' : ' single'}`} aria-hidden="true">
-                  {r.all ? (
-                    <>
-                      <i />
-                      <i />
-                      <i />
-                    </>
-                  ) : (
-                    (r.name ?? '').slice(0, 1).toUpperCase()
-                  )}
+                <span
+                  className={`pf-dots${r.all ? '' : ' single'}`}
+                  aria-hidden="true"
+                  style={r.all ? undefined : { background: portfolioColor(colorIndex(r.id)) }}
+                >
+                  {r.all ? allDots : (r.name ?? '').slice(0, 1).toUpperCase()}
                 </span>
                 <span className="pf-text">
                   <b>{r.name}</b>
