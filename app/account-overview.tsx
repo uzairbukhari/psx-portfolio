@@ -229,7 +229,7 @@ export default function AccountOverview({
   const soleClass = o.classes.length === 1 ? o.classes[0].key : null;
   return (
     <div className="overview">
-      <section className="slab hero-slab" aria-label="Net worth">
+      <section className="slab hero-slab" aria-label="Net worth" data-tour="value">
         <div className="hero-left">
           <span className="lbl">
             Net worth · {compact ? scopeName : 'all portfolios'}

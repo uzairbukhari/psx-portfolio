@@ -7,6 +7,7 @@ import { webMcpEnabled } from './webmcp-pref';
 import { cachedHoldings, cachedTaxSummary } from './portfolio-memo';
 import { useConfirm } from '@/components/confirm-dialog';
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useMemo,
@@ -52,6 +53,7 @@ import {
   Briefcase,
   Upload,
   Wallet,
+  LifeBuoy,
   LogOut,
   Settings,
   ChevronDown,
@@ -142,6 +144,13 @@ import { CompanyNavProvider } from './ticker-link';
 import { LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import { ThemeMenuItems } from './theme-menu';
+import { HelpPanel } from './help-panel';
+import { ChecklistStrip, PageTip, StartScreen } from './onboarding-ui';
+import { ProductTour, TourOffer } from './product-tour';
+import { useOnboarding } from './use-onboarding';
+import { checklistItems, shouldOfferTour, showChecklist, tipVisible, type ChecklistId, type TipId } from '@/lib/onboarding';
+import type { TourStepId } from '@/lib/tour-steps';
+import { MoreSheet } from './more-sheet';
 import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
 import { MAX_WATCH_TICKERS } from '@/lib/market-watch';
@@ -779,6 +788,20 @@ function DashboardContent({
   );
   const initialPathname = usePathname();
   const [bellOpen, setBellOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [tourSource, setTourSource] = useState<'auto' | 'help' | null>(null);
+  const onb = useOnboarding();
+  const { markFresh, tick: tickOnboarding, setTour } = onb;
+  const endTour = useCallback(
+    (outcome: 'completed' | 'skipped', atStep: TourStepId) => {
+      track('tour_finished', { outcome, at_step: atStep });
+      if (tourSource === 'auto') setTour(outcome);
+      setTourSource(null);
+    },
+    [tourSource, setTour],
+  );
+  const markFreshToday = useCallback(() => markFresh(today()), [markFresh]);
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(
     null,
   );
@@ -1310,6 +1333,9 @@ function DashboardContent({
       .then((d) => setUsage(d))
       .catch(() => {});
   }, [tab, usage]);
+  useEffect(() => {
+    if (tab === 'reports') tickOnboarding('insights');
+  }, [tab, tickOnboarding]);
   async function save(
     next: Portfolio,
     success = 'Saved to your private portfolio.',
@@ -1918,6 +1944,7 @@ function DashboardContent({
     attempt(async () => {
       const pkg = await vault!.session.backupPackage();
       track('backup_exported');
+      tickOnboarding('backup');
       download(
         `sipwise-backup-${today()}.encrypted.json`,
         JSON.stringify(pkg, null, 2),
@@ -2336,6 +2363,28 @@ function DashboardContent({
   // A new account with nothing in it has no pages to open yet: the sidebar keeps only pin, Settings and the profile.
   // An empty portfolio beside others keeps the full sidebar, so the others stay one click away.
   const emptyStart = p.companies.length === 0 && !hasAssets && (workspace?.account.portfolios.length ?? 0) <= 1;
+  const onbItems = checklistItems(onb.state, {
+    hasHolding: p.companies.length > 0 || hasAssets,
+    hasSipBudget: (p.sipBlueprint?.budget ?? 0) > 0,
+  });
+  const pageTip = (id: TipId) =>
+    tourSource || !tipVisible(onb.state, id) ? null : <PageTip key={id} id={id} onDismiss={() => onb.dismissTip(id)} />;
+  const onbActions = {
+    busy,
+    onGo: (id: ChecklistId) => {
+      if (id === 'first_holding') pickAsset('stock');
+      else if (id === 'backup') {
+        setSettingsEntry((e) => ({ n: e.n + 1, section: 'data' }));
+        setTab('settings');
+      } else if (id === 'sip_budget') setTab('sip-tracker');
+      else if (id === 'insights') setTab('reports');
+    },
+    onTax: (status: 'filer' | 'non-filer') => {
+      saveFilerStatus(status);
+      onb.tick('tax');
+    },
+    onHide: onb.hide,
+  };
   const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
@@ -2923,6 +2972,12 @@ function DashboardContent({
         ]
       : []),
   ];
+  function signOut() {
+    track('signed_out');
+    void flushAnalytics().finally(() => {
+      window.location.href = '/api/auth/logout';
+    });
+  }
   const accountMenu = (withName: boolean) => email ? (
     <DropdownMenu>
       <DropdownMenuTrigger className="account-trigger">
@@ -2963,6 +3018,14 @@ function DashboardContent({
             <ShieldCheck size={15} /> Admin console
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem
+          onClick={() => {
+            track('help_opened', { item: 'panel' });
+            setHelpOpen(true);
+          }}
+        >
+          <LifeBuoy size={15} /> Help
+        </DropdownMenuItem>
         <ThemeMenuItems />
         {vault && (
           <DropdownMenuItem onClick={vault.lock}>
@@ -2972,12 +3035,7 @@ function DashboardContent({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
-          onClick={() => {
-            track('signed_out');
-            void flushAnalytics().finally(() => {
-              window.location.href = '/api/auth/logout';
-            });
-          }}
+          onClick={signOut}
         >
           <LogOut size={15} /> Sign out
         </DropdownMenuItem>
@@ -2988,6 +3046,66 @@ function DashboardContent({
   return (
     <CompanyNavProvider value={openCompany}>
       <main className="desk">
+        <HelpPanel
+          open={helpOpen}
+          onOpenChange={setHelpOpen}
+          onTour={
+            emptyStart
+              ? undefined
+              : () => {
+                  setHelpOpen(false);
+                  setTab('holdings');
+                  window.setTimeout(() => setTourSource('help'), 450);
+                }
+          }
+          onChecklist={
+            emptyStart
+              ? undefined
+              : () => {
+                  setHelpOpen(false);
+                  setTab('holdings');
+                  markFresh(today());
+                  onb.show();
+                }
+          }
+          checklistNote={`${onbItems.filter((i) => i.done).length} of ${onbItems.length} done`}
+          onTips={() => {
+            onb.resetTips();
+            notify('Page tips are back. They show once on each page.');
+          }}
+        />
+        {tourSource && <ProductTour source={tourSource} onClose={endTour} />}
+        {!tourSource &&
+          shouldOfferTour(onb.state, { hasHolding: p.companies.length > 0 || hasAssets, onHoldings: tab === 'holdings' }) && (
+            <TourOffer
+              onStart={() => setTourSource('auto')}
+              onDecline={() => {
+                track('tour_finished', { outcome: 'declined', at_step: 'offer' });
+                setTour('declined');
+              }}
+            />
+          )}
+        {email && (
+          <MoreSheet
+            open={moreOpen}
+            onOpenChange={setMoreOpen}
+            items={navItems.filter((i) => i.extra)}
+            active={tab}
+            onNavigate={setTab}
+            onSettings={() => setTab('settings')}
+            onHelp={() => {
+              track('help_opened', { item: 'panel' });
+              setHelpOpen(true);
+            }}
+            onLock={vault?.lock}
+            onSignOut={signOut}
+            onAdmin={isAdmin ? () => window.location.assign('/admin') : undefined}
+            name={name}
+            email={email}
+            picture={picture}
+            unlocked={!!vault}
+          />
+        )}
         <ImportRequestRunner
           request={workspace?.importRequest ?? null}
           busy={busy}
@@ -2999,7 +3117,7 @@ function DashboardContent({
           }}
         />
         <div className="flex flex-col gap-2">
-          <header className={'app-header' + (chromeless ? ' chromeless' : '')}>
+          <header className={'app-header' + (chromeless ? ' chromeless' : '') + (emptyStart ? ' no-nav' : '')}>
             <div className="side">
             <div className="header-brand-group">
               <button
@@ -3016,7 +3134,7 @@ function DashboardContent({
                 <Wordmark />
               </button>
             </div>
-            {!emptyStart && tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
+            {!emptyStart && tab !== 'settings' && <div className="side-portfolio" data-tour="portfolios">{workspace?.selector}</div>}
             {!emptyStart && (
               <AppNav
                 items={navItems}
@@ -3024,6 +3142,8 @@ function DashboardContent({
                 onNavigate={setTab}
                 onAdd={() => openTx('buy', tab === 'company' ? companyTicker : '')}
                 addDisabled={busy}
+                onMore={email ? () => setMoreOpen(true) : undefined}
+                moreActive={moreOpen}
               />
             )}
             {(
@@ -3054,7 +3174,7 @@ function DashboardContent({
                 </button>
               </div>
             )}
-            {email && <div className="side-user">{accountMenu(true)}</div>}
+            {email && <div className="side-user" data-tour="profile">{accountMenu(true)}</div>}
             </div>
             <div className="header-right">
               {tab === 'sip-plan' && <PlanMonthNav month={month} setMonth={setMonth} />}
@@ -3102,6 +3222,7 @@ function DashboardContent({
               >
                 <PopoverTrigger
                   className="bell-trigger hdr-btn"
+                  data-tour="bell"
                   aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
                 >
                   <Bell size={18} />
@@ -3202,6 +3323,7 @@ function DashboardContent({
                 type="button"
                 data-slot="hdr"
                 className="hdr-btn"
+                data-tour="add"
                 disabled={busy}
                 aria-label="Add transaction"
                 onClick={() =>
@@ -3217,7 +3339,24 @@ function DashboardContent({
           </header>
           <NavPanel id="holdings" tab={tab}>
             <MarketGlanceProvider held={held} p={p}>
-            {p.companies.length === 0 && !hasAssets ? (
+            {emptyStart ? (
+              <StartScreen
+                disabled={busy}
+                only={isAll || locked ? ['stock'] : undefined}
+                onPick={pickAsset}
+                onImportFile={importFile}
+                onRestoreFile={(file) =>
+                  workspace ? workspace.requestImport(file, undefined, true) : restoreBackup(file)
+                }
+                onHelp={() => {
+                  track('help_opened', { item: 'faq' });
+                  setHelpOpen(true);
+                }}
+                onMount={markFreshToday}
+                items={onbItems}
+                actions={onbActions}
+              />
+            ) : p.companies.length === 0 && !hasAssets ? (
               <div className="panel empty-holdings">
                 <span className="empty-holdings-icon" aria-hidden="true">
                   <Briefcase size={26} />
@@ -3261,6 +3400,9 @@ function DashboardContent({
               </div>
             ) : (
               <>
+                {showChecklist(onb.state, onbItems, today()) && (
+                  <ChecklistStrip items={onbItems} actions={onbActions} onAllDone={() => onb.stampDone(today())} />
+                )}
                 {pendingCompanies.length > 0 && (
                   <p className="notice" role="status">
                     Company details for {pendingCompanies.join(', ')} are still
@@ -3692,6 +3834,7 @@ function DashboardContent({
             </MarketGlanceProvider>
           </NavPanel>
           <NavPanel id="reports" tab={tab}>
+            {pageTip('insights')}
             {isAll ? (
               <AllInsights
                 portfolio={p}
@@ -3741,6 +3884,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="sip-tracker" tab={tab}>
+            {pageTip('sip_blueprint')}
             <SipTracker
               parts={workspace?.account.portfolios ?? []}
               blueprint={p.sipBlueprint ?? null}
@@ -3760,6 +3904,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>
+            {pageTip('picks')}
             {!hasStocks ? (
               <div className="panel empty-holdings">
                 <h2>Monthly Picks needs a stock</h2>
@@ -3805,6 +3950,7 @@ function DashboardContent({
             )}
           </NavPanel>
           <NavPanel id="history" tab={tab}>
+            {pageTip('activity')}
             <div className="activity-head">
               <h2>Activity</h2>
               <button
@@ -3952,6 +4098,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="company" tab={tab}>
+            {pageTip('company')}
             {companyTicker && (
               <CompanyDetail
                 portfolio={p}
@@ -4062,6 +4209,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="notifications" tab={tab}>
+            {pageTip('notifications')}
             <NotificationsView
               notifications={allNotifications}
               busy={busy}

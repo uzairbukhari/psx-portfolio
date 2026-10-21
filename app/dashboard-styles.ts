@@ -14,3 +14,4 @@ import './redesign.css';
 import './holdings-home.css';
 import './redesign-admin.css';
 import './redesign-settings.css';
+import './onboarding.css';

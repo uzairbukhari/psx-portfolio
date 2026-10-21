@@ -290,7 +290,7 @@ function Setup({ onPrepared }: { onPrepared: (prepared: PreparedVault) => void }
     }
   }
   return (
-    <Shell title="Choose a vault password" kicker="Step 1 · password" step="Step 1 of 2">
+    <Shell title="Choose a vault password" kicker="Step 1 · password" step="Step 1 of 3">
       <p className="muted">
         Your holdings are encrypted on this device before they are saved, so nobody else, including whoever runs this app, can read them. Choose a vault password that is separate from your Google sign-in.
       </p>
@@ -369,7 +369,7 @@ function RecoveryKey({ prepared, onDone, onBack }: { prepared: PreparedVault; on
     }
   }
   return (
-    <Shell title="Save your recovery key" kicker="Step 2 · recovery key" step="Step 2 of 2" wide>
+    <Shell title="Save your recovery key" kicker="Step 2 · recovery key" step="Step 2 of 3" wide>
       <p className="muted">If you forget your vault password, this key is the only way back in. We cannot recover it for you. Save it in a password manager or print it, and keep it away from this device’s backups.</p>
       <div className="vault-recovery" data-testid="recovery-key">{prepared.recoverySecret}</div>
       <div className="vault-blocks" aria-hidden="true">
