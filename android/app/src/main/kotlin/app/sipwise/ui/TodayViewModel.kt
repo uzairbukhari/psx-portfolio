@@ -6,6 +6,8 @@ import app.sipwise.ledger.Ledger
 import app.sipwise.model.AccountOverview
 import app.sipwise.model.AssetsView
 import app.sipwise.model.DayMove
+import app.sipwise.model.MarketSummaryBody
+import app.sipwise.model.SipView
 import app.sipwise.model.TodayView
 import app.sipwise.model.TrackRange
 import app.sipwise.model.TrackView
@@ -28,6 +30,10 @@ data class TodayUi(
     val skippedWelcome: Boolean = false,
     val overview: AccountOverview? = null,
     val assets: AssetsView = AssetsView(),
+    /** This month's SIP Blueprint, for the card that links to it; null while there is no plan. */
+    val sip: SipView? = null,
+    val market: MarketSummaryBody? = null,
+    val marketOpen: Boolean = false,
     val move: DayMove? = null,
     val track: TrackView? = null,
     val range: TrackRange = TrackRange.HALF,
@@ -78,7 +84,10 @@ class TodayViewModel(
                 val reply = ledger.view("today.view")
                 val view = decodeView(TodayView.serializer(), reply)
                 _ui.value = _ui.value.copy(view = view, error = null)
-                if (view.hasAssets) loadAssets() else _ui.value = _ui.value.copy(overview = null, assets = AssetsView())
+                // Net worth counts every class, so the overview is loaded for a stock-only portfolio too; only the
+                // gold, plan and fund sections need the assets view.
+                loadOverview(view.hasAssets)
+                loadSip()
                 if (view.hasStocks && !view.firstUse) loadHistory()
             } catch (e: EngineException) {
                 _ui.value = _ui.value.copy(error = e.message)
@@ -124,20 +133,43 @@ class TodayViewModel(
             }
     }
 
-    /** Net worth and the asset classes, for a portfolio that holds funds, plans or metals; a failure only hides that dashboard. */
-    private suspend fun loadAssets() {
+    /** The market pulse, polled by the screen while it is on top. Public data, no holdings. */
+    suspend fun loadMarket() {
+        val reply = ledger.marketSummary() ?: return
+        val open =
+            try {
+                ledger.marketOpen()
+            } catch (ignored: EngineException) {
+                false
+            }
+        _ui.value = _ui.value.copy(market = reply.summary, marketOpen = open)
+    }
+
+    /** Net worth across every asset class, and the asset sections when the scope holds any; a failure hides them. */
+    private suspend fun loadOverview(withAssets: Boolean) {
         try {
             val overview = ledger.view("overview.view")
-            val assets = ledger.view("assets.view")
+            val assets = if (withAssets) ledger.view("assets.view") else null
             _ui.value =
                 _ui.value.copy(
                     overview = if (overview is JsonNull) null else decodeView(AccountOverview.serializer(), overview),
-                    assets = decodeView(AssetsView.serializer(), assets),
+                    assets = assets?.let { decodeView(AssetsView.serializer(), it) } ?: AssetsView(),
                 )
         } catch (ignored: EngineException) {
             _ui.value = _ui.value.copy(overview = null, assets = AssetsView())
         } catch (ignored: SerializationException) {
             _ui.value = _ui.value.copy(overview = null, assets = AssetsView())
+        }
+    }
+
+    /** The SIP card: where this month stands. Without a blueprint the card invites you to set one up. */
+    private suspend fun loadSip() {
+        try {
+            _ui.value = _ui.value.copy(sip = decodeView(SipView.serializer(), ledger.view("sip.view")))
+        } catch (ignored: EngineException) {
+            _ui.value = _ui.value.copy(sip = null)
+        } catch (ignored: SerializationException) {
+            _ui.value = _ui.value.copy(sip = null)
         }
     }
 }

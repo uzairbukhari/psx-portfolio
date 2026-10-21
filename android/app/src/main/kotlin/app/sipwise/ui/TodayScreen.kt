@@ -1,5 +1,6 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Flag
@@ -19,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,15 +29,21 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import app.sipwise.R
-import app.sipwise.designsystem.AreaChart
 import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.ChartLayer
+import app.sipwise.designsystem.ChartLegend
 import app.sipwise.designsystem.ChartSeries
 import app.sipwise.designsystem.DeltaPill
 import app.sipwise.designsystem.EmptyState
 import app.sipwise.designsystem.IconTile
 import app.sipwise.designsystem.ListRow
+import app.sipwise.designsystem.MixBar
+import app.sipwise.designsystem.MixSegment
 import app.sipwise.designsystem.MoneyText
 import app.sipwise.designsystem.NightSlab
 import app.sipwise.designsystem.Overline
@@ -47,6 +56,8 @@ import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.SkeletonBlock
 import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
+import app.sipwise.designsystem.TimeSeriesChart
+import app.sipwise.model.AccountOverview
 import app.sipwise.model.ClassTotal
 import app.sipwise.model.DayMove
 import app.sipwise.model.MonthProgress
@@ -54,15 +65,18 @@ import app.sipwise.model.Mover
 import app.sipwise.model.NextAction
 import app.sipwise.model.PortfolioSummary
 import app.sipwise.model.ReturnBreakdown
+import app.sipwise.model.SipView
 import app.sipwise.model.TodayView
 import app.sipwise.model.TrackRange
 import app.sipwise.model.UpcomingDividend
 import app.sipwise.model.moneyShort
 import app.sipwise.model.monthTitle
 import app.sipwise.model.plural
+import app.sipwise.model.sharePercent
 import app.sipwise.model.shortDate
 import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
+import kotlinx.coroutines.delay
 
 @Suppress("CyclomaticComplexMethod")
 @Composable
@@ -74,6 +88,15 @@ fun TodayScreen(
     onAddEntry: () -> Unit,
     onOpenPortfolio: () -> Unit,
 ) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                viewModel.loadMarket()
+                delay(if (viewModel.ui.value.marketOpen) MARKET_POLL_MS else MARKET_IDLE_POLL_MS)
+            }
+        }
+    }
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     if (view == null) {
@@ -85,7 +108,7 @@ fun TodayScreen(
         return
     }
     if (!view.hasStocks) {
-        AssetsToday(view, ui, onOpenPortfolio) { action -> if (action.key == "prices") viewModel.refreshPrices() else onOpenPlan() }
+        AssetsToday(view, ui, onOpenPlan, onOpenPortfolio) { action -> if (action.key == "prices") viewModel.refreshPrices() else onOpenPlan() }
         return
     }
     LazyColumn(
@@ -97,10 +120,18 @@ fun TodayScreen(
             return@LazyColumn
         }
         view.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { HeroCard(view.summary, view.openCount, view.breakdown, ui.showReturn, viewModel::toggleReturn) }
+        val overview = ui.overview
+        if (overview != null && overview.classes.size > 1) {
+            item { NetWorthCard(overview, overview.portfolios.singleOrNull()?.name) }
+        } else {
+            item { HeroCard(view.summary, view.openCount, view.breakdown, ui.showReturn, viewModel::toggleReturn) }
+        }
         ui.move?.takeIf { it.available }?.let { move -> item { MoveCard(move, onOpenCompany) } }
         if (ui.track?.value?.isChart == true || (ui.track == null && !ui.historyFailed)) item { ValueCard(ui, viewModel) }
-        item { MonthCard(view.progress) }
+        ui.sip?.let { sip -> item { SipTodayCard(sip, onOpenPlan) } }
+        ui.market?.takeIf { it.index != null }?.let { market -> item { MarketCard(market, ui.marketOpen) } }
+        if (overview != null && overview.portfolios.size > 1) item { PortfolioShares(overview, onOpenPortfolio) }
+        if (ui.sip == null) item { MonthCard(view.progress) }
         if (view.upcoming.isNotEmpty()) {
             item { Text(stringResource(R.string.today_upcoming_title), style = MaterialTheme.typography.titleMedium) }
             item { UpcomingCard(view.upcoming, onOpenCompany) }
@@ -126,9 +157,11 @@ fun TodayScreen(
 private fun AssetsToday(
     view: TodayView,
     ui: TodayUi,
+    onOpenSip: () -> Unit,
     onOpenPortfolio: () -> Unit,
     onAction: (NextAction) -> Unit,
 ) {
+
     val overview = ui.overview
     if (overview == null) {
         ScreenSkeleton()
@@ -144,6 +177,7 @@ private fun AssetsToday(
         }
         item { Text(stringResource(R.string.today_assets_title), style = MaterialTheme.typography.titleMedium) }
         item { ClassesCard(overview.classes, onOpenPortfolio) }
+        ui.sip?.let { sip -> item { SipTodayCard(sip, onOpenSip) } }
         if (view.actions.isNotEmpty()) {
             item { Text(stringResource(R.string.actions_title), style = MaterialTheme.typography.titleMedium) }
             item { ActionsCard(view.actions, ui.pricing, onAction) }
@@ -272,29 +306,40 @@ private fun ValueCard(
                 SkeletonBlock(Modifier.fillMaxWidth().height(VALUE_CHART_HEIGHT))
             } else {
                 Text(track.value.summary, style = MaterialTheme.typography.bodyMedium)
-                AreaChart(
-                    series = listOf(ChartSeries(track.value.value, MaterialTheme.colorScheme.primary, fill = true)),
+                val valueLabel = stringResource(R.string.today_value_series)
+                val moneyInLabel = stringResource(R.string.today_money_in_series)
+                val valueColor = SipwiseTheme.chart.category(0)
+                val moneyInColor = SipwiseTheme.chart.neutral
+                TimeSeriesChart(
+                    series =
+                        listOf(
+                            ChartSeries(track.value.value, valueColor, fill = true),
+                            ChartSeries(track.value.moneyIn, moneyInColor, dashed = true),
+                        ),
                     description = track.value.spoken,
                     height = VALUE_CHART_HEIGHT,
                     xLabel = ::dayLabel,
                     scrubDetail = { _, ys -> ys.filterNotNull().joinToString(" / ") { moneyShort(it) } },
                 )
+                ChartLegend(
+                    listOf(
+                        ChartLayer(valueLabel, emptyList(), valueColor),
+                        ChartLayer(moneyInLabel, emptyList(), moneyInColor, dashed = true),
+                    ),
+                )
+                track.value.notes.forEach {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            val ranges = listOf(TrackRange.MONTH, TrackRange.HALF, TrackRange.YEAR)
-            val labels = ranges.associateWith { stringResource(rangeLabel(it)) }
-            SegmentedControl(ranges, ui.range, label = { labels.getValue(it) }, onSelect = viewModel::setRange)
+            SegmentedControl(TrackRange.entries.toList(), ui.range, label = { it.label }, onSelect = viewModel::setRange)
         }
     }
 }
 
 private val VALUE_CHART_HEIGHT = 170.dp
+private const val MARKET_POLL_MS = 60_000L
+private const val MARKET_IDLE_POLL_MS = 600_000L
 
-private fun rangeLabel(range: TrackRange) =
-    when (range) {
-        TrackRange.MONTH -> R.string.insights_range_1m
-        TrackRange.HALF -> R.string.insights_range_6m
-        else -> R.string.insights_range_1y
-    }
 
 /** The next payouts the ledger expects: when the book closes and what it should pay. */
 @Composable
@@ -463,3 +508,74 @@ private fun WelcomeCard(
         Text(stringResource(R.string.welcome_note), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
     }
 }
+
+/** This month's SIP: the ring, what is in against the plan, the streak, and the way through to the Blueprint. */
+@Composable
+private fun SipTodayCard(
+    sip: SipView,
+    onOpen: () -> Unit,
+) {
+    val state = sip.state
+    val hero = sip.hero
+    SipwiseCard(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.today_sip_title))
+            if (state == null || hero == null) {
+                Text(stringResource(R.string.today_sip_none), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.today_sip_set_up), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                return@Column
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                ProgressRing(
+                    progress = (state.progress.percent / SIP_PERCENT).toFloat(),
+                    size = SIP_RING,
+                    centerText = "${state.progress.percent.toInt()}%",
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    MoneyText(
+                        stringResource(R.string.today_sip_done_of, moneyShort(state.progress.done), moneyShort(state.progress.planned)),
+                        style = SipwiseNumbers.small,
+                    )
+                    Text(hero.status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (hero.streak > 0) DeltaPill(stringResource(R.string.sip_streak, hero.streak), positive = true)
+                }
+            }
+            Text(hero.encouragement, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+private val SIP_RING = 64.dp
+private const val SIP_PERCENT = 100.0
+
+/** Each portfolio in its own colour with its share of net worth, the same colour rule as the web. */
+@Composable
+private fun PortfolioShares(
+    overview: AccountOverview,
+    onOpen: () -> Unit,
+) {
+    val chart = SipwiseTheme.chart
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.overview_portfolios))
+            MixBar(
+                overview.portfolios.mapIndexed { i, p -> MixSegment(p.name, p.share, chart.category(i)) },
+                labels = false,
+            )
+            overview.portfolios.forEachIndexed { i, p ->
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onOpen),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Canvas(Modifier.size(DOT)) { drawCircle(chart.category(i)) }
+                    Text(p.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
+                    Text(sharePercent(p.share), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    MoneyText(moneyShort(p.value), style = SipwiseNumbers.small)
+                }
+            }
+        }
+    }
+}
+
+private val DOT = 10.dp

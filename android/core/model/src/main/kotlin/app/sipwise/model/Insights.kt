@@ -90,4 +90,10 @@ data class BenchmarkChart(
 data class TrackView(val value: ValueChart, val mwr: ReturnText = ReturnText(), val benchmark: BenchmarkChart)
 
 /** Chart ranges for the track record. [key] is what the shared TypeScript calls them. */
-enum class TrackRange(val key: String) { MONTH("1m"), HALF("6m"), YEAR("1y"), ALL("all") }
+enum class TrackRange(val key: String, val label: String) {
+    MONTH("1m", "1M"),
+    QUARTER("3m", "3M"),
+    HALF("6m", "6M"),
+    YEAR("1y", "1Y"),
+    ALL("all", "All"),
+}

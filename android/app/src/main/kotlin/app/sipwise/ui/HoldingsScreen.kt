@@ -1,14 +1,20 @@
 package app.sipwise.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -20,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -30,8 +37,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.sipwise.R
+import app.sipwise.designsystem.ChartBar
+import app.sipwise.designsystem.ComboChart
 import app.sipwise.designsystem.DeltaPill
 import app.sipwise.designsystem.EmptyState
+import app.sipwise.designsystem.MixBar
+import app.sipwise.designsystem.MixSegment
 import app.sipwise.designsystem.MoneyText
 import app.sipwise.designsystem.NightSlab
 import app.sipwise.designsystem.Overline
@@ -46,11 +57,16 @@ import app.sipwise.designsystem.TickerTile
 import app.sipwise.designsystem.Treemap
 import app.sipwise.designsystem.TreemapItem
 import app.sipwise.model.ALL_PORTFOLIOS
+import app.sipwise.model.AssetTotal
 import app.sipwise.model.HoldingRow
 import app.sipwise.model.HoldingSort
+import app.sipwise.model.InvestedMonth
 import app.sipwise.model.PortfolioSummary
+import app.sipwise.model.SectorTotal
 import app.sipwise.model.moneyShort
+import app.sipwise.model.monthShort
 import app.sipwise.model.plural
+import app.sipwise.model.sharePercent
 import app.sipwise.model.shortDate
 import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
@@ -98,6 +114,9 @@ fun HoldingsScreen(
                 item { Text(overview.total.incomplete.joinToString(" "), color = SipwiseTheme.colors.warn, style = MaterialTheme.typography.bodyMedium) }
             }
             if (isAll) item { PortfolioBreakdown(overview, viewModel::openPortfolio) }
+            if (overview.sectors.size > 1 && hasStocks) item { SectorsCard(overview.sectors) }
+            if (!hasStocks && overview.topAssets.isNotEmpty()) item { LargestAssetsCard(overview.topAssets) }
+            if (!hasStocks && overview.invested.months.size > 1) item { MoneyInCard(overview.invested.months) }
         }
         if (view.rows.isEmpty() && ui.assets.isEmpty) item { EmptyState(stringResource(R.string.nav_portfolio), stringResource(R.string.holdings_empty)) }
         if (view.rows.size >= MIN_TREEMAP) item { AllocationCard(view.rows, onOpenCompany) }
@@ -235,7 +254,99 @@ private fun HoldingItem(
                 MoneyText(moneyShort(row.value), style = SipwiseNumbers.medium)
                 val gain = row.gain
                 if (gain != null) DeltaPill(signedPercent(row.gainPercent), positive = gain >= 0)
+                row.weight?.takeIf { it > 0 }?.let { WeightBar(it, row.sector) }
             }
+        }
+    }
+}
+
+/** How much of the stocks this holding is, as a short bar in its sector's colour. */
+@Composable
+private fun WeightBar(
+    weight: Double,
+    sector: String,
+) {
+    val full = (weight / PERCENT).toFloat().coerceIn(0f, 1f)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(sharePercent(weight), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(
+            Modifier
+                .width(WEIGHT_WIDTH)
+                .height(WEIGHT_HEIGHT)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(WEIGHT_HEIGHT / 2)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(full)
+                    .height(WEIGHT_HEIGHT)
+                    .background(sectorColor(sector), RoundedCornerShape(WEIGHT_HEIGHT / 2)),
+            )
+        }
+    }
+}
+
+private const val PERCENT = 100.0
+private val WEIGHT_WIDTH = 56.dp
+private val WEIGHT_HEIGHT = 6.dp
+
+/** One colour per sector, stable for a sector name, from the same palette the charts use. */
+@Composable
+private fun sectorColor(sector: String): Color =
+    if (sector.isEmpty()) SipwiseTheme.chart.other else SipwiseTheme.chart.category(sector.hashCode())
+
+/** The web's Sectors card: each sector's share of the stocks, biggest first. */
+@Composable
+private fun SectorsCard(sectors: List<SectorTotal>) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.holdings_sectors))
+            MixBar(sectors.map { MixSegment(it.sector, it.share, sectorColor(it.sector)) }, labels = false)
+            sectors.forEach {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Box(Modifier.size(DOT).background(sectorColor(it.sector), RoundedCornerShape(DOT / 2)))
+                    Text(it.sector, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
+                    Text(sharePercent(it.share), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    MoneyText(moneyShort(it.value), style = SipwiseNumbers.small)
+                }
+            }
+        }
+    }
+}
+
+private val DOT = 10.dp
+
+/** For a portfolio without stocks: its largest funds, metal holdings, plans and currency. */
+@Composable
+private fun LargestAssetsCard(assets: List<AssetTotal>) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.holdings_largest))
+            assets.forEach {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(it.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        Text(sharePercent(it.share), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    MoneyText(moneyShort(it.value), style = SipwiseNumbers.small)
+                    it.gain?.let { gain -> DeltaPill(signedMoney(gain), positive = gain >= 0) }
+                }
+            }
+        }
+    }
+}
+
+/** Money paid in per month over the last year, bars with the running total over them. */
+@Composable
+private fun MoneyInCard(months: List<InvestedMonth>) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Overline(stringResource(R.string.holdings_money_in))
+            ComboChart(
+                bars = months.map { ChartBar(monthShort(it.month), it.amount) },
+                lineLabel = stringResource(R.string.holdings_money_in_total),
+                description = stringResource(R.string.holdings_money_in_description),
+                valueLabel = ::moneyShort,
+            )
         }
     }
 }

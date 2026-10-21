@@ -720,4 +720,17 @@
     <string name="assets_metal_rate">Rate: %1$s per tola · %2$s · %3$s</string>
     <string name="assets_rate_dealer">dealer</string>
     <string name="assets_rate_intl">international estimate</string>
+    <!-- Today: the value chart's two lines and the SIP card -->
+    <string name="today_value_series">Value</string>
+    <string name="today_money_in_series">Money in</string>
+    <string name="today_sip_title">This month\'s SIP</string>
+    <string name="today_sip_none">No monthly plan yet. Set a budget and a split and the app keeps the month on track.</string>
+    <string name="today_sip_set_up">Set up the SIP Blueprint</string>
+    <string name="today_sip_done_of">%1$s of %2$s in</string>
+    <!-- Portfolio: sectors, largest holdings and money in -->
+    <string name="holdings_sectors">Sectors</string>
+    <string name="holdings_largest">Largest holdings</string>
+    <string name="holdings_money_in">Money in per month</string>
+    <string name="holdings_money_in_total">Total so far</string>
+    <string name="holdings_money_in_description">What you paid in each month over the last year, with the running total.</string>
 </resources>

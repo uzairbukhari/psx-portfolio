@@ -27,6 +27,9 @@ data class PortfolioTotal(
     val gainPercent: Double? = null,
     val share: Double = 0.0,
     val heldCount: Int = 0,
+    val cost: Double? = null,
+    val missingPrice: Int = 0,
+    val unknownCost: Int = 0,
 )
 
 @Serializable
@@ -40,6 +43,19 @@ data class HoldingTotal(
     val gainPercent: Double? = null,
 )
 
+/** One fund, metal holding, savings plan or currency still held, for the largest-holdings card. */
+@Serializable
+data class AssetTotal(
+    val id: String,
+    val name: String,
+    val classKey: String = "",
+    val value: Double = 0.0,
+    val share: Double = 0.0,
+    val gain: Double? = null,
+    val gainPercent: Double? = null,
+)
+
+/** One sector of the stocks held, with its share of the stock value. */
 @Serializable
 data class SectorTotal(val sector: String, val value: Double = 0.0, val share: Double = 0.0)
 
@@ -86,6 +102,7 @@ data class AccountOverview(
     val classes: List<ClassTotal> = emptyList(),
     val portfolios: List<PortfolioTotal> = emptyList(),
     val topHoldings: List<HoldingTotal> = emptyList(),
+    val topAssets: List<AssetTotal> = emptyList(),
     val holdingCount: Int = 0,
     val sectors: List<SectorTotal> = emptyList(),
     val invested: InvestedSummary = InvestedSummary(),
