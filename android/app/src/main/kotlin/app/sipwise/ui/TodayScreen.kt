@@ -161,7 +161,6 @@ private fun AssetsToday(
     onOpenPortfolio: () -> Unit,
     onAction: (NextAction) -> Unit,
 ) {
-
     val overview = ui.overview
     if (overview == null) {
         ScreenSkeleton()
@@ -339,7 +338,6 @@ private fun ValueCard(
 private val VALUE_CHART_HEIGHT = 170.dp
 private const val MARKET_POLL_MS = 60_000L
 private const val MARKET_IDLE_POLL_MS = 600_000L
-
 
 /** The next payouts the ledger expects: when the book closes and what it should pay. */
 @Composable
