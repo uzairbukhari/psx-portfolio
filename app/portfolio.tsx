@@ -2333,6 +2333,9 @@ function DashboardContent({
     tab === 'currency' ||
     tab === 'plan' ||
     tab === 'notifications';
+  // A new account with nothing in it has no pages to open yet: the sidebar keeps only pin, Settings and the profile.
+  // An empty portfolio beside others keeps the full sidebar, so the others stay one click away.
+  const emptyStart = p.companies.length === 0 && !hasAssets && (workspace?.account.portfolios.length ?? 0) <= 1;
   const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
@@ -3013,8 +3016,8 @@ function DashboardContent({
                 <Wordmark />
               </button>
             </div>
-            {tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
-            {(
+            {!emptyStart && tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
+            {!emptyStart && (
               <AppNav
                 items={navItems}
                 active={tab}
