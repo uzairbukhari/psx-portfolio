@@ -258,3 +258,37 @@ fun slotAt(
     if (count <= 0 || width <= 0f || x < 0f || x > width) return -1
     return minOf((x / width * count).toInt(), count - 1)
 }
+
+/**
+ * Stacked tops for a stacked area chart: each layer's y becomes its own value plus every layer below it, so the
+ * areas can be drawn back to front without overlapping. Layers must share their x values; a short layer is left as
+ * far as it goes.
+ */
+fun stackLayers(layers: List<List<List<Double>>>): List<List<List<Double>>> {
+    val tops = mutableListOf<List<List<Double>>>()
+    val running = mutableMapOf<Double, Double>()
+    for (layer in layers) {
+        tops +=
+            layer.map { point ->
+                val x = point[0]
+                val top = (running[x] ?: 0.0) + point[1]
+                running[x] = top
+                listOf(x, top)
+            }
+    }
+    return tops
+}
+
+/** How far a series moved over the window it covers, for the chart's spoken summary. Null with fewer than two points. */
+data class Trend(val change: Double, val percent: Double) {
+    val up: Boolean get() = change > 0
+}
+
+fun trend(points: List<List<Double>>): Trend? {
+    if (points.size < 2) return null
+    val first = points.first()[1]
+    val last = points.last()[1]
+    return Trend(last - first, if (first != 0.0) (last - first) / kotlin.math.abs(first) * PERCENT else 0.0)
+}
+
+private const val PERCENT = 100.0

@@ -105,4 +105,29 @@ class ChartMathTest {
         assertEquals(3, slotAt(100f, 100f, 4))
         assertEquals(-1, slotAt(-1f, 100f, 4))
     }
+
+    @Test
+    fun `stacked layers add up and keep their x values`() {
+        val a = listOf(listOf(1.0, 10.0), listOf(2.0, 20.0))
+        val b = listOf(listOf(1.0, 5.0), listOf(2.0, 5.0))
+        val tops = stackLayers(listOf(a, b))
+        assertEquals(listOf(10.0, 20.0), tops[0].map { it[1] })
+        assertEquals(listOf(15.0, 25.0), tops[1].map { it[1] })
+        assertEquals(listOf(1.0, 2.0), tops[1].map { it[0] })
+        assertEquals(emptyList<List<List<Double>>>(), stackLayers(emptyList()))
+    }
+
+    @Test
+    fun `trend reads the move over the window`() {
+        val up = trend(listOf(listOf(0.0, 100.0), listOf(1.0, 111.0)))!!
+        assertEquals(11.0, up.change, 1e-9)
+        assertEquals(11.0, up.percent, 1e-9)
+        assertTrue(up.up)
+        val down = trend(listOf(listOf(0.0, 100.0), listOf(1.0, 90.0)))!!
+        assertEquals(-10.0, down.percent, 1e-9)
+        assertEquals(false, down.up)
+        // A flat start cannot give a percentage, and one point is no trend at all.
+        assertEquals(0.0, trend(listOf(listOf(0.0, 0.0), listOf(1.0, 5.0)))!!.percent, 1e-9)
+        assertEquals(null, trend(listOf(listOf(0.0, 1.0))))
+    }
 }
