@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -49,7 +50,6 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -300,7 +300,13 @@ fun StackedAreaChart(
             onShowTable = onShowTable,
         )
         ChartLegend(layers, hidden, onSlab) { label ->
-            hidden = if (label in hidden) hidden - label else if (hidden.size + 1 < layers.size) hidden + label else hidden
+            // The last visible layer cannot be hidden, so a chart is never left empty.
+            hidden =
+                when {
+                    label in hidden -> hidden - label
+                    hidden.size + 1 < layers.size -> hidden + label
+                    else -> hidden
+                }
         }
     }
 }

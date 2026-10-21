@@ -44,7 +44,6 @@ import app.sipwise.designsystem.ChartLayer
 import app.sipwise.designsystem.DeltaPill
 import app.sipwise.designsystem.HabitSquare
 import app.sipwise.designsystem.HabitState
-import app.sipwise.designsystem.HabitStrip as HabitStripChart
 import app.sipwise.designsystem.MixBar
 import app.sipwise.designsystem.MixSegment
 import app.sipwise.designsystem.MoneyText
@@ -66,6 +65,7 @@ import app.sipwise.model.SipView
 import app.sipwise.model.money
 import app.sipwise.model.moneyShort
 import app.sipwise.model.shortDate
+import app.sipwise.designsystem.HabitStrip as HabitStripChart
 
 /**
  * The SIP Blueprint: one plan you follow every month. The hero says where the month stands, each class row says what
@@ -107,17 +107,7 @@ fun SipScreen(
                 row = row,
                 month = hero?.month.orEmpty(),
                 busy = ui.busy,
-                onAct = {
-                    when (row.next) {
-                        SipRowAction.PICKS -> onOpenPicks(hero?.month.orEmpty())
-                        SipRowAction.HOLDINGS -> onOpenHoldings()
-                        SipRowAction.LOG -> viewModel.open(SipSheet.Log(row.sipClass ?: SipClass.GOLD, row.amount, row.rate))
-                        SipRowAction.MARK ->
-                            row.sipClass?.let {
-                                if (row.done && row.manual) viewModel.markUndone(it) else viewModel.markDone(it, row.amount, view.asOf)
-                            }
-                    }
-                },
+                onAct = { act(row, view, viewModel, onOpenPicks, onOpenHoldings) },
                 onMove = { row.sipClass?.let { viewModel.open(SipSheet.Move(it, row.amount)) } },
             )
         }
@@ -134,6 +124,16 @@ fun SipScreen(
         item { FutureCard(onOpen = { viewModel.open(SipSheet.Future) }) }
         ui.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
     }
+    SipSheets(view, ui, viewModel)
+}
+
+/** Whichever sheet is open over the Blueprint. */
+@Composable
+private fun SipSheets(
+    view: SipView,
+    ui: SipUi,
+    viewModel: SipViewModel,
+) {
     when (val sheet = ui.sheet) {
         null -> Unit
         SipSheet.Edit -> EditPlanSheet(view, ui, viewModel)
@@ -141,6 +141,37 @@ fun SipScreen(
         is SipSheet.Log -> LogPurchaseSheet(sheet, view.asOf, ui, viewModel)
         is SipSheet.Move -> MovePlanSheet(sheet, ui, viewModel)
     }
+}
+
+/**
+ * What the row's button does: open Monthly Picks or Holdings for the classes you choose by hand, open the log sheet
+ * for gold and currency, or tick the row off (and untick one you ticked yourself).
+ */
+private fun act(
+    row: SipRow,
+    view: SipView,
+    viewModel: SipViewModel,
+    onOpenPicks: (String) -> Unit,
+    onOpenHoldings: () -> Unit,
+) {
+    val month = view.hero?.month.orEmpty()
+    val key = row.sipClass
+    when (row.next) {
+        SipRowAction.PICKS -> onOpenPicks(month)
+        SipRowAction.HOLDINGS -> onOpenHoldings()
+        SipRowAction.LOG -> viewModel.open(SipSheet.Log(key ?: SipClass.GOLD, row.amount, row.rate))
+        SipRowAction.MARK -> mark(row, key, view.asOf, viewModel)
+    }
+}
+
+private fun mark(
+    row: SipRow,
+    key: SipClass?,
+    asOf: String,
+    viewModel: SipViewModel,
+) {
+    if (key == null) return
+    if (row.done && row.manual) viewModel.markUndone(key) else viewModel.markDone(key, row.amount, asOf)
 }
 
 /** The slab: where the month stands, how much is left, the streak and the next SIP day. */

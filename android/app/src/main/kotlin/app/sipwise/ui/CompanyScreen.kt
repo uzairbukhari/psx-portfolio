@@ -134,13 +134,25 @@ fun CompanyScreen(
             items(entries, key = { it.id }) { EntryItem(it, onOpen = { onOpenEntry(it.id) }) }
         }
     }
+    CompanyDialogs(view, ui, viewModel, onAdd)
+}
+
+/** Whichever sheet or dialog is open over the page. */
+@Composable
+private fun CompanyDialogs(
+    view: CompanyView,
+    ui: CompanyUi,
+    viewModel: CompanyViewModel,
+    onAdd: () -> Unit,
+) {
+    val close = { viewModel.open(null) }
     when (val dialog = ui.dialog) {
         null -> Unit
-        CompanyDialog.Price -> PriceDialog(view, ui.busy, ui.error, onSave = viewModel::savePrice, onDismiss = { viewModel.open(null) })
-        CompanyDialog.Actions -> ActionsSheet(view, onPick = viewModel::open, onAdd = onAdd, onDismiss = { viewModel.open(null) })
-        CompanyDialog.Edit -> EditCompanyDialog(view, ui.busy, ui.error, onSave = viewModel::saveCompany, onDismiss = { viewModel.open(null) })
-        CompanyDialog.Symbol -> SymbolDialog(view, ui.busy, ui.error, onSave = viewModel::changeSymbol, onDismiss = { viewModel.open(null) })
-        is CompanyDialog.Received -> ReceivedDialog(dialog.row, ui.busy, ui.error, onSave = viewModel::markReceived, onDismiss = { viewModel.open(null) })
+        CompanyDialog.Price -> PriceDialog(view, ui.busy, ui.error, onSave = viewModel::savePrice, onDismiss = close)
+        CompanyDialog.Actions -> ActionsSheet(view, onPick = viewModel::open, onAdd = onAdd, onDismiss = close)
+        CompanyDialog.Edit -> EditCompanyDialog(view, ui.busy, ui.error, onSave = viewModel::saveCompany, onDismiss = close)
+        CompanyDialog.Symbol -> SymbolDialog(view, ui.busy, ui.error, onSave = viewModel::changeSymbol, onDismiss = close)
+        is CompanyDialog.Received -> ReceivedDialog(dialog.row, ui.busy, ui.error, onSave = viewModel::markReceived, onDismiss = close)
     }
 }
 

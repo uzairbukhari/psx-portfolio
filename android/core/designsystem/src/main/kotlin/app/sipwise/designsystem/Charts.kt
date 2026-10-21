@@ -58,6 +58,7 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.min
+
 /** One line (or area) on an [AreaChart]; points are [x, y] pairs sorted by x. */
 data class ChartSeries(
     val points: List<List<Double>>,
