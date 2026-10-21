@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -215,7 +216,7 @@ private fun SipHeroSlab(
         hero.nudge?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = SlabColors.loss) }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stringResource(R.string.sip_next_day, shortDate(hero.next.date), hero.next.days),
+                pluralStringResource(R.plurals.sip_next_day, hero.next.days, shortDate(hero.next.date), hero.next.days),
                 style = MaterialTheme.typography.bodySmall,
                 color = SlabColors.muted,
                 modifier = Modifier.weight(1f),
@@ -336,7 +337,7 @@ private fun HabitCard(
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Overline(stringResource(R.string.sip_habit), modifier = Modifier.weight(1f))
-                Text(stringResource(R.string.sip_longest, longest), style = MaterialTheme.typography.labelSmall)
+                Text(pluralStringResource(R.plurals.sip_longest, longest, longest), style = MaterialTheme.typography.labelSmall)
             }
             HabitStripChart(squares)
             Text(stringResource(R.string.sip_habit_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -376,7 +377,7 @@ private fun FutureSheet(
             val invested = if (real) last?.realInvested else last?.invested
             MoneyText(moneyShort(value ?: 0.0), style = SipwiseNumbers.hero)
             Text(
-                stringResource(R.string.sip_future_summary, projection.years, moneyShort(invested ?: 0.0), "%.1f".format(projection.annual)),
+                pluralStringResource(R.plurals.sip_future_summary, projection.years, projection.years, moneyShort(invested ?: 0.0), "%.1f".format(projection.annual)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -408,7 +409,7 @@ private fun FutureSheet(
                 Text(stringResource(R.string.sip_future_today_money), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = real, onCheckedChange = { real = it })
             }
-            Text(stringResource(R.string.sip_future_years, years.toInt()), style = MaterialTheme.typography.bodyMedium)
+            Text(pluralStringResource(R.plurals.sip_future_years, years.toInt(), years.toInt()), style = MaterialTheme.typography.bodyMedium)
             Slider(
                 value = years,
                 onValueChange = { years = it },

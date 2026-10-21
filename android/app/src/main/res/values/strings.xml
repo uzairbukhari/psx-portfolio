@@ -259,7 +259,10 @@
     <string name="company_dividends_received">Dividends received</string>
     <string name="company_dividends_total">Total so far</string>
     <string name="company_dividends_chart">Dividends received from %1$s, each payment with the running total</string>
-    <string name="company_dividends_sum">%1$s from %2$d payments</string>
+    <plurals name="company_dividends_sum">
+        <item quantity="one">%1$s from %2$d payment</item>
+        <item quantity="other">%1$s from %2$d payments</item>
+    </plurals>
     <string name="company_edit">Edit company</string>
     <string name="company_edit_hint">Fix the name or sector</string>
     <string name="company_edit_note">The name and sector change in every portfolio that holds this company.</string>
@@ -279,7 +282,10 @@
     <string name="sip_all_in">All in for this month. Nice work.</string>
     <string name="sip_left_of">left of %1$s this month</string>
     <string name="sip_streak">%1$d-month streak</string>
-    <string name="sip_next_day">Next SIP day %1$s, in %2$d days</string>
+    <plurals name="sip_next_day">
+        <item quantity="one">Next SIP day %1$s, in %2$d day</item>
+        <item quantity="other">Next SIP day %1$s, in %2$d days</item>
+    </plurals>
     <string name="sip_edit_plan">Edit plan</string>
     <string name="sip_done">Done</string>
     <string name="sip_above_target">%1$s above target</string>
@@ -297,19 +303,28 @@
     <string name="sip_mix">Your mix</string>
     <string name="sip_mix_after">After this month\'s plan</string>
     <string name="sip_habit">Your habit</string>
-    <string name="sip_longest">Best run: %1$d months</string>
+    <plurals name="sip_longest">
+        <item quantity="one">Best run: %1$d month</item>
+        <item quantity="other">Best run: %1$d months</item>
+    </plurals>
     <string name="sip_habit_note">A month counts when at least 80% of the budget went in. Tap a square for the month.</string>
     <string name="sip_future">Future you</string>
     <string name="sip_future_blurb">Where this plan lands if you keep it up, in money of the day and in today\'s money.</string>
     <string name="sip_future_open">See the years ahead</string>
     <string name="sip_future_loading">Working it out…</string>
-    <string name="sip_future_summary">In %1$d years, after putting in %2$s, at about %3$s%% a year</string>
+    <plurals name="sip_future_summary">
+        <item quantity="one">In %1$d year, after putting in %2$s, at about %3$s%% a year</item>
+        <item quantity="other">In %1$d years, after putting in %2$s, at about %3$s%% a year</item>
+    </plurals>
     <string name="sip_future_invested">Money in</string>
     <string name="sip_future_growth">Growth</string>
     <string name="sip_future_chart">Money in and growth, year by year</string>
     <string name="sip_future_year">Yr %1$d</string>
     <string name="sip_future_today_money">Show it in today\'s money</string>
-    <string name="sip_future_years">Over %1$d years</string>
+    <plurals name="sip_future_years">
+        <item quantity="one">Over %1$d year</item>
+        <item quantity="other">Over %1$d years</item>
+    </plurals>
     <string name="sip_future_mark">%1$s in year %2$d</string>
     <string name="sip_future_skip">Skipping one month costs about %1$s by the end.</string>
     <string name="sip_log_gold">Log a gold purchase</string>

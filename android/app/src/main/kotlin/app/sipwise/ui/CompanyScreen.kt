@@ -384,7 +384,7 @@ private fun DividendsChart(view: CompanyView) {
             )
             view.payments.lastOrNull()?.let {
                 Text(
-                    stringResource(R.string.company_dividends_sum, money(it.total), view.payments.size),
+                    pluralStringResource(R.plurals.company_dividends_sum, view.payments.size, money(it.total), view.payments.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
