@@ -169,7 +169,15 @@ test('gold coins are valued, added to net worth and shown as their own class', (
   );
   assert.ok(Math.abs(o.classes.reduce((n, c) => n + c.share, 0) - 100) < 1e-9);
   assert.equal(o.portfolios[0].value, 21000 + 436000);
+  // Funds, metal, plans and currency get their own largest-holdings list; stocks stay in topHoldings.
+  assert.deepEqual(
+    o.topAssets.map((x) => [x.id, x.name, x.classKey, x.value]),
+    [['g', 'Coins', 'gold', 436000]],
+  );
+  assert.equal(o.topAssets[0].gain, 36000);
+  assert.deepEqual(accountOverview(parts, '2026-10-06').topAssets, []);
   const noRate = accountOverview(withGold, '2026-10-06');
+  assert.deepEqual(noRate.topAssets, []);
   assert.ok(noRate.total.incomplete.some((m) => /gold rate/.test(m)));
   assert.equal(noRate.total.gain, null);
 });

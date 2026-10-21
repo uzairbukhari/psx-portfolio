@@ -63,6 +63,16 @@ export type HoldingTotal = {
   gainPercent: number | null;
   portfolios: string[];
 };
+/** One fund, metal holding, plan or currency still held, for the largest-holdings card. */
+export type AssetTotal = {
+  id: string;
+  name: string;
+  classKey: AssetClassKey;
+  value: number;
+  share: number;
+  gain: number | null;
+  gainPercent: number | null;
+};
 export type SectorTotal = { sector: string; value: number; share: number };
 export type IncomeMonth = { month: string; amount: number };
 export type InvestedMonth = { month: string; amount: number } & Record<AssetClassKey, number>;
@@ -86,6 +96,8 @@ export type AccountOverview = {
   portfolios: PortfolioTotal[];
   /** Largest holdings across every portfolio, merged by ticker. */
   topHoldings: HoldingTotal[];
+  /** Largest priced funds, metal, plans and currency still held (not stocks), biggest first. */
+  topAssets: AssetTotal[];
   holdingCount: number;
   sectors: SectorTotal[];
   /** Money paid in per month over the last twelve months, oldest first: stock buys, fund and plan paid-in, gold and silver purchases. Sales, redemptions and cash back are not subtracted. */
@@ -271,6 +283,19 @@ export function accountOverview(
       gainPercent: percent(h.gain, h.cost),
       portfolios: h.portfolios.map((p) => p.name),
     }));
+  const topAssets: AssetTotal[] = assetValues
+    .filter((m) => m.v.open && m.v.value !== null && m.v.value > 0)
+    .sort((a, b) => b.v.value! - a.v.value!)
+    .slice(0, 6)
+    .map((m) => ({
+      id: m.asset.id,
+      name: m.asset.name,
+      classKey: m.v.classKey,
+      value: round(m.v.value!),
+      share: share(m.v.value!, total),
+      gain: m.v.gain,
+      gainPercent: percent(m.v.gain, m.v.cost),
+    }));
   const sectorValues = new Map<string, number>();
   for (const h of held) {
     if (h.value === null) continue;
@@ -448,6 +473,7 @@ export function accountOverview(
     classes: classes.filter((c) => c.count > 0 || c.value > 0),
     portfolios,
     topHoldings,
+    topAssets,
     holdingCount: held.length,
     sectors,
     invested: {

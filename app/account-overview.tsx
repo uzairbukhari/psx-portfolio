@@ -4,13 +4,15 @@ import type { FundNavRow } from '@/lib/mufap';
 import type { PlanNavRow } from '@/lib/plans';
 import { useMemo, type ReactNode } from 'react';
 import { EChart } from './charts/echart';
-import { barOption, donutOption, type ChartTokens } from '@/lib/chart-kit';
+import { barOption, donutOption, stackedAreaOption, type ChartTokens } from '@/lib/chart-kit';
 import { money, moneyShort, type DisplayPart } from '@/lib/portfolio';
 import {
   accountOverview,
   ASSET_CLASS_LABELS,
   type AssetClassKey,
 } from '@/lib/account-overview';
+import { cumulativeByClass } from '@/lib/insights';
+import { portfolioColor } from './portfolio-color';
 import { daysBetween } from '@/lib/performance';
 import type { FxRateRow } from '@/lib/fx-rates';
 import type { MetalRateRow } from '@/lib/metal-rates';
@@ -67,6 +69,50 @@ function KseSpark({ points, up }: { points: { value: number }[]; up: boolean }) 
       <polygon points={`0,56 ${coords.join(' ')} 300,56`} className={up ? 'area up' : 'area down'} />
       <polyline points={coords.join(' ')} className={up ? 'line up' : 'line down'} fill="none" />
     </svg>
+  );
+}
+
+type GlanceRow = { key: string; name: string; value: number; share: number; color: string; note?: string; gain?: number | null };
+
+/** A small card listing the largest parts of something (sectors, holdings, asset classes) with their share. */
+function GlanceList({ label, aside, rows }: { label: string; aside?: string; rows: GlanceRow[] }) {
+  return (
+    <section className="card glance-list" aria-label={label}>
+      <div className="between">
+        <span className="lbl">{label}</span>
+        {aside ? <small>{aside}</small> : null}
+      </div>
+      {rows.length ? (
+        <ul>
+          {rows.map((r) => (
+            <li key={r.key}>
+              <span className="gl-name">
+                <i aria-hidden="true" style={{ background: r.color }} />
+                <b title={r.name}>{r.name}</b>
+                <small className="num">{r.share.toFixed(1)}%</small>
+              </span>
+              <span className="gl-value num">{moneyShort(r.value)}</span>
+              <span className="gl-bar" aria-hidden="true">
+                <i style={{ width: `${Math.min(100, Math.max(2, r.share))}%`, background: r.color }} />
+              </span>
+              {r.note || (r.gain !== undefined && r.gain !== null) ? (
+                <small className="gl-note">
+                  {r.note}
+                  {r.gain !== undefined && r.gain !== null ? (
+                    <span className={`num ${tone(r.gain)}`}>
+                      {r.note ? ' · ' : ''}
+                      {signed(r.gain)}
+                    </span>
+                  ) : null}
+                </small>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="report-empty">Add prices to see this.</p>
+      )}
+    </section>
   );
 }
 
@@ -147,14 +193,40 @@ export default function AccountOverview({
     : null;
   // No PSX stocks held: the market pulse, the stocks chart and the sector split have nothing to show.
   const hasStocks = o.classes.some((c) => c.key === 'stocks');
-  const sectorData = o.sectors.map((s, i) => ({
-    ...s,
-    fill:
-      s.sector === 'Others' || s.sector === 'Other' || i >= SECTOR_COLORS.length
-        ? OTHER_COLOR
-        : SECTOR_COLORS[i],
+  // Without stocks the slab has no value chart: show how the money went in instead, against today's worth.
+  const moneyIn = useMemo(
+    () =>
+      hasStocks ? null : cumulativeByClass(parts, asOf, { metalRates, fundNavs, planNavs, fxRates }),
+    [hasStocks, parts, asOf, metalRates, fundNavs, planNavs, fxRates],
+  );
+  const positionCount = o.classes.reduce((n, c) => n + c.count, 0);
+  const holdingRows: GlanceRow[] = o.topAssets.slice(0, 5).map((a) => ({
+    key: a.id,
+    name: a.name,
+    value: a.value,
+    share: a.share,
+    color: CLASS_COLORS[a.classKey],
+    note: ASSET_CLASS_LABELS[a.classKey],
+    gain: a.gain,
   }));
-
+  const classRows: GlanceRow[] = o.classes.map((c) => ({
+    key: c.key,
+    name: c.label,
+    value: c.value,
+    share: c.share,
+    color: CLASS_COLORS[c.key],
+    note: `${c.count} ${c.count === 1 ? 'position' : 'positions'}`,
+    gain: c.gain,
+  }));
+  const sectorRows: GlanceRow[] = o.sectors.map((s, i) => ({
+    key: s.sector,
+    name: s.sector,
+    value: s.value,
+    share: s.share,
+    color: s.sector === 'Other' || s.sector === 'Others' || i >= SECTOR_COLORS.length ? OTHER_COLOR : SECTOR_COLORS[i],
+  }));
+  const stockCount = o.classes.find((c) => c.key === 'stocks')?.count ?? 0;
+  const soleClass = o.classes.length === 1 ? o.classes[0].key : null;
   return (
     <div className="overview">
       <section className="slab hero-slab" aria-label="Net worth">
@@ -198,8 +270,8 @@ export default function AccountOverview({
           )}
           <small className="hero-scope">
             {compact
-              ? `${o.holdingCount} ${o.holdingCount === 1 ? 'holding' : 'holdings'}`
-              : `${o.portfolios.length} portfolios · ${o.holdingCount} ${o.holdingCount === 1 ? 'holding' : 'holdings'}`}
+              ? `${positionCount} ${positionCount === 1 ? 'holding' : 'holdings'}`
+              : `${o.portfolios.length} portfolios · ${positionCount} ${positionCount === 1 ? 'holding' : 'holdings'}`}
             {total.oldestQuoteDate
               ? ` · oldest price ${dateLabel(total.oldestQuoteDate)}${staleDays && staleDays > 3 ? ' (stale)' : ''}`
               : ''}
@@ -260,7 +332,57 @@ export default function AccountOverview({
             </div>
           </dl>
         </div>
-        <div className="hero-right">{hasStocks ? chart : null}</div>
+        <div className="hero-right">
+          {hasStocks ? (
+            chart
+          ) : moneyIn && moneyIn.series.length && moneyIn.months.length > 1 ? (
+            <div className="value-chart">
+              <div className="value-chart-head">
+                <span className="lbl">Money in vs worth today</span>
+              </div>
+              <EChart
+                className="value-chart-canvas"
+                label={`Money paid in by asset class over ${moneyIn.months.length} months, worth ${money(total.value)} today.`}
+                build={(t) =>
+                  stackedAreaOption(t, {
+                    dates: moneyIn.dates,
+                    series: moneyIn.series.map((x) => ({
+                      name: x.label,
+                      data: x.data,
+                      color: classColor(t, x.key),
+                    })),
+                    valueFormat: money,
+                    dateLabel: (x, long) => (long ? dateLabel(x) : monthLabel(x.slice(0, 7))),
+                    refLine: { y: total.value, label: `Worth ${moneyShort(total.value)} today`, color: t.success },
+                  })
+                }
+              />
+              <p className="value-chart-note">
+                Money paid in at each month end, by asset class; sales and redemptions take it down. The dashed line is
+                what it is worth today.
+              </p>
+            </div>
+          ) : o.topAssets.length ? (
+            <div className="value-chart">
+              <div className="value-chart-head">
+                <span className="lbl">Where it sits</span>
+              </div>
+              <EChart
+                className="value-chart-canvas"
+                label={`Holdings: ${o.topAssets.map((a) => `${a.name} ${a.share.toFixed(1)}%`).join(', ')}.`}
+                build={(t) =>
+                  donutOption(t, {
+                    centerTitle: 'Worth',
+                    slices: o.topAssets.map((a, i) => ({ name: a.name, value: a.value, color: t.cat[i % t.cat.length] })),
+                    valueFormat: money,
+                    centerFormat: (n) => moneyShort(n),
+                  })
+                }
+              />
+              <p className="value-chart-note">The money-in chart appears once there are two months of history.</p>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <div className="glance-row">
@@ -297,6 +419,7 @@ export default function AccountOverview({
           </div>
         </section>
         )}
+        {hasStocks ? (
         <section className="card glance-kse" aria-label="KSE-100">
           <div className="between">
             <span className="lbl">
@@ -331,9 +454,56 @@ export default function AccountOverview({
             </>
           )}
         </section>
+        ) : (
+          <GlanceList
+            label="Largest holdings"
+            aside={`${positionCount} ${positionCount === 1 ? 'holding' : 'holdings'}`}
+            rows={holdingRows}
+          />
+        )}
+        {compact ? (
+          hasStocks ? (
+            <GlanceList
+              label="Sectors"
+              aside={`${stockCount} ${stockCount === 1 ? 'company' : 'companies'}`}
+              rows={sectorRows}
+            />
+          ) : soleClass ? (
+            <section className="card glance-list" aria-label="Money in">
+              <div className="between">
+                <span className="lbl">Money in, last 12 months</span>
+                <small className="num">{moneyShort(invested.total)}</small>
+              </div>
+              {invested.months.some((m) => m.amount > 0) ? (
+                <EChart
+                  className="glance-bars"
+                  label={`Money paid in per month, last 12 months, ${money(invested.total)} in total.`}
+                  build={(t) =>
+                    barOption(t, {
+                      cats: invested.months.map((m) => monthLabel(m.month)),
+                      catTitle: (c) => c,
+                      series: [
+                        {
+                          name: ASSET_CLASS_LABELS[soleClass],
+                          data: invested.months.map((m) => m[soleClass]),
+                          color: classColor(t, soleClass),
+                        },
+                      ],
+                      valueFormat: money,
+                    })
+                  }
+                />
+              ) : (
+                <p className="report-empty">Nothing paid in during the last 12 months.</p>
+              )}
+            </section>
+          ) : (
+            <GlanceList label="Asset mix" aside={moneyShort(total.value)} rows={classRows} />
+          )
+        ) : (
         <section className="card glance-pf" aria-label="Portfolios">
           <ul className="overview-portfolios">
-            {o.portfolios.map((p) => (
+            {o.portfolios.map((p, i) => (
               <li key={p.id}>
                 <button
                   type="button"
@@ -341,7 +511,7 @@ export default function AccountOverview({
                   onClick={() => onOpenPortfolio(p.id)}
                 >
                   <span className="overview-portfolio__top">
-                    <i className="pf-avatar" aria-hidden="true">
+                    <i className="pf-avatar" aria-hidden="true" style={{ background: portfolioColor(i) }}>
                       {p.name.slice(0, 1).toUpperCase()}
                     </i>
                     <b>{p.name}</b>
@@ -370,6 +540,7 @@ export default function AccountOverview({
             ))}
           </ul>
         </section>
+        )}
       </div>
 
       {!compact && (

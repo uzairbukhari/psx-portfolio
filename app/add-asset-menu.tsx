@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { Banknote, Coins, Landmark, PiggyBank, Plus, TrendingUp } from 'lucide-react';
+import { Banknote, Coins, Landmark, Layers, PiggyBank, TrendingUp } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,22 +49,26 @@ export const ASSET_CHOICES: {
   },
 ];
 
-/** The "+" in the Holdings header: pick which kind of asset to add to this portfolio. */
+/** "Add asset" beside the header's + Add: pick which kind of asset to add to this portfolio. */
 export function AddAssetMenu({
   onPick,
   disabled,
+  header = false,
 }: {
   onPick: (kind: AssetPick) => void;
   disabled?: boolean;
+  /** Styled as a header button (the label hides on narrow screens). */
+  header?: boolean;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="secondary compact add-asset__trigger"
+        className={header ? 'hdr-btn hdr-asset' : 'secondary compact add-asset__trigger'}
+        data-slot={header ? 'hdr' : undefined}
         aria-label="Add an asset"
         disabled={disabled}
       >
-        <Plus size={15} /> <span>Add asset</span>
+        <Layers size={header ? 18 : 15} /> <span className={header ? 'hdr-label' : undefined}>Add asset</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {ASSET_CHOICES.map(({ kind, label, Icon }) => (

@@ -57,8 +57,8 @@ export const isLocal = !isStaging;
 export async function choosePortfolio(page: Page, name: string) {
   await page.getByRole('button', { name: 'Select portfolio' }).click();
   await page.getByRole('menuitem', { name, exact: false }).first().click();
-  // A portfolio with no records shows the "Start your portfolio" screen instead of the tabs.
-  await expect(page.getByRole('navigation', { name: 'Main' }).first().or(page.getByText('Start your portfolio'))).toBeVisible({ timeout: 30_000 });
+  // A portfolio with no records shows the "Start your portfolio" screen (beside the tabs when other portfolios exist).
+  await expect(page.getByRole('navigation', { name: 'Main' }).or(page.getByText('Start your portfolio')).first()).toBeVisible({ timeout: 30_000 });
 }
 
 /** The visible page text on one line, for loose "this content is on the page" assertions. */

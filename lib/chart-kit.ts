@@ -918,6 +918,9 @@ export function stackedAreaOption(t: ChartTokens, c: StackedAreaCfg): EChartsOpt
     ...o,
     legend: {
       top: 0,
+      // One line on narrow cards; a wrapped legend would sit over the reference line's label.
+      type: 'scroll',
+      pageTextStyle: { color: t.muted },
       icon: 'roundRect',
       itemWidth: 10,
       itemHeight: 10,
@@ -956,7 +959,11 @@ export function stackedAreaOption(t: ChartTokens, c: StackedAreaCfg): EChartsOpt
         formatter: (v: string) => c.dateLabel(v, false),
       },
     },
-    yAxis: valueAxis(t, compact, { scale: false }),
+    // Keep the reference line on the chart when it sits above the stack (worth more than was paid in).
+    yAxis: {
+      ...valueAxis(t, compact, { scale: false }),
+      ...(refLine ? { max: (v: { max: number }) => Math.max(v.max, c.refLine!.y * 1.05) } : {}),
+    },
     series: c.series.map((s, i) => ({
       name: s.name,
       type: 'line' as const,

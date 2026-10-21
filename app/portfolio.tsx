@@ -2333,8 +2333,9 @@ function DashboardContent({
     tab === 'currency' ||
     tab === 'plan' ||
     tab === 'notifications';
-  // A portfolio with nothing in it shows only its start screen: no tabs to open.
-  const hideTabs = p.companies.length === 0 && !hasAssets;
+  // A new account with nothing in it has no pages to open yet: the sidebar keeps only pin, Settings and the profile.
+  // An empty portfolio beside others keeps the full sidebar, so the others stay one click away.
+  const emptyStart = p.companies.length === 0 && !hasAssets && (workspace?.account.portfolios.length ?? 0) <= 1;
   const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
@@ -2998,7 +2999,7 @@ function DashboardContent({
           }}
         />
         <div className="flex flex-col gap-2">
-          <header className={'app-header' + (hideTabs ? ' no-tabs' : '') + (chromeless ? ' chromeless' : '')}>
+          <header className={'app-header' + (chromeless ? ' chromeless' : '')}>
             <div className="side">
             <div className="header-brand-group">
               <button
@@ -3015,8 +3016,8 @@ function DashboardContent({
                 <Wordmark />
               </button>
             </div>
-            {!hideTabs && tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
-            {!hideTabs && (
+            {!emptyStart && tab !== 'settings' && <div className="side-portfolio">{workspace?.selector}</div>}
+            {!emptyStart && (
               <AppNav
                 items={navItems}
                 active={tab}
@@ -3025,7 +3026,7 @@ function DashboardContent({
                 addDisabled={busy}
               />
             )}
-            {!hideTabs && (
+            {(
               <div className="side-tools">
                 <button
                   type="button"
@@ -3053,7 +3054,7 @@ function DashboardContent({
                 </button>
               </div>
             )}
-            {!hideTabs && email && <div className="side-user">{accountMenu(true)}</div>}
+            {email && <div className="side-user">{accountMenu(true)}</div>}
             </div>
             <div className="header-right">
               {tab === 'sip-plan' && <PlanMonthNav month={month} setMonth={setMonth} />}
@@ -3193,6 +3194,9 @@ function DashboardContent({
                   </div>
                 </PopoverContent>
               </Popover>
+              {tab === 'holdings' && !isAll && !locked && !emptyStart && (p.companies.length > 0 || hasAssets) && (
+                <AddAssetMenu onPick={pickAsset} disabled={busy} header />
+              )}
               {tab !== 'settings' && (
               <button
                 type="button"
@@ -3284,8 +3288,9 @@ function DashboardContent({
                     </button>
                   </p>
                 )}
-                {!isAll && !locked && (
-                  <div className="add-asset">
+                {!isAll && !locked && (p.companies.length > 0 || hasAssets) && (
+                  // Phones: the header has no room, so Add asset stays above the dashboard there.
+                  <div className="add-asset add-asset--phone">
                     <AddAssetMenu onPick={pickAsset} disabled={busy} />
                   </div>
                 )}
