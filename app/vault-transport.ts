@@ -5,6 +5,17 @@ import { createPublicData } from '@/lib/public-data-client';
 import { TransportError, type VaultTransport } from '@/lib/vault-client';
 
 async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  try {
+    return await attempt<T>(path, method, body);
+  } catch (e) {
+    // A read that hit a passing Cloudflare error page (1102, 5xx) or an empty answer is asked once more before it is shown.
+    if (method !== 'GET' || !(e instanceof TransportError) || (e.status > 0 && e.status < 500 && e.status !== 200)) throw e;
+    await new Promise((r) => setTimeout(r, 1200));
+    return attempt<T>(path, method, body);
+  }
+}
+
+async function attempt<T>(path: string, method: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -18,6 +29,7 @@ async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T>
   }
   const data = (await res.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
   if (!res.ok) throw new TransportError(data?.error ?? 'The request failed. Try again.', res.status, data?.code);
+  if (data === null) throw new TransportError('The server sent an empty or unreadable answer. Try again in a moment.', res.status);
   return data as T;
 }
 
