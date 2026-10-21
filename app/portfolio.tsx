@@ -7,6 +7,7 @@ import { webMcpEnabled } from './webmcp-pref';
 import { cachedHoldings, cachedTaxSummary } from './portfolio-memo';
 import { useConfirm } from '@/components/confirm-dialog';
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useMemo,
@@ -144,6 +145,9 @@ import { LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import { ThemeMenuItems } from './theme-menu';
 import { HelpPanel } from './help-panel';
+import { ChecklistStrip, StartScreen } from './onboarding-ui';
+import { useOnboarding } from './use-onboarding';
+import { checklistItems, showChecklist, type ChecklistId } from '@/lib/onboarding';
 import { MoreSheet } from './more-sheet';
 import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
 import PsxMarketPulse, { type PsxMarketPulseHandle } from './psx-market-pulse';
@@ -784,6 +788,9 @@ function DashboardContent({
   const [bellOpen, setBellOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const onb = useOnboarding();
+  const { markFresh, tick: tickOnboarding } = onb;
+  const markFreshToday = useCallback(() => markFresh(today()), [markFresh]);
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(
     null,
   );
@@ -1315,6 +1322,9 @@ function DashboardContent({
       .then((d) => setUsage(d))
       .catch(() => {});
   }, [tab, usage]);
+  useEffect(() => {
+    if (tab === 'reports') tickOnboarding('insights');
+  }, [tab, tickOnboarding]);
   async function save(
     next: Portfolio,
     success = 'Saved to your private portfolio.',
@@ -1923,6 +1933,7 @@ function DashboardContent({
     attempt(async () => {
       const pkg = await vault!.session.backupPackage();
       track('backup_exported');
+      tickOnboarding('backup');
       download(
         `sipwise-backup-${today()}.encrypted.json`,
         JSON.stringify(pkg, null, 2),
@@ -2341,6 +2352,26 @@ function DashboardContent({
   // A new account with nothing in it has no pages to open yet: the sidebar keeps only pin, Settings and the profile.
   // An empty portfolio beside others keeps the full sidebar, so the others stay one click away.
   const emptyStart = p.companies.length === 0 && !hasAssets && (workspace?.account.portfolios.length ?? 0) <= 1;
+  const onbItems = checklistItems(onb.state, {
+    hasHolding: p.companies.length > 0 || hasAssets,
+    hasSipBudget: (p.sipBlueprint?.budget ?? 0) > 0,
+  });
+  const onbActions = {
+    busy,
+    onGo: (id: ChecklistId) => {
+      if (id === 'first_holding') pickAsset('stock');
+      else if (id === 'backup') {
+        setSettingsEntry((e) => ({ n: e.n + 1, section: 'data' }));
+        setTab('settings');
+      } else if (id === 'sip_budget') setTab('sip-tracker');
+      else if (id === 'insights') setTab('reports');
+    },
+    onTax: (status: 'filer' | 'non-filer') => {
+      saveFilerStatus(status);
+      onb.tick('tax');
+    },
+    onHide: onb.hide,
+  };
   const taxedDividends = cachedTaxSummary(p).dividends;
   const ledgerEntries = (ticker: string | undefined) =>
     [
@@ -3255,7 +3286,24 @@ function DashboardContent({
           </header>
           <NavPanel id="holdings" tab={tab}>
             <MarketGlanceProvider held={held} p={p}>
-            {p.companies.length === 0 && !hasAssets ? (
+            {emptyStart ? (
+              <StartScreen
+                disabled={busy}
+                only={isAll || locked ? ['stock'] : undefined}
+                onPick={pickAsset}
+                onImportFile={importFile}
+                onRestoreFile={(file) =>
+                  workspace ? workspace.requestImport(file, undefined, true) : restoreBackup(file)
+                }
+                onHelp={() => {
+                  track('help_opened', { item: 'faq' });
+                  setHelpOpen(true);
+                }}
+                onMount={markFreshToday}
+                items={onbItems}
+                actions={onbActions}
+              />
+            ) : p.companies.length === 0 && !hasAssets ? (
               <div className="panel empty-holdings">
                 <span className="empty-holdings-icon" aria-hidden="true">
                   <Briefcase size={26} />
@@ -3299,6 +3347,9 @@ function DashboardContent({
               </div>
             ) : (
               <>
+                {showChecklist(onb.state, onbItems, today()) && (
+                  <ChecklistStrip items={onbItems} actions={onbActions} onAllDone={() => onb.stampDone(today())} />
+                )}
                 {pendingCompanies.length > 0 && (
                   <p className="notice" role="status">
                     Company details for {pendingCompanies.join(', ')} are still
