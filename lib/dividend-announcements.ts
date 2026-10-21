@@ -17,15 +17,22 @@ export async function readAnnouncements(
   db: D1Database,
   tickers: string[],
 ): Promise<PayoutAnnouncement[]> {
-  const wanted = new Set(tickers);
-  const rows = await db
-    .prepare(
-      `SELECT ticker,book_closure_start,book_closure_end,announced_on,kind,period,details,percent,per_share_rs
-       FROM dividend_announcements ORDER BY book_closure_start DESC`,
-    )
-    .all<Row>();
-  return rows.results
-    .filter((r) => wanted.has(r.ticker))
+  // Only the asked-for tickers are read (the primary key starts with ticker), in chunks under D1's bound-parameter limit.
+  const unique = [...new Set(tickers)];
+  const rows: Row[] = [];
+  for (let i = 0; i < unique.length; i += 90) {
+    const part = unique.slice(i, i + 90);
+    const result = await db
+      .prepare(
+        `SELECT ticker,book_closure_start,book_closure_end,announced_on,kind,period,details,percent,per_share_rs
+         FROM dividend_announcements WHERE ticker IN (${part.map(() => '?').join(',')})`,
+      )
+      .bind(...part)
+      .all<Row>();
+    rows.push(...result.results);
+  }
+  return rows
+    .sort((a, b) => (b.book_closure_start ?? '').localeCompare(a.book_closure_start ?? ''))
     .map((r) => ({
       ticker: r.ticker,
       announcedOn: r.announced_on,

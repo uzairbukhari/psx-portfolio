@@ -46,7 +46,7 @@ export type PublicData = {
     error?: string;
   }>;
   /** Tells the server which funds are held (public MUFAP ids only) so their price is stored nightly. */
-  trackFunds?(mufapIds: string[], retry?: boolean): Promise<{ error?: string }>;
+  trackFunds?(mufapIds: string[], retry?: boolean): Promise<{ error?: string; added?: number; refreshed?: boolean }>;
   /** MUFAP payouts of these funds (public ids only). */
   fundPayouts?(
     mufapIds: string[],
@@ -232,12 +232,6 @@ export async function loadAccountView(
         ),
       ),
     ];
-    const [market, lookups] = await Promise.all([
-      tickers.length ? publicData.market(tickers).catch(() => null) : null,
-      placeholders.length
-        ? publicData.companies(placeholders).catch(() => [])
-        : [],
-    ]);
     const fundIds = [
       ...new Set(
         account.portfolios.flatMap((p) =>
@@ -249,10 +243,16 @@ export async function loadAccountView(
         ),
       ),
     ];
-    const payouts =
+    // Quotes, company lookups and fund payouts are independent: ask for all of them at once.
+    const [market, lookups, payouts] = await Promise.all([
+      tickers.length ? publicData.market(tickers).catch(() => null) : null,
+      placeholders.length
+        ? publicData.companies(placeholders).catch(() => [])
+        : [],
       syncDividends && fundIds.length && publicData.fundPayouts
-        ? await publicData.fundPayouts(fundIds).catch(() => [])
-        : [];
+        ? publicData.fundPayouts(fundIds).catch(() => [])
+        : [],
+    ]);
     if (syncDividends && (market || payouts.length) && !session.offline) {
       let changed = false;
       const batch = `fund-${new Date().toISOString().slice(0, 19)}`;

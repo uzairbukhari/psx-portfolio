@@ -70,7 +70,7 @@ export function createPublicData(call: PublicCall): PublicData {
       );
     },
     async trackFunds(mufapIds, retry) {
-      return await call<{ error?: string }>('/api/public-data/funds', 'POST', {
+      return await call<{ error?: string; added?: number; refreshed?: boolean }>('/api/public-data/funds', 'POST', {
         mufapIds,
         ...(retry ? { retry: true } : {}),
       });

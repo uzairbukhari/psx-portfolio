@@ -89,6 +89,9 @@ export type VaultStatus =
   | { state: 'locked'; vault: NonNullable<VaultResponse['vault']>; portfolio: EncryptedPortfolioResponse | null; offline: boolean };
 
 /** Reads the vault metadata (and the ciphertext) the client needs to unlock. Falls back to the device cache offline. */
+/** How long after opening the vault its first reload may reuse the ciphertext read for the unlock. */
+const FRESH_OPEN_MS = 20_000;
+
 export async function loadVaultStatus(transport: VaultTransport, cache: VaultCache = memoryCache()): Promise<VaultStatus> {
   try {
     const { vault } = await transport.getVault();
@@ -227,7 +230,11 @@ export class VaultSession {
     this.revision = state.revision;
     this.account = state.account ?? accountFromPortfolio(state.portfolio);
     this.offline = offline;
+    this.freshUntil = offline ? 0 : Date.now() + FRESH_OPEN_MS;
   }
+
+  /** Until this time (set when the vault opens from a read made moments ago) the first reload reuses what is open. */
+  private freshUntil = 0;
 
   get vaultId() {
     return this.material.vaultId;
@@ -294,6 +301,10 @@ export class VaultSession {
     return this.guarded(async () => {
       const key = this.requireKey();
       const epoch = this.epoch;
+      // The first load after an unlock already holds the ciphertext fetched (and decrypted) a moment ago: use it once.
+      const reuse = this.freshUntil > Date.now();
+      this.freshUntil = 0;
+      if (reuse) return { portfolio: this.portfolioFor(target), account: this.account, revision: this.revision };
       let stored: EncryptedPortfolioResponse;
       try {
         stored = await this.transport.getPortfolio();
@@ -326,6 +337,7 @@ export class VaultSession {
 
   /** Saves the complete collection atomically; every portfolio shares the same revision. */
   async saveAccount(next: PortfolioAccount, expectedRevision: number, options: { replaceAll?: boolean } = {}): Promise<number> {
+    this.freshUntil = 0;
     return this.guarded(async () => {
       if (expectedRevision !== this.revision) throw new ConflictError();
       normalizeAccount(next, false);

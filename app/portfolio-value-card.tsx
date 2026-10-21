@@ -61,9 +61,15 @@ export default function PortfolioValueCard({
         .join(','),
     [p.trades],
   );
+  // Closes older than the first trade are never drawn: ask only for the span the ledger covers (plus a margin).
+  const fromKey = useMemo(() => {
+    const first = p.trades.filter((t) => !t.voided).map((t) => t.date).sort()[0];
+    if (!first || !/^\d{4}-\d{2}-\d{2}$/.test(first)) return '';
+    return new Date(Date.parse(`${first}T00:00:00Z`) - 14 * 86_400_000).toISOString().slice(0, 10);
+  }, [p.trades]);
   // Results are keyed by the request that produced them, so new inputs (or a retry)
   // never show the previous ledger's history or error while the next load runs.
-  const requestKey = `${tickerKey}#${attempt}`;
+  const requestKey = `${tickerKey}@${fromKey}#${attempt}`;
   const [loaded, setLoaded] = useState<{
     key: string;
     eod?: Record<string, PricePoint[]>;
@@ -75,7 +81,7 @@ export default function PortfolioValueCard({
   useEffect(() => {
     if (!tickerKey) return;
     let live = true;
-    fetch(`/api/price-history?tickers=${encodeURIComponent(tickerKey)}`)
+    fetch(`/api/price-history?tickers=${encodeURIComponent(tickerKey)}${fromKey ? `&from=${fromKey}` : ''}`)
       .then(async (r) => {
         const d = (await readJson(r)) as {
           histories?: Record<string, { eod: number[][] }>;
@@ -113,7 +119,7 @@ export default function PortfolioValueCard({
     return () => {
       live = false;
     };
-  }, [tickerKey, requestKey]);
+  }, [tickerKey, fromKey, requestKey]);
 
   const series = useMemo(
     () =>

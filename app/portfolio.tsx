@@ -374,6 +374,22 @@ type HoldingsSortKey =
   | 'gain'
   | 'weight';
 const clone = (p: Portfolio): Portfolio => JSON.parse(JSON.stringify(p));
+const QUOTE_JOB_KEY = 'sipwise.quoteJob';
+const QUOTE_JOB_WINDOW_MS = 15 * 60_000;
+function markQuoteJobStarted() {
+  try {
+    sessionStorage.setItem(QUOTE_JOB_KEY, String(Date.now()));
+  } catch {
+    /* private mode: a reload then simply does not look for the job */
+  }
+}
+function quoteJobRecentlyStarted() {
+  try {
+    return Date.now() - Number(sessionStorage.getItem(QUOTE_JOB_KEY) ?? 0) < QUOTE_JOB_WINDOW_MS;
+  } catch {
+    return false;
+  }
+}
 function download(name: string, data: string, type = 'application/json') {
   const url = URL.createObjectURL(new Blob([data], { type }));
   const a = document.createElement('a');
@@ -1054,6 +1070,8 @@ function DashboardContent({
   /** POST starts (or joins) a refresh; GET with `since` (even empty) only reads its state. */
   async function quoteCall(tickers: string[], since?: string) {
     if (!tickers.length) throw Error('No companies to price.');
+    // Remember a refresh was started here, so a reload can pick it up (see resumeRefresh).
+    if (since === undefined) markQuoteJobStarted();
     const r =
       since === undefined
         ? await fetch('/api/quotes', {
@@ -1126,7 +1144,8 @@ function DashboardContent({
   }
   /** After a reload, picks up a refresh that is still queued or running instead of starting another. */
   async function resumeRefresh(tickers: string[]) {
-    if (quoteRunning.current || !tickers.length) return;
+    // Only a refresh this device started can still be waiting; every other load skips the extra request.
+    if (quoteRunning.current || !tickers.length || !quoteJobRecentlyStarted()) return;
     try {
       const d = await quoteCall(tickers, '');
       if (!isPending(d.job)) return;
@@ -1549,7 +1568,7 @@ function DashboardContent({
       ? p?.[DISPLAY_PARTS]?.some((part) =>
           part.portfolio.assets?.some((a) => a.kind === 'fund'),
         )
-      : p?.assets?.some((a) => a.kind === 'fund')) || tab === 'holdings',
+      : p?.assets?.some((a) => a.kind === 'fund')) || holdingsTab === 'funds',
   );
   const planNavData = usePlanNavs(
     (isAll

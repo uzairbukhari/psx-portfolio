@@ -80,7 +80,27 @@ export function useFundHistory(mufapId: string, enabled: boolean) {
   return state;
 }
 
-/** Tells the server which funds are held (public MUFAP ids only, once per set) so their price is stored nightly. */
+const TRACKED_KEY = 'sipwise.fundsTracked';
+const trackedToday = (key: string) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TRACKED_KEY) ?? 'null') as { key?: string; day?: string } | null;
+    return saved?.key === key && saved.day === new Date().toISOString().slice(0, 10);
+  } catch {
+    return false;
+  }
+};
+const rememberTracked = (key: string) => {
+  try {
+    localStorage.setItem(TRACKED_KEY, JSON.stringify({ key, day: new Date().toISOString().slice(0, 10) }));
+  } catch {
+    /* the next load simply asks again */
+  }
+};
+
+/**
+ * Tells the server which funds are held (public MUFAP ids only) so their price is stored nightly. Once per set of
+ * funds per day per device; the catalogue is re-read only when the server says prices may have changed.
+ */
 export function useTrackFunds(mufapIds: string[], onTracked?: () => void) {
   const sent = useRef('');
   const [error, setError] = useState('');
@@ -88,11 +108,14 @@ export function useTrackFunds(mufapIds: string[], onTracked?: () => void) {
   useEffect(() => {
     if (!key || sent.current === key) return;
     sent.current = key;
+    if (trackedToday(key)) return;
     webPublicData
       .trackFunds?.(key.split(','))
       .then((r) => {
         setError(r?.error ?? '');
-        if (!r?.error) onTracked?.();
+        if (r?.error) return;
+        rememberTracked(key);
+        if (r?.refreshed ?? true) onTracked?.();
       })
       .catch((e: unknown) => {
         sent.current = '';
