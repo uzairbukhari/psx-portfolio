@@ -73,6 +73,8 @@ fun MoreScreen(
     onSignOut: () -> Unit,
     onAccountDeleted: () -> Unit,
     onManagePortfolios: () -> Unit,
+    onOpenTargetPlan: () -> Unit,
+    onEditTargets: () -> Unit,
     updates: UpdateViewModel,
 ) {
     val ui by settings.ui.collectAsStateWithLifecycle()
@@ -116,6 +118,13 @@ fun MoreScreen(
         SectionCard(R.string.portfolios_title) {
             Text(stringResource(R.string.portfolios_hint), style = MaterialTheme.typography.bodyMedium)
             OutlinedButton(onClick = onManagePortfolios) { Text(stringResource(R.string.portfolios_manage)) }
+        }
+        // The old per-company monthly plan, kept for anyone who sets target weights by hand; the SIP Blueprint tab
+        // is the plan most people follow now.
+        SectionCard(R.string.settings_targets_title) {
+            Text(stringResource(R.string.settings_targets_hint), style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = onOpenTargetPlan) { Text(stringResource(R.string.settings_targets_plan)) }
+            OutlinedButton(onClick = onEditTargets) { Text(stringResource(R.string.settings_targets_edit)) }
         }
         SecurityCard(vault, session)
         if (user.role == "super_admin") AdminCard()
