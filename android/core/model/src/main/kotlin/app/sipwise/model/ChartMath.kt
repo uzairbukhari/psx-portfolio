@@ -255,7 +255,8 @@ fun slotAt(
     width: Float,
     count: Int,
 ): Int {
-    if (count <= 0 || width <= 0f || x < 0f || x > width) return -1
+    if (count <= 0 || width <= 0f) return -1
+    if (x < 0f || x > width) return -1
     return minOf((x / width * count).toInt(), count - 1)
 }
 

@@ -45,9 +45,9 @@ import app.sipwise.BuildConfig
 import app.sipwise.R
 import app.sipwise.SipwiseApp
 import app.sipwise.data.Appearance
-import app.sipwise.designsystem.ChartPalette
 import app.sipwise.data.ShareFiles
 import app.sipwise.designsystem.BrandColors
+import app.sipwise.designsystem.ChartPalette
 import app.sipwise.designsystem.NightSlab
 import app.sipwise.designsystem.Overline
 import app.sipwise.designsystem.SegmentedControl

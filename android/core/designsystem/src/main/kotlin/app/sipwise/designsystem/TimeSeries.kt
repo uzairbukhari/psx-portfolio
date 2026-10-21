@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,7 +75,6 @@ private const val MINI_HEIGHT = 28
 private const val MINI_ALPHA = 0.35f
 private const val MINI_WINDOW_ALPHA = 0.16f
 private const val MARKER_HIT_DP = 22
-private const val DOUBLE_TAP_ZOOM = 3f
 private const val TWO_FINGERS = 2
 
 /**
@@ -171,24 +171,30 @@ fun TimeSeriesChart(
                     }
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
-                        var fingers = 1
-                        while (true) {
+                        // One finger scrubs for the whole gesture; the moment a second lands it becomes zoom and pan,
+                        // and stays that way until every finger is up, so a lifted finger cannot start scrubbing.
+                        var pinching = false
+                        var pressed = 1
+                        while (pressed > 0) {
                             val event = awaitPointerEvent()
-                            val down = event.changes.count { it.pressed }
-                            if (down == 0) break
-                            fingers = maxOf(fingers, down)
-                            if (zoomable && down >= TWO_FINGERS) {
-                                scrub = null
-                                val zoom = event.calculateZoom()
-                                val pan = event.calculatePan()
-                                val focus = (event.calculateCentroid().x / plotWidth()).coerceIn(0f, 1f)
-                                if (zoom != 1f) window = window.zoom(zoom, focus)
-                                if (pan.x != 0f) window = window.pan(-pan.x / plotWidth() * window.width)
-                                event.changes.forEach { it.consume() }
-                            } else if (fingers < TWO_FINGERS) {
-                                val position = event.changes.firstOrNull { it.pressed }?.position ?: break
-                                scrubTo(position.x)
-                                event.changes.forEach { it.consume() }
+                            pressed = event.changes.count { it.pressed }
+                            if (pressed >= TWO_FINGERS) pinching = true
+                            when {
+                                pressed == 0 -> Unit
+                                pinching && zoomable -> {
+                                    scrub = null
+                                    val focus = (event.calculateCentroid().x / plotWidth()).coerceIn(0f, 1f)
+                                    val zoom = event.calculateZoom()
+                                    val pan = event.calculatePan().x
+                                    if (zoom != 1f) window = window.zoom(zoom, focus)
+                                    if (pan != 0f) window = window.pan(-pan / plotWidth() * window.width)
+                                    event.changes.forEach { it.consume() }
+                                }
+                                pinching -> Unit
+                                else -> {
+                                    event.changes.firstOrNull { it.pressed }?.let { scrubTo(it.position.x) }
+                                    event.changes.forEach { it.consume() }
+                                }
                             }
                         }
                         scrub = null
@@ -197,7 +203,7 @@ fun TimeSeriesChart(
                     detectTapGestures(
                         onDoubleTap = { if (zoomable) window = ZoomWindow() },
                         onTap = { tap ->
-                            val plot = plotOf(size.width - axisWidth.toPx(), size.height, from, to, lo, hi, showAxes, this)
+                            val plot = plotOf(PlotFrame(size.width - axisWidth.toPx(), size.height.toFloat(), from, to, lo, hi, showAxes))
                             val hit = MARKER_HIT_DP.dp.toPx()
                             picked =
                                 markers
@@ -208,7 +214,7 @@ fun TimeSeriesChart(
                     )
                 },
         ) {
-            val plot = plotOf(size.width - axisWidth.toPx(), size.height, from, to, lo, hi, showAxes, this)
+            val plot = plotOf(PlotFrame(size.width - axisWidth.toPx(), size.height, from, to, lo, hi, showAxes))
             if (showAxes) drawAxes(plot, ink, measurer, yLabel, xLabel)
             for (ref in references) {
                 val y = plot.y(ref.y)
@@ -230,8 +236,9 @@ fun TimeSeriesChart(
                 }
             }
             val frac = scrub
-            if (frac == null && picked == null && head != null && progress.value >= 1f) {
-                head.points.lastOrNull()?.let { last ->
+            val idle = frac == null && picked == null
+            if (idle && progress.value >= 1f) {
+                head?.points?.lastOrNull()?.let { last ->
                     val c = Offset(plot.x(last[0]), plot.y(last[1]))
                     drawCircle(head.color.copy(alpha = DOT_HALO_ALPHA), 9.dp.toPx(), c)
                     drawCircle(head.color, 4.dp.toPx(), c)
@@ -332,29 +339,29 @@ private fun DrawScope.drawMarker(
 
 internal const val AXIS_WIDTH = 40
 
-/** The plot frame of a chart that fills [width] by [height] with [showAxes] deciding the room under it. */
-internal fun plotOf(
-    width: Float,
-    height: Float,
-    from: Double,
-    to: Double,
-    lo: Double,
-    hi: Double,
-    showAxes: Boolean,
-    density: androidx.compose.ui.unit.Density,
-): Plot =
-    with(density) {
-        Plot(
-            left = 0f,
-            right = width,
-            top = BUBBLE_ROOM.dp.toPx(),
-            bottom = height - (if (showAxes) X_AXIS_ROOM.dp else 4.dp).toPx(),
-            minX = from,
-            spanX = (to - from).takeIf { it > 0 } ?: 1.0,
-            lo = lo,
-            hi = hi,
-        )
-    }
+/** What a chart needs to lay its plot out: the canvas it fills, the x window it shows and the y range it covers. */
+internal class PlotFrame(
+    val width: Float,
+    val height: Float,
+    val from: Double,
+    val to: Double,
+    val lo: Double,
+    val hi: Double,
+    val showAxes: Boolean,
+)
+
+/** The plot frame of a chart, with room kept for the value bubble above and the x labels below. */
+internal fun Density.plotOf(frame: PlotFrame): Plot =
+    Plot(
+        left = 0f,
+        right = frame.width,
+        top = BUBBLE_ROOM.dp.toPx(),
+        bottom = frame.height - (if (frame.showAxes) X_AXIS_ROOM.dp else 4.dp).toPx(),
+        minX = frame.from,
+        spanX = (frame.to - frame.from).takeIf { it > 0 } ?: 1.0,
+        lo = frame.lo,
+        hi = frame.hi,
+    )
 
 /** The chart colours and label styles for a card or a night slab, resolved once. */
 @Composable

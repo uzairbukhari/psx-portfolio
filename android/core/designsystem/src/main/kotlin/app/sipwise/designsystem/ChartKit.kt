@@ -3,6 +3,8 @@ package app.sipwise.designsystem
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,8 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -49,16 +49,16 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.sipwise.model.compactAxis
 import app.sipwise.model.cumulative
 import app.sipwise.model.niceTicks
-import app.sipwise.model.paddedRange
 import app.sipwise.model.slotAt
 import app.sipwise.model.stackLayers
 import kotlin.math.max
@@ -247,51 +247,9 @@ fun ComboChart(
                         }
                     },
             ) {
-                val axis = AXIS_ROOM.dp.toPx()
-                val room = VALUE_ROOM.dp.toPx()
-                val floor = size.height - axis
-                val slot = size.width / bars.size
-                val barWidth = slot * (1f - BAR_GAP_FRACTION)
-                val radius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
-                val dash = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
-                for (tick in niceTicks(0.0, lineTop, 3)) {
-                    val y = floor - (tick / lineTop).toFloat() * (floor - room)
-                    if (y < 0f) continue
-                    drawLine(ink.grid, Offset(0f, y), Offset(size.width, y), 1.dp.toPx(), pathEffect = dash)
-                }
-                drawLine(ink.grid, Offset(0f, floor), Offset(size.width, floor), 1.dp.toPx())
-                bars.forEachIndexed { i, bar ->
-                    val left = slot * i + (slot - barWidth) / 2f
-                    val h = ((bar.value / barTop).toFloat() * (floor - room)).coerceAtLeast(0f)
-                    val alpha = if (picked < 0 || picked == i) PICKED_ALPHA else DIM_ALPHA
-                    drawRoundRect((bar.color ?: barColor).copy(alpha = alpha), Offset(left, floor - h), Size(barWidth, h), radius)
-                    val label = measurer.measure(bar.label, ink.labelStyle)
-                    if (label.size.width <= slot) {
-                        drawText(measurer, bar.label, Offset(slot * i + (slot - label.size.width) / 2f, floor + 3.dp.toPx()), ink.labelStyle)
-                    }
-                }
-                if (line.size >= 2) {
-                    val path =
-                        Path().apply {
-                            line.forEachIndexed { i, value ->
-                                val x = slot * i + slot / 2f
-                                val y = floor - (value / lineTop).toFloat() * (floor - room)
-                                if (i == 0) moveTo(x, y) else lineTo(x, y)
-                            }
-                        }
-                    drawPath(path, lineColor, style = Stroke(2.2.dp.toPx(), cap = StrokeCap.Round))
-                    line.lastOrNull()?.let {
-                        val c = Offset(slot * (line.size - 1) + slot / 2f, floor - (it / lineTop).toFloat() * (floor - room))
-                        drawCircle(lineColor.copy(alpha = DOT_HALO_ALPHA), 9.dp.toPx(), c)
-                        drawCircle(lineColor, 4.dp.toPx(), c)
-                    }
-                }
-                if (picked >= 0) {
-                    val text = "${valueLabel(bars[picked].value)} · ${valueLabel(line.getOrElse(picked) { 0.0 })}"
-                    val layout = measurer.measure(text, ink.bubbleStyle)
-                    val x = (slot * picked + slot / 2f - layout.size.width / 2f).coerceIn(0f, size.width - layout.size.width - 12.dp.toPx())
-                    tag(measurer, text, Offset(x, 0f), ink.bubble, ink.bubbleStyle, 6.dp.toPx())
-                }
+                drawCombo(
+                    ComboPaint(bars, line, barTop, lineTop, picked, barColor, lineColor, ink, measurer, valueLabel),
+                )
             }
             ChartLegend(
                 listOf(ChartLayer("Each payment", emptyList(), barColor), ChartLayer(lineLabel, emptyList(), lineColor)),
@@ -557,3 +515,74 @@ fun ChartTableSheet(
 }
 
 private const val TABLE_MAX_HEIGHT = 420
+
+/** Everything one [ComboChart] draws, gathered so the drawing is a function of its own. */
+private class ComboPaint(
+    val bars: List<ChartBar>,
+    val line: List<Double>,
+    val barTop: Double,
+    val lineTop: Double,
+    val picked: Int,
+    val barColor: Color,
+    val lineColor: Color,
+    val ink: ChartInk,
+    val measurer: TextMeasurer,
+    val valueLabel: (Double) -> String,
+)
+
+/** The bars on the left scale, the cumulative line on the right, and the pinned bar's bubble. */
+private fun DrawScope.drawCombo(p: ComboPaint) {
+    val floor = size.height - AXIS_ROOM.dp.toPx()
+    val room = VALUE_ROOM.dp.toPx()
+    val slot = size.width / p.bars.size
+    val barWidth = slot * (1f - BAR_GAP_FRACTION)
+    val radius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
+    val dash = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
+    for (tick in niceTicks(0.0, p.lineTop, GRID_LINES)) {
+        val y = floor - (tick / p.lineTop).toFloat() * (floor - room)
+        if (y >= 0f) drawLine(p.ink.grid, Offset(0f, y), Offset(size.width, y), 1.dp.toPx(), pathEffect = dash)
+    }
+    drawLine(p.ink.grid, Offset(0f, floor), Offset(size.width, floor), 1.dp.toPx())
+    p.bars.forEachIndexed { i, bar ->
+        val left = slot * i + (slot - barWidth) / 2f
+        val h = ((bar.value / p.barTop).toFloat() * (floor - room)).coerceAtLeast(0f)
+        val alpha = if (p.picked < 0 || p.picked == i) PICKED_ALPHA else DIM_ALPHA
+        drawRoundRect((bar.color ?: p.barColor).copy(alpha = alpha), Offset(left, floor - h), Size(barWidth, h), radius)
+        val label = p.measurer.measure(bar.label, p.ink.labelStyle)
+        if (label.size.width <= slot) {
+            drawText(p.measurer, bar.label, Offset(slot * i + (slot - label.size.width) / 2f, floor + 3.dp.toPx()), p.ink.labelStyle)
+        }
+    }
+    if (p.line.size >= 2) drawCumulative(p, floor, room, slot)
+    if (p.picked >= 0) {
+        val text = "${p.valueLabel(p.bars[p.picked].value)} · ${p.valueLabel(p.line.getOrElse(p.picked) { 0.0 })}"
+        val layout = p.measurer.measure(text, p.ink.bubbleStyle)
+        val x = (slot * p.picked + slot / 2f - layout.size.width / 2f).coerceIn(0f, size.width - layout.size.width - 12.dp.toPx())
+        tag(p.measurer, text, Offset(x, 0f), p.ink.bubble, p.ink.bubbleStyle, 6.dp.toPx())
+    }
+}
+
+/** The running total as a line through the middle of each bar, with its last point emphasised. */
+private fun DrawScope.drawCumulative(
+    p: ComboPaint,
+    floor: Float,
+    room: Float,
+    slot: Float,
+) {
+    val y = { value: Double -> floor - (value / p.lineTop).toFloat() * (floor - room) }
+    val path =
+        Path().apply {
+            p.line.forEachIndexed { i, value ->
+                val x = slot * i + slot / 2f
+                if (i == 0) moveTo(x, y(value)) else lineTo(x, y(value))
+            }
+        }
+    drawPath(path, p.lineColor, style = Stroke(2.2.dp.toPx(), cap = StrokeCap.Round))
+    p.line.lastOrNull()?.let {
+        val c = Offset(slot * (p.line.size - 1) + slot / 2f, y(it))
+        drawCircle(p.lineColor.copy(alpha = DOT_HALO_ALPHA), 9.dp.toPx(), c)
+        drawCircle(p.lineColor, 4.dp.toPx(), c)
+    }
+}
+
+private const val GRID_LINES = 3
