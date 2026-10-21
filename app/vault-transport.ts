@@ -18,6 +18,7 @@ async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T>
   }
   const data = (await res.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
   if (!res.ok) throw new TransportError(data?.error ?? 'The request failed. Try again.', res.status, data?.code);
+  if (data === null) throw new TransportError('The server sent an empty or unreadable answer. Try again in a moment.', res.status);
   return data as T;
 }
 

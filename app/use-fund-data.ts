@@ -21,12 +21,12 @@ export function useFundCatalog(enabled: boolean) {
       .funds?.()
       // An empty directory means the nightly run has not happened yet: ask for it once, then read it again.
       .then(async (r) => {
-        if (r.funds.length || !webPublicData.trackFunds) return r;
+        if (r?.funds?.length || !webPublicData.trackFunds) return r;
         await webPublicData.trackFunds([]);
         return (await webPublicData.funds?.()) ?? r;
       })
       .then(
-        (r) => live && setState({ funds: r.funds, error: '', loaded: true }),
+        (r) => live && setState({ funds: r?.funds ?? [], error: '', loaded: true }),
       )
       .catch(
         (e: unknown) =>

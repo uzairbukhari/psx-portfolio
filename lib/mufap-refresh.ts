@@ -2,6 +2,28 @@
 // `fund_navs` tables. Public data only. Runs on Cloudflare (MUFAP answers Cloudflare egress, but blocks GitHub's runners).
 import { parseMufapNavs, parseMufapPayouts } from './mufap.ts';
 
+/** Fetches a MUFAP page; on a refusal the error names the status and the block page's server/mitigation headers and first words, so a log says why. Retries once after a pause. */
+async function fetchMufap(url: string) {
+  let last = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 5000));
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        Referer: 'https://www.mufap.com.pk/',
+      },
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (response.ok) return response;
+    const snippet = (await response.text().catch(() => '')).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+    last = `${response.status} from mufap.com.pk (server ${response.headers.get('server') ?? '?'}, mitigated ${response.headers.get('cf-mitigated') ?? 'no'}${snippet ? `, "${snippet}"` : ''})`;
+  }
+  throw new Error(last);
+}
+
 const URL_ = 'https://www.mufap.com.pk/Industry/IndustryStatDaily?tab=3';
 const PAYOUTS_URL = 'https://www.mufap.com.pk/Industry/IndustryStatDaily?tab=4';
 /** Far fewer than the real list means the page changed: fail loudly instead of storing a fragment. */
@@ -23,17 +45,7 @@ const MAX_TRACKED = 3000;
 const RETRY_GAP_MS = 2 * 60_000;
 
 export async function refreshFunds(db: FundDb) {
-  const response = await fetch(URL_, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      Referer: 'https://www.mufap.com.pk/',
-    },
-    signal: AbortSignal.timeout(25_000),
-  });
-  if (!response.ok) throw new Error(`${response.status} from mufap.com.pk`);
+  const response = await fetchMufap(URL_);
   const { catalog, navs } = parseMufapNavs(await response.text());
   if (catalog.length < MIN_FUNDS)
     throw new Error(
@@ -139,17 +151,7 @@ export async function trackFunds(db: FundDb, ids: unknown, retry = false) {
  * loses a daily payer's day; clients then fall back to matching their statement.
  */
 export async function refreshFundPayouts(db: FundDb) {
-  const response = await fetch(PAYOUTS_URL, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      Referer: 'https://www.mufap.com.pk/',
-    },
-    signal: AbortSignal.timeout(25_000),
-  });
-  if (!response.ok) throw new Error(`${response.status} from mufap.com.pk`);
+  const response = await fetchMufap(PAYOUTS_URL);
   const payouts = parseMufapPayouts(await response.text());
   if (payouts.length < MIN_PAYOUTS)
     throw new Error(

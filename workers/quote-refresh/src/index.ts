@@ -99,11 +99,11 @@ export default {
             })
             .catch(async (e) => {
               console.error('Fund price refresh failed', e);
-              await recordJobRun(env.DB, { job: 'funds', source: 'cron', startedAt, ok: false, detail: e }).catch(() => {});
+              await recordJobRun(env.DB, { job: 'funds', source: 'cron', startedAt, ok: false, detail: e instanceof Error ? e.message : String(e) }).catch(() => {});
             });
           await refreshFundPayouts(env.DB)
             .then((r) => console.log('Fund payouts stored', r))
-            .catch((e) => console.error('Fund payout refresh failed', e));
+            .catch((e) => console.error('Fund payout refresh failed', e instanceof Error ? e.message : e));
           await refreshPlanNavs(env.DB)
             .then((r) => console.log('Plan prices stored', r))
             .catch((e) => console.error('Plan price refresh failed', e));
