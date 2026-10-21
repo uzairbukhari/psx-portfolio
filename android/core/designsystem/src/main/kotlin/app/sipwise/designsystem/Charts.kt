@@ -47,6 +47,17 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.sipwise.model.TreemapCell
+import app.sipwise.model.compactAxis
+import app.sipwise.model.cumulative
+import app.sipwise.model.nearestIndex
+import app.sipwise.model.niceTicks
+import app.sipwise.model.paddedRange
+import app.sipwise.model.slotAt
+import app.sipwise.model.treemap
+import app.sipwise.model.valueAt
+import app.sipwise.model.visiblePoints
+import app.sipwise.model.ZoomWindow
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2

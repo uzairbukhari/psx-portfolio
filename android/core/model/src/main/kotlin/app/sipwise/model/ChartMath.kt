@@ -1,4 +1,4 @@
-package app.sipwise.designsystem
+package app.sipwise.model
 
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -182,3 +182,79 @@ fun paddedRange(
 private const val DEFAULT_PAD = 0.06
 private const val FLAT = 1e-9
 private const val FLAT_BAND = 0.02
+
+/**
+ * The visible part of a zoomed chart, as fractions (0 to 1) of the full x range. Pinch changes the width around a
+ * focus point; two fingers or the mini-map move it. Never narrower than [MIN_WIDTH] and never outside 0..1.
+ */
+data class ZoomWindow(
+    val start: Float = 0f,
+    val end: Float = 1f,
+) {
+    val width: Float get() = end - start
+    val zoomed: Boolean get() = width < FULL_WIDTH - EPS
+
+    /** Scale the window by [factor] (above 1 zooms in) keeping the point at [focus] (0 to 1 of the window) still. */
+    fun zoom(
+        factor: Float,
+        focus: Float,
+    ): ZoomWindow {
+        if (!(factor > 0f)) return this
+        val newWidth = (width / factor).coerceIn(MIN_WIDTH, FULL_WIDTH)
+        val anchor = start + width * focus.coerceIn(0f, 1f)
+        return moved(anchor - newWidth * focus.coerceIn(0f, 1f), newWidth)
+    }
+
+    /** Move the window by [delta] of the full range (positive shows later data). */
+    fun pan(delta: Float): ZoomWindow = moved(start + delta, width)
+
+    private fun moved(
+        newStart: Float,
+        newWidth: Float,
+    ): ZoomWindow {
+        val s = newStart.coerceIn(0f, FULL_WIDTH - newWidth)
+        return ZoomWindow(s, s + newWidth)
+    }
+
+    companion object {
+        const val MIN_WIDTH = 0.04f
+        private const val FULL_WIDTH = 1f
+        private const val EPS = 1e-4f
+    }
+}
+
+/** Points whose x falls inside [from], [to] (points are sorted by x), plus one neighbour each side so lines reach the edge. */
+fun visiblePoints(
+    points: List<List<Double>>,
+    from: Double,
+    to: Double,
+): List<List<Double>> {
+    if (points.size < 2) return points
+    val xs = points.map { it[0] }
+    var first = xs.indexOfFirst { it >= from }
+    var last = xs.indexOfLast { it <= to }
+    if (first < 0) first = points.size - 1
+    if (last < 0) last = 0
+    first = max(first - 1, 0)
+    last = minOf(last + 1, points.size - 1)
+    return if (first > last) points.takeLast(2) else points.subList(first, last + 1)
+}
+
+/** Running totals: 1, 2, 3 becomes 1, 3, 6. */
+fun cumulative(values: List<Double>): List<Double> {
+    var sum = 0.0
+    return values.map {
+        sum += it
+        sum
+    }
+}
+
+/** Index of the bar under [x] when [count] equal slots fill [width]; -1 outside the chart. */
+fun slotAt(
+    x: Float,
+    width: Float,
+    count: Int,
+): Int {
+    if (count <= 0 || width <= 0f || x < 0f || x > width) return -1
+    return minOf((x / width * count).toInt(), count - 1)
+}

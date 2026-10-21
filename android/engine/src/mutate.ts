@@ -9,6 +9,9 @@ import { setBudget } from '../../../mobile/src/data/sip.ts';
 import { withPicksInputs } from '../../../mobile/src/data/picks.ts';
 import { heldValues, recordRun, runLocalPicks } from '../../../lib/picks-local.ts';
 import { parsePublicAnalysis } from '../../../lib/api-validate.ts';
+import { accountSipBlueprint, setAccountSipBlueprint } from '../../../lib/portfolio-account.ts';
+import { SIP_CLASSES, rebalanceEdit, validateBlueprint, type SipBlueprint, type SipClass, type SipMonth } from '../../../lib/sip-blueprint.ts';
+import { withQuickEntry, type QuickEntry } from '../../../lib/sip-blueprint-data.ts';
 import {
   addCompany,
   isIsoDate,
@@ -150,11 +153,158 @@ function apply(portfolio: Parameters<typeof recordTrade>[0], op: string, p: Para
     }
     case 'buys':
       return recordBuys(portfolio, p.buys as BuyDraft[], str(p, 'month'), date || undefined, note);
+    case 'sip.log': {
+      // A gold or currency purchase logged from the SIP Blueprint: the same entry the asset form would add.
+      const entry = quickEntry(p, date);
+      return withQuickEntry(portfolio, entry);
+    }
     case 'company': {
       if (!isValidSymbol(ticker)) throw new Error('Enter a valid PSX symbol (2-12 letters or digits).');
       return addCompany(portfolio, { ticker, name: str(p, 'name'), sector: str(p, 'sector') }, p.quote as Parameters<typeof addCompany>[2]);
     }
     default:
       throw new Error(`Unknown ledger change: ${op}`);
+  }
+}
+
+/** The purchase a "Log it" row saves: grams of 24K gold, or units of a currency, with the rupees paid. */
+function quickEntry(p: Params, date: string): QuickEntry {
+  if (!isIsoDate(date)) throw new Error('Enter the date as YYYY-MM-DD.');
+  const amount = num(p, 'amount');
+  if (amount === null || amount <= 0) throw new Error('Enter the amount in rupees.');
+  const kind = str(p, 'class');
+  if (kind === 'gold') {
+    const grams = num(p, 'grams');
+    if (grams === null || grams <= 0) throw new Error('Enter the weight in grams.');
+    return { class: 'gold', date, grams, amount };
+  }
+  if (kind === 'currency') {
+    const units = num(p, 'units');
+    if (units === null || units <= 0) throw new Error('Enter how much currency you bought.');
+    const currency = str(p, 'currency').toUpperCase();
+    if (currency !== 'USD' && currency !== 'AED' && currency !== 'SAR') throw new Error('Choose US dollars, dirhams or riyals.');
+    return { class: 'currency', date, currency, units, pkr: amount };
+  }
+  throw new Error('Only gold and foreign currency can be logged here.');
+}
+
+/** A class key from the app, checked against the four the blueprint knows. */
+function sipClass(p: Params, key = 'class'): SipClass {
+  const value = str(p, key);
+  if (!(SIP_CLASSES as string[]).includes(value)) throw new Error(`Unknown SIP class: ${value || '(none)'}.`);
+  return value as SipClass;
+}
+
+/**
+ * One change to the SIP Blueprint (account-level, stored in the first portfolio like the tax status). Returns the next
+ * account; the app saves it with a revision check, as with every other change.
+ */
+export function mutateBlueprint(account: PortfolioAccount, op: string, p: Params): PortfolioAccount {
+  const current = accountSipBlueprint(account);
+  const next = nextBlueprint(current, op, p);
+  if (next !== null) validateBlueprint(next);
+  return setAccountSipBlueprint(account, next);
+}
+
+function requireBlueprint(current: SipBlueprint | null): SipBlueprint {
+  if (!current) throw new Error('Set up your SIP first.');
+  return current;
+}
+
+/** This month's record, started from the plan in force the first time anything is saved for the month. */
+function monthRecord(b: SipBlueprint, month: string, p: Params): SipMonth {
+  const existing = b.months[month];
+  if (existing) return existing;
+  const plan = JSON.parse(str(p, 'plan') || '{}') as Record<string, unknown>;
+  const budget = num(p, 'budget') ?? b.budget;
+  const row = {} as Record<SipClass, number>;
+  for (const k of SIP_CLASSES) {
+    const value = plan[k];
+    row[k] = typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+  }
+  return { budget, plan: row, done: {} };
+}
+
+function withMonth(b: SipBlueprint, month: string, patch: Partial<SipMonth>, base: SipMonth): SipBlueprint {
+  const next: SipMonth = { ...base, ...patch };
+  if (patch.edited === undefined && 'edited' in patch) delete next.edited;
+  return { ...b, months: { ...b.months, [month]: next } };
+}
+
+function nextBlueprint(current: SipBlueprint | null, op: string, p: Params): SipBlueprint | null {
+  const month = str(p, 'month');
+  if (op !== 'save' && op !== 'clear' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Which month?');
+  switch (op) {
+    case 'save': {
+      // The whole plan from the setup flow or the edit sheet. A month nobody has started takes it straight away.
+      const saved = JSON.parse(str(p, 'blueprint')) as SipBlueprint;
+      const months = { ...current?.months };
+      const running = str(p, 'month');
+      const started = running ? months[running] : undefined;
+      if (started && !Object.keys(started.done).length) delete months[running];
+      return { ...saved, since: current?.since ?? saved.since, months };
+    }
+    case 'clear':
+      return null;
+    case 'done': {
+      const b = requireBlueprint(current);
+      const k = sipClass(p);
+      const amount = num(p, 'amount');
+      if (amount === null || amount < 0) throw new Error('How much went in?');
+      const date = str(p, 'date');
+      if (!isIsoDate(date)) throw new Error('Enter the date as YYYY-MM-DD.');
+      const base = monthRecord(b, month, p);
+      return withMonth(b, month, { done: { ...base.done, [k]: { amount, date } } }, base);
+    }
+    case 'undone': {
+      const b = requireBlueprint(current);
+      const k = sipClass(p);
+      const base = monthRecord(b, month, p);
+      const { [k]: _gone, ...rest } = base.done;
+      return withMonth(b, month, { done: rest }, base);
+    }
+    case 'plan': {
+      // A stepper change: the row the person moved, with the difference spread over the rows that are not done.
+      const b = requireBlueprint(current);
+      const base = monthRecord(b, month, p);
+      const k = sipClass(p);
+      const amount = num(p, 'amount');
+      if (amount === null || amount < 0) throw new Error('Enter an amount.');
+      const locked = SIP_CLASSES.filter((c) => base.done[c] !== undefined);
+      const plan = rebalanceEdit(base.plan, k, amount, base.budget, b.targets, locked);
+      return withMonth(b, month, { plan, edited: true }, base);
+    }
+    case 'resetPlan': {
+      const b = requireBlueprint(current);
+      const base = monthRecord(b, month, p);
+      const suggested = JSON.parse(str(p, 'plan')) as Record<SipClass, number>;
+      return withMonth(b, month, { plan: suggested, edited: undefined }, base);
+    }
+    case 'strict': {
+      // The rebalance switch. A month nobody has hand-edited follows it straight away.
+      const b = requireBlueprint(current);
+      const strict = p.strict === true || p.strict === 'true';
+      const next: SipBlueprint = { ...b, strict };
+      const snapshot = b.months[month];
+      if (snapshot && !snapshot.edited) {
+        const suggested = JSON.parse(str(p, 'plan') || '{}') as Record<SipClass, number>;
+        if (SIP_CLASSES.every((k) => typeof suggested[k] === 'number')) next.months = { ...b.months, [month]: { ...snapshot, plan: suggested } };
+      }
+      return next;
+    }
+    case 'assumptions': {
+      const b = requireBlueprint(current);
+      const stepUp = num(p, 'stepUp');
+      const returns = JSON.parse(str(p, 'returns') || '{}') as Record<string, number>;
+      const kept: Partial<Record<SipClass, number>> = {};
+      for (const k of SIP_CLASSES) if (typeof returns[k] === 'number' && Number.isFinite(returns[k])) kept[k] = returns[k];
+      return { ...b, stepUp: stepUp ?? b.stepUp, returns: kept };
+    }
+    case 'notify': {
+      const b = requireBlueprint(current);
+      return { ...b, notify: p.notify === true || p.notify === 'true' };
+    }
+    default:
+      throw new Error(`Unknown SIP change: ${op}`);
   }
 }

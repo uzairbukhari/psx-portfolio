@@ -179,12 +179,18 @@ object SipwiseTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalSipwiseColors.current
+
+    val chart: ChartColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalChartColors.current
 }
 
 @Composable
 fun SipwiseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    chartPalette: ChartPalette = ChartPalette.CLASSIC,
     content: @Composable () -> Unit,
 ) {
     val palette = if (darkTheme) DarkPalette else LightPalette
@@ -195,7 +201,10 @@ fun SipwiseTheme(
             darkTheme -> palette.darkScheme()
             else -> palette.lightScheme()
         }
-    CompositionLocalProvider(LocalSipwiseColors provides sipwiseColors(palette)) {
+    CompositionLocalProvider(
+        LocalSipwiseColors provides sipwiseColors(palette),
+        LocalChartColors provides chartColors(chartPalette, darkTheme),
+    ) {
         MaterialTheme(colorScheme = scheme, typography = SipwiseTypography, shapes = SipwiseShapes, content = content)
     }
 }

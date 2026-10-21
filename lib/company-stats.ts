@@ -71,3 +71,81 @@ export function compactNumber(n: number | null): string {
   const v = n / div;
   return `${v.toFixed(suffix ? 1 : 0)}${suffix}`;
 }
+
+/** The live day figures the key-statistics card needs; every field may be unknown. */
+export type DayQuote = {
+  high: number | null;
+  low: number | null;
+  volume: number | null;
+  previousClose: number | null;
+  price: number | null;
+};
+
+/** One label/value row of the key-statistics card. A null value is shown as a dash. */
+export type StatRow = { label: string; value: number | null; format: 'rs' | 'compact' | 'ratio' | 'percent' };
+
+/**
+ * The key-statistics card, worked out from public data only: the live day quote, today's ticks, the cached PSX
+ * company facts and the payout announcements. Shared by the web card and the phone so both show the same figures.
+ * `company` is the account's own record (its explicit face value wins); pass undefined when the value is only assumed,
+ * so an invented face value never feeds a published-looking yield.
+ */
+export function keyStats(o: {
+  stats: CompanyStats | null;
+  day: DayQuote | undefined;
+  eod: readonly [number, number][];
+  intraday: readonly [number, number][];
+  company: { faceValue?: number } | undefined;
+  faceValueAt: (company: { faceValue?: number } | undefined, evidence: FaceValueEvidence[] | undefined, date: string) => number | null;
+  todayIso: string;
+}): { left: StatRow[]; right: StatRow[] } {
+  const { stats, day, eod, intraday, company, faceValueAt, todayIso } = o;
+  // The first tick of the latest session is the opening print.
+  const first = intraday[0];
+  const last = intraday[intraday.length - 1];
+  const open = first && last && pktDay(first[0]) === pktDay(last[0]) ? first[1] : null;
+  // PSX's own 52-week range when scraped; otherwise the range of the last year's daily closes.
+  const range = (() => {
+    if (stats?.week52High != null && stats.week52Low != null) return { low: stats.week52Low, high: stats.week52High };
+    const newest = eod[eod.length - 1];
+    if (!newest) return { low: null, high: null };
+    const closes = eod.filter(([t]) => t >= newest[0] - 365 * DAY_SECONDS).map(([, p]) => p);
+    return closes.length ? { low: Math.min(...closes), high: Math.max(...closes) } : { low: null, high: null };
+  })();
+  const dps = stats ? trailingDividendPerShare(stats.payouts, (date) => faceValueAt(company, stats.faceValues, date), todayIso) : null;
+  const price = day?.price ?? null;
+  return {
+    left: [
+      { label: 'Open', value: open, format: 'rs' },
+      { label: "Day's high", value: day?.high ?? null, format: 'rs' },
+      { label: "Day's low", value: day?.low ?? null, format: 'rs' },
+      { label: '52 wk high', value: range.high, format: 'rs' },
+      { label: '52 wk low', value: range.low, format: 'rs' },
+    ],
+    right: [
+      { label: 'Volume', value: day?.volume ?? null, format: 'compact' },
+      { label: 'Market cap', value: stats?.marketCap ?? null, format: 'compact' },
+      { label: 'PE ratio', value: stats?.peTtm ?? null, format: 'ratio' },
+      { label: 'Dividend yield', value: dps !== null && price ? (dps / price) * 100 : null, format: 'percent' },
+      { label: 'Prev. close', value: day?.previousClose ?? null, format: 'rs' },
+    ],
+  };
+}
+
+const DAY_SECONDS = 86_400;
+const pktDay = (sec: number) => new Date((sec + 5 * 3600) * 1000).toISOString().slice(0, 10);
+
+/** A stat row as text, the way both clients print it ("320.00", "2.4M", "8.00", "6.25%", "—"). */
+export function formatStat(row: StatRow): string {
+  if (row.value === null || !Number.isFinite(row.value)) return '—';
+  switch (row.format) {
+    case 'compact':
+      return compactNumber(row.value);
+    case 'ratio':
+      return row.value.toFixed(2);
+    case 'percent':
+      return `${row.value.toFixed(2)}%`;
+    default:
+      return row.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+}

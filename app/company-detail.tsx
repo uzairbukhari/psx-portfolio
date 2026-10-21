@@ -13,7 +13,6 @@ import { EChart } from './charts/echart';
 import { barOption, timeSeriesOption } from '@/lib/chart-kit';
 import {
   money,
-  realizedSales,
   type Dividend,
   type Portfolio,
   type StockSplit,
@@ -27,7 +26,11 @@ import {
   type PricePoint,
 } from '@/lib/price-history';
 import LedgerTimeline from './ledger-timeline';
-import { cachedHoldings } from './portfolio-memo';
+import {
+  realisedProfit as realisedProfitOf,
+  tradeMarkers,
+  weightInStocks,
+} from '@/lib/company-view';
 import { buildEntries } from '@/lib/ledger-entries';
 import { readJson } from '@/lib/safe-json';
 import { useMarketGlance } from './use-market-glance';
@@ -67,8 +70,6 @@ const RANGES: [HistoryRange, string][] = [
   ['5y', '5Y'],
 ];
 
-const tradeSeconds = (date: string) =>
-  Math.round(Date.parse(`${date}T12:00:00+05:00`) / 1000);
 const tone = (n: number | null) =>
   n === null ? undefined : n >= 0 ? 'pos-text' : 'neg-text';
 const pct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
@@ -155,12 +156,9 @@ function PriceChart({
   const first = points[0]?.[0];
   const last = points.at(-1)?.[0];
   const markers =
-    range === 'today' || first === undefined || last === undefined
+    range === 'today'
       ? []
-      : trades
-          .filter((t) => !t.voided && t.price !== null && t.kind !== 'opening')
-          .map((t) => ({ t, x: tradeSeconds(t.date) }))
-          .filter(({ x }) => x >= first && x <= last);
+      : tradeMarkers(trades, ticker, first, last, money);
 
   return (
     <section className="card company-price-card">
@@ -233,11 +231,11 @@ function PriceChart({
                 holding.average <= hi + pad
                   ? [{ y: holding.average, label: 'Avg. cost' }]
                   : undefined,
-              markers: markers.map(({ t: tr, x }) => ({
-                x: x * 1000,
-                y: tr.price!,
-                color: tr.kind === 'sell' ? t.danger : t.success,
-                label: `${tr.kind === 'sell' ? 'Sold' : 'Bought'} ${tr.shares} at ${money(tr.price!)} · ${tr.date}`,
+              markers: markers.map((m) => ({
+                x: m.x * 1000,
+                y: m.y,
+                color: m.kind === 'sell' ? t.danger : t.success,
+                label: m.label,
               })),
             })
           }
@@ -352,14 +350,10 @@ export default function CompanyDetail({
     else onBack();
   };
   const held = (holding?.shares ?? 0) > 0;
-  const stocksValue = cachedHoldings(portfolio).reduce(
-    (a, h) => a + (h.value ?? 0),
-    0,
+  const weight = useMemo(
+    () => weightInStocks(portfolio, summary.value),
+    [portfolio, summary.value],
   );
-  const weight =
-    summary.value !== null && stocksValue > 0
-      ? summary.value / stocksValue
-      : null;
 
   const glance = useMarketGlance(
     [ticker],
@@ -380,19 +374,10 @@ export default function CompanyDetail({
     'activity',
   );
   // Profit on shares already sold; unknown when any sale has no cost basis.
-  const realisedProfit = useMemo(() => {
-    try {
-      const sales = realizedSales(portfolio).filter((x) => x.ticker === ticker);
-      if (!sales.length) return 0;
-      return sales.some((x) => x.realizedGain === null)
-        ? null
-        : Math.round(
-            sales.reduce((a, x) => a + (x.realizedGain ?? 0), 0) * 100,
-          ) / 100;
-    } catch {
-      return null;
-    }
-  }, [portfolio, ticker]);
+  const realisedProfit = useMemo(
+    () => realisedProfitOf(portfolio, ticker),
+    [portfolio, ticker],
+  );
   const dividendTotal =
     summary.dividendNet === null ? summary.dividendGross : summary.dividendNet;
 

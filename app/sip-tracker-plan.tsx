@@ -5,8 +5,7 @@
 import { useState } from 'react';
 import { ArrowRight, Check, Flame, Minus, Pencil, Plus, RotateCcw } from 'lucide-react';
 import { barOption } from '@/lib/chart-kit';
-import { CURRENCY_NAMES, SUPPORTED_CURRENCIES, chooseFxRate, type CurrencyCode } from '@/lib/fx-rates';
-import { TOLA_GRAMS, chooseRate } from '@/lib/metal-rates';
+import { CURRENCY_NAMES, SUPPORTED_CURRENCIES, type CurrencyCode } from '@/lib/fx-rates';
 import { money } from '@/lib/portfolio';
 import {
   SIP_CLASSES,
@@ -22,16 +21,19 @@ import {
   type SipClass,
   type SipDone,
 } from '@/lib/sip-blueprint';
-import type { QuickEntry, SipMonthState, SipRates } from '@/lib/sip-blueprint-data';
+import {
+  logRate,
+  monthLong,
+  ordinal,
+  rowHint,
+  type QuickEntry,
+  type SipMonthState,
+  type SipRates,
+} from '@/lib/sip-blueprint-data';
 import { EChart } from './charts/echart';
 import { MixBar } from './sip-tracker-setup';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthLong = (m: string) =>
-  ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][
-    Number(m.slice(5, 7)) - 1
-  ];
-const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
 const shortDate = (d: string) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
 const digits = (text: string) => Number(text.replace(/[^0-9]/g, '')) || 0;
 
@@ -233,7 +235,7 @@ export function SipPlan({
               </span>
               <div className="sp-row-name">
                 <b>{SIP_CLASS_LABELS[k]}</b>
-                <small>{hint(k, amount, rates, asOf)}</small>
+                <small>{rowHint(k, amount, rates, asOf)}</small>
                 {!done && Math.abs(diff) >= 100 && (
                   <span className="sp-tag" data-tone={diff > 0 ? 'up' : 'down'}>
                     {draft || edited
@@ -392,19 +394,6 @@ export function SipPlan({
   );
 }
 
-/** What to buy, in plain words. Grams and dollars use the public rate Sipwise already has. */
-function hint(k: SipClass, amount: number, rates: SipRates, asOf: string): string {
-  if (k === 'stocks') return 'From your shortlist or Monthly Picks';
-  if (k === 'funds') return 'Money market or income fund, or a savings plan';
-  if (k === 'gold') {
-    const rate = chooseRate(rates.metalRates ?? [], 'gold', asOf);
-    const g = gramsFor(amount, rate?.pkrPerGram);
-    return rate && g !== null && amount > 0 ? `≈ ${g.toFixed(g < 1 ? 2 : 1)} g of 24K at ${lakh(rate.pkrPerGram * TOLA_GRAMS)}/tola` : '24K coins or bars';
-  }
-  const usd = chooseFxRate(rates.fxRates ?? [], 'USD', asOf);
-  return usd && amount > 0 ? `≈ $${Math.round(amount / usd.pkrPerUnit).toLocaleString('en-US')} as a cash reserve` : 'Dollars, dirhams or riyals as a reserve';
-}
-
 function RowForm({
   k,
   mode,
@@ -432,7 +421,7 @@ function RowForm({
   const [qtyText, setQtyText] = useState('');
   const [error, setError] = useState('');
   const amount = digits(amountText);
-  const rate = k === 'gold' ? chooseRate(rates.metalRates ?? [], 'gold', asOf)?.pkrPerGram : chooseFxRate(rates.fxRates ?? [], currency, asOf)?.pkrPerUnit;
+  const rate = logRate(k, rates, asOf, currency);
   const suggested = k === 'gold' ? gramsFor(amount, rate) : rate ? amount / rate : null;
   const qty = qtyText === '' ? (suggested ?? 0) : Number(qtyText);
 

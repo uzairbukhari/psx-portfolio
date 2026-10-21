@@ -503,6 +503,11 @@
     <string name="settings_appearance_system">System</string>
     <string name="settings_appearance_light">Light</string>
     <string name="settings_appearance_dark">Dark</string>
+    <string name="settings_chart_palette">Chart colours</string>
+    <string name="settings_chart_palette_classic">Classic</string>
+    <string name="settings_chart_palette_vibrant">Vibrant</string>
+    <string name="settings_chart_palette_accessible">Colour-blind</string>
+    <string name="settings_chart_palette_note">Colour-blind uses blue and orange for gains and losses. Only this device.</string>
     <string name="settings_appearance_note">System follows your phone’s light or dark setting.</string>
     <string name="settings_tax">Tax status</string>
     <string name="settings_tax_filer">Filer · 15%%</string>

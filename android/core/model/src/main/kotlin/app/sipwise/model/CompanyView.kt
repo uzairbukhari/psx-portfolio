@@ -45,10 +45,52 @@ data class CompanyView(
     val portfolios: List<PortfolioRef> = emptyList(),
     val dividends: List<DividendRow> = emptyList(),
     val entries: List<ActivityEntry> = emptyList(),
+    /** False once every share has been sold: the page then shows the position as closed. */
+    val held: Boolean = false,
+    /** Share of the stocks you hold that sits in this company, 0 to 1; null when some value is unknown. */
+    val weight: Double? = null,
+    /** Profit on shares already sold; null when a sale has no cost basis. */
+    val realisedProfit: Double? = null,
+    val payments: List<DividendPayment> = emptyList(),
+    val markers: List<TradeMarker> = emptyList(),
 )
 
-/** Chart ranges, in the order the Expo app lists them. */
-enum class HistoryRange(val wire: String) { DAY("today"), WEEK("7d"), MONTH("1m"), YEAR("1y"), YEARS3("3y"), YEARS5("5y") }
+/** One received dividend with the running total, for the per-payment bars and the cumulative line. */
+@Serializable
+data class DividendPayment(
+    val id: String,
+    val date: String,
+    val month: String,
+    val net: Double,
+    val gross: Double,
+    val total: Double,
+)
+
+/** A buy or sale drawn on the price chart. [x] is unix seconds, [y] the price paid or taken. */
+@Serializable
+data class TradeMarker(val x: Double, val y: Double, val kind: String, val label: String = "") {
+    val sell: Boolean get() = kind == "sell"
+}
+
+/** One row of the key-statistics card, already formatted by the engine (`company.stats`). */
+@Serializable
+data class StatRow(val label: String, val value: String)
+
+/** The key-statistics card: two columns, as the web lays them out. */
+@Serializable
+data class CompanyStats(val left: List<StatRow> = emptyList(), val right: List<StatRow> = emptyList())
+
+/** Chart ranges, in the order the web company page lists them. */
+enum class HistoryRange(val wire: String, val label: String) {
+    DAY("today", "1D"),
+    WEEK("7d", "1W"),
+    MONTH("1m", "1M"),
+    MONTHS3("3m", "3M"),
+    MONTHS6("6m", "6M"),
+    YEAR("1y", "1Y"),
+    YEARS3("3y", "3Y"),
+    YEARS5("5y", "5Y"),
+}
 
 @Serializable
 data class RangeChange(val change: Double, val percent: Double)

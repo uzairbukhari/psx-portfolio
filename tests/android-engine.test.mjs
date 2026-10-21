@@ -494,3 +494,212 @@ test('foreign currency holdings are valued from the public rates and requested o
   run('account.load', { json: JSON.stringify(dropCurrency(seed())) });
   assert.equal(run('rates.wanted').value.fx, false);
 });
+
+test('the company view adds the weight, realised profit, payments and chart markers the web page shows', async () => {
+  const { dividendPayments, realisedProfit, tradeMarkers, weightInStocks } = await import('../lib/company-view.ts');
+  const { money } = await import('../lib/portfolio.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const reference = normalizeAccount(seed(), false);
+  const portfolio = dashboardPortfolio(reference, ALL_PORTFOLIOS);
+  const { held } = safeHoldings(portfolio);
+  const h = held.find((x) => x.shares > 0);
+  const view = run('company.view', { scope: ALL_PORTFOLIOS, ticker: h.ticker }).value;
+  assert.equal(view.held, true);
+  assert.deepEqual(view.weight, roundTrip(weightInStocks(portfolio, h.value)));
+  assert.deepEqual(view.realisedProfit, roundTrip(realisedProfit(portfolio, h.ticker)));
+  assert.deepEqual(view.payments, roundTrip(dividendPayments(portfolio, h.ticker)));
+  assert.deepEqual(view.markers, roundTrip(tradeMarkers(portfolio.trades, h.ticker, 0, Number.MAX_SAFE_INTEGER, money)));
+  // Every marker is a buy or a sale with a price, so the chart never draws an opening with no price.
+  for (const m of view.markers) {
+    assert.ok(m.kind === 'buy' || m.kind === 'sell');
+    assert.ok(Number.isFinite(m.y) && m.y > 0);
+  }
+});
+
+test('company.stats formats the key statistics exactly as the web card does', async () => {
+  const { keyStats, formatStat } = await import('../lib/company-stats.ts');
+  const { faceValueFor } = await import('../lib/face-values.ts');
+  const { parseEod, parseIntraday } = await import('../lib/price-history.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const ticker = run('holdings.view', { scope: 'all' }).value.rows[0].ticker;
+  const day = 86_400;
+  const eod = Array.from({ length: 300 }, (_, i) => [1_700_000_000 + i * day, 100 + (i % 37)]);
+  const stats = {
+    ticker,
+    peTtm: 12.5,
+    marketCap: 48_000_000_000,
+    week52Low: null,
+    week52High: null,
+    payouts: [{ kind: 'dividend', percent: 40, perShareRs: null, bookClosureStart: '2026-04-10' }],
+    faceValues: [{ date: '2020-01-01', faceValue: 10, source: 'https://dps.psx.com.pk/', status: 'verified' }],
+  };
+  const quote = { price: 120, previousClose: 118, open: 119, high: 121, low: 117, volume: 450_000 };
+  const got = run('company.stats', {
+    ticker,
+    stats: JSON.stringify({ stats }),
+    day: JSON.stringify(quote),
+    history: JSON.stringify({ eod, intraday: [] }),
+  });
+  assert.equal(got.ok, true, got.error);
+  const company = normalizeAccount(seed(), false)
+    .portfolios.flatMap((x) => x.portfolio.companies)
+    .find((c) => c.ticker === ticker && !c.faceValueAssumed);
+  const expected = keyStats({
+    stats,
+    day: quote,
+    eod: parseEod(eod),
+    intraday: parseIntraday([]),
+    company,
+    faceValueAt: faceValueFor,
+    todayIso: today(),
+  });
+  const rows = (list) => list.map((row) => ({ label: row.label, value: formatStat(row) }));
+  assert.deepEqual(got.value.left, rows(expected.left));
+  assert.deepEqual(got.value.right, rows(expected.right));
+  // Nothing is invented: a statistic with no evidence prints an em dash.
+  assert.ok([...got.value.left, ...got.value.right].every((r) => typeof r.value === 'string' && r.value.length > 0));
+});
+
+test('every chart range the Android company page offers comes back from the shared slicer', async () => {
+  const { parseEod, parseIntraday, sliceRange, rangeChange } = await import('../lib/price-history.ts');
+  const day = 86_400;
+  const eod = Array.from({ length: 2000 }, (_, i) => [1_600_000_000 + i * day, 100 + (i % 53)]);
+  const json = JSON.stringify({ eod, intraday: [] });
+  for (const range of ['today', '7d', '1m', '3m', '6m', '1y', '3y', '5y']) {
+    const got = run('history.series', { json, range });
+    assert.equal(got.ok, true, `${range}: ${got.error}`);
+    const expected = sliceRange(parseEod(eod), parseIntraday([]), range);
+    assert.deepEqual(got.value.points, roundTrip(expected), `points for ${range}`);
+    assert.deepEqual(got.value.change, roundTrip(rangeChange(expected)), `change for ${range}`);
+  }
+});
+
+test('sip.view matches the shared sipView, and opens the wizard when there is no plan yet', async () => {
+  const { sipView } = await import('../lib/sip-blueprint-data.ts');
+  const { accountSipBlueprint, setAccountSipBlueprint } = await import('../lib/portfolio-account.ts');
+  const asOf = today();
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  run('rates.set', { metals: '[]', navs: '[]', fx: '[]' });
+  const reference = normalizeAccount(seed(), false);
+  const b = accountSipBlueprint(reference);
+  assert.ok(b, 'the test seed carries a blueprint');
+  const got = run('sip.view', { asOf });
+  assert.equal(got.ok, true, got.error);
+  assert.equal(got.value.setup, false);
+  const expected = sipView(b, reference.portfolios, asOf, {}, { canLog: reference.portfolios.some((p) => !p.locked) });
+  assert.deepEqual(got.value.hero, roundTrip(expected.hero));
+  assert.deepEqual(got.value.rows, roundTrip(expected.rows));
+  assert.deepEqual(got.value.state, roundTrip(expected.state));
+  assert.equal(got.value.day, expected.day);
+  assert.equal(got.value.strict, expected.strict);
+  // Rows only ever ask for one of the four actions the phone knows how to carry out.
+  for (const row of got.value.rows) assert.ok(['picks', 'holdings', 'log', 'mark'].includes(row.action), row.action);
+
+  run('account.load', { json: JSON.stringify(setAccountSipBlueprint(normalizeAccount(seed(), false), null)) });
+  const wizard = run('sip.view', { asOf }).value;
+  assert.equal(wizard.setup, true);
+  assert.equal(wizard.presets.length, 4);
+  assert.ok(wizard.presets.every((p) => p.annual > 0 || p.key === 'custom'));
+  assert.ok(wizard.budgetPills.length > 0);
+  assert.ok(wizard.blank.budget > 0);
+});
+
+test('sip.preview, sip.project and sip.rebalance answer the drafts the sheets show', async () => {
+  const { blendedReturn, planMonth, projectSip, mixAfter, rebalanceEdit, targetsTotal, DEFAULT_RETURNS, SIP_CLASSES } =
+    await import('../lib/sip-blueprint.ts');
+  const { classWeights, LONG_RUN_INFLATION } = await import('../lib/sip-blueprint-data.ts');
+  const { accountSipBlueprint } = await import('../lib/portfolio-account.ts');
+  const asOf = today();
+  run('account.load', { json: JSON.stringify(seed()) });
+  run('rates.set', { metals: '[]', navs: '[]', fx: '[]' });
+  const reference = normalizeAccount(seed(), false);
+  const b = accountSipBlueprint(reference);
+
+  const draft = { budget: 60_000, targets: { stocks: 50, funds: 30, gold: 15, currency: 5 }, strict: true };
+  const preview = run('sip.preview', { asOf, draft: JSON.stringify(draft) });
+  assert.equal(preview.ok, true, preview.error);
+  const held = classWeights(reference.portfolios, asOf, {});
+  const plan = planMonth(draft.budget, draft.targets, held.weights, true);
+  assert.deepEqual(preview.value.plan, roundTrip(plan));
+  assert.equal(preview.value.total, targetsTotal(draft.targets));
+  assert.equal(preview.value.valid, true);
+  assert.equal(preview.value.annual, blendedReturn(draft.targets));
+  assert.deepEqual(preview.value.mix, roundTrip(mixAfter(held.values, plan)));
+  assert.ok(preview.value.in10.value > preview.value.in10.invested);
+  // A split that does not add up to 100 is not offered as a plan to save.
+  assert.equal(run('sip.preview', { asOf, draft: JSON.stringify({ ...draft, targets: { ...draft.targets, gold: 40 } }) }).value.valid, false);
+
+  const projection = run('sip.project', { monthly: '50000', years: '15', stepUp: '10' });
+  assert.equal(projection.ok, true, projection.error);
+  const annual = blendedReturn(b.targets, { ...DEFAULT_RETURNS, ...b.returns });
+  const points = projectSip({ monthly: 50_000, years: 15, annualPct: annual, stepUpPct: 10, inflationPct: LONG_RUN_INFLATION });
+  assert.deepEqual(projection.value.points, roundTrip(points));
+  assert.equal(projection.value.annual, annual);
+  assert.equal(projection.value.last.year, 15);
+  // Today's money is always the smaller of the two, and every milestone carries its words.
+  assert.ok(projection.value.last.realValue < projection.value.last.value);
+  assert.ok(projection.value.marks.nominal.every((m) => typeof m.label === 'string' && m.label.startsWith('Rs')));
+  assert.ok(projection.value.skip.real < projection.value.skip.nominal);
+
+  const state = run('sip.view', { asOf }).value.state;
+  const moved = run('sip.rebalance', { asOf, class: 'gold', amount: String(state.plan.gold + 2_000) });
+  assert.equal(moved.ok, true, moved.error);
+  const locked = SIP_CLASSES.filter((k) => state.done[k]);
+  assert.deepEqual(moved.value.plan, roundTrip(rebalanceEdit(state.plan, 'gold', state.plan.gold + 2_000, state.budget, b.targets, locked)));
+  assert.deepEqual(moved.value.locked, locked);
+  assert.equal(run('sip.rebalance', { asOf, class: 'nope', amount: '1' }).ok, false);
+  assert.equal(run('sip.rebalance', { asOf, class: 'gold', amount: '-1' }).ok, false);
+});
+
+test('SIP blueprint changes go through mutate.account and return the next account unsaved', async () => {
+  const { accountSipBlueprint } = await import('../lib/portfolio-account.ts');
+  const asOf = today();
+  const month = asOf.slice(0, 7);
+  run('account.load', { json: JSON.stringify(seed()) });
+  const before = accountSipBlueprint(normalizeAccount(seed(), false));
+
+  const ticked = run('mutate.account', {
+    op: 'sip.done',
+    params: JSON.stringify({ month, class: 'gold', amount: '5000', date: asOf }),
+  });
+  assert.equal(ticked.ok, true, ticked.error);
+  const next = accountSipBlueprint(JSON.parse(ticked.value.account));
+  assert.deepEqual(next.months[month].done.gold, { amount: 5000, date: asOf });
+  // The loaded account is untouched until the app saves and loads it back.
+  assert.deepEqual(accountSipBlueprint(normalizeAccount(seed(), false)).months[month]?.done?.gold, before.months[month]?.done?.gold);
+
+  const untick = run('mutate.account', { op: 'sip.undone', params: JSON.stringify({ month, class: 'gold' }) });
+  assert.equal(untick.ok, true, untick.error);
+  assert.equal(accountSipBlueprint(JSON.parse(untick.value.account)).months[month].done.gold, undefined);
+
+  const notify = run('mutate.account', { op: 'sip.notify', params: JSON.stringify({ month, notify: true }) });
+  assert.equal(accountSipBlueprint(JSON.parse(notify.value.account)).notify, true);
+
+  const cleared = run('mutate.account', { op: 'sip.clear', params: '{}' });
+  assert.equal(cleared.ok, true, cleared.error);
+  assert.equal(accountSipBlueprint(JSON.parse(cleared.value.account)), null);
+
+  // A bad change is refused with the same wording the person reads on the web.
+  assert.match(run('mutate.account', { op: 'sip.done', params: JSON.stringify({ month, class: 'gold', amount: '5000', date: 'nope' }) }).error, /YYYY-MM-DD/);
+  assert.equal(run('mutate.account', { op: 'sip.nope', params: JSON.stringify({ month }) }).ok, false);
+});
+
+test('a gold or currency purchase logged from the SIP Blueprint lands in the ledger as an asset entry', () => {
+  const asOf = today();
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const owner = account.portfolios.find((p) => !p.locked);
+  const logged = run('mutate', {
+    portfolio: owner.id,
+    op: 'sip.log',
+    params: JSON.stringify({ class: 'gold', date: asOf, amount: '20000', grams: '5.8' }),
+  });
+  assert.equal(logged.ok, true, logged.error);
+  const assets = JSON.parse(logged.value.account).portfolios.find((p) => p.id === owner.id).portfolio.assets ?? [];
+  const metal = assets.filter((a) => a.kind === 'metal');
+  assert.ok(metal.some((a) => a.entries.some((e) => e.date === asOf && e.amount === 20000)));
+  assert.equal(run('mutate', { portfolio: owner.id, op: 'sip.log', params: JSON.stringify({ class: 'gold', date: asOf, amount: '0', grams: '5.8' }) }).ok, false);
+});

@@ -69,6 +69,11 @@ const SHARED = [
   'company-enrichment',
   'company-directory',
   'quote-merge',
+  // Read by the phone's engine for the Company page and the SIP Blueprint.
+  'company-stats',
+  'company-view',
+  'sip-blueprint-data',
+  'pk-benchmarks',
 ];
 const FORBIDDEN = /from\s+['"](cloudflare:|next\/|@\/|react-dom|node:)/;
 

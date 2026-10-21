@@ -9,6 +9,7 @@ import type { MetalAsset } from '../assets.ts';
 import type { CurrencyAsset } from '../currency.ts';
 import type { PlanAsset } from '../plans.ts';
 import { TEST_COMPANIES, TEST_FUNDS, priceOf } from './universe.ts';
+import { blankBlueprint, monthsBack, planMonth, type SipBlueprint } from '../sip-blueprint.ts';
 
 /** `YYYY-MM-DD` that is `days` before `today`. */
 export function daysAgo(today: string, days: number): string {
@@ -45,6 +46,21 @@ type TradeSeed = Partial<Trade> & Pick<Trade, 'ticker' | 'kind' | 'date' | 'shar
 function trade(t: TradeSeed): Trade {
   const fees = t.fees ?? (t.price && t.kind !== 'opening' ? r2(t.shares * t.price * 0.0025) : 0);
   return { id: nextId('t'), fees, month: t.kind === 'buy' && !t.source ? monthOf(t.date) : '', note: 'Fictional test trade.', ...t };
+}
+
+/** A SIP Blueprint with a few finished months (some met, some not) so the streak, habit and projection have data. */
+function seedBlueprint(today: string): SipBlueprint {
+  const month = monthOf(today);
+  const base = blankBlueprint(monthsBack(month, 6)[0], 50_000);
+  const plan = planMonth(base.budget, base.targets, null, false);
+  const months: SipBlueprint['months'] = {};
+  // The last three finished months: two fully done by hand, one skipped.
+  monthsBack(month, 4)
+    .slice(0, 3)
+    .forEach((m, i) => {
+      months[m] = { budget: base.budget, plan, done: i === 1 ? {} : { stocks: { amount: plan.stocks, date: `${m}-02` }, funds: { amount: plan.funds, date: `${m}-02` }, gold: { amount: plan.gold, date: `${m}-03` }, currency: { amount: plan.currency, date: `${m}-03` } } };
+    });
+  return { ...base, day: 2, stepUp: 10, returns: { stocks: 15 }, notify: true, months };
 }
 
 function ahlCore(today: string, now: Date): Portfolio {
@@ -137,6 +153,7 @@ function ahlCore(today: string, now: Date): Portfolio {
     dividendTrackingFrom: d(30),
     taxProfile: { filerStatus: 'filer' },
     monthlyExpenses: 80_000,
+    sipBlueprint: seedBlueprint(today),
     brokerFileHashes: ['a'.repeat(64)],
     brokerFormats: [{ broker: 'Fictional Securities', signature: 'date|scrip|side|qty|rate', report: 'trades', dateStyle: 'iso', columns: { ticker: 1, date: 0, side: 2, shares: 3, price: 4, fees: null, reference: null } }],
     monthlyPicksShortlist: ['MEBL', 'LUCK', 'FFC', 'TRG'],

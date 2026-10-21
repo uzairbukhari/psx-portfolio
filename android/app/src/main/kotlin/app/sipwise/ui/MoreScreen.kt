@@ -45,6 +45,7 @@ import app.sipwise.BuildConfig
 import app.sipwise.R
 import app.sipwise.SipwiseApp
 import app.sipwise.data.Appearance
+import app.sipwise.designsystem.ChartPalette
 import app.sipwise.data.ShareFiles
 import app.sipwise.designsystem.BrandColors
 import app.sipwise.designsystem.NightSlab
@@ -78,6 +79,7 @@ fun MoreScreen(
     val context = LocalContext.current
     DisposableEffect(Unit) { onDispose { ShareFiles.clear(context) } }
     val appearance by settings.appearance.collectAsStateWithLifecycle()
+    val chartPalette by settings.chartPalette.collectAsStateWithLifecycle()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.gutter),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -89,6 +91,10 @@ fun MoreScreen(
             val labels = Appearance.entries.associateWith { stringResource(appearanceLabel(it)) }
             SegmentedControl(Appearance.entries.toList(), appearance, label = { labels.getValue(it) }, onSelect = settings::setAppearance)
             Text(stringResource(R.string.settings_appearance_note), style = MaterialTheme.typography.bodySmall)
+            val paletteLabels = ChartPalette.entries.associateWith { stringResource(chartPaletteLabel(it)) }
+            Text(stringResource(R.string.settings_chart_palette), style = MaterialTheme.typography.labelLarge)
+            SegmentedControl(ChartPalette.entries.toList(), chartPalette, label = { paletteLabels.getValue(it) }, onSelect = settings::setChartPalette)
+            Text(stringResource(R.string.settings_chart_palette_note), style = MaterialTheme.typography.bodySmall)
         }
         SectionCard(R.string.settings_tax) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -132,6 +138,13 @@ private fun appearanceLabel(option: Appearance) =
         Appearance.SYSTEM -> R.string.settings_appearance_system
         Appearance.LIGHT -> R.string.settings_appearance_light
         Appearance.DARK -> R.string.settings_appearance_dark
+    }
+
+private fun chartPaletteLabel(option: ChartPalette) =
+    when (option) {
+        ChartPalette.CLASSIC -> R.string.settings_chart_palette_classic
+        ChartPalette.VIBRANT -> R.string.settings_chart_palette_vibrant
+        ChartPalette.ACCESSIBLE -> R.string.settings_chart_palette_accessible
     }
 
 @Composable
