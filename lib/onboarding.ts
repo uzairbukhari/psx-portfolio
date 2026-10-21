@@ -12,6 +12,9 @@ export type ChecklistId = (typeof CHECKLIST_IDS)[number];
 export type TourOutcome = 'completed' | 'skipped' | 'declined';
 const TOUR_OUTCOMES: readonly string[] = ['completed', 'skipped', 'declined'];
 
+export const TIP_IDS = ['insights', 'activity', 'company', 'sip_blueprint', 'picks', 'notifications'] as const;
+export type TipId = (typeof TIP_IDS)[number];
+
 export type TickId = 'tax' | 'backup' | 'insights';
 
 export type OnboardingState = {
@@ -23,6 +26,10 @@ export type OnboardingState = {
   /** How the first-visit tour ended (or was turned down). Absent until then; the tour is then offered once. */
   tour?: TourOutcome;
   ticks: Partial<Record<TickId, true>>;
+  /** Page tips the person has dismissed. */
+  tips?: Partial<Record<TipId, true>>;
+  /** The person asked to see the page tips again (so they show even on an account that was not onboarded here). */
+  tipsOn?: true;
   /** PKT day on which every item was first done, so the card can leave a day later. */
   doneOn?: string;
 };
@@ -37,12 +44,16 @@ export function parseOnboarding(raw: string | null): OnboardingState {
     if (!x || typeof x !== 'object' || x.v !== ONBOARDING_VERSION) return { ...EMPTY_ONBOARDING, ticks: {} };
     const ticks: OnboardingState['ticks'] = {};
     for (const id of ['tax', 'backup', 'insights'] as const) if (x.ticks?.[id] === true) ticks[id] = true;
+    const tips: NonNullable<OnboardingState['tips']> = {};
+    for (const id of TIP_IDS) if (x.tips?.[id] === true) tips[id] = true;
     return {
       v: ONBOARDING_VERSION,
       ...(typeof x.fresh === 'string' ? { fresh: x.fresh } : {}),
       ...(x.hidden === true ? { hidden: true as const } : {}),
       ...(typeof x.tour === 'string' && TOUR_OUTCOMES.includes(x.tour) ? { tour: x.tour } : {}),
       ticks,
+      ...(Object.keys(tips).length ? { tips } : {}),
+      ...(x.tipsOn === true ? { tipsOn: true as const } : {}),
       ...(typeof x.doneOn === 'string' ? { doneOn: x.doneOn } : {}),
     };
   } catch {
@@ -112,4 +123,40 @@ export function withDoneDay(state: OnboardingState, items: ChecklistItem[], toda
  */
 export function shouldOfferTour(state: OnboardingState, facts: { hasHolding: boolean; onHoldings: boolean }): boolean {
   return !!state.fresh && !state.tour && facts.hasHolding && facts.onHoldings;
+}
+
+export const PAGE_TIPS: Record<TipId, { title: string; text: string }> = {
+  insights: {
+    title: 'Each kind of asset has its own reports',
+    text: 'Summary adds everything up. Pick Stocks for sectors, dividends and tax, or another class for its own reports.',
+  },
+  activity: {
+    title: 'Fix a mistake without losing history',
+    text: 'Edit or void any entry from its menu. Voided entries drop out of your totals but are kept, and you can show them again.',
+  },
+  company: {
+    title: 'Your buys and sells are on the chart',
+    text: 'The dots on the price chart mark your own trades in this company. Dividends and every entry are listed below.',
+  },
+  sip_blueprint: {
+    title: 'Start with a monthly amount',
+    text: 'Set what you plan to invest each month. Holdings then shows how much of it you have put in.',
+  },
+  picks: {
+    title: 'Ideas, not advice',
+    text: 'Monthly Picks is maths worked out on your device from public PSX data and your own limits. Nothing is bought for you.',
+  },
+  notifications: {
+    title: 'Cleared is not deleted',
+    text: 'Cleared notifications stay here as history, so a dividend you have already dealt with is never announced twice.',
+  },
+};
+
+/**
+ * Whether a page tip shows: it is not dismissed, and either this device was onboarded and the tour has been dealt
+ * with (finished, skipped or declined) or the person asked for the tips to come back.
+ */
+export function tipVisible(state: OnboardingState, id: TipId): boolean {
+  if (state.tips?.[id]) return false;
+  return state.tipsOn === true || (!!state.fresh && !!state.tour);
 }

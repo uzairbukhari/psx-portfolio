@@ -145,10 +145,10 @@ import { LoadError } from './sign-in';
 import { UserAvatar } from './user-avatar';
 import { ThemeMenuItems } from './theme-menu';
 import { HelpPanel } from './help-panel';
-import { ChecklistStrip, StartScreen } from './onboarding-ui';
+import { ChecklistStrip, PageTip, StartScreen } from './onboarding-ui';
 import { ProductTour, TourOffer } from './product-tour';
 import { useOnboarding } from './use-onboarding';
-import { checklistItems, shouldOfferTour, showChecklist, type ChecklistId } from '@/lib/onboarding';
+import { checklistItems, shouldOfferTour, showChecklist, tipVisible, type ChecklistId, type TipId } from '@/lib/onboarding';
 import type { TourStepId } from '@/lib/tour-steps';
 import { MoreSheet } from './more-sheet';
 import type { AhlLedgerStatement } from '@/lib/ahl-ledger-pdf';
@@ -2367,6 +2367,8 @@ function DashboardContent({
     hasHolding: p.companies.length > 0 || hasAssets,
     hasSipBudget: (p.sipBlueprint?.budget ?? 0) > 0,
   });
+  const pageTip = (id: TipId) =>
+    tourSource || !tipVisible(onb.state, id) ? null : <PageTip key={id} id={id} onDismiss={() => onb.dismissTip(id)} />;
   const onbActions = {
     busy,
     onGo: (id: ChecklistId) => {
@@ -3056,6 +3058,21 @@ function DashboardContent({
                   window.setTimeout(() => setTourSource('help'), 450);
                 }
           }
+          onChecklist={
+            emptyStart
+              ? undefined
+              : () => {
+                  setHelpOpen(false);
+                  setTab('holdings');
+                  markFresh(today());
+                  onb.show();
+                }
+          }
+          checklistNote={`${onbItems.filter((i) => i.done).length} of ${onbItems.length} done`}
+          onTips={() => {
+            onb.resetTips();
+            notify('Page tips are back. They show once on each page.');
+          }}
         />
         {tourSource && <ProductTour source={tourSource} onClose={endTour} />}
         {!tourSource &&
@@ -3817,6 +3834,7 @@ function DashboardContent({
             </MarketGlanceProvider>
           </NavPanel>
           <NavPanel id="reports" tab={tab}>
+            {pageTip('insights')}
             {isAll ? (
               <AllInsights
                 portfolio={p}
@@ -3866,6 +3884,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="sip-tracker" tab={tab}>
+            {pageTip('sip_blueprint')}
             <SipTracker
               parts={workspace?.account.portfolios ?? []}
               blueprint={p.sipBlueprint ?? null}
@@ -3885,6 +3904,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>
+            {pageTip('picks')}
             {!hasStocks ? (
               <div className="panel empty-holdings">
                 <h2>Monthly Picks needs a stock</h2>
@@ -3930,6 +3950,7 @@ function DashboardContent({
             )}
           </NavPanel>
           <NavPanel id="history" tab={tab}>
+            {pageTip('activity')}
             <div className="activity-head">
               <h2>Activity</h2>
               <button
@@ -4077,6 +4098,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="company" tab={tab}>
+            {pageTip('company')}
             {companyTicker && (
               <CompanyDetail
                 portfolio={p}
@@ -4187,6 +4209,7 @@ function DashboardContent({
             />
           </NavPanel>
           <NavPanel id="notifications" tab={tab}>
+            {pageTip('notifications')}
             <NotificationsView
               notifications={allNotifications}
               busy={busy}

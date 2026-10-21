@@ -3,7 +3,7 @@
 // it) and the slim "Getting started" strip that follows on Holdings. The rules live in lib/onboarding.ts.
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, FileUp, RotateCcw, ShieldCheck } from 'lucide-react';
-import { checklistProgress, type ChecklistId, type ChecklistItem } from '@/lib/onboarding';
+import { checklistProgress, PAGE_TIPS, type ChecklistId, type ChecklistItem, type TipId } from '@/lib/onboarding';
 import { ASSET_CHOICES, type AssetPick } from './add-asset-menu';
 
 const BROKERS = ['AHL (Arif Habib)', 'Finqalab', 'JS Global', 'Youngs Capital', 'Syed Faraz Equities', 'Other PSX statement'];
@@ -274,5 +274,21 @@ export function StartScreen({
         </details>
       </div>
     </div>
+  );
+}
+
+/** A one-time note at the top of a page the first time it is opened. Dismissed for good with "Got it". */
+export function PageTip({ id, onDismiss }: { id: TipId; onDismiss: () => void }) {
+  const tip = PAGE_TIPS[id];
+  return (
+    <aside className="ob-tip" aria-label="Tip">
+      <div>
+        <b>{tip.title}</b>
+        <span>{tip.text}</span>
+      </div>
+      <button type="button" data-slot="ob-btn" className="ob-btn ob-btn--sec" onClick={onDismiss}>
+        Got it
+      </button>
+    </aside>
   );
 }

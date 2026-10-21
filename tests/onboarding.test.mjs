@@ -91,3 +91,26 @@ test('tour steps: ids match the analytics catalog and missing targets are skippe
   assert.ok(!pages.items.some((i) => i.name === 'Monthly Picks'));
   for (const s of TOUR_STEPS) assert.ok(s.body || s.items?.length, s.id);
 });
+
+import { PAGE_TIPS, TIP_IDS, tipVisible } from '../lib/onboarding.ts';
+
+test('page tips wait for the tour, hide once dismissed and come back on request', () => {
+  const fresh = { ...blank(), fresh: '2026-10-21' };
+  assert.equal(tipVisible(fresh, 'insights'), false, 'not before the tour is dealt with');
+  assert.equal(tipVisible({ ...fresh, tour: 'skipped' }, 'insights'), true);
+  assert.equal(tipVisible({ ...fresh, tour: 'declined', tips: { insights: true } }, 'insights'), false);
+  assert.equal(tipVisible({ ...fresh, tour: 'declined', tips: { insights: true } }, 'activity'), true);
+  assert.equal(tipVisible(blank(), 'insights'), false, 'an existing user sees nothing by default');
+  assert.equal(tipVisible({ ...blank(), tipsOn: true }, 'picks'), true);
+});
+
+test('every tip has copy and is allowed by the analytics catalog', () => {
+  const allowed = EVENT_CATALOG.tip_dismissed.tip;
+  for (const id of TIP_IDS) {
+    assert.ok(PAGE_TIPS[id].title && PAGE_TIPS[id].text, id);
+    assert.ok(allowed.includes(id), id);
+  }
+  const s = parseOnboarding(JSON.stringify({ v: 1, ticks: {}, tips: { insights: true, nope: true }, tipsOn: true }));
+  assert.deepEqual(s.tips, { insights: true });
+  assert.equal(s.tipsOn, true);
+});

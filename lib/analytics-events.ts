@@ -68,6 +68,7 @@ export const EVENT_CATALOG = {
   tour_started: { source: ['auto', 'help'] },
   tour_step_viewed: { step: ['value', 'add', 'portfolios', 'pages', 'bell', 'profile'] },
   tour_finished: { outcome: ['completed', 'skipped', 'declined'], at_step: ['value', 'add', 'portfolios', 'pages', 'bell', 'profile', 'offer'] },
+  tip_dismissed: { tip: ['insights', 'activity', 'company', 'sip_blueprint', 'picks', 'notifications'] },
   help_opened: { item: ['panel', 'tour', 'checklist', 'tips', 'faq', 'shortcuts', 'privacy', 'terms', 'contact'] },
   // Errors for the super-admin audit log (category, code and screen only: no message text, no stack)
   client_error: { area: ERROR_AREAS, code: ERROR_CODES, screen: SCREENS },

@@ -9,6 +9,7 @@ import {
   parseOnboarding,
   type OnboardingState,
   type TickId,
+  type TipId,
   type TourOutcome,
 } from '@/lib/onboarding';
 import { track } from './analytics';
@@ -70,9 +71,28 @@ export function useOnboarding() {
     [update],
   );
   const setTour = useCallback((outcome: TourOutcome) => update((s) => (s.tour === outcome ? s : { ...s, tour: outcome })), [update]);
+  const dismissTip = useCallback(
+    (id: TipId) =>
+      update((s) => {
+        if (s.tips?.[id]) return s;
+        track('tip_dismissed', { tip: id });
+        return { ...s, tips: { ...s.tips, [id]: true } };
+      }),
+    [update],
+  );
+  /** Brings every page tip back (Help > Show page tips again). */
+  const resetTips = useCallback(
+    () =>
+      update((s) => {
+        const next: OnboardingState = { ...s, tipsOn: true };
+        delete next.tips;
+        return next;
+      }),
+    [update],
+  );
   const stampDone = useCallback((day: string) => update((s) => (s.doneOn ? s : { ...s, doneOn: day })), [update]);
 
-  return { state, setTour, markFresh, tick, hide, show, stampDone };
+  return { state, dismissTip, resetTips, setTour, markFresh, tick, hide, show, stampDone };
 }
 
 export type Onboarding = ReturnType<typeof useOnboarding>;

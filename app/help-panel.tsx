@@ -25,11 +25,19 @@ export function HelpPanel({
   open,
   onOpenChange,
   onTour,
+  onChecklist,
+  checklistNote,
+  onTips,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Replays the tour. Left out where there is nothing to point at yet (an empty account). */
   onTour?: () => void;
+  /** Brings the Getting started card back to Holdings; `note` is its progress ("3 of 6 done"). */
+  onChecklist?: () => void;
+  checklistNote?: string;
+  /** Shows the one-time page tips again. */
+  onTips?: () => void;
 }) {
   const phone = usePhoneWidth();
   return (
@@ -44,23 +52,53 @@ export function HelpPanel({
           <SheetDescription>Quick answers about Sipwise.</SheetDescription>
         </SheetHeader>
         <div className="help-body">
-          {onTour && (
+          {(onTour || onChecklist || onTips) && (
             <section aria-labelledby="help-start">
               <h3 id="help-start" className="help-h">
                 <PlayCircle size={14} aria-hidden="true" /> Get started
               </h3>
-              <button
-                type="button"
-                data-slot="help-row"
-                className="help-row"
-                onClick={() => {
-                  track('help_opened', { item: 'tour' });
-                  onTour();
-                }}
-              >
-                <b>Take the tour</b>
-                <small>Where everything lives · about a minute</small>
-              </button>
+              {onTour && (
+                <button
+                  type="button"
+                  data-slot="help-row"
+                  className="help-row"
+                  onClick={() => {
+                    track('help_opened', { item: 'tour' });
+                    onTour();
+                  }}
+                >
+                  <b>Take the tour</b>
+                  <small>Where everything lives · about a minute</small>
+                </button>
+              )}
+              {onChecklist && (
+                <button
+                  type="button"
+                  data-slot="help-row"
+                  className="help-row"
+                  onClick={() => {
+                    track('help_opened', { item: 'checklist' });
+                    onChecklist();
+                  }}
+                >
+                  <b>Getting started checklist</b>
+                  <small>{checklistNote ? `${checklistNote} · ` : ''}Show it on Holdings</small>
+                </button>
+              )}
+              {onTips && (
+                <button
+                  type="button"
+                  data-slot="help-row"
+                  className="help-row"
+                  onClick={() => {
+                    track('help_opened', { item: 'tips' });
+                    onTips();
+                  }}
+                >
+                  <b>Show page tips again</b>
+                  <small>The one-time notes at the top of each page</small>
+                </button>
+              )}
             </section>
           )}
           <section aria-labelledby="help-faq">
