@@ -366,33 +366,89 @@ export function blendedReturn(
 
 export type ProjectionPoint = { year: number; invested: number; value: number; realInvested: number; realValue: number };
 
+/** Changes tried on top of the plan in "Future you". Every field is optional; none means the plan as it is. */
+export type SipLevers = {
+  /** A different monthly amount from now. */
+  monthly?: number;
+  /** Yearly raise of the monthly amount, percent. */
+  stepUp?: number;
+  /** Stop putting money in after this many years; what is there keeps growing. */
+  stopAfterYears?: number;
+  /** Put nothing in for this many years first. */
+  startDelayYears?: number;
+  /** Put nothing in for `months` months starting at the beginning of `fromYear` (1 is the first year). */
+  pause?: { fromYear: number; months: number };
+  /** Skip this many months every year (the last ones of the year). */
+  skipMonthsPerYear?: number;
+  /** Extra money at the start of year `year`, once or every year from then on. */
+  extra?: { amount: number; year: number; yearly: boolean };
+  /** A different yearly return, percent. */
+  annualPct?: number;
+  /** A one-time fall of `pct` percent at the start of year `year`. */
+  fall?: { pct: number; year: number };
+};
+
+export type SipProjectionBase = {
+  monthly: number;
+  annualPct: number;
+  stepUpPct?: number;
+  inflationPct?: number;
+  /** What the SIP classes are worth today: the projection starts from it and counts it as money in. */
+  startValue?: number;
+};
+
 /**
- * Money put in at the start of every month, growing at `annualPct` a year (compounded monthly). The monthly amount
- * rises by `stepUpPct` each year. `real*` figures are in today's rupees, deflated by `inflationPct`. Year 0 is zero.
+ * Money put in at the start of every month, growing at `annualPct` a year (compounded monthly), with the changes in
+ * `levers` applied. The monthly amount rises by `stepUpPct` each year, counted from the first year money goes in.
+ * `real*` figures are in today's rupees, deflated by `inflationPct`. Year 0 is `startValue` (zero by default).
  */
+export function projectScenario(base: SipProjectionBase, levers: SipLevers, years: number): ProjectionPoint[] {
+  const annual = levers.annualPct ?? base.annualPct;
+  const monthly = Math.max(0, levers.monthly ?? base.monthly);
+  const stepUp = levers.stepUp ?? base.stepUpPct ?? 0;
+  const delay = Math.max(0, Math.round(levers.startDelayYears ?? 0));
+  const r = Math.pow(1 + annual / 100, 1 / 12) - 1;
+  const inf = Math.pow(1 + (base.inflationPct ?? 0) / 100, 1 / 12) - 1;
+  const start = Math.max(0, base.startValue ?? 0);
+  const points: ProjectionPoint[] = [{ year: 0, invested: start, value: start, realInvested: start, realValue: start }];
+  let value = start;
+  let invested = start;
+  let realInvested = start;
+  for (let y = 0; y < Math.max(0, Math.round(years)); y++) {
+    const active =
+      y >= delay && (levers.stopAfterYears === undefined || y < delay + Math.max(0, levers.stopAfterYears));
+    const raised = monthly * Math.pow(1 + stepUp / 100, Math.max(0, y - delay));
+    if (levers.fall && y === Math.round(levers.fall.year) - 1) value *= 1 - Math.min(100, Math.max(0, levers.fall.pct)) / 100;
+    for (let mo = 0; mo < 12; mo++) {
+      const m = y * 12 + mo;
+      let c = active ? raised : 0;
+      const pause = levers.pause;
+      if (pause) {
+        const from = (Math.round(pause.fromYear) - 1) * 12;
+        if (m >= from && m < from + Math.round(pause.months)) c = 0;
+      }
+      if (levers.skipMonthsPerYear && mo >= 12 - Math.round(levers.skipMonthsPerYear)) c = 0;
+      const x = levers.extra;
+      if (x && mo === 0 && (x.yearly ? y >= Math.round(x.year) - 1 : y === Math.round(x.year) - 1)) c += Math.max(0, x.amount);
+      value = (value + c) * (1 + r);
+      invested += c;
+      realInvested += c / Math.pow(1 + inf, m);
+    }
+    points.push({ year: y + 1, invested, value, realInvested, realValue: value / Math.pow(1 + inf, (y + 1) * 12) });
+  }
+  return points;
+}
+
+/** The plan as it is: `projectScenario` with no changes. */
 export function projectSip(o: {
   monthly: number;
   years: number;
   annualPct: number;
   stepUpPct?: number;
   inflationPct?: number;
+  startValue?: number;
 }): ProjectionPoint[] {
-  const r = Math.pow(1 + o.annualPct / 100, 1 / 12) - 1;
-  const inf = Math.pow(1 + (o.inflationPct ?? 0) / 100, 1 / 12) - 1;
-  const points: ProjectionPoint[] = [{ year: 0, invested: 0, value: 0, realInvested: 0, realValue: 0 }];
-  let value = 0;
-  let invested = 0;
-  let realInvested = 0;
-  for (let y = 1; y <= Math.max(0, Math.round(o.years)); y++) {
-    const c = Math.max(0, o.monthly) * Math.pow(1 + (o.stepUpPct ?? 0) / 100, y - 1);
-    for (let m = 0; m < 12; m++) {
-      value = (value + c) * (1 + r);
-      invested += c;
-      realInvested += c / Math.pow(1 + inf, (y - 1) * 12 + m);
-    }
-    points.push({ year: y, invested, value, realInvested, realValue: value / Math.pow(1 + inf, y * 12) });
-  }
-  return points;
+  return projectScenario(o, {}, o.years);
 }
 
 /** What one month's amount skipped today would have grown to after `years`. */

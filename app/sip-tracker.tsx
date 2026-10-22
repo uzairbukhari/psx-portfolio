@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { today } from '@/lib/portfolio';
 import { type SipBlueprint, type SipClass, type SipMonth } from '@/lib/sip-blueprint';
 import { classWeights, sipMonthState, type QuickEntry, type SipRates } from '@/lib/sip-blueprint-data';
-import { SipFuture } from './sip-tracker-future';
 import { SipHabit, SipHero, SipPlan } from './sip-tracker-plan';
 import { PlanEditor, SipWizard, editorFrom, type EditorValue } from './sip-tracker-setup';
 
@@ -155,7 +154,6 @@ function SipDashboard({
       }
       return onSave(next, strict ? 'Fixed split on.' : 'Rebalancing with new money.');
     },
-    saveFuture: (patch: Pick<SipBlueprint, 'stepUp' | 'returns'>) => onSave({ ...b, ...patch }, 'Assumptions saved.'),
   };
 
   return (
@@ -176,7 +174,6 @@ function SipDashboard({
         onOpenHoldings={onOpenHoldings}
         onEdit={() => setEditing(true)}
       />
-      <SipFuture b={b} busy={busy} onSave={actions.saveFuture} />
       <SipHabit st={st} />
       {editing && (
         <EditDialog

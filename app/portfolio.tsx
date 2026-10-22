@@ -69,6 +69,7 @@ import {
   PanelLeft,
   Pin,
   PinOff,
+  Sparkles,
   Target,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
@@ -119,6 +120,7 @@ import {
   MonthlyPicks,
   PlanPage,
   SipTracker,
+  FutureYou,
   CompanyDetail,
   GoldSilverSection,
   ForeignCurrencySection,
@@ -224,6 +226,7 @@ const TAB_PATHS: Record<string, string> = {
   reports: '/reports',
   'sip-plan': '/plan',
   'sip-tracker': '/sip-tracker',
+  future: '/future',
   sip: '/sip',
   history: '/activity',
   'research-desk': '/research-desk',
@@ -1520,6 +1523,7 @@ function DashboardContent({
   ]);
   const metalRates = useMetalRates(
     tab === 'sip-tracker' ||
+      tab === 'future' ||
       !!(isAll
         ? p?.[DISPLAY_PARTS]?.some((part) =>
             part.portfolio.assets?.some((a) => a.kind === 'metal'),
@@ -1528,6 +1532,7 @@ function DashboardContent({
   );
   const fxData = useFxRates(
     tab === 'sip-tracker' ||
+      tab === 'future' ||
       !!(isAll
         ? p?.[DISPLAY_PARTS]?.some((part) =>
             part.portfolio.assets?.some((a) => a.kind === 'currency'),
@@ -1606,7 +1611,7 @@ function DashboardContent({
           : 'holdings'
         : tab === 'history'
           ? 'activity'
-          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'settings' || tab === 'notifications'
+          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'future' || tab === 'settings' || tab === 'notifications'
             ? tab
             : null;
     if (screen) track('screen_viewed', { screen });
@@ -2961,6 +2966,7 @@ function DashboardContent({
       ? [{ tab: 'sip-plan', href: '/plan', label: 'Plan', short: 'Plan', icon: <TrendingUp className="tab-icon" aria-hidden="true" /> }]
       : []),
     { tab: 'sip-tracker', href: '/sip-tracker', label: 'SIP Blueprint', short: 'Blueprint', extra: true, icon: <Target className="tab-icon" aria-hidden="true" /> },
+    { tab: 'future', href: '/future', label: 'Future you', short: 'Future', extra: true, icon: <Sparkles className="tab-icon" aria-hidden="true" /> },
     ...(hasStocks
       ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
       : []),
@@ -3901,6 +3907,21 @@ function DashboardContent({
               onLog={logSipEntry}
               onOpenPicks={() => setTab('sip')}
               onOpenHoldings={() => setTab('holdings')}
+            />
+          </NavPanel>
+          <NavPanel id="future" tab={tab}>
+            <FutureYou
+              parts={workspace?.account.portfolios ?? []}
+              blueprint={p.sipBlueprint ?? null}
+              rates={{
+                metalRates: metalRates.rates,
+                fundNavs: fundData.navs,
+                planNavs,
+                fxRates: fxData.data.rates,
+              }}
+              busy={busy}
+              onSave={saveSipBlueprint}
+              onOpenBlueprint={() => setTab('sip-tracker')}
             />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>

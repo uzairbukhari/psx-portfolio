@@ -56,6 +56,7 @@ const SHARED = [
   'assets',
   'plans',
   'sip-blueprint',
+  'sip-scenarios',
   'fund-payouts',
   'funds',
   'mufap',
