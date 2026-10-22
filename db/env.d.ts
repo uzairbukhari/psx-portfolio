@@ -12,6 +12,11 @@ declare namespace Cloudflare {
     GITHUB_REPO?: string;
     /** Cloudflare Web Analytics site token for the public pages (not a secret); the beacon is off while unset. */
     CF_WEB_ANALYTICS_TOKEN?: string;
+    /** Where people can also write to (shown on the feedback page as a mailto link). Hidden while unset or malformed. */
+    SUPPORT_EMAIL?: string;
+    /** Cloudflare Turnstile site key (public) and secret for the signed-out feedback form. Signed-out sending is off while the secret is unset. */
+    TURNSTILE_SITE_KEY?: string;
+    TURNSTILE_SECRET_KEY?: string;
     OPENAI_MODEL?: string;
     /** Per-user AI spend cap per PKT month in USD (Monthly Picks); defaults to 1. */
     /** "true" when the per-minute cron Worker owns Monthly Picks execution (GET becomes read-only). */

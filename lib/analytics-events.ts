@@ -9,7 +9,7 @@ export type Platform = (typeof PLATFORMS)[number];
 
 const SCREENS = [
   'landing', 'privacy', 'terms', 'sign_in', 'holdings', 'reports', 'sip', 'activity', 'overview', 'company',
-  'settings', 'notifications', 'inbox', 'today', 'portfolio', 'plan', 'more', 'gold_silver', 'funds', 'plans', 'future', 'zakat',
+  'settings', 'notifications', 'inbox', 'today', 'portfolio', 'plan', 'more', 'gold_silver', 'funds', 'plans', 'future', 'zakat', 'feedback',
 ] as const;
 const IMPORT_SOURCES = ['ahl', 'finqalab', 'broker', 'ipo', 'backup'] as const;
 const ENTRY_KINDS = ['buy', 'sell', 'dividend', 'bonus', 'split', 'opening', 'other'] as const;
@@ -73,7 +73,8 @@ export const EVENT_CATALOG = {
   tour_step_viewed: { step: ['value', 'add', 'portfolios', 'pages', 'bell', 'profile'] },
   tour_finished: { outcome: ['completed', 'skipped', 'declined'], at_step: ['value', 'add', 'portfolios', 'pages', 'bell', 'profile', 'offer'] },
   tip_dismissed: { tip: ['insights', 'activity', 'company', 'sip_blueprint', 'picks', 'notifications'] },
-  help_opened: { item: ['panel', 'tour', 'checklist', 'tips', 'faq', 'shortcuts', 'privacy', 'terms', 'contact'] },
+  feedback_sent: { kind: ['contact', 'issue', 'feature'] },
+  help_opened: { item: ['panel', 'tour', 'checklist', 'tips', 'faq', 'shortcuts', 'privacy', 'terms', 'contact', 'feedback'] },
   // Errors for the super-admin audit log (category, code and screen only: no message text, no stack)
   client_error: { area: ERROR_AREAS, code: ERROR_CODES, screen: SCREENS },
 } as const satisfies Record<string, Record<string, readonly string[]>>;

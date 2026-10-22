@@ -2,9 +2,25 @@
 // Help: short answers, shortcuts and the policy links, in a sheet that opens from the profile menu (desktop) or More
 // (phone). The tour, checklist and tips are added to the "Get started" group as they are built.
 import { useEffect, useState } from 'react';
-import { BookOpen, Keyboard, PlayCircle } from 'lucide-react';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  BookOpen,
+  Keyboard,
+  MessageSquareText,
+  PlayCircle,
+} from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { HELP_FAQ, HELP_SHORTCUTS } from '@/lib/help-content';
 import { track } from './analytics';
 
@@ -28,6 +44,7 @@ export function HelpPanel({
   onChecklist,
   checklistNote,
   onTips,
+  onFeedback,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -38,6 +55,8 @@ export function HelpPanel({
   checklistNote?: string;
   /** Shows the one-time page tips again. */
   onTips?: () => void;
+  /** Opens the Contact us / Report an issue / Suggest a feature page. */
+  onFeedback?: () => void;
 }) {
   const phone = usePhoneWidth();
   return (
@@ -82,7 +101,10 @@ export function HelpPanel({
                   }}
                 >
                   <b>Getting started checklist</b>
-                  <small>{checklistNote ? `${checklistNote} · ` : ''}Show it on Holdings</small>
+                  <small>
+                    {checklistNote ? `${checklistNote} · ` : ''}Show it on
+                    Holdings
+                  </small>
                 </button>
               )}
               {onTips && (
@@ -105,7 +127,11 @@ export function HelpPanel({
             <h3 id="help-faq" className="help-h">
               <BookOpen size={14} aria-hidden="true" /> How Sipwise works
             </h3>
-            <Accordion onValueChange={(v) => v.length > 0 && track('help_opened', { item: 'faq' })}>
+            <Accordion
+              onValueChange={(v) =>
+                v.length > 0 && track('help_opened', { item: 'faq' })
+              }
+            >
               {HELP_FAQ.map((q) => (
                 <AccordionItem key={q.id} value={q.id}>
                   <AccordionTrigger>{q.question}</AccordionTrigger>
@@ -128,12 +154,38 @@ export function HelpPanel({
               ))}
             </ul>
           </section>
+          {onFeedback && (
+            <section aria-labelledby="help-contact">
+              <h3 id="help-contact" className="help-h">
+                <MessageSquareText size={14} aria-hidden="true" /> Still stuck?
+              </h3>
+              <button
+                type="button"
+                data-slot="help-row"
+                className="help-row"
+                onClick={onFeedback}
+              >
+                <b>Contact us, report an issue or suggest a feature</b>
+                <small>Write to us from inside the app</small>
+              </button>
+            </section>
+          )}
         </div>
         <nav className="help-foot" aria-label="Legal">
-          <a href="/privacy" target="_blank" rel="noreferrer" onClick={() => track('help_opened', { item: 'privacy' })}>
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => track('help_opened', { item: 'privacy' })}
+          >
             Privacy
           </a>
-          <a href="/terms" target="_blank" rel="noreferrer" onClick={() => track('help_opened', { item: 'terms' })}>
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => track('help_opened', { item: 'terms' })}
+          >
             Terms
           </a>
         </nav>
