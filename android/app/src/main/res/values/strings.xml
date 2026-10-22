@@ -73,6 +73,12 @@
     <string name="sort_weight">Weight</string>
     <string name="sort_name">Name</string>
     <string name="sector_all">All sectors</string>
+    <string name="today_moves_note">Stocks: the last trading day. Funds, gold and plans: the last 3 days, as their prices come in a day or two late.</string>
+    <string name="tab_holding">Holding</string>
+    <string name="tab_gold">Gold</string>
+    <string name="tab_funds">Mutual Fund</string>
+    <string name="tab_forex">Forex</string>
+    <string name="tab_saving">Saving fund</string>
     <plurals name="holding_priced">
         <item quantity="one">%1$d share · priced %2$s</item>
         <item quantity="other">%1$d shares · priced %2$s</item>

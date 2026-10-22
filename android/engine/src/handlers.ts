@@ -88,11 +88,11 @@ import {
   type SipClass,
 } from '../../../lib/sip-blueprint.ts';
 import { LONG_RUN_INFLATION, classWeights, rowHint, sipView } from '../../../lib/sip-blueprint-data.ts';
-import { describePieces, valueMetal, type MetalAsset } from '../../../lib/assets.ts';
+import { describePieces, valueAsset, valueMetal, type Asset, type MetalAsset } from '../../../lib/assets.ts';
 import { valueCurrency, type CurrencyAsset } from '../../../lib/currency.ts';
 import type { FxRateRow } from '../../../lib/fx-rates.ts';
 import { valueFund, type FundAsset } from '../../../lib/funds.ts';
-import { dueEntries, planValue, type PlanAsset } from '../../../lib/plans.ts';
+import { dueEntries, planValue, type PlanAsset, type PlanNavRow } from '../../../lib/plans.ts';
 import { tolaFromGrams, type MetalRateRow } from '../../../lib/metal-rates.ts';
 import type { FundNavRow } from '../../../lib/mufap.ts';
 
@@ -110,6 +110,7 @@ let overlay: Overlay = { quoteRows: [], announcements: [], faceValues: {}, looku
 // Public gold and silver rates and mutual fund prices, kept beside the overlay.
 let metalRates: MetalRateRow[] = [];
 let fundNavs: FundNavRow[] = [];
+let planNavs: PlanNavRow[] = [];
 let fxRates: FxRateRow[] = [];
 let overlaid: { source: PortfolioAccount; version: number; account: PortfolioAccount } | null = null;
 let overlayVersion = 0;
@@ -248,7 +249,48 @@ function dayMove(held: Holding[], histories: Record<string, number[][]>) {
   const gainer = byPercent[0].percent > 0 ? byPercent[0] : null;
   const loser = byPercent[byPercent.length - 1].percent < 0 ? byPercent[byPercent.length - 1] : null;
   const pick = (r: { ticker: string; change: number; percent: number } | null) => (r ? { ticker: r.ticker, change: r.change, percent: r.percent } : null);
-  return { available: true, counted: rows.length, of: open, amount, percent: base > 0 ? (amount / base) * 100 : 0, gainer: pick(gainer), loser: pick(loser) };
+  return { available: true, counted: rows.length, of: open, amount, base, percent: base > 0 ? (amount / base) * 100 : 0, gainer: pick(gainer), loser: pick(loser) };
+}
+
+/** Funds, gold, silver and savings plans are priced once a day or two behind, so their move is taken over three days. */
+const ASSET_MOVE_DAYS = 3;
+const shiftDay = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * What the non-stock assets of one portfolio gained or lost over the last three days: what was held three days ago,
+ * valued at today's price against the price then, so a purchase made since does not count as a gain.
+ */
+function assetsMove(assets: Asset[], asOf: string) {
+  const ref = shiftDay(asOf, -ASSET_MOVE_DAYS);
+  let amount = 0;
+  let base = 0;
+  let counted = 0;
+  for (const asset of assets) {
+    if (asset.kind === 'currency') continue;
+    const held = {
+      ...asset,
+      entries: (asset.entries as { date: string }[]).filter((e) => e.date <= ref),
+      ...(asset.kind === 'plan' ? { valuations: asset.valuations.filter((v) => v.date <= ref) } : {}),
+    } as Asset;
+    if (!(held.entries as unknown[]).length) continue;
+    const before = valueAsset(held, metalRates, ref, fundNavs, planNavs).value;
+    const now = valueAsset(held, metalRates, asOf, fundNavs, planNavs).value;
+    if (before === null || now === null || before <= 0) continue;
+    amount += now - before;
+    base += before;
+    counted += 1;
+  }
+  return { amount, base, counted };
+}
+
+/** A portfolio's move: stocks on the last trading day, the other assets over three days. */
+function portfolioMove(part: { portfolio: ReturnType<typeof dashboardPortfolio> }, histories: Record<string, number[][]>) {
+  const stocks = dayMove(safeHoldings(part.portfolio).held, histories);
+  const others = assetsMove(part.portfolio.assets ?? [], today());
+  const amount = (stocks.available ? stocks.amount ?? 0 : 0) + others.amount;
+  const base = (stocks.available ? stocks.base ?? 0 : 0) + others.base;
+  if (!stocks.available && others.counted === 0) return { available: false };
+  return { available: true, counted: (stocks.counted ?? 0) + others.counted, of: 0, amount, percent: base > 0 ? (amount / base) * 100 : 0 };
 }
 
 const handlers: Record<string, Handler> = {
@@ -364,6 +406,7 @@ const handlers: Record<string, Handler> = {
   'rates.set': (args) => {
     metalRates = typeof args.metals === 'string' && args.metals ? (JSON.parse(args.metals) as MetalRateRow[]) : metalRates;
     fundNavs = typeof args.navs === 'string' && args.navs ? (JSON.parse(args.navs) as FundNavRow[]) : fundNavs;
+    planNavs = typeof args.plans === 'string' && args.plans ? (JSON.parse(args.plans) as PlanNavRow[]) : planNavs;
     fxRates = typeof args.fx === 'string' && args.fx ? (JSON.parse(args.fx) as FxRateRow[]) : fxRates;
     return { metals: metalRates.length, navs: fundNavs.length, fx: fxRates.length };
   },
@@ -373,6 +416,8 @@ const handlers: Record<string, Handler> = {
       metals: assets.some((a) => a.kind === 'metal'),
       funds: assets.some((a) => a.kind === 'fund'),
       fx: assets.some((a) => a.kind === 'currency'),
+      plans: assets.some((a) => a.kind === 'plan'),
+      fundIds: [...new Set(assets.flatMap((a) => (a.kind === 'fund' ? [a.mufapId] : [])))],
     };
   },
 
@@ -490,12 +535,13 @@ const handlers: Record<string, Handler> = {
     return dayMove(safeHoldings(portfolio).held, histories);
   },
 
-  // The same day move for each portfolio on its own, for the Portfolios card. A locked portfolio has nothing to count.
+  // The move of each portfolio on its own, for the Portfolios card: stocks over the last trading day, funds, gold and
+  // plans over three days. A locked portfolio has nothing to count.
   'today.portfolioMoves': (args) => {
     const histories = JSON.parse(text(args, 'histories')) as Record<string, number[][]>;
     return viewAccount().portfolios.map((part) => ({
       id: part.id,
-      move: part.locked ? { available: false } : dayMove(safeHoldings(part.portfolio).held, histories),
+      move: part.locked ? { available: false } : portfolioMove(part, histories),
     }));
   },
 

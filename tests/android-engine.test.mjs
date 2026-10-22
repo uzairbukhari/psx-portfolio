@@ -709,9 +709,10 @@ test('saving a SIP blueprint from the phone form fills in the preset and keeps a
   assert.equal(b.budget, 50000);
 });
 
-test("each portfolio's own move today is listed, and agrees with the combined one", () => {
+test("each portfolio's own move today is listed, with the stocks' day move inside it", () => {
   const account = seed();
   run('account.load', { json: JSON.stringify(account) });
+  run('rates.set', { metals: '[]', navs: '[]', fx: '[]' });
   const reference = normalizeAccount(seed(), false);
   const { held } = safeHoldings(dashboardPortfolio(reference, ALL_PORTFOLIOS));
   const histories = {};
@@ -724,11 +725,34 @@ test("each portfolio's own move today is listed, and agrees with the combined on
   assert.equal(moves.value.length, account.portfolios.length);
   const open = moves.value.filter((m) => m.move.available);
   assert.ok(open.length > 0);
-  const total = open.reduce((sum, m) => sum + m.move.amount, 0);
-  const all = run('today.move', { scope: 'all', histories: JSON.stringify(histories) }).value;
-  assert.ok(Math.abs(total - all.amount) < 1, `${total} vs ${all.amount}`);
-  const none = run('today.portfolioMoves', { histories: '{}' });
-  assert.ok(none.value.every((m) => !m.move.available));
+  assert.ok(open.some((m) => m.move.amount > 0), 'prices doubled over the previous close, so something gained');
+  assert.equal(run('today.portfolioMoves', { histories: '{}' }).value.length, account.portfolios.length);
+});
+
+test('funds, gold and plans move over three days in the portfolio moves, and the rates wanted name the held funds', async () => {
+  const { valueMetal } = await import('../lib/assets.ts');
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const asOf = today();
+  const day = (back) => new Date(Date.parse(`${asOf}T00:00:00Z`) - back * 86_400_000).toISOString().slice(0, 10);
+  const owner = account.portfolios.find((p) => (p.portfolio.assets ?? []).some((a) => a.kind === 'metal' && a.entries.some((e) => e.date <= day(3))));
+  assert.ok(owner, 'the seed holds gold bought more than three days ago');
+  const metal = owner.portfolio.assets.find((a) => a.kind === 'metal' && a.entries.some((e) => e.date <= day(3)));
+  const row = (date, pkrPerTola) => ({ date, metal: metal.metal, kind: 'local', pkrPerTola, sourceUrl: 'x', fetchedAt: 'x' });
+  const rates = [row(day(4), 400_000), row(day(3), 400_000), row(asOf, 440_000)];
+  run('rates.set', { metals: JSON.stringify(rates), navs: '[]', fx: '[]' });
+  const held = { ...metal, entries: metal.entries.filter((e) => e.date <= day(3)) };
+  const expected = valueMetal(held, rates, asOf).value - valueMetal(held, rates, day(3)).value;
+  assert.ok(expected > 0);
+  const moves = run('today.portfolioMoves', { histories: '{}' });
+  assert.equal(moves.ok, true, moves.error);
+  const mine = moves.value.find((m) => m.id === owner.id).move;
+  assert.equal(mine.available, true);
+  assert.ok(mine.amount >= expected - 1, `${mine.amount} should include the gold move ${expected}`);
+  const wanted = run('rates.wanted').value;
+  assert.equal(typeof wanted.plans, 'boolean');
+  assert.ok(Array.isArray(wanted.fundIds));
+  assert.equal(wanted.fundIds.length, new Set(wanted.fundIds).size);
 });
 
 test('a gold or currency purchase logged from the SIP Blueprint lands in the ledger as an asset entry', () => {

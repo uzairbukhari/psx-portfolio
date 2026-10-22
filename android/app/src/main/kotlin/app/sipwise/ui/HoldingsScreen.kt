@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,8 +57,10 @@ import app.sipwise.designsystem.Treemap
 import app.sipwise.designsystem.TreemapItem
 import app.sipwise.model.ALL_PORTFOLIOS
 import app.sipwise.model.AssetTotal
+import app.sipwise.model.AssetsView
 import app.sipwise.model.HoldingRow
 import app.sipwise.model.HoldingSort
+import app.sipwise.model.HoldingsView
 import app.sipwise.model.InvestedMonth
 import app.sipwise.model.PortfolioSummary
 import app.sipwise.model.SectorTotal
@@ -80,11 +86,16 @@ fun HoldingsScreen(
         if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
     }
+    val hasStocks = view.rows.isNotEmpty() || view.soldOut.isNotEmpty()
+    // In All, one asset class at a time; a single portfolio keeps its one list.
+    val tabs = allTabs(hasStocks, ui.assets)
+    var picked by rememberSaveable { mutableStateOf(AllTab.HOLDING) }
+    val tab = if (isAll && tabs.size > 1) picked.takeIf { it in tabs } ?: tabs.first() else null
+    val showStocks = tab == null || tab == AllTab.HOLDING
     LazyColumn(
         contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        val hasStocks = view.rows.isNotEmpty() || view.soldOut.isNotEmpty()
         val overview = ui.overview
         if (overview == null) {
             item { SummaryCard(view.summary) }
@@ -100,31 +111,87 @@ fun HoldingsScreen(
         }
         if (view.rows.isEmpty() && ui.assets.isEmpty) item { EmptyState(stringResource(R.string.nav_portfolio), stringResource(R.string.holdings_empty)) }
         if (!isAll && view.rows.size >= MIN_TREEMAP) item { AllocationCard(view.rows, onOpenCompany) }
-        if (hasStocks) {
-            item { OutlinedButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.insights_open)) } }
-            item { SortRow(ui.sort, viewModel::setSort) }
+        if (tabs.size > 1 && isAll) item { AllTabRow(tabs, tab, onPick = { picked = it }) }
+        if (hasStocks && showStocks) {
+            if (!isAll) {
+                item { OutlinedButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.insights_open)) } }
+                item { SortRow(ui.sort, viewModel::setSort) }
+            }
             if (view.sectors.size > 1) item { SectorRow(view.sectors, ui.sector, viewModel::setSector) }
         }
-        items(view.rows, key = { it.ticker }) { HoldingItem(it, onOpenCompany) }
+        if (showStocks) items(view.rows, key = { it.ticker }) { HoldingItem(it, onOpenCompany) }
         if (!ui.assets.isEmpty) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) { AssetSections(ui.assets, java.time.LocalDate.now().year) }
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) { AssetSections(ui.assets.only(tab), java.time.LocalDate.now().year) }
             }
         }
-        if (view.soldOut.isNotEmpty()) {
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        pluralStringResource(R.plurals.holdings_show_sold, view.soldOut.size, view.soldOut.size),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Switch(checked = ui.showSold, onCheckedChange = viewModel::setShowSold)
-                }
-            }
-            if (ui.showSold) items(view.soldOut, key = { "sold-${it.ticker}" }) { HoldingItem(it, onOpenCompany) }
+        if (showStocks) soldOutItems(view, ui, viewModel::setShowSold, onOpenCompany)
+    }
+}
+
+/** What the All view can switch between, one asset class at a time. */
+private enum class AllTab(val label: Int) {
+    HOLDING(R.string.tab_holding),
+    GOLD(R.string.tab_gold),
+    FUNDS(R.string.tab_funds),
+    FOREX(R.string.tab_forex),
+    SAVING(R.string.tab_saving),
+}
+
+private fun allTabs(
+    hasStocks: Boolean,
+    assets: AssetsView,
+): List<AllTab> =
+    buildList {
+        if (hasStocks) add(AllTab.HOLDING)
+        if (assets.metals.isNotEmpty()) add(AllTab.GOLD)
+        if (assets.funds.isNotEmpty()) add(AllTab.FUNDS)
+        if (assets.currencies.isNotEmpty()) add(AllTab.FOREX)
+        if (assets.plans.isNotEmpty()) add(AllTab.SAVING)
+    }
+
+/** The assets of one tab; with no tab (a single portfolio, or nothing to switch between) all of them. */
+private fun AssetsView.only(tab: AllTab?): AssetsView =
+    when (tab) {
+        null -> this
+        AllTab.HOLDING -> AssetsView()
+        AllTab.GOLD -> AssetsView(metals = metals)
+        AllTab.FUNDS -> AssetsView(funds = funds)
+        AllTab.FOREX -> AssetsView(currencies = currencies)
+        AllTab.SAVING -> AssetsView(plans = plans)
+    }
+
+@Composable
+private fun AllTabRow(
+    tabs: List<AllTab>,
+    selected: AllTab?,
+    onPick: (AllTab) -> Unit,
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        items(tabs) { tab ->
+            FilterChip(selected = tab == selected, onClick = { onPick(tab) }, label = { Text(stringResource(tab.label)) })
         }
     }
+}
+
+private fun LazyListScope.soldOutItems(
+    view: HoldingsView,
+    ui: HoldingsUi,
+    onShowSold: (Boolean) -> Unit,
+    onOpenCompany: (String) -> Unit,
+) {
+    if (view.soldOut.isEmpty()) return
+    item {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                pluralStringResource(R.plurals.holdings_show_sold, view.soldOut.size, view.soldOut.size),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Switch(checked = ui.showSold, onCheckedChange = onShowSold)
+        }
+    }
+    if (ui.showSold) items(view.soldOut, key = { "sold-${it.ticker}" }) { HoldingItem(it, onOpenCompany) }
 }
 
 @Composable
