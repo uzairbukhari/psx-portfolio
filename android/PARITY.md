@@ -48,6 +48,7 @@ Feature numbers and the Expo implementation come from `plans/native-android-rewr
 | 41 | Encrypted backup | `backup.ts`, `lib/vault-backup.ts` | Done (encrypted backup through the share sheet; the unencrypted readable copy was removed) |
 | 42 | Lock now, sign out, delete account | more.tsx, `DeleteAccountSheet.tsx` | Done (lock, sign out, delete account) |
 | 43 | Manage portfolios | `portfolios.tsx` | Done (add, rename, lock or unlock, delete empty, each with Undo) |
+| 45 | Zakat (Beta) | `ZakatScreen.kt`, engine `zakat.view` | Done on Android (More > Zakat: setup, estimate, payments, close year; no reminders yet; Expo app has none) |
 | 44 | Usage analytics + opt-out | `analytics.ts`, `AnalyticsBridge.tsx`, `screens.ts` | Done (catalog events only, batches to /api/events, per-device switch in More, account_state once per session) |
 | 45 | Haptics, reduce motion | `haptics.ts`, `motion.ts` | Partial (success haptic on every saved change; animations follow the system setting) |
 | 46 | Old routes / deep links | redirects, `routes.test.ts` | Done (sipwise:// and sipwise-staging:// links; old Expo paths sip, alerts, account, reports, history keep working) |

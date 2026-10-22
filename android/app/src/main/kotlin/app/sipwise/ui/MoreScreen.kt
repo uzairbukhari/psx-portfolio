@@ -75,6 +75,7 @@ fun MoreScreen(
     onManagePortfolios: () -> Unit,
     onOpenTargetPlan: () -> Unit,
     onEditTargets: () -> Unit,
+    onOpenZakat: () -> Unit,
     updates: UpdateViewModel,
 ) {
     val ui by settings.ui.collectAsStateWithLifecycle()
@@ -125,6 +126,10 @@ fun MoreScreen(
             Text(stringResource(R.string.settings_targets_hint), style = MaterialTheme.typography.bodyMedium)
             OutlinedButton(onClick = onOpenTargetPlan) { Text(stringResource(R.string.settings_targets_plan)) }
             OutlinedButton(onClick = onEditTargets) { Text(stringResource(R.string.settings_targets_edit)) }
+        }
+        SectionCard(R.string.zakat_title) {
+            Text(stringResource(R.string.zakat_hint), style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = onOpenZakat) { Text(stringResource(R.string.zakat_open)) }
         }
         SecurityCard(vault, session)
         if (user.role == "super_admin") AdminCard()
