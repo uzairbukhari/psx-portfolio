@@ -143,7 +143,7 @@
 .landing .lp-legal h1{font-size:38px;letter-spacing:-1.2px;margin:0 0 8px}
 .landing .lp-legal h2{font-size:21px;letter-spacing:-.3px;margin:36px 0 8px}
 .landing .lp-legal p,.landing .lp-legal li{font-size:16px;line-height:1.7;color:var(--soft)}
-.landing .lp-legal ul{padding-left:20px;margin:8px 0}
+.landing .lp-legal ul,.landing .lp-legal ol{padding-left:20px;margin:8px 0}
 .landing .lp-legal .updated{font-size:13px;color:var(--muted)}
 .landing .lp-nav a.lp-brand{color:var(--ink)}
 .landing .google-btn{color:#152840}
