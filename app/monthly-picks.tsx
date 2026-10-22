@@ -3,7 +3,8 @@
 // order ticket with whole shares. The ranking is worked out on this device from public data; nothing is saved until you
 // record the buys.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { money, type Portfolio, type Quote } from '@/lib/portfolio';
+import { money, today, type Portfolio, type Quote } from '@/lib/portfolio';
+import { MAX_WATCH_TICKERS } from '@/lib/market-watch';
 import { estimateMonthlyPicks, summarizeEstimates } from '@/lib/monthly-picks';
 import { heldValues, runLocalPicks, type StoredPicksRun } from '@/lib/picks-local';
 import { leftOutNotes, orderText, picksRows } from '@/lib/picks-view';
@@ -20,8 +21,6 @@ import { useRecommendations } from './use-recommendations';
 
 type Props = {
   portfolio: Portfolio;
-  month: string;
-  setMonth: (month: string) => void;
   feePct: number;
   setFeePct: (fee: number) => void;
   /** What the SIP Blueprint still wants spent on stocks this month; the amount starts here. */
@@ -35,18 +34,23 @@ type Props = {
   destinations: PickDestination[];
   defaultDestination: string;
   onOpenCompany: (ticker: string) => void;
+  /** Opens the SIP Blueprint, where the monthly amount is set. */
+  onOpenBlueprint?: () => void;
   /** Set when the person came from Insights to balance a heavy holding: these tickers sit out this run. Held in memory only. */
   hint?: { avoid: string[] } | null;
   onClearHint?: () => void;
 };
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const rupees = (n: number) => `Rs ${Math.round(n).toLocaleString('en-US')}`;
 const monthTitle = (month: string) => `${MONTH_NAMES[Number(month.slice(5, 7)) - 1] ?? month} ${month.slice(0, 4)}`;
 
 export default function MonthlyPicks({
-  portfolio, month, setMonth, feePct, setFeePct, sipBudget, busy, onSave, onRefreshPrices, onManualPrice, onRecordBatch,
-  destinations, defaultDestination, onOpenCompany, hint, onClearHint,
+  portfolio, feePct, setFeePct, sipBudget, busy, onSave, onRefreshPrices, onManualPrice, onRecordBatch,
+  destinations, defaultDestination, onOpenCompany, onOpenBlueprint, hint, onClearHint,
 }: Props) {
+  // Only the current month: the SIP Blueprint's month when there is one, else today's.
+  const month = sipBudget?.month ?? today().slice(0, 7);
   type Entry = { ticker: string; name: string };
   // The list is its own thing. Until the person edits it for the first time it mirrors their saved companies.
   const [list, setListState] = useState<Entry[]>(
@@ -56,19 +60,14 @@ export default function MonthlyPicks({
     ? portfolio.monthlyPicksShortlist
     : portfolio.companies.filter((company) => company.target > 0).map((company) => company.ticker);
   const [shortlist, setShortlist] = useState<string[]>(initial.filter((t) => list.some((e) => e.ticker === t)).slice(0, MAX_SHORTLIST));
-  // The amount starts from the SIP Blueprint's stocks share for the month, else the last run's, else a round number.
-  const [amount, setAmountState] = useState(
-    sipBudget?.amount ?? portfolio.monthlyPicksRuns?.[0]?.amount ?? portfolio.budgets[month] ?? 100000,
-  );
+  // With a SIP Blueprint the amount is its stocks share for the month (what is still to buy); only without one is it typed here.
+  const [typedAmount, setTypedAmount] = useState(portfolio.monthlyPicksRuns?.[0]?.amount ?? portfolio.budgets[month] ?? 100000);
   const amountTouched = useRef(false);
   const setAmount = useCallback((next: number) => {
     amountTouched.current = true;
-    setAmountState(next);
+    setTypedAmount(next);
   }, []);
-  const sipAmount = sipBudget?.amount;
-  useEffect(() => {
-    if (sipAmount !== undefined && !amountTouched.current) setAmountState(sipAmount);
-  }, [sipAmount]);
+  const amount = sipBudget ? sipBudget.amount : typedAmount;
 
   const [order, setOrder] = useState<'ranked' | 'name'>('ranked');
   const [openTicker, setOpenTicker] = useState<string | null>(null);
@@ -81,7 +80,12 @@ export default function MonthlyPicks({
     setAppliedHint(hint);
     setShortlist((current) => current.filter((t) => !hint.avoid.includes(t)));
   }
-  const recs = useRecommendations({ portfolio, tickers: useMemo(() => list.map((e) => e.ticker), [list]), onSave });
+  // Public figures for the ticked companies first, then the rest of the list, within what the server accepts.
+  const analysisTickers = useMemo(
+    () => [...new Set([...shortlist, ...list.map((e) => e.ticker)])].slice(0, MAX_WATCH_TICKERS),
+    [shortlist, list],
+  );
+  const recs = useRecommendations({ portfolio, tickers: analysisTickers, onSave });
 
   // List edits are instant on screen and saved in the background a moment after the last change (and when leaving).
   const latest = useRef({ list, shortlist, portfolio, onSave, feePct, month, amount, sipBudget });
@@ -193,8 +197,8 @@ export default function MonthlyPicks({
   }, [estimates.length]);
 
   const rows = useMemo(
-    () => picksRows({ list, shortlist, result, facts: recs.facts, held, order }),
-    [list, shortlist, result, recs.facts, held, order],
+    () => picksRows({ list, shortlist, result, facts: recs.facts, held, order, pub: analysis ?? undefined }),
+    [list, shortlist, result, recs.facts, held, order, analysis],
   );
   const leftOut = useMemo(() => leftOutNotes(rows), [rows]);
   const missingOwn = portfolio.companies.filter((company) => !list.some((e) => e.ticker === company.ticker));
@@ -242,55 +246,44 @@ export default function MonthlyPicks({
         <div className="mp2-slab__top">
           <div>
             <p className="lbl">{monthTitle(month)} · stocks</p>
-            <h2>Where should {amountValid ? money(amount) : 'this month’s money'} go this month?</h2>
+            <h2>Where should {amountValid ? rupees(amount) : 'this month’s money'} go this month?</h2>
             <p className="mu">Ranked from public PSX data on this device. Your amount and holdings never leave it.</p>
             {sipBudget && (
               <span className="mp2-source">
-                From your SIP Blueprint: {money(sipBudget.planned)} planned{sipBudget.bought > 0 ? `, ${money(sipBudget.bought)} bought` : ''}
+                From your SIP Blueprint: {rupees(sipBudget.planned)} planned{sipBudget.bought > 0 ? `, ${rupees(sipBudget.bought)} bought` : ''}
+                {sipBudget.done ? ' · this month is already covered' : ''}
+                {onOpenBlueprint && (
+                  <>
+                    {' · '}
+                    <button type="button" data-slot="plain" className="link-button" onClick={onOpenBlueprint}>change</button>
+                  </>
+                )}
               </span>
             )}
           </div>
-          <div className="mp2-fields">
-            <label>
-              Contribution month
-              <input
-                type="month"
-                value={month}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  if (!next) return;
-                  setMonth(next);
-                  if (sipBudget && next === sipBudget.month) setAmount(sipBudget.amount);
-                }}
-              />
-            </label>
-            <label>
-              Fresh money (PKR)
-              <input
-                type="number" inputMode="numeric" min="1" max="1000000000" step="1"
-                value={Number.isFinite(amount) ? amount : ''}
-                onChange={(event) => { setAmount(Number(event.target.value)); schedule(); }}
-                aria-invalid={!amountValid}
-              />
-              <small>{amountValid ? '' : 'Enter an amount between 1 and 1,000,000,000.'}</small>
-            </label>
-            <label>
-              Est. fees (%)
-              <input
-                type="number" inputMode="decimal" min="0" max="10" step="0.01"
-                value={Number.isFinite(feePct) ? feePct : ''}
-                onChange={(event) => { setFeePct(Number(event.target.value)); schedule(); }}
-                aria-invalid={!feeValid}
-              />
-            </label>
+          <div className="mp2-amount">
+            {sipBudget ? (
+              <b className="num mp2-amount__big">{rupees(amount)}</b>
+            ) : (
+              <label>
+                Money to invest this month (PKR)
+                <input
+                  type="number" inputMode="numeric" min="1" max="1000000000" step="1"
+                  value={Number.isFinite(amount) ? amount : ''}
+                  onChange={(event) => { setAmount(Number(event.target.value)); schedule(); }}
+                  aria-invalid={!amountValid}
+                />
+                <small>{amountValid ? 'Set up the SIP Blueprint and this fills in by itself.' : 'Enter an amount between 1 and 1,000,000,000.'}</small>
+              </label>
+            )}
+            <ol className="mp2-steps" aria-label="Progress this month">
+              {(['Shortlist', 'Ranked', 'Buy', 'Done'] as const).map((label, i) => {
+                const state = stepState((i + 1) as 1 | 2 | 3 | 4);
+                return <li key={label} data-state={state}>{state === 'done' ? '✓ ' : `${i + 1} `}{label}</li>;
+              })}
+            </ol>
           </div>
         </div>
-        <ol className="mp2-steps" aria-label="Progress this month">
-          {(['Shortlist', 'Ranked', 'Buy', 'Done'] as const).map((label, i) => {
-            const state = stepState((i + 1) as 1 | 2 | 3 | 4);
-            return <li key={label} data-state={state}>{state === 'done' ? '✓ ' : `${i + 1} `}{label}</li>;
-          })}
-        </ol>
       </section>
 
       {recs.error && (
@@ -370,6 +363,7 @@ export default function MonthlyPicks({
           onRecord={() => setRecording(true)}
           onCopy={() => void copyOrder()}
           onRefreshPrices={() => void Promise.all([onRefreshPrices(), listQuotes.refresh()])}
+          onFeeChange={(fee) => { setFeePct(fee); schedule(); }}
           onManualPrice={(ticker) => {
             if (portfolio.companies.some((c) => c.ticker === ticker)) return onManualPrice(ticker);
             setPriceFor(ticker);
@@ -399,8 +393,7 @@ export default function MonthlyPicks({
                   data-slot="plain"
                   className="mp-history__item"
                   onClick={() => {
-                    setMonth(item.month);
-                    setAmount(item.amount);
+                    if (!sipBudget) setAmount(item.amount);
                     setFeePct(item.feePct);
                     setShortlist(item.shortlist.filter((t) => list.some((e) => e.ticker === t)).slice(0, MAX_SHORTLIST));
                   }}

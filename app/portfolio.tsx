@@ -3987,8 +3987,7 @@ function DashboardContent({
                 hint={picksHint}
                 onClearHint={() => setPicksHint(null)}
                 portfolio={picksPortfolio ?? p}
-                month={month}
-                setMonth={setMonth}
+                onOpenBlueprint={() => setTab('sip-tracker')}
                 feePct={fees}
                 setFeePct={setFees}
                 sipBudget={picksAmount}
