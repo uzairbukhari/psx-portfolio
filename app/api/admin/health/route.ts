@@ -1,4 +1,5 @@
-import { env } from 'cloudflare:workers';
+import { env, waitUntil } from 'cloudflare:workers';
+import { adminCached } from '@/lib/admin-cache';
 import { adminHealth, spendCaps } from '@/lib/admin-health';
 import { platformLimits } from '@/lib/admin-platform';
 import { db, failure, requireSuperAdmin } from '@/lib/server';
@@ -7,6 +8,7 @@ import { db, failure, requireSuperAdmin } from '@/lib/server';
 export async function GET(req: Request) {
   try {
     await requireSuperAdmin(req);
-    return Response.json(await adminHealth(db(), { ...spendCaps(env), platform: platformLimits(env) }), { headers: { 'Cache-Control': 'no-store' } });
+    const health = await adminCached(req, 'health', () => adminHealth(db(), { ...spendCaps(env), platform: platformLimits(env) }), waitUntil);
+    return Response.json(health, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return failure(error, undefined, req); }
 }

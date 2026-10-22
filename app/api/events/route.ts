@@ -4,7 +4,7 @@ import { isInternal } from '@/lib/roles';
 import { parseBatch } from '@/lib/analytics-events';
 import { pruneJobRuns } from '@/lib/job-runs';
 import { pruneServerErrors } from '@/lib/server-errors';
-import { purgeOldEvents, recordBatch, resolveOrigin, userKey } from '@/lib/analytics-store';
+import { purgeOldEvents, purgeStagingEvents, recordBatch, resolveOrigin, userKey } from '@/lib/analytics-store';
 import { takeRateLimit } from '@/lib/rate-limit';
 import { readLimited } from '@/lib/read-limited';
 import { db, failure } from '@/lib/server';
@@ -23,6 +23,11 @@ export async function POST(req: Request) {
     const batch = parseBatch(JSON.parse(new TextDecoder().decode(bytes)));
     if (!batch) throw new UserError('Invalid events.', 400);
     const database = db();
+    // Staging keeps no usage events: test runs would only grow the table (and the account-wide D1 read count).
+    if (env.APP_ENV === 'staging') {
+      if (Math.random() < 0.05) await purgeStagingEvents(database).catch(() => {});
+      return new Response(null, { status: 204 });
+    }
     const who = viewer ? await userKey(viewer.email, env.SESSION_SECRET ?? '') : `ip:${req.headers.get('cf-connecting-ip') ?? 'unknown'}`;
     const limit = await takeRateLimit(database, who, 'events', { windowMs: 60_000, max: 60 });
     if (!limit.allowed) return new Response(null, { status: 204 });

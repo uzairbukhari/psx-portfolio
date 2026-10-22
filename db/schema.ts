@@ -222,7 +222,7 @@ export const aiUsage = sqliteTable(
     costUsd: real('cost_usd').notNull().default(0),
     createdAt: text('created_at').notNull(),
   },
-  (table) => [index('idx_ai_usage_user_created').on(table.userId, table.createdAt)],
+  (table) => [index('idx_ai_usage_user_created').on(table.userId, table.createdAt), index('idx_ai_usage_created').on(table.createdAt)],
 );
 
 // Shared, public PSX company-page facts (price, financials, ratios, announcements) used
@@ -234,7 +234,7 @@ export const companyFacts = sqliteTable('company_facts', {
   fetchedOn: text('fetched_on').notNull(),
   payload: text('payload').notNull(),
   fetchedAt: text('fetched_at').notNull(),
-});
+}, (t) => [index('company_facts_fetched_idx').on(t.fetchedAt)]);
 
 // One row ('latest') of public market breakpoints for the Monthly Picks score, taken from every cached company page
 // by the facts scraper once a day (lib/facts-benchmarks.ts). Public numbers only.
@@ -294,7 +294,7 @@ export const dividendAnnouncements = sqliteTable(
     perShareRs: real('per_share_rs'),
     fetchedAt: text('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.ticker, t.bookClosureStart, t.announcedOn, t.kind] })],
+  (t) => [primaryKey({ columns: [t.ticker, t.bookClosureStart, t.announcedOn, t.kind] }), index('dividend_announcements_fetched_idx').on(t.fetchedAt)],
 );
 
 // Per-ticker PSX price history for the company page chart. Written by the GitHub

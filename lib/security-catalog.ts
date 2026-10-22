@@ -8,6 +8,9 @@ import type { Company } from './portfolio.ts';
 
 export type CatalogEntry = { ticker: string; name: string };
 
+// Runs on every 5-minute quote scrape for every listed security, so an unchanged row is left alone: `last_seen_at` moves
+// at most every six hours, and an earlier write only happens at once when the name PSX prints changed. Before this the
+// upsert rewrote all ~560 rows each run (about 50,000 D1 writes a day, half of the free daily write allowance).
 export function catalogUpsertSql(rows: number): string {
   return `INSERT INTO security_catalog (ticker,name,source,first_seen_at,last_seen_at)
           VALUES ${Array.from({ length: rows }, () => '(?,?,?,?,?)').join(',')}
@@ -15,7 +18,10 @@ export function catalogUpsertSql(rows: number): string {
             name=CASE WHEN security_catalog.name_source IS NULL THEN excluded.name ELSE security_catalog.name END,
             source=CASE WHEN security_catalog.name_source IS NULL THEN excluded.source ELSE security_catalog.source END,
             last_seen_at=excluded.last_seen_at
-          WHERE excluded.last_seen_at >= security_catalog.last_seen_at`;
+          WHERE excluded.last_seen_at >= security_catalog.last_seen_at
+            AND (julianday(excluded.last_seen_at) IS NULL OR julianday(security_catalog.last_seen_at) IS NULL
+                 OR julianday(excluded.last_seen_at) - julianday(security_catalog.last_seen_at) >= 0.25
+                 OR (security_catalog.name_source IS NULL AND security_catalog.name <> excluded.name))`;
 }
 /** Bound values per row for `catalogUpsertSql` (first and last seen start equal). */
 export const catalogRowParams = (entry: CatalogEntry, source: string, at: string) => [entry.ticker, entry.name, source, at, at];
