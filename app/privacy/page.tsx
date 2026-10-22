@@ -13,7 +13,7 @@ export default function Page() {
       <LandingNav />
       <article className="lp-legal">
         <h1>Privacy policy</h1>
-        <p className="updated">Last updated 7 October 2026</p>
+        <p className="updated">Last updated 18 October 2026</p>
         <p>
           Sipwise is a portfolio ledger and planner. This page says what we
           collect and what we cannot see.
@@ -74,9 +74,11 @@ export default function Page() {
         </p>
         <h2>Deleting your data</h2>
         <p>
-          You can export an encrypted backup or erase your vault from Settings.
-          To remove your account details as well, contact us at the address
-          below.
+          You can export an encrypted backup and delete your account from
+          Settings in the web app and the Android app (&ldquo;Delete
+          account&rdquo;). That removes your encrypted portfolio, your account
+          details, your usage events and every signed-in phone. You can also
+          ask us to delete it by writing to the address below.
         </p>
         <h2>Contact</h2>
         <p>

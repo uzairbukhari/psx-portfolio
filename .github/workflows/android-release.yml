@@ -115,7 +115,7 @@ jobs:
         run: |
           ./gradlew --no-daemon \
             :core:vault:test :core:designsystem:testDebugUnitTest :app:testProductionReleaseUnitTest \
-            :app:assembleProductionRelease :app:bundleProductionRelease :app:assembleStagingRelease \
+            :app:assembleProductionRelease :app:bundleProductionRelease :app:bundlePlayRelease :app:assembleStagingRelease \
             -PversionName="${{ steps.v.outputs.name }}" -PrcNumber="${{ steps.v.outputs.rc }}" \
             -PapiBaseUrl="${{ vars.API_BASE_URL_PROD }}"
       - name: Verify signatures and the version code
@@ -140,6 +140,8 @@ jobs:
           cp android/app/build/outputs/apk/production/release/*.apk "dist/sipwise-$v.apk"
           cp android/app/build/outputs/apk/staging/release/*.apk "dist/sipwise-staging-$v.apk"
           cp android/app/build/outputs/bundle/productionRelease/*.aab "dist/sipwise-$v.aab"
+          # The Google Play upload bundle: no GitHub self-updater, no install-packages permission.
+          cp android/app/build/outputs/bundle/playRelease/*.aab "dist/sipwise-play-$v.aab"
           cp android/app/build/outputs/mapping/productionRelease/mapping.txt "dist/mapping-$v.txt"
           (cd dist && sha256sum * > SHA256SUMS)
       - name: Release notes from Conventional Commits

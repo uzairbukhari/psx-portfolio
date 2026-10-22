@@ -390,7 +390,7 @@ private fun MainShell(
     val context = LocalContext.current
     LedgerNotices(unlocked.ledger, snackbar)
     val updates: UpdateViewModel = viewModel()
-    UpdatePrompt(updates, includePrereleases = user.role == "super_admin")
+    if (BuildConfig.SELF_UPDATE) UpdatePrompt(updates, includePrereleases = user.role == "super_admin")
     val container = (context.applicationContext as SipwiseApp).container
     val analytics = container.analytics
     val link by container.pendingLink.collectAsStateWithLifecycle()

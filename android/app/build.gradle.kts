@@ -56,6 +56,7 @@ android {
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com\"")
         buildConfigField("String", "UPDATE_REPO", "\"uzairbukhari/psx-portfolio\"")
         buildConfigField("String", "TAG_PREFIX", "\"android-v\"")
+        buildConfigField("boolean", "SELF_UPDATE", "true")
     }
 
     flavorDimensions += "env"
@@ -78,10 +79,24 @@ android {
             buildConfigField("boolean", "INCLUDE_PRERELEASES", "false")
             buildConfigField("boolean", "SIGN_IN_DETAIL", "false")
         }
+
+        // The Google Play build: same app id as production, but Play delivers updates, so the GitHub self-updater and the
+        // install-packages permission (src/play/AndroidManifest.xml) are out. Signed with the upload key (SIPWISE_PLAY_*),
+        // falling back to the production key.
+        create("play") {
+            dimension = "env"
+            manifestPlaceholders["deepLinkScheme"] = "sipwise"
+            resValue("string", "app_name", "Sipwise")
+            val api = providers.gradleProperty("apiBaseUrl").orElse("").get()
+            buildConfigField("String", "API_BASE_URL", "\"$api\"")
+            buildConfigField("boolean", "INCLUDE_PRERELEASES", "false")
+            buildConfigField("boolean", "SIGN_IN_DETAIL", "false")
+            buildConfigField("boolean", "SELF_UPDATE", "false")
+        }
     }
 
     signingConfigs {
-        for (flavor in listOf("staging", "production")) {
+        for (flavor in listOf("staging", "production", "play")) {
             val file = signingEnv(flavor, "KEYSTORE_FILE")
             if (file != null) {
                 create(flavor) {
@@ -101,7 +116,9 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
-    productFlavors.configureEach { signingConfigs.findByName(name)?.let { signingConfig = it } }
+    productFlavors.configureEach {
+        (signingConfigs.findByName(name) ?: if (name == "play") signingConfigs.findByName("production") else null)?.let { signingConfig = it }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
