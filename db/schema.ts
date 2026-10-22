@@ -380,6 +380,17 @@ export const platformMetrics = sqliteTable(
   (table) => [primaryKey({ columns: [table.day, table.script] })],
 );
 
+// Cloudflare's own count of D1 rows read and written per UTC day for the whole account (all four databases share the
+// free daily limit), copied in by the cron Worker from the GraphQL Analytics API (lib/d1-usage.ts). `by_db` is a JSON
+// object of database id -> { reads, writes }. One row per day.
+export const d1UsageDays = sqliteTable('d1_usage_days', {
+  day: text('day').primaryKey(),
+  reads: integer('reads').notNull().default(0),
+  writes: integer('writes').notNull().default(0),
+  byDb: text('by_db').notNull().default('{}'),
+  fetchedAt: text('fetched_at').notNull(),
+});
+
 // Per-user fixed-window rate limits for expensive actions (forced PSX refreshes,
 // on-demand facts scrapes). One row per user and action.
 export const rateLimits = sqliteTable(

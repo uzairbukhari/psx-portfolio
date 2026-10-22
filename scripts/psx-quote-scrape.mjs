@@ -13,7 +13,7 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-quote-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK]
 import { pathToFileURL } from 'node:url';
-import { d1, trackedTickers as sharedTrackedTickers, trackRun } from './d1-rest.mjs';
+import { d1, standDownForBrownout, trackedTickers as sharedTrackedTickers, trackRun } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsx } from '../lib/psx-fetch.ts';
 import { parseIndexConstituents } from '../lib/psx-market.ts';
@@ -108,6 +108,7 @@ async function writeMarketSummary(index, constituents, retrievedAt, parsedIndice
 // then completes those requests with a verified per-ticker result. A request queued while this run is
 // already going is left for the next run (see completeRequests).
 async function main() {
+  if (await standDownForBrownout('quotes', 14, { dryRun })) return;
   trackRun('quotes', { dryRun });
   const snapshot = dryRun ? new Map() : await snapshotOpenRequests(d1);
   try {

@@ -5,6 +5,7 @@ import { adminHealth, type AdminHealth, type AdminHealthOptions } from './admin-
 import { platformReport, type PlatformReport } from './admin-platform.ts';
 import { isExpoPushToken, type PushMessage } from './dividend-push.ts';
 import { isFcmToken, sendFcm } from './fcm.ts';
+import { meterFrom, readD1Days, type D1Meter } from './d1-usage.ts';
 
 export type Alert = { key: string; label: string };
 export const ALERT_PUSH = { title: 'Sipwise admin', body: 'Something needs a look in the admin console.' } as const;
@@ -13,12 +14,19 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const pktDay = (d: Date) => new Date(d.getTime() + 5 * 3_600_000).toISOString().slice(0, 10);
 
 /** What is wrong right now, as stable keys (so a repeat the same day is recognised) with a label for the log only. */
-export function alertsFrom(health: Pick<AdminHealth, 'pipelines'>, platform: Pick<PlatformReport, 'status' | 'today' | 'connected' | 'server'>, errors: { errors24h: number; errorsPrev24h: number }): Alert[] {
+export function alertsFrom(health: Pick<AdminHealth, 'pipelines'>, platform: Pick<PlatformReport, 'status' | 'today' | 'connected' | 'server'>, errors: { errors24h: number; errorsPrev24h: number }, d1: Pick<D1Meter, 'level' | 'readShare' | 'writeShare'> | null = null): Alert[] {
   const out: Alert[] = [];
   for (const p of health.pipelines) if (p.status === 'failing') out.push({ key: `pipeline:${p.id}`, label: `${p.label} is failing` });
   if (platform.today.limitHits > 0) out.push({ key: 'platform:limit', label: 'Cloudflare limit hits' });
   if (platform.connected && platform.today.usedShare >= 0.8) out.push({ key: 'platform:requests', label: 'Requests near the daily limit' });
   if (platform.server.lastHour >= 20) out.push({ key: 'platform:server-errors', label: 'Server errors in the last hour' });
+  // One alert per level per day: halfway through the free D1 allowance, then the point where scrapers slow down.
+  if (d1 && d1.level !== 'ok') {
+    const share = Math.round(Math.max(d1.readShare, d1.writeShare) * 100);
+    out.push(d1.level === 'notice'
+      ? { key: 'd1:notice', label: `D1 daily allowance at ${share}%` }
+      : { key: 'd1:warn', label: `D1 daily allowance at ${share}%, scrapers slowed` });
+  }
   if (errors.errors24h >= 10 && errors.errors24h >= errors.errorsPrev24h * 2) out.push({ key: 'errors:spike', label: 'Client errors spiking' });
   return out;
 }
@@ -49,7 +57,8 @@ export async function sendAdminAlerts(db: D1Database, opts: AdminHealthOptions &
   const now = opts.now ?? new Date();
   try {
     const [health, platform, errors] = await Promise.all([adminHealth(db, opts), platformReport(db, { ...opts.platform, now }), clientErrorCounts(db, now)]);
-    const alerts = alertsFrom(health, platform, errors);
+    const today24 = (await readD1Days(db, now, 1)).filter((r) => r.day === now.toISOString().slice(0, 10)).pop();
+    const alerts = alertsFrom(health, platform, errors, today24 ? meterFrom(today24) : null);
     if (!alerts.length) return { found: 0, fresh: 0, sent: 0 };
     const today = pktDay(now);
     const marks = (await db.prepare("SELECT key,last_attempt_at AS at FROM refresh_state WHERE kind='admin-alert'").all<{ key: string; at: string | null }>()).results;

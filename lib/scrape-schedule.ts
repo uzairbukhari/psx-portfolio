@@ -3,16 +3,20 @@
 // `workflow_dispatch`. PSX is still fetched from the GitHub runner, never from Cloudflare.
 export type ScheduledWorkflow = { workflow: string; reason: string };
 
-/** Which workflows are due at this Cron Trigger firing (UTC): quotes every tick, history every 15 min, plus the post-close close. */
-export function dueWorkflows(when: Date): ScheduledWorkflow[] {
+/**
+ * Which workflows are due at this Cron Trigger firing (UTC): quotes every tick, history every 15 min, plus the post-close
+ * close. In a D1 brownout (80% of the free daily rows used, see lib/d1-usage.ts) quotes run every 15 minutes and history
+ * hourly, which still leaves the app fresh prices while it keeps its headroom for the rest of the UTC day.
+ */
+export function dueWorkflows(when: Date, brownout = false): ScheduledWorkflow[] {
   const day = when.getUTCDay();
   if (day === 0 || day === 6) return [];
   const hour = when.getUTCHours();
   const minute = when.getUTCMinutes();
   const due: ScheduledWorkflow[] = [];
   if (hour >= 4 && hour <= 11) {
-    due.push({ workflow: 'psx-quotes.yml', reason: 'market hours, every 5 minutes' });
-    if (minute % 15 === 0) due.push({ workflow: 'psx-history.yml', reason: 'market hours, every 15 minutes' });
+    if (!brownout || minute % 15 === 0) due.push({ workflow: 'psx-quotes.yml', reason: brownout ? 'market hours, every 15 minutes (D1 brownout)' : 'market hours, every 5 minutes' });
+    if (brownout ? minute === 0 : minute % 15 === 0) due.push({ workflow: 'psx-history.yml', reason: brownout ? 'market hours, hourly (D1 brownout)' : 'market hours, every 15 minutes' });
   }
   if (hour === 12 && minute >= 10 && minute < 15) due.push({ workflow: 'psx-history.yml', reason: 'after the close, final daily close' });
   return due;

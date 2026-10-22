@@ -7,7 +7,7 @@
 // Env: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (D1 edit permission).
 // Usage: node scripts/psx-history-scrape.mjs [--dry-run] [--tickers=MEBL,LUCK] [--refresh-eod]
 // --refresh-eod re-fetches daily closes for every ticker regardless of age (backfill after raising the retention).
-import { d1, trackedTickers, trackRun } from './d1-rest.mjs';
+import { d1, standDownForBrownout, trackedTickers, trackRun } from './d1-rest.mjs';
 import { markFinished, markRunning } from './refresh-state.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
 import { fetchPsxToken, fetchPsxTimeseries, PsxNoSeriesError } from '../lib/psx-fetch.ts';
@@ -56,6 +56,7 @@ async function openRequests() {
 }
 
 async function main() {
+  if (await standDownForBrownout('history', 55, { dryRun })) return;
   trackRun('history', { dryRun });
   const requested = await openRequests();
   const { kept, skipped } = await listedOnly([...new Set([...(await trackedTickers(tickerArg)), ...requested])]);

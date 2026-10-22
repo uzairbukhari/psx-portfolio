@@ -112,6 +112,67 @@ export default function AdminPlatform() {
         </div>
       </div>
 
+      <h2>Database allowance today (UTC)</h2>
+      {report.d1.meter ? (
+        <>
+          <div className="admin-spend">
+            <div className="admin-kpi">
+              <small>D1 rows read</small>
+              <strong>{report.d1.meter.reads.toLocaleString()}</strong>
+              <span className="muted">
+                of 5,000,000 a day, shared by production and staging
+              </span>
+              <div
+                className="admin-meter"
+                data-level={level(report.d1.meter.readShare)}
+              >
+                <span
+                  style={{
+                    width: `${Math.min(100, report.d1.meter.readShare * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <div className="admin-kpi">
+              <small>D1 rows written</small>
+              <strong>{report.d1.meter.writes.toLocaleString()}</strong>
+              <span className="muted">of 100,000 a day</span>
+              <div
+                className="admin-meter"
+                data-level={level(report.d1.meter.writeShare)}
+              >
+                <span
+                  style={{
+                    width: `${Math.min(100, report.d1.meter.writeShare * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <div className="admin-kpi">
+              <small>Slowdown</small>
+              <strong>{report.d1.brownout ? 'On' : 'Off'}</strong>
+              <span className="muted">
+                From 80% the scrapers run less often until 00:00 UTC. Phones
+                are alerted at 50% and 80%.
+              </span>
+            </div>
+          </div>
+          <h3>Rows read, last 14 days</h3>
+          <DayBars
+            rows={report.d1.days}
+            pick={(d) => d.reads}
+            name="Rows read"
+          />
+        </>
+      ) : (
+        <p className="muted">
+          D1 usage is not connected. It uses the same{' '}
+          <code>CF_ANALYTICS_TOKEN</code> and <code>CF_ACCOUNT_ID</code> as the
+          numbers above (Account Analytics: Read) and refreshes at 15 and 45
+          minutes past every hour.
+        </p>
+      )}
+
       {t.scripts.length > 0 && (
         <div className="table-wrap">
           <table className="admin-table">

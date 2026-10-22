@@ -4,6 +4,7 @@ import { sendAdminAlerts } from '../../../lib/admin-alerts';
 import { syncPlatformMetrics } from '../../../lib/cf-analytics';
 import { recordJobRun } from '../../../lib/job-runs';
 import { PIPELINES } from '../../../lib/pipelines';
+import { isBrownout, syncD1Usage } from '../../../lib/d1-usage';
 import { dispatchWorkflow, dueWorkflows, isFundRefreshTime, isPlatformTime } from '../../../lib/scrape-schedule';
 
 // This Worker has no VAULT_DB binding and no way to learn what any user holds: it only starts public scrapers.
@@ -27,7 +28,7 @@ interface Env {
  * triggers run hours late or are dropped. The workflows keep their GitHub cron as a fallback.
  */
 async function startDueScrapers(env: Env, scheduledTime: number) {
-  const due = dueWorkflows(new Date(scheduledTime));
+  const due = dueWorkflows(new Date(scheduledTime), await isBrownout(env.DB, new Date(scheduledTime)));
   const settings = {
     token: env.GITHUB_DISPATCH_TOKEN,
     repo: env.GITHUB_REPO,
@@ -76,6 +77,9 @@ export default {
           const startedAt = new Date().toISOString();
           const sync = await syncPlatformMetrics(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, ['psx-portfolio-sip', 'psx-portfolio-sip-quote-refresh'], new Date(controller.scheduledTime)).catch((e: unknown) => ({ stored: 0, error: e instanceof Error ? e.message : 'sync failed' }));
           await recordJobRun(env.DB, { job: 'platform', source: 'cron', startedAt, ok: !sync.error, detail: sync.error ?? `${sync.stored} Workers` }).catch(() => {});
+          // D1 rows read and written today, account-wide: the meter, the 50% and 80% alerts and the brownout read this.
+          const d1 = await syncD1Usage(env.DB, { token: env.CF_ANALYTICS_TOKEN, accountId: env.CF_ACCOUNT_ID }, new Date(controller.scheduledTime)).catch((e: unknown) => ({ meter: null, error: e instanceof Error ? e.message : 'D1 usage sync failed' }));
+          if (d1.error) console.error('D1 usage sync failed', d1.error);
           const lab = Number(env.AI_RESEARCH_MONTHLY_CAP_USD);
           const result = await sendAdminAlerts(env.DB, {
             now: new Date(controller.scheduledTime),
