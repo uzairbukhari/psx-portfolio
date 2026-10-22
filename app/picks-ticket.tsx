@@ -11,7 +11,7 @@ const whole = (n: number) => `Rs ${Math.round(n).toLocaleString('en-US')}`;
 
 export default function PicksTicket({
   estimates, summary, result, feePct, leftOut, priceDate, canRecord, copied,
-  onRecord, onCopy, onRefreshPrices, onManualPrice,
+  onRecord, onCopy, onRefreshPrices, onManualPrice, onFeeChange,
 }: {
   estimates: MonthlyPickEstimate[];
   summary: EstimateSummary;
@@ -25,6 +25,7 @@ export default function PicksTicket({
   onCopy: () => void;
   onRefreshPrices: () => void;
   onManualPrice: (ticker: string) => void;
+  onFeeChange: (fee: number) => void;
 }) {
   const sizing = explainSizing(result?.sizing).filter((line) => !line.includes('is left out'));
   const recordable = estimates.filter((e) => (e.shares ?? 0) > 0).length;
@@ -76,7 +77,15 @@ export default function PicksTicket({
             <b>{summary.unspentPkr === null ? '—' : whole(summary.unspentPkr)}</b>
             {!summary.incomplete && (
               <>
-                <span className="muted">Fees ({feePct}%, estimate)</span>
+                <span className="muted">
+                  Fees{' '}
+                  <input
+                    className="mp2-fee" type="number" inputMode="decimal" min="0" max="10" step="0.01"
+                    aria-label="Estimated fees in percent" value={Number.isFinite(feePct) ? feePct : ''}
+                    onChange={(event) => onFeeChange(Number(event.target.value))}
+                  />
+                  % (saved)
+                </span>
                 <b>{whole(fees)}</b>
               </>
             )}
