@@ -65,3 +65,5 @@ financial-data/
 android/engine/node_modules/
 android/core/engine/src/main/assets/engine.js
 /android/app/google-services.json
+mobile/your-key-file.json
+app.json
