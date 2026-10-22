@@ -199,7 +199,9 @@ import {
   setAccountZakat,
 } from '@/lib/portfolio-account';
 import type { ZakatBook } from '@/lib/zakat';
-import { withQuickEntry, type QuickEntry } from '@/lib/sip-blueprint-data';
+import { picksBudget, withQuickEntry, type QuickEntry } from '@/lib/sip-blueprint-data';
+import { DEFAULT_PICKS_FEE_PCT } from '@/lib/monthly-picks';
+import { recordRun, type StoredPicksRun } from '@/lib/picks-local';
 import type { SipBlueprint } from '@/lib/sip-blueprint';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
@@ -430,8 +432,6 @@ const blankTrade = (
   month: kind === 'buy' ? today().slice(0, 7) : '',
   note: '',
 });
-type PickBuy = { ticker: string; shares: number; price: number | null };
-type PickQueue = { picks: PickBuy[]; month: string; index: number };
 const blankDividend = (ticker: string): Dividend => ({
   id: crypto.randomUUID(),
   ticker,
@@ -895,7 +895,6 @@ function DashboardContent({
     return () => window.removeEventListener('popstate', onPopState);
   }, [isAdmin]);
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [pickQueue, setPickQueue] = useState<PickQueue | null>(null);
   const [p, setP] = useState<Portfolio | null>(null),
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
@@ -903,7 +902,7 @@ function DashboardContent({
     [failed, setFailed] = useState(false),
     [month, setMonth] = useState(today().slice(0, 7)),
     [picksHint, setPicksHint] = useState<{ avoid: string[] } | null>(null),
-    [fees, setFees] = useState(0),
+    [fees, setFees] = useState(DEFAULT_PICKS_FEE_PCT),
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
     [ahlStatement, setAhlStatement] = useState<{
@@ -1661,10 +1660,29 @@ function DashboardContent({
       quotes,
       budgets: picksHome.portfolio.budgets,
       monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
+      monthlyPicksFeePct: picksHome.portfolio.monthlyPicksFeePct,
       monthlyPicksList: picksHome.portfolio.monthlyPicksList,
       monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
     };
   }, [workspace, picksHome, p]);
+  // The fee estimate is saved with the Monthly Picks inputs; until one is saved the default applies.
+  const savedPicksFee = picksHome?.portfolio.monthlyPicksFeePct;
+  useEffect(() => {
+    if (savedPicksFee !== undefined) setFees(savedPicksFee);
+  }, [savedPicksFee]);
+  // What the SIP Blueprint still wants spent on stocks this month: the starting amount for Monthly Picks.
+  const picksAmount = useMemo(
+    () =>
+      p?.sipBlueprint && workspace
+        ? picksBudget(p.sipBlueprint, workspace.account.portfolios, today(), {
+            metalRates: metalRates.rates,
+            fundNavs: fundData.navs,
+            planNavs,
+            fxRates: fxData.data.rates,
+          })
+        : null,
+    [p?.sipBlueprint, workspace, metalRates.rates, fundData.navs, planNavs, fxData.data.rates],
+  );
   if (!p && email && !(failed && message))
     return <DashboardSkeleton />;
   // Signed-out visitors never reach the dashboard: DashboardRoute (a Server Component) renders the landing.
@@ -2564,24 +2582,6 @@ function DashboardContent({
     setDividend(blankDividend(ticker));
     setStockSplit(blankStockSplit(ticker));
   }
-  /** Monthly Picks "Record these buys": walks the dialog through each priced pick in turn. */
-  function openPick(queue: PickQueue, index: number) {
-    const pick = queue.picks[index];
-    if (!pick) {
-      setPickQueue(null);
-      closeTx();
-      return;
-    }
-    setPickQueue({ ...queue, index });
-    openTx('buy', pick.ticker, pick.price);
-    setTrade((t) => t && { ...t, shares: pick.shares, month: queue.month });
-  }
-  function recordPicks(picks: PickBuy[], pickMonth: string) {
-    const valid = picks.filter(
-      (x) => x.price !== null && x.price > 0 && x.shares > 0,
-    );
-    if (valid.length) openPick({ picks: valid, month: pickMonth, index: 0 }, 0);
-  }
   function closeTx() {
     setTrade(null);
     setDividend(null);
@@ -2831,6 +2831,68 @@ function DashboardContent({
     if (!part) throw Error('Choose a destination portfolio.');
     return part.portfolio;
   }
+  const pickDestinations = (workspace?.account.portfolios ?? []).map((part) => ({
+    id: part.id,
+    name: part.name,
+    locked: part.locked,
+  }));
+  /** Monthly Picks "Record these buys": every checked buy becomes a ledger entry in one save. */
+  async function recordPickBatch(input: {
+    rows: { ticker: string; name: string; shares: number; price: number; fees: number }[];
+    month: string;
+    date: string;
+    destinationId: string;
+    run: StoredPicksRun | null;
+  }) {
+    const part = workspace?.account.portfolios.find(
+      (entry) => entry.id === input.destinationId,
+    );
+    if (!part) throw Error('Choose a portfolio to record into.');
+    if (part.locked)
+      throw Error(
+        'This portfolio is locked. Unlock it in Settings → Portfolios.',
+      );
+    const next = clone(part.portfolio);
+    const added: string[] = [];
+    for (const row of input.rows) {
+      if (!next.companies.some((c) => c.ticker === row.ticker)) {
+        if (!/^[A-Z0-9]{2,12}$/.test(row.ticker))
+          throw Error('Enter a valid PSX symbol (2-12 letters or digits).');
+        // Name and sector are filled in from the public company directory when this saves.
+        next.companies.push({
+          ticker: row.ticker,
+          name: row.name || row.ticker,
+          sector: '',
+          target: 0,
+          approved: false,
+          screenDate: '',
+          note: '',
+        });
+        added.push(row.ticker);
+      }
+      next.trades.push({
+        id: crypto.randomUUID(),
+        ticker: row.ticker,
+        kind: 'buy',
+        date: input.date,
+        shares: row.shares,
+        price: row.price,
+        fees: row.fees,
+        month: input.month,
+        note: 'Monthly Picks',
+        ...(input.run ? { picksRunId: input.run.id } : {}),
+      });
+    }
+    // The ranking is kept beside the buys when they go to the portfolio that holds the Monthly Picks settings.
+    if (input.run && picksHome?.id === part.id)
+      next.monthlyPicksRuns = recordRun(next.monthlyPicksRuns, input.run);
+    await save(
+      next,
+      `${input.rows.length} ${input.rows.length === 1 ? 'buy' : 'buys'} recorded. Holdings and average cost updated.`,
+      { target: { id: part.id }, reload: true },
+    );
+    if (added.length) void queueQuoteRefresh(added);
+  }
   async function record(e: React.FormEvent) {
     e.preventDefault();
     if (!trade) return;
@@ -2877,7 +2939,6 @@ function DashboardContent({
     );
     if (isNew) void queueQuoteRefresh([trade.ticker]);
     closeTx();
-    if (pickQueue && !editing) openPick(pickQueue, pickQueue.index + 1);
   }
   async function recordStockSplit(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -3939,10 +4000,10 @@ function DashboardContent({
                 hint={picksHint}
                 onClearHint={() => setPicksHint(null)}
                 portfolio={picksPortfolio ?? p}
-                month={month}
-                setMonth={setMonth}
+                onOpenBlueprint={() => setTab('sip-tracker')}
                 feePct={fees}
                 setFeePct={setFees}
+                sipBudget={picksAmount}
                 busy={busy}
                 onSave={async (next, message) => {
                   if (!picksHome || workspace!.account.portfolios.length < 2)
@@ -3951,6 +4012,7 @@ function DashboardContent({
                     {
                       ...picksHome.portfolio,
                       monthlyPicksShortlist: next.monthlyPicksShortlist,
+                      monthlyPicksFeePct: next.monthlyPicksFeePct,
                       monthlyPicksList: next.monthlyPicksList,
                       budgets: next.budgets,
                       monthlyPicksRuns: next.monthlyPicksRuns,
@@ -3959,7 +4021,9 @@ function DashboardContent({
                     { target: { id: picksHome.id }, reload: true },
                   );
                 }}
-                onRecordBuys={recordPicks}
+                onRecordBatch={recordPickBatch}
+                destinations={pickDestinations}
+                defaultDestination={isAll ? (picksHome?.id ?? '') : (target?.id ?? picksHome?.id ?? '')}
                 onRefreshPrices={refresh}
                 onOpenCompany={openCompany}
                 onManualPrice={(ticker) => {
@@ -4375,7 +4439,6 @@ function DashboardContent({
           open={!!(trade || dividend || stockSplit)}
           onOpenChange={(open) => {
             if (!open) {
-              setPickQueue(null);
               closeTx();
             }
           }}
@@ -4484,9 +4547,7 @@ function DashboardContent({
               return (
                 <>
                   <DialogTitle>
-                    {pickQueue
-                      ? `Pick ${pickQueue.index + 1} of ${pickQueue.picks.length} · ${title}`
-                      : title}
+                    {title}
                   </DialogTitle>
                   <DialogDescription>{description}</DialogDescription>
                   {workspace &&
@@ -4930,18 +4991,6 @@ function DashboardContent({
                                 ? 'Save stock split'
                                 : 'Save entry'}
                         </button>
-                        {pickQueue && (
-                          <button
-                            className="secondary"
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              openPick(pickQueue, pickQueue.index + 1)
-                            }
-                          >
-                            Skip
-                          </button>
-                        )}
                         {correcting && (
                           <button
                             className="secondary"

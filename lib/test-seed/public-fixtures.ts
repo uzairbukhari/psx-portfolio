@@ -5,6 +5,8 @@
 import { TEST_COMPANIES, TEST_FUNDS, TEST_METAL_RATES } from './universe.ts';
 import { TEST_ACCOUNT_EMAIL } from '../test-account.ts';
 import { daysAgo } from './account.ts';
+import { computeMetrics, type CompanyFacts } from '../company-facts.ts';
+import { buildBenchmarks } from '../facts-benchmarks.ts';
 
 const q = (v: string | number | null) => (v === null ? 'NULL' : typeof v === 'number' ? String(v) : `'${v.replace(/'/g, "''")}'`);
 const row = (table: string, mode: string, cols: Record<string, string | number | null>) =>
@@ -71,6 +73,7 @@ export function buildPublicFixtureSql(today: string, mode: FixtureMode = 'all', 
         sql.push(row('metal_rates', ins, { date: daysAgo(today, i), metal, kind, pkr_per_tola: Math.round(tola * wobble * factor), source_url: 'https://example.test/metal-rates', source_label: 'Test fixture', fetched_at: at }));
   }
 
+  const allFacts: CompanyFacts[] = [];
   for (const [index, c] of TEST_COMPANIES.entries()) {
     sql.push(row('security_catalog', ins, {
       ticker: c.ticker, name: c.name, sector: c.sector, security_type: 'equity', source: 'test-fixture', first_seen_at: at, last_seen_at: at,
@@ -91,18 +94,22 @@ export function buildPublicFixtureSql(today: string, mode: FixtureMode = 'all', 
     sql.push(row('price_history', ins, { ticker: c.ticker, eod: JSON.stringify(closes), intraday: '[]', eod_fetched_at: at, intraday_fetched_at: null }));
 
     const eps = Math.round((c.price / (8 + (index % 6))) * 100) / 100;
-    const quarters = ['Q1 2025', 'Q2 2025', 'Q3 2025', 'Q4 2025', 'Q1 2026', 'Q2 2026'].map((period, i) => ({ period, revenue: 1000 + i * 40, pat: 200 + i * 10, eps: Math.round((eps / 4) * (1 + i * 0.03) * 100) / 100 }));
+    const quarters = ['Q1 2025', 'Q2 2025', 'Q3 2025', 'Q4 2025', 'Q1 2026', 'Q2 2026'].map((period, i) => ({ period, revenue: 1000 + i * 40, pat: 200 + i * 10, eps: Math.round((eps / 4) * (1 + i * (0.01 + (index % 5) * 0.02)) * 100) / 100 }));
     const facts = {
       ticker: c.ticker, name: c.name, sector: c.sector, price: c.price, priceDate: today, peTtm: Math.round((c.price / eps) * 10) / 10,
-      week52: { low: Math.round(c.price * 0.7), high: Math.round(c.price * 1.15) }, change1y: 18.5, changeYtd: 7.2, marketCapThousands: c.price * 1e6, freeFloatPct: 35,
+      week52: { low: Math.round(c.price * 0.7), high: Math.round(c.price * 1.15) }, change1y: -10 + ((index * 7) % 17) * 4, changeYtd: 7.2, marketCapThousands: c.price * 1e6, freeFloatPct: 35,
       annual: [{ period: '2024', revenue: 3800, pat: 760, eps: eps * 0.9 }, { period: '2025', revenue: 4100, pat: 830, eps }],
       quarterly: quarters,
-      ratios: { grossMargin: [40, 41, 42], netMargin: [20, 21, 22], epsGrowth: [8, 10, 12], peg: [1.1, 1, 0.9] },
+      ratios: { grossMargin: [40, 41, 42], netMargin: [20 + (index % 5) * 2, 21, 20 - (index % 4) * 2], epsGrowth: [8, 10, 12], peg: [1.1, 1, 0.9] },
       announcements: [{ date: daysAgo(today, 20), title: 'Financial results (fictional)', category: 'Financial Results', url: null }],
       source: `https://dps.psx.com.pk/company/${c.ticker}`, fetchedAt: at,
     };
     sql.push(row('company_facts', ins, { ticker: c.ticker, fetched_on: today, payload: JSON.stringify(facts), fetched_at: at }));
+    allFacts.push(facts as unknown as CompanyFacts);
   }
+  // The market breakpoints the facts scraper takes once a day from the cached pages.
+  const benchmarks = buildBenchmarks(allFacts.map((f) => computeMetrics(f, today)), today);
+  if (benchmarks) sql.push(row('facts_benchmarks', ins, { id: 'latest', payload: JSON.stringify(benchmarks), computed_on: today, sample: benchmarks.sample }));
 
   // One cash payout announcement for a held company, so the dividend sync has something to propose.
   sql.push(row('dividend_announcements', ins, {

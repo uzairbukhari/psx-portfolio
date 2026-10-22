@@ -236,6 +236,15 @@ export const companyFacts = sqliteTable('company_facts', {
   fetchedAt: text('fetched_at').notNull(),
 });
 
+// One row ('latest') of public market breakpoints for the Monthly Picks score, taken from every cached company page
+// by the facts scraper once a day (lib/facts-benchmarks.ts). Public numbers only.
+export const factsBenchmarks = sqliteTable('facts_benchmarks', {
+  id: text('id').primaryKey(),
+  payload: text('payload').notNull(),
+  computedOn: text('computed_on').notNull(),
+  sample: integer('sample').notNull(),
+});
+
 // Tracks on-demand PSX facts scrapes (GitHub Actions workflow_dispatch): dedupes
 // dispatches and surfaces the last scrape error per ticker.
 export const factsRequests = sqliteTable('facts_requests', {

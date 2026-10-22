@@ -17,6 +17,10 @@ export function parsePublicAnalysis(value: unknown): PublicAnalysisResponse | nu
     index: isObject(value.index) ? (value.index as PublicAnalysisResponse['index']) : null,
     facts: value.facts as PublicAnalysisResponse['facts'],
     factsMaxAgeDays: Number.isFinite(value.factsMaxAgeDays) ? Number(value.factsMaxAgeDays) : 7,
+    benchmark:
+      isObject(value.benchmark) && Number.isFinite(value.benchmark.sample) && typeof value.benchmark.computedOn === 'string'
+        ? { sample: Number(value.benchmark.sample), computedOn: value.benchmark.computedOn }
+        : null,
     dispatchEnabled: Boolean(value.dispatchEnabled),
   };
 }

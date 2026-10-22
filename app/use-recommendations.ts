@@ -45,6 +45,8 @@ export function useRecommendations({ portfolio, tickers, onSave }: Options) {
   const history = portfolio.monthlyPicksRuns ?? [];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [facts, setFacts] = useState<Record<string, FactsInfo>>({});
+  /** The latest public analysis for the shortlist: the ranking is worked out from it on the device, no save needed. */
+  const [analysis, setAnalysis] = useState<PublicAnalysisResponse | null>(null);
   const [dispatchEnabled, setDispatchEnabled] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +62,14 @@ export function useRecommendations({ portfolio, tickers, onSave }: Options) {
   const load = useCallback(async (list: string[]) => {
     if (!list.length) {
       setFacts({});
+      setAnalysis(null);
       return {} as Record<string, FactsInfo>;
     }
-    const analysis = await fetchAnalysis(list);
-    const byTicker = Object.fromEntries(analysis.facts.map((info) => [info.ticker, info as FactsInfo]));
+    const next = await fetchAnalysis(list);
+    const byTicker = Object.fromEntries(next.facts.map((info) => [info.ticker, info as FactsInfo]));
     setFacts(byTicker);
-    setDispatchEnabled(analysis.dispatchEnabled);
+    setAnalysis(next);
+    setDispatchEnabled(next.dispatchEnabled);
     return byTicker;
   }, []);
 
@@ -144,7 +148,7 @@ export function useRecommendations({ portfolio, tickers, onSave }: Options) {
   }, [requestFacts]);
 
   return {
-    history, current, facts, dispatchEnabled, loaded, error, setError,
+    history, current, facts, analysis, dispatchEnabled, loaded, error, setError,
     running: progress !== null, progress, refreshing: watch.length > 0,
     select: (run: Recommendation) => setSelectedId(run.id), start, refreshFacts,
   };
