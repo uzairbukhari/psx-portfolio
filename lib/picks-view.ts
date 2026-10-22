@@ -45,6 +45,8 @@ export type RowsInput = {
   facts: Record<string, FactsLite | undefined>;
   held: HoldingValue[];
   order: 'ranked' | 'name';
+  /** The public figures for every listed company, so unticked rows still show their numbers. */
+  pub?: { companies: { ticker: string; metrics: { unavailable?: string | null; peTtm?: number | null; epsYoYPct?: number | null } }[]; scores: { ticker: string; score: number }[] };
 };
 
 export function picksRows(input: RowsInput): PicksRow[] {
@@ -54,6 +56,8 @@ export function picksRows(input: RowsInput): PicksRow[] {
   const pickRank = new Map((result?.picks ?? []).map((pick, i) => [pick.ticker, i + 1]));
   const coverage = new Map((result?.coverage ?? []).map((c) => [c.ticker, c]));
   const limited = new Map((result?.sizing?.picks ?? []).filter((p) => p.constrainedBy === 'overweight' || p.constrainedBy === 'concentration_cap').map((p) => [p.ticker, p.constrainedBy]));
+  const pubMetrics = new Map((input.pub?.companies ?? []).filter((c) => !c.metrics.unavailable).map((c) => [c.ticker, c.metrics]));
+  const pubScore = new Map((input.pub?.scores ?? []).map((c) => [c.ticker, c.score]));
   const rows = input.list.map((entry): PicksRow => {
     const note = dataNote(input.facts[entry.ticker]);
     const cov = coverage.get(entry.ticker);
@@ -70,8 +74,9 @@ export function picksRows(input: RowsInput): PicksRow[] {
     }
     return {
       ticker: entry.ticker, name: entry.name, ticked: isTicked, rank,
-      score: cov?.assessmentStatus === 'assessed' ? (cov.metrics?.score ?? null) : null,
-      peTtm: cov?.metrics?.peTtm ?? null, epsYoYPct: cov?.metrics?.epsYoYPct ?? null,
+      score: cov?.assessmentStatus === 'assessed' ? (cov.metrics?.score ?? null) : pubMetrics.has(entry.ticker) ? (pubScore.get(entry.ticker) ?? null) : null,
+      peTtm: cov?.metrics?.peTtm ?? pubMetrics.get(entry.ticker)?.peTtm ?? null,
+      epsYoYPct: cov?.metrics?.epsYoYPct ?? pubMetrics.get(entry.ticker)?.epsYoYPct ?? null,
       ownPct: own.get(entry.ticker) ?? null, tag, dataNote: note.text, stale: note.stale,
     };
   });

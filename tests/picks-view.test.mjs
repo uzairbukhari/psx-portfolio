@@ -55,3 +55,11 @@ test('order text lists only picks with shares', () => {
   assert.equal(text, 'Monthly Picks 2026-10\nMEBL BUY 32 @ about 320.00');
   assert.equal(orderText([], '2026-10'), '');
 });
+
+test('unticked and unranked rows still show their public numbers', () => {
+  const pub = { companies: [{ ticker: 'FFC', metrics: { peTtm: 7.5, epsYoYPct: 12 } }, { ticker: 'NODATA', metrics: { unavailable: 'No PSX company data' } }], scores: [{ ticker: 'FFC', score: 63 }, { ticker: 'NODATA', score: 0 }] };
+  const rows = picksRows({ list, shortlist: ['FFC'], result: null, facts: {}, held, order: 'name', pub });
+  const ffc = rows.find((r) => r.ticker === 'FFC');
+  assert.deepEqual([ffc.score, ffc.peTtm, ffc.epsYoYPct], [63, 7.5, 12]);
+  assert.equal(rows.find((r) => r.ticker === 'NODATA').score, null);
+});
