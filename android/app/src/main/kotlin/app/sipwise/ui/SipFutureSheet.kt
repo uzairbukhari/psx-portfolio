@@ -220,7 +220,7 @@ private fun ComparisonTable(
         plan.checkpoints.forEachIndexed { k, cp ->
             val bold = k == plan.checkpoints.lastIndex
             TableRow(
-                stringResource(R.string.sip_whatif_in_years, cp.year, startYear + cp.year),
+                pluralStringResource(R.plurals.sip_whatif_in_years, cp.year, cp.year, startYear + cp.year),
                 comparison.lines.map { it.checkpoints.getOrNull(k)?.valueLabel.orEmpty() to it.checkpoints.getOrNull(k)?.deltaLabel.orEmpty() },
                 bold,
             )

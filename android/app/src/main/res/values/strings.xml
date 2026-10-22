@@ -332,7 +332,6 @@
         <item quantity="other">Over %1$d years</item>
     </plurals>
     <string name="sip_future_mark">%1$s in year %2$d</string>
-    <string name="sip_future_skip">Skipping one month costs about %1$s by the end.</string>
     <string name="sip_future_every_month">Every month</string>
     <string name="sip_future_raise">Raise it yearly by</string>
     <string name="sip_future_from_holdings">Start from what I hold today (%1$s)</string>
@@ -347,7 +346,10 @@
     <string name="sip_whatif_compare">Compare</string>
     <string name="sip_whatif_chart">Your plan against what-ifs, year by year</string>
     <string name="sip_whatif_plan">Your plan</string>
-    <string name="sip_whatif_in_years">In %1$d years (%2$d)</string>
+    <plurals name="sip_whatif_in_years">
+        <item quantity="one">In %1$d year (%2$d)</item>
+        <item quantity="other">In %1$d years (%2$d)</item>
+    </plurals>
     <string name="sip_whatif_put_in">You put in</string>
     <string name="sip_whatif_growth">Growth</string>
     <string name="sip_whatif_multiple">Each rupee became</string>
