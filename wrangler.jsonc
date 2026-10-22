@@ -51,7 +51,7 @@
 		"SUPPORT_EMAIL": "support@sipwise.trade",
 		// Cloudflare Turnstile site key (public) for the signed-out feedback form. Also needs the TURNSTILE_SECRET_KEY
 		// Worker secret; signed-out sending stays off until both are set.
-		"TURNSTILE_SITE_KEY": ""
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAFhK1XMrEwcSRy8j"
 	},
 	// Staging: a separate Worker + D1 database (see CLAUDE.md "Staging"). Wrangler
 	// environments do not inherit vars or bindings, so everything is repeated here.
