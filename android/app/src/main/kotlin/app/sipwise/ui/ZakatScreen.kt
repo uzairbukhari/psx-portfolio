@@ -27,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
 import app.sipwise.designsystem.MoneyText
@@ -130,54 +129,10 @@ private fun Overview(
             Text(stringResource(R.string.zakat_close_year))
         }
     }
-    SipwiseCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Overline(stringResource(R.string.zakat_counted))
-            view.breakdown.rows.forEach { ValueRow(it.label, money(it.counted)) }
-            HorizontalDivider()
-            ValueRow(stringResource(R.string.zakat_debts), money(-view.breakdown.debts))
-            ValueRow(stringResource(R.string.zakat_net), money(view.breakdown.net))
-            ValueRow(stringResource(R.string.zakat_nisab), money(view.breakdown.nisab.value))
-            view.breakdown.otherMethodZakat?.let { ValueRow(stringResource(R.string.zakat_other_method), money(it)) }
-            view.breakdown.missing.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-        }
-    }
-    SipwiseCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Overline(stringResource(R.string.zakat_cash_and_more))
-                TextButton(onClick = { dialog = ZakatDialog.Item }, enabled = !busy && view.canLog) { Text(stringResource(R.string.zakat_add)) }
-            }
-            if (view.items.isEmpty()) Text(stringResource(R.string.zakat_no_items), style = MaterialTheme.typography.bodySmall)
-            view.items.forEach { item ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    ValueRow(item.label, money(item.amount), Modifier.weight(1f))
-                    TextButton(onClick = { viewModel.removeItem(item.id) }, enabled = !busy && view.canLog) { Text(stringResource(R.string.zakat_remove)) }
-                }
-            }
-        }
-    }
-    SipwiseCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Overline(stringResource(R.string.zakat_payments))
-            if (view.payments.isEmpty()) Text(stringResource(R.string.zakat_no_payments), style = MaterialTheme.typography.bodySmall)
-            view.payments.reversed().forEach { pay ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    ValueRow("${mediumDate(pay.date)} · ${pay.kind}", money(pay.amount), Modifier.weight(1f))
-                    TextButton(onClick = { viewModel.voidPayment(pay.id) }, enabled = !busy && view.canLog) { Text(stringResource(R.string.zakat_void)) }
-                }
-            }
-            p.past.forEach { y -> ValueRow(stringResource(R.string.zakat_past_year, y.name), "${money(y.paid)} / ${money(y.amountDue)}") }
-        }
-    }
-    if (view.reminders.isNotEmpty()) {
-        SipwiseCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Overline(stringResource(R.string.zakat_coming_up))
-                view.reminders.forEach { Text("${mediumDate(it.date)} · ${it.title}", style = MaterialTheme.typography.bodyMedium) }
-            }
-        }
-    }
+    BreakdownCard(view)
+    ItemsCard(view, busy, onAdd = { dialog = ZakatDialog.Item }, onRemove = viewModel::removeItem)
+    PaymentsCard(view, busy, viewModel::voidPayment)
+    RemindersCard(view)
     Text(stringResource(R.string.zakat_note), style = MaterialTheme.typography.bodySmall)
     TextButton(onClick = { dialog = ZakatDialog.Stop }, enabled = !busy && view.canLog) { Text(stringResource(R.string.zakat_stop)) }
 
@@ -223,6 +178,79 @@ private fun Overview(
                 dismissButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.zakat_cancel)) } },
             )
         null -> Unit
+    }
+}
+
+@Composable
+private fun BreakdownCard(view: ZakatView) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Overline(stringResource(R.string.zakat_counted))
+            view.breakdown.rows.forEach { ValueRow(it.label, money(it.counted)) }
+            HorizontalDivider()
+            ValueRow(stringResource(R.string.zakat_debts), money(-view.breakdown.debts))
+            ValueRow(stringResource(R.string.zakat_net), money(view.breakdown.net))
+            ValueRow(stringResource(R.string.zakat_nisab), money(view.breakdown.nisab.value))
+            view.breakdown.otherMethodZakat?.let { ValueRow(stringResource(R.string.zakat_other_method), money(it)) }
+            view.breakdown.missing.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        }
+    }
+}
+
+@Composable
+private fun ItemsCard(
+    view: ZakatView,
+    busy: Boolean,
+    onAdd: () -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Overline(stringResource(R.string.zakat_cash_and_more))
+                TextButton(onClick = onAdd, enabled = !busy && view.canLog) { Text(stringResource(R.string.zakat_add)) }
+            }
+            if (view.items.isEmpty()) Text(stringResource(R.string.zakat_no_items), style = MaterialTheme.typography.bodySmall)
+            view.items.forEach { item ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    ValueRow(item.label, money(item.amount), Modifier.weight(1f))
+                    TextButton(onClick = { onRemove(item.id) }, enabled = !busy && view.canLog) { Text(stringResource(R.string.zakat_remove)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentsCard(
+    view: ZakatView,
+    busy: Boolean,
+    onVoid: (String) -> Unit,
+) {
+    SipwiseCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Overline(stringResource(R.string.zakat_payments))
+            if (view.payments.isEmpty()) Text(stringResource(R.string.zakat_no_payments), style = MaterialTheme.typography.bodySmall)
+            view.payments.reversed().forEach { pay ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    ValueRow("${mediumDate(pay.date)} · ${pay.kind}", money(pay.amount), Modifier.weight(1f))
+                    TextButton(onClick = { onVoid(pay.id) }, enabled = !busy && view.canLog) { Text(stringResource(R.string.zakat_void)) }
+                }
+            }
+            view.progress.past.forEach { y -> ValueRow(stringResource(R.string.zakat_past_year, y.name), "${money(y.paid)} / ${money(y.amountDue)}") }
+        }
+    }
+}
+
+@Composable
+private fun RemindersCard(view: ZakatView) {
+    if (view.reminders.isNotEmpty()) {
+        SipwiseCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Overline(stringResource(R.string.zakat_coming_up))
+                view.reminders.forEach { Text("${mediumDate(it.date)} · ${it.title}", style = MaterialTheme.typography.bodyMedium) }
+            }
+        }
     }
 }
 
