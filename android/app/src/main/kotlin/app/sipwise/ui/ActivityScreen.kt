@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
@@ -26,6 +27,7 @@ import app.sipwise.designsystem.MoneyText
 import app.sipwise.designsystem.ScreenSkeleton
 import app.sipwise.designsystem.SipwiseCard
 import app.sipwise.designsystem.SipwiseNumbers
+import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.Spacing
 import app.sipwise.designsystem.TickerTile
 import app.sipwise.model.ActivityFilter
@@ -77,7 +79,11 @@ fun ActivityScreen(
                                 onClick = if (entry.editable) ({ onOpenEntry(entry.id) }) else null,
                                 modifier = Modifier.padding(horizontal = Spacing.lg),
                                 leading = { TickerTile(entry.ticker) },
-                                trailing = { entry.amount?.let { MoneyText(money(it), style = SipwiseNumbers.small) } },
+                                trailing = {
+                                    entry.amount?.let {
+                                        MoneyText(money(it), style = SipwiseNumbers.small, color = if (entry.kind == "dividend") SipwiseTheme.colors.gain else Color.Unspecified)
+                                    }
+                                },
                             )
                         }
                     }

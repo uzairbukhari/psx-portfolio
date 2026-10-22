@@ -20,9 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,10 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.repeatOnLifecycle
 import app.sipwise.R
 import app.sipwise.designsystem.ChartBar
 import app.sipwise.designsystem.ComboChart
@@ -70,10 +65,6 @@ import app.sipwise.model.sharePercent
 import app.sipwise.model.shortDate
 import app.sipwise.model.signedMoney
 import app.sipwise.model.signedPercent
-import kotlinx.coroutines.delay
-
-private const val MARKET_POLL_MS = 60_000L
-private const val MARKET_IDLE_POLL_MS = 600_000L
 
 @Suppress("CyclomaticComplexMethod")
 @Composable
@@ -85,15 +76,6 @@ fun HoldingsScreen(
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val view = ui.view
     val isAll = viewModel.scope.collectAsStateWithLifecycle().value == ALL_PORTFOLIOS
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(viewModel) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                viewModel.loadMarket()
-                delay(if (viewModel.ui.value.marketOpen) MARKET_POLL_MS else MARKET_IDLE_POLL_MS)
-            }
-        }
-    }
     if (view == null) {
         if (ui.error != null) Text(ui.error.orEmpty(), modifier = Modifier.padding(Spacing.gutter)) else ScreenSkeleton()
         return
@@ -102,9 +84,7 @@ fun HoldingsScreen(
         contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        val market = ui.market
         val hasStocks = view.rows.isNotEmpty() || view.soldOut.isNotEmpty()
-        if (hasStocks && market?.index != null) item { MarketCard(market, ui.marketOpen) }
         val overview = ui.overview
         if (overview == null) {
             item { SummaryCard(view.summary) }
@@ -114,21 +94,13 @@ fun HoldingsScreen(
                 item { Text(overview.total.incomplete.joinToString(" "), color = SipwiseTheme.colors.warn, style = MaterialTheme.typography.bodyMedium) }
             }
             if (isAll) item { PortfolioBreakdown(overview, viewModel::openPortfolio) }
-            if (overview.sectors.size > 1 && hasStocks) item { SectorsCard(overview.sectors) }
+            if (!isAll && overview.sectors.size > 1 && hasStocks) item { SectorsCard(overview.sectors) }
             if (!hasStocks && overview.topAssets.isNotEmpty()) item { LargestAssetsCard(overview.topAssets) }
             if (!hasStocks && overview.invested.months.size > 1) item { MoneyInCard(overview.invested.months) }
         }
         if (view.rows.isEmpty() && ui.assets.isEmpty) item { EmptyState(stringResource(R.string.nav_portfolio), stringResource(R.string.holdings_empty)) }
-        if (view.rows.size >= MIN_TREEMAP) item { AllocationCard(view.rows, onOpenCompany) }
+        if (!isAll && view.rows.size >= MIN_TREEMAP) item { AllocationCard(view.rows, onOpenCompany) }
         if (hasStocks) {
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(ui.priceMessage ?: stringResource(R.string.holdings_prices_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                    TextButton(onClick = viewModel::refreshPrices, enabled = !ui.pricing) {
-                        Text(stringResource(if (ui.pricing) R.string.holdings_refreshing else R.string.holdings_refresh_prices))
-                    }
-                }
-            }
             item { OutlinedButton(onClick = onOpenInsights, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.insights_open)) } }
             item { SortRow(ui.sort, viewModel::setSort) }
             if (view.sectors.size > 1) item { SectorRow(view.sectors, ui.sector, viewModel::setSector) }

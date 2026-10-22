@@ -83,6 +83,10 @@ data class DayMove(
     val loser: Mover? = null,
 )
 
+/** One portfolio's own day move, for the Portfolios card on Today. */
+@Serializable
+data class PortfolioMove(val id: String, val move: DayMove)
+
 /** "October 2026" for a `YYYY-MM` month key, or "October" without the year. */
 fun monthTitle(
     month: String,

@@ -1,9 +1,9 @@
 package app.sipwise.engine
 
 import android.content.Context
+import androidx.javascriptengine.EvaluationFailedException
 import androidx.javascriptengine.IsolateStartupParameters
 import androidx.javascriptengine.IsolateTerminatedException
-import androidx.javascriptengine.JavaScriptException
 import androidx.javascriptengine.JavaScriptIsolate
 import androidx.javascriptengine.JavaScriptSandbox
 import app.sipwise.session.EngineBridge
@@ -37,7 +37,7 @@ class JsEngineBridge private constructor(
             isolate.evaluateJavaScriptAsync(script).await()
         } catch (e: IsolateTerminatedException) {
             throw EngineDiedException("The calculation engine stopped while the app was in the background. Unlock again to continue.", e)
-        } catch (e: JavaScriptException) {
+        } catch (e: EvaluationFailedException) {
             throw EngineException(e.message ?: "The calculation engine failed.", e)
         } catch (e: IllegalStateException) {
             // The isolate was closed by a lock while this call was waiting.

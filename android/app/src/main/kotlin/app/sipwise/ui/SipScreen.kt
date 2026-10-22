@@ -415,7 +415,6 @@ private fun FutureSheet(
                 onValueChange = { years = it },
                 onValueChangeFinished = { viewModel.project(years = years.toInt()) },
                 valueRange = MIN_YEARS..MAX_YEARS,
-                steps = (MAX_YEARS - MIN_YEARS).toInt() - 1,
             )
             val marks = (if (real) projection.marks.real else projection.marks.nominal).filter { it.year != null }
             for (mark in marks) {
@@ -748,9 +747,9 @@ private fun TargetSliders(
                 }
                 Slider(
                     value = value,
-                    onValueChange = { onSet(k.wire, it.toDouble()) },
+                    // Snaps to 5% without drawing a tick for every step.
+                    onValueChange = { onSet(k.wire, (Math.round(it / TARGET_STEP) * TARGET_STEP).toDouble()) },
                     valueRange = 0f..PERCENT.toFloat(),
-                    steps = TARGET_STEPS,
                     modifier = Modifier.semantics { contentDescription = "${labels[k.wire]} ${value.toInt()} percent" },
                 )
             }
@@ -764,7 +763,7 @@ private fun TargetSliders(
     }
 }
 
-private const val TARGET_STEPS = 19
+private const val TARGET_STEP = 5
 
 @Composable
 private fun DayField(
@@ -775,9 +774,8 @@ private fun DayField(
         Text(stringResource(R.string.sip_day, day), style = MaterialTheme.typography.bodyMedium)
         Slider(
             value = day.toFloat(),
-            onValueChange = { onSet(it.toInt().coerceIn(1, MAX_DAY)) },
+            onValueChange = { onSet(Math.round(it).coerceIn(1, MAX_DAY)) },
             valueRange = 1f..MAX_DAY.toFloat(),
-            steps = MAX_DAY - 2,
         )
         Text(stringResource(R.string.sip_day_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

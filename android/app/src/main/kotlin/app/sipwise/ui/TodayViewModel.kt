@@ -7,6 +7,7 @@ import app.sipwise.model.AccountOverview
 import app.sipwise.model.AssetsView
 import app.sipwise.model.DayMove
 import app.sipwise.model.MarketSummaryBody
+import app.sipwise.model.PortfolioMove
 import app.sipwise.model.SipView
 import app.sipwise.model.TodayView
 import app.sipwise.model.TrackRange
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonNull
 
 data class TodayUi(
@@ -35,6 +37,8 @@ data class TodayUi(
     val market: MarketSummaryBody? = null,
     val marketOpen: Boolean = false,
     val move: DayMove? = null,
+    /** Each portfolio's own move today, by portfolio id. */
+    val moves: Map<String, DayMove> = emptyMap(),
     val track: TrackView? = null,
     val range: TrackRange = TrackRange.HALF,
     val historyFailed: Boolean = false,
@@ -117,9 +121,11 @@ class TodayViewModel(
                     }
                     val move = ledger.view("today.move", mapOf("histories" to closes.recent))
                     val track = ledger.view("track.view", mapOf("range" to _ui.value.range.key, "histories" to closes.full))
+                    val moves = ledger.view("today.portfolioMoves", mapOf("histories" to closes.recent))
                     _ui.value =
                         _ui.value.copy(
                             move = decodeView(DayMove.serializer(), move),
+                            moves = decodeView(ListSerializer(PortfolioMove.serializer()), moves).associate { it.id to it.move },
                             track = decodeView(TrackView.serializer(), track),
                             historyFailed = false,
                         )

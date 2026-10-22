@@ -258,7 +258,16 @@ function nextBlueprint(current: SipBlueprint | null, op: string, p: Params): Sip
       const running = str(p, 'month');
       const started = running ? months[running] : undefined;
       if (started && !Object.keys(started.done).length) delete months[running];
-      return { ...saved, since: current?.since ?? saved.since, months };
+      // The phone sends only what the form shows, so what it does not (the preset name, return assumptions, the
+      // step-up) stays as it was, and a plan with no preset yet reads as the styles do not match: custom.
+      return {
+        ...saved,
+        preset: saved.preset ?? current?.preset ?? 'custom',
+        since: current?.since ?? saved.since,
+        stepUp: saved.stepUp ?? current?.stepUp,
+        returns: saved.returns ?? current?.returns,
+        months,
+      };
     }
     case 'clear':
       return null;

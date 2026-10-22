@@ -490,6 +490,15 @@ const handlers: Record<string, Handler> = {
     return dayMove(safeHoldings(portfolio).held, histories);
   },
 
+  // The same day move for each portfolio on its own, for the Portfolios card. A locked portfolio has nothing to count.
+  'today.portfolioMoves': (args) => {
+    const histories = JSON.parse(text(args, 'histories')) as Record<string, number[][]>;
+    return viewAccount().portfolios.map((part) => ({
+      id: part.id,
+      move: part.locked ? { available: false } : dayMove(safeHoldings(part.portfolio).held, histories),
+    }));
+  },
+
   // The Activity ledger: filtered, searched and grouped by month, newest first.
   'activity.view': (args) => {
     const scope = typeof args.scope === 'string' ? args.scope : ALL_PORTFOLIOS;

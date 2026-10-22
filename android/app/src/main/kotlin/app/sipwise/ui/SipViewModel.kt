@@ -16,10 +16,13 @@ import app.sipwise.session.EngineException
 import app.sipwise.session.VaultLockedException
 import app.sipwise.session.decodeView
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -121,6 +124,8 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
         previewJob?.cancel()
         previewJob =
             viewModelScope.launch {
+                // A slider reports every frame; wait until the thumb settles so the engine is not asked for each one.
+                delay(PREVIEW_DEBOUNCE_MS)
                 val json =
                     buildJsonObject {
                         put("budget", draft.budget)
@@ -131,7 +136,9 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
                         put("strict", draft.strict)
                     }
                 try {
-                    val reply = ledger.engine.call("sip.preview", mapOf("draft" to json.toString()))
+                    // Once asked, the engine finishes the call even if a newer one replaces it: cancelling a call in
+                    // flight is not something the JavaScript sandbox is built for.
+                    val reply = withContext(NonCancellable) { ledger.engine.call("sip.preview", mapOf("draft" to json.toString())) }
                     _ui.value = _ui.value.copy(preview = decodeView(SipPreview.serializer(), reply))
                 } catch (ignored: EngineException) {
                     // The preview is a help, not a gate: the draft can still be saved and the engine validates it.
@@ -178,7 +185,9 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
                 put("day", draft.day)
                 put("strict", draft.strict)
                 put("notify", draft.notify)
-                put("since", view?.blueprint?.since ?: view?.asOf.orEmpty())
+                put("preset", draft.preset)
+                // `since` is a month ("2026-10"), not a day.
+                put("since", view?.blueprint?.since?.takeIf { it.isNotEmpty() } ?: view?.month?.takeIf { it.isNotEmpty() } ?: view?.asOf.orEmpty().take(MONTH_LENGTH))
                 view?.blueprint?.stepUp?.let { put("stepUp", it) }
                 put("months", buildJsonObject { })
             }
@@ -354,5 +363,7 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
 
     private companion object {
         const val DEFAULT_YEARS = 15
+        const val PREVIEW_DEBOUNCE_MS = 120L
+        const val MONTH_LENGTH = 7
     }
 }

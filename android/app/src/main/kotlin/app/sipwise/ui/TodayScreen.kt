@@ -130,7 +130,7 @@ fun TodayScreen(
         if (ui.track?.value?.isChart == true || (ui.track == null && !ui.historyFailed)) item { ValueCard(ui, viewModel) }
         ui.sip?.let { sip -> item { SipTodayCard(sip, onOpenPlan) } }
         ui.market?.takeIf { it.index != null }?.let { market -> item { MarketCard(market, ui.marketOpen) } }
-        if (overview != null && overview.portfolios.size > 1) item { PortfolioShares(overview, onOpenPortfolio) }
+        if (overview != null && overview.portfolios.size > 1) item { PortfolioShares(overview, ui.moves, onOpenPortfolio) }
         if (ui.sip == null) item { MonthCard(view.progress) }
         if (view.upcoming.isNotEmpty()) {
             item { Text(stringResource(R.string.today_upcoming_title), style = MaterialTheme.typography.titleMedium) }
@@ -550,6 +550,7 @@ private const val SIP_PERCENT = 100.0
 @Composable
 private fun PortfolioShares(
     overview: AccountOverview,
+    moves: Map<String, DayMove>,
     onOpen: () -> Unit,
 ) {
     val chart = SipwiseTheme.chart
@@ -569,7 +570,13 @@ private fun PortfolioShares(
                     Canvas(Modifier.size(DOT)) { drawCircle(chart.category(i)) }
                     Text(p.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
                     Text(sharePercent(p.share), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    MoneyText(moneyShort(p.value), style = SipwiseNumbers.small)
+                    Column(horizontalAlignment = Alignment.End) {
+                        MoneyText(moneyShort(p.value), style = SipwiseNumbers.small)
+                        // How much this portfolio went up or down on the last trading day; none for one without stocks.
+                        moves[p.id]?.takeIf { it.available }?.let { move ->
+                            MoneyText("${signedMoney(move.amount)} (${signedPercent(move.percent)})", style = SipwiseNumbers.tiny, color = moveTone(move.amount))
+                        }
+                    }
                 }
             }
         }

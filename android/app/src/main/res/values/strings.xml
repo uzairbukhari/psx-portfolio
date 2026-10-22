@@ -199,6 +199,7 @@
     <string name="company_cost">Cost</string>
     <string name="company_value">Value</string>
     <string name="company_unrealised">Unrealised gain</string>
+    <string name="company_unrealised_on_cost">%1$s on cost</string>
     <string name="company_realised">Realised gain</string>
     <string name="company_cost_unknown">Cost is not known. Edit the opening entry to add its cost.</string>
     <string name="company_change_up">Up %1$s (%2$s) over %3$s</string>

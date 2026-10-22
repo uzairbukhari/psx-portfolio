@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -211,9 +212,17 @@ private fun PositionCard(view: CompanyView) {
             StatRow(R.string.company_cost to moneyShort(view.cost), R.string.company_value to moneyShort(view.value))
             val gain = view.gain
             StatRow(
-                R.string.company_unrealised to if (gain == null) "—" else "${signedMoney(gain)} (${signedPercent(view.gainPercent)})",
+                R.string.company_unrealised to if (gain == null) "—" else signedMoney(gain),
                 R.string.company_realised to signedMoney(view.realisedProfit ?: view.realized),
+                leftColor = gainColor(gain),
+                rightColor = gainColor(view.realisedProfit ?: view.realized),
             )
+            if (gain != null && view.gainPercent != null) {
+                DeltaPill(
+                    stringResource(R.string.company_unrealised_on_cost, signedPercent(view.gainPercent)),
+                    positive = gain >= 0,
+                )
+            }
             view.weight?.takeIf { view.held }?.let { WeightInStocks(it) }
             if (view.cost == null && view.held) Text(stringResource(R.string.company_cost_unknown), style = MaterialTheme.typography.bodySmall)
         }
@@ -261,13 +270,23 @@ private fun shares(value: Double) = java.text.NumberFormat.getInstance(java.util
 private fun StatRow(
     left: Pair<Int, String>,
     right: Pair<Int, String>,
+    leftColor: Color = Color.Unspecified,
+    rightColor: Color = Color.Unspecified,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        for ((label, value) in listOf(left, right)) {
-            StatTile(stringResource(label), value, Modifier.weight(1f))
-        }
+        StatTile(stringResource(left.first), left.second, Modifier.weight(1f), valueColor = leftColor)
+        StatTile(stringResource(right.first), right.second, Modifier.weight(1f), valueColor = rightColor)
     }
 }
+
+/** Green for a gain, red for a loss, and the normal text colour when there is nothing to judge yet. */
+@Composable
+private fun gainColor(amount: Double?): Color =
+    when {
+        amount == null || amount == 0.0 -> Color.Unspecified
+        amount > 0 -> SipwiseTheme.colors.gain
+        else -> SipwiseTheme.colors.loss
+    }
 
 /**
  * The price slab: the last price, how it moved over the chosen range, the chart with your buys and sales marked and
@@ -600,7 +619,12 @@ private fun EntryItem(
             subtitle = "${shortDate(entry.date)} · ${entry.detail}",
             onClick = if (entry.editable) onOpen else null,
             modifier = Modifier.padding(horizontal = Spacing.lg),
-            trailing = { entry.amount?.let { MoneyText(money(it), style = SipwiseNumbers.small) } },
+            trailing = {
+                entry.amount?.let {
+                    // Dividends are money coming in, so they read green like a gain.
+                    MoneyText(money(it), style = SipwiseNumbers.small, color = if (entry.kind == "dividend") SipwiseTheme.colors.gain else Color.Unspecified)
+                }
+            },
         )
     }
 }
