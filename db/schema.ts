@@ -538,7 +538,7 @@ export const metalRates = sqliteTable(
     sourceLabel: text('source_label'),
     fetchedAt: text('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] })],
+  (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] }), index('metal_rates_fetched_idx').on(t.fetchedAt)],
 );
 
 // Shared foreign currency rates (rupees per one unit of USD, AED or SAR). Public data only; written by scripts/fx-rates-scrape.mjs.
@@ -655,6 +655,9 @@ export const analyticsEvents = sqliteTable(
   (table) => [
     index('analytics_events_day_idx').on(table.day, table.event),
     index('analytics_events_user_idx').on(table.userKey, table.day),
+    // The admin console and the alert check filter by event first (client_error counts by time, People milestones).
+    index('analytics_events_event_ts_idx').on(table.event, table.ts),
+    index('analytics_events_event_user_idx').on(table.event, table.userKey, table.day),
   ],
 );
 
