@@ -2,13 +2,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Activity, ArrowLeft, BarChart3, Cloud, LayoutDashboard, ScrollText, UserSearch, Users } from 'lucide-react';
+import { Activity, ArrowLeft, BarChart3, Cloud, LayoutDashboard, MessageSquareText, ScrollText, UserSearch, Users } from 'lucide-react';
 import { ADMIN_SECTIONS, type AdminSection } from './admin-sections';
 import AdminAccounts from './admin-accounts';
 import AdminOverview from './admin-overview';
 import AdminUsers from './admin-users';
 import AdminPlatform from './admin-platform';
 import AuditLog from './audit-log';
+import AdminFeedback from './admin-feedback';
 import SystemHealth from './system-health';
 import UsageDashboard from './usage-dashboard';
 import { UserAvatar } from './user-avatar';
@@ -17,8 +18,9 @@ import { PillSwitch } from './insight-card';
 import './dashboard-styles';
 import './admin.css';
 import './redesign-admin.css';
+import './feedback.css';
 
-const ICONS = { overview: LayoutDashboard, health: Activity, platform: Cloud, analytics: BarChart3, audit: ScrollText, users: UserSearch, accounts: Users } as const;
+const ICONS = { overview: LayoutDashboard, health: Activity, platform: Cloud, analytics: BarChart3, audit: ScrollText, users: UserSearch, feedback: MessageSquareText, accounts: Users } as const;
 
 /** Full-width super admin space, outside Settings and outside the vault gate (none of it needs the portfolio). */
 export default function AdminConsole({ section, email, name, picture }: { section: AdminSection; email: string; name: string | null; picture: string | null }) {
@@ -74,6 +76,7 @@ export default function AdminConsole({ section, email, name, picture }: { sectio
             {section === 'analytics' && <UsageDashboard includeInternal={includeInternal} days={days} />}
             {section === 'audit' && <AuditLog includeInternal={includeInternal} days={days} />}
             {section === 'users' && <AdminUsers includeInternal={includeInternal} />}
+            {section === 'feedback' && <AdminFeedback />}
             {section === 'accounts' && <AdminAccounts email={email} />}
           </div>
         </main>

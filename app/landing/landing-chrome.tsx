@@ -45,7 +45,7 @@ export function LandingFooter() {
           <a href="/download">Android app</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
-          <a href="mailto:support@sipwise.trade">Contact</a>
+          <a href="/feedback">Contact</a>
         </span>
         <span>
           Sipwise is a tracking and planning tool. It is not investment advice

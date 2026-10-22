@@ -30,6 +30,7 @@ export const PAGE_TITLES: Record<string, string> = {
   'sip-tracker': 'SIP Blueprint',
   future: 'Future you',
   zakat: 'Zakat',
+  feedback: 'Feedback',
   history: 'Activity',
   sip: 'Monthly Picks',
   settings: 'Settings',

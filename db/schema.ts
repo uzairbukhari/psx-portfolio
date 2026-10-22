@@ -648,3 +648,25 @@ export const analyticsEvents = sqliteTable(
     index('analytics_events_user_idx').on(table.userKey, table.day),
   ],
 );
+
+// Contact us / Report an issue / Suggest a feature (lib/feedback.ts). Free text typed on purpose, never portfolio data.
+// `user_key` is the same HMAC as analytics, so the table names nobody unless the person left a contact email.
+export const feedback = sqliteTable(
+  'feedback',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at'),
+    kind: text('kind').notNull(),
+    message: text('message').notNull(),
+    contactEmail: text('contact_email'),
+    signedIn: integer('signed_in').notNull().default(0),
+    userKey: text('user_key'),
+    page: text('page').notNull().default(''),
+    platform: text('platform').notNull().default('web'),
+    appVersion: text('app_version'),
+    status: text('status').notNull().default('new'),
+    note: text('note'),
+  },
+  (table) => [index('feedback_status_idx').on(table.status, table.id)],
+);
