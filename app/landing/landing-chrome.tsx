@@ -43,6 +43,7 @@ export function LandingFooter() {
       <div className="lp-wrap">
         <span>&copy; 2026 Sipwise &middot; sipwise.trade</span>
         <span className="lp-footer-links">
+          <a href="/download">Android app</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
           <a href="mailto:support@sipwise.trade">Contact</a>

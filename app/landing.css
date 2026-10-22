@@ -143,7 +143,7 @@
 .landing .lp-legal h1{font-size:38px;letter-spacing:-1.2px;margin:0 0 8px}
 .landing .lp-legal h2{font-size:21px;letter-spacing:-.3px;margin:36px 0 8px}
 .landing .lp-legal p,.landing .lp-legal li{font-size:16px;line-height:1.7;color:var(--soft)}
-.landing .lp-legal ul{padding-left:20px;margin:8px 0}
+.landing .lp-legal ul,.landing .lp-legal ol{padding-left:20px;margin:8px 0}
 .landing .lp-legal .updated{font-size:13px;color:var(--muted)}
 .landing .lp-nav a.lp-brand{color:var(--ink)}
 .landing .google-btn{color:#152840}
@@ -166,3 +166,9 @@
 .landing .lp-brand .logo-word em{font-style:normal;color:var(--primary-2)}
 .landing section[id]{scroll-margin-top:72px}
 .landing{scroll-behavior:smooth}
+.landing .lp-legal ol{list-style:decimal;padding-left:22px;margin:8px 0}
+.landing .lp-legal li{margin:0 0 10px}
+.landing .lp-legal a:not(.dl-btn){color:rgb(var(--ch-primary));text-decoration:underline;text-underline-offset:3px}
+.landing .lp-legal .dl-card{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:24px 0 8px;padding:20px;border:1px solid var(--border);border-radius:16px;background:rgb(var(--ch-primary) / .08)}
+.landing .lp-legal .dl-card p{margin:0;font-size:14px}
+.landing .lp-legal .dl-btn{display:inline-block;font-size:16px;font-weight:600;padding:12px 22px;border-radius:12px;background:rgb(var(--ch-primary));color:var(--primary-foreground);text-decoration:none}
