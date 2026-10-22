@@ -9,6 +9,7 @@ import { dataMeta } from '@/lib/market-freshness';
 import { pktDate, type PricePoint } from '@/lib/price-history';
 import { db, failure, identity } from '@/lib/server';
 import { tickerOK } from '@/lib/research-jobs';
+import { serverTiming } from '@/lib/server-timing';
 import { UserError } from '@/lib/user-error';
 
 export async function GET(req: Request) {
@@ -20,22 +21,38 @@ export async function GET(req: Request) {
         new Set(batch.split(',').map((t) => t.trim().toUpperCase()).filter(Boolean)),
       );
       if (tickers.length > 60 || !tickers.every(tickerOK)) throw new UserError('Invalid symbols.');
-      const rows = tickers.length
-        ? (
-            await db()
-              .prepare(
-                `SELECT ticker, eod FROM price_history WHERE ticker IN (${tickers.map(() => '?').join(',')})`,
-              )
-              .bind(...tickers)
-              .all<{ ticker: string; eod: string }>()
-          ).results
-        : [];
-      return Response.json(
-        {
-          histories: Object.fromEntries(rows.map((r) => [r.ticker, { eod: JSON.parse(r.eod) }])),
-        } satisfies PriceHistoryBatchResponse,
-        { headers: { 'Cache-Control': 'no-store' } },
-      );
+      const startedAt = Date.now();
+      const from = new URL(req.url).searchParams.get('from');
+      if (from !== null && !/^\d{4}-\d{2}-\d{2}$/.test(from)) throw new UserError('Invalid date.');
+      const cache = { 'Cache-Control': 'private, max-age=900, must-revalidate' };
+      if (!tickers.length) return Response.json({ histories: {} } satisfies PriceHistoryBatchResponse, { headers: cache });
+      const marks = tickers.map(() => '?').join(',');
+      // A light check first: when the stored closes have not changed since the browser's copy, answer 304 and never
+      // read or send the big series.
+      const version = await db()
+        .prepare(`SELECT COUNT(*) AS n, MAX(eod_fetched_at) AS t FROM price_history WHERE ticker IN (${marks})`)
+        .bind(...tickers)
+        .first<{ n: number; t: string | null }>();
+      const etag = `W/"ph|${tickers.join('.')}|${from ?? ''}|${version?.n ?? 0}|${version?.t ?? ''}"`;
+      if (req.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { ...cache, ETag: etag } });
+      const rows = (
+        await db()
+          .prepare(`SELECT ticker, eod FROM price_history WHERE ticker IN (${marks})`)
+          .bind(...tickers)
+          .all<{ ticker: string; eod: string }>()
+      ).results;
+      // The stored text is already JSON: pass it through instead of parsing and re-encoding every series.
+      // Only a `from` date needs it parsed, to cut the older closes.
+      const fromSecs = from ? Date.parse(`${from}T00:00:00Z`) / 1000 : 0;
+      const body = `{"histories":{${rows
+        .map(
+          (r) =>
+            `${JSON.stringify(r.ticker)}:{"eod":${
+              fromSecs ? JSON.stringify((JSON.parse(r.eod) as PricePoint[]).filter((point) => point[0] >= fromSecs)) : r.eod
+            }}`,
+        )
+        .join(',')}}}`;
+      return new Response(body, { headers: { ...cache, ...serverTiming(startedAt, rows.length), ETag: etag, 'Content-Type': 'application/json' } });
     }
     const ticker = (new URL(req.url).searchParams.get('ticker') ?? '')
       .trim()

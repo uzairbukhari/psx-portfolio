@@ -99,6 +99,7 @@ test('lock zeroes the key, drops decrypted state, and refuses further work', asy
 test('a request in flight when the vault locks never repopulates state or reports success', async () => {
   const server = createVaultServer();
   const { session } = await setup(server);
+  await session.reload(); // the first reload after opening is answered from memory; this one uses the network
   let release;
   server.state.hold = new Promise((r) => (release = r));
   const reload = session.reload().then(() => 'resolved', (e) => e);
@@ -111,6 +112,28 @@ test('a request in flight when the vault locks never repopulates state or report
   assert.ok((await save) instanceof c.VaultLockedError);
   assert.deepEqual(session.portfolio, blankPortfolio());
   assert.equal(session.revision, 0);
+});
+
+test('the first reload after opening reuses what the unlock read, once; later reloads and saves go to the server', async () => {
+  const server = createVaultServer();
+  const { session } = await setup(server);
+  let reads = 0;
+  const transport = server.as('a@example.com');
+  const counting = { ...transport, getPortfolio: () => (reads++, transport.getPortfolio()) };
+  const status = await c.loadVaultStatus(counting);
+  const opened = await c.unlockVault(counting, status, { password: PASSWORD });
+  assert.equal(reads, 1);
+  const first = await opened.reload();
+  assert.equal(reads, 1, 'first reload reuses the ciphertext read for the unlock');
+  assert.equal(first.revision, status.portfolio.revision);
+  await opened.reload();
+  assert.equal(reads, 2, 'the second reload asks the server');
+  const again = await c.unlockVault(counting, await c.loadVaultStatus(counting), { password: PASSWORD });
+  reads = 0;
+  await again.save(withMarker(again.portfolio), again.revision);
+  await again.reload();
+  assert.equal(reads, 1, 'a save ends the reuse window');
+  void session;
 });
 
 test('conflicting saves from two devices: one wins, the other gets ConflictError and nothing is overwritten', async () => {

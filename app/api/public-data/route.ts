@@ -1,5 +1,6 @@
 import { db, failure, identity } from '@/lib/server';
 import { readPublicData } from '@/lib/public-data-api';
+import { serverTiming } from '@/lib/server-timing';
 
 const headers = { 'Cache-Control': 'no-store' };
 
@@ -7,7 +8,10 @@ const headers = { 'Cache-Control': 'no-store' };
 export async function GET(req: Request) {
   try {
     await identity(req);
-    return Response.json(await readPublicData(db(), new URL(req.url).searchParams.get('tickers')), { headers });
+    const startedAt = Date.now();
+    const data = await readPublicData(db(), new URL(req.url).searchParams.get('tickers'));
+    const rows = data.quoteRows.length + data.announcements.length + data.corporateActions.length;
+    return Response.json(data, { headers: { ...headers, ...serverTiming(startedAt, rows) } });
   } catch (e) {
     return failure(e, undefined, req);
   }

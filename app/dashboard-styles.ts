@@ -8,7 +8,6 @@ import './insights.css';
 import './insights-guided.css';
 import './account-overview.css';
 import './settings.css';
-import './always-dark.css';
 import './sip-tracker.css';
 import './redesign.css';
 import './holdings-home.css';

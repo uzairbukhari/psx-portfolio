@@ -141,8 +141,10 @@ export async function trackFunds(db: FundDb, ids: unknown, retry = false) {
       ).results[0]?.t ?? '';
     wantRetry = !last || Date.now() - Date.parse(last) > RETRY_GAP_MS;
   }
-  if (fresh.length || !directory || wantRetry) await refreshFunds(db);
-  return { added: fresh.length };
+  const refreshed = fresh.length > 0 || !directory || wantRetry;
+  if (refreshed) await refreshFunds(db);
+  // `refreshed` tells the client whether prices may have changed, so it re-reads the catalogue only then.
+  return { added: fresh.length, refreshed };
 }
 
 /**

@@ -15,12 +15,27 @@ async function call<T>(path: string, method = 'GET', body?: unknown): Promise<T>
   }
 }
 
+// Public answers that are the same for everyone and change at most daily: the server already sends
+// `private, max-age=900`, so the browser may reuse them instead of asking again on every refresh.
+const CACHEABLE = /^\/api\/public-data\/(metals|fx|plan-navs|funds(\?(fund|payouts)=[\w%,]+)?)$/;
+// After the server was told about funds (it may fetch prices then) the catalogue may have changed: the next read of it goes to the network.
+let catalogueStale = false;
+
+function cacheMode(path: string, method: string): RequestCache {
+  if (method !== 'GET' || !CACHEABLE.test(path)) return 'no-store';
+  if (path === '/api/public-data/funds' && catalogueStale) {
+    catalogueStale = false;
+    return 'reload';
+  }
+  return 'default';
+}
+
 async function attempt<T>(path: string, method: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
       method,
-      cache: 'no-store',
+      cache: cacheMode(path, method),
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -30,6 +45,7 @@ async function attempt<T>(path: string, method: string, body?: unknown): Promise
   const data = (await res.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
   if (!res.ok) throw new TransportError(data?.error ?? 'The request failed. Try again.', res.status, data?.code);
   if (data === null) throw new TransportError('The server sent an empty or unreadable answer. Try again in a moment.', res.status);
+  if (method === 'POST' && path === '/api/public-data/funds') catalogueStale = true;
   return data as T;
 }
 
