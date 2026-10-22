@@ -63,12 +63,10 @@ import {
   ScrollText,
   FlaskConical,
   Microscope,
-  LockKeyhole,
-  ShieldCheck,
   TrendingUp,
   PanelLeft,
-  Pin,
-  PinOff,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sparkles,
   Target,
 } from 'lucide-react';
@@ -144,8 +142,7 @@ import type { OwnedFund } from './mutual-funds';
 import { buildAssetEntries, buildEntries } from '@/lib/ledger-entries';
 import { CompanyNavProvider } from './ticker-link';
 import { LoadError } from './sign-in';
-import { UserAvatar } from './user-avatar';
-import { ThemeMenuItems } from './theme-menu';
+import { AccountMenu } from './account-menu';
 import { HelpPanel } from './help-panel';
 import { ChecklistStrip, PageTip, StartScreen } from './onboarding-ui';
 import { ProductTour, TourOffer } from './product-tour';
@@ -3004,68 +3001,22 @@ function DashboardContent({
     });
   }
   const accountMenu = (withName: boolean) => email ? (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="account-trigger">
-        <UserAvatar name={name} email={email} picture={picture} />
-        {withName && (
-            <span className="account-who">
-              <b>{name || email}</b>
-              <small>{vault ? 'Vault unlocked' : 'Signed in'}</small>
-            </span>
-          )}
-          {withName ? (
-            <LockKeyhole size={15} className="account-chevron" />
-          ) : (
-            <ChevronDown size={14} className="account-chevron" />
-          )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="account-menu">
-        <div className="account-menu-header">
-          <UserAvatar
-            name={name}
-            email={email}
-            picture={picture}
-            large
-          />
-          <div>
-            {name && (
-              <span className="account-menu-name">{name}</span>
-            )}
-            <span className="account-menu-email">{email}</span>
-          </div>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setTab('settings')}>
-          <Settings size={15} /> Settings
-        </DropdownMenuItem>
-        {isAdmin && (
-          <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
-            <ShieldCheck size={15} /> Admin console
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem
-          onClick={() => {
-            track('help_opened', { item: 'panel' });
-            setHelpOpen(true);
-          }}
-        >
-          <LifeBuoy size={15} /> Help
-        </DropdownMenuItem>
-        <ThemeMenuItems />
-        {vault && (
-          <DropdownMenuItem onClick={vault.lock}>
-            <LockKeyhole size={15} /> Lock vault
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          onClick={signOut}
-        >
-          <LogOut size={15} /> Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <AccountMenu
+      name={name}
+      email={email}
+      picture={picture}
+      isAdmin={isAdmin}
+      unlocked={!!vault}
+      sideMode={withName ? side.mode : 'phone'}
+      onSettings={() => setTab('settings')}
+      onHelp={() => {
+        track('help_opened', { item: 'panel' });
+        setHelpOpen(true);
+      }}
+      onAdmin={isAdmin ? () => window.location.assign('/admin') : undefined}
+      onLock={vault?.lock}
+      onSignOut={signOut}
+    />
   ) : null;
 
   return (
@@ -3158,6 +3109,16 @@ function DashboardContent({
                 <LogoMark size={28} />
                 <Wordmark />
               </button>
+              <button
+                type="button"
+                data-slot="side-collapse"
+                className="side-collapse"
+                aria-label={side.mode === 'pinned' ? 'Collapse sidebar' : 'Expand sidebar'}
+                title={(side.mode === 'pinned' ? 'Collapse sidebar' : 'Expand sidebar') + ' ( [ )'}
+                onClick={() => side.setMode(side.mode === 'pinned' ? 'auto' : 'pinned')}
+              >
+                {side.mode === 'pinned' ? <PanelLeftClose size={18} aria-hidden="true" /> : <PanelLeftOpen size={18} aria-hidden="true" />}
+              </button>
             </div>
             {!emptyStart && tab !== 'settings' && <div className="side-portfolio" data-tour="portfolios">{workspace?.selector}</div>}
             {!emptyStart && (
@@ -3170,34 +3131,6 @@ function DashboardContent({
                 onMore={email ? () => setMoreOpen(true) : undefined}
                 moreActive={moreOpen}
               />
-            )}
-            {(
-              <div className="side-tools">
-                <button
-                  type="button"
-                  data-slot="side-tool"
-                  className="side-tool"
-                  aria-pressed={side.mode !== 'auto'}
-                  aria-label={side.mode === 'auto' ? 'Pin menu' : 'Unpin menu'}
-                  title={(side.mode === 'auto' ? 'Pin menu' : 'Unpin menu') + ' ( [ )'}
-                  onClick={() => side.setMode(side.mode === 'auto' ? 'pinned' : 'auto')}
-                >
-                  {side.mode === 'auto' ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
-                  <span className="tab-long">{side.mode === 'auto' ? 'Pin menu' : 'Unpin'}</span>
-                </button>
-                <button
-                  type="button"
-                  data-slot="side-tool"
-                  className="side-tool"
-                  data-active={tab === 'settings' || undefined}
-                  aria-label="Settings"
-                  data-tip="Settings"
-                  onClick={() => setTab('settings')}
-                >
-                  <Settings size={20} aria-hidden="true" />
-                  <span className="tab-long">Settings</span>
-                </button>
-              </div>
             )}
             {email && <div className="side-user" data-tour="profile">{accountMenu(true)}</div>}
             </div>
