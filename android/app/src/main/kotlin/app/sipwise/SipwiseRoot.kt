@@ -113,8 +113,6 @@ import app.sipwise.ui.SignInScreen
 import app.sipwise.ui.SipScreen
 import app.sipwise.ui.SipViewModel
 import app.sipwise.ui.TargetsScreen
-import app.sipwise.ui.ZakatScreen
-import app.sipwise.ui.ZakatViewModel
 import app.sipwise.ui.TargetsViewModel
 import app.sipwise.ui.TodayScreen
 import app.sipwise.ui.TodayViewModel
@@ -122,6 +120,8 @@ import app.sipwise.ui.UnlockScreen
 import app.sipwise.ui.UpdatePrompt
 import app.sipwise.ui.VaultFailedScreen
 import app.sipwise.ui.VaultSetupScreen
+import app.sipwise.ui.ZakatScreen
+import app.sipwise.ui.ZakatViewModel
 import app.sipwise.ui.findFragmentActivity
 import app.sipwise.update.UpdateViewModel
 import app.sipwise.vault.VaultUi
