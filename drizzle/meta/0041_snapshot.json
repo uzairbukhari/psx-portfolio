@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b195e72a-db0a-478b-9b4d-8cafffcdab98",
+  "id": "799728d2-69c8-44f9-9d86-69219ecfc747",
   "prevId": "b03f1aaf-1b79-40b2-92e7-b108d48fb852",
   "tables": {
     "admin_actions": {
@@ -610,6 +610,13 @@
             "created_at"
           ],
           "isUnique": false
+        },
+        "idx_ai_usage_created": {
+          "name": "idx_ai_usage_created",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -837,7 +844,15 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "company_facts_fetched_idx": {
+          "name": "company_facts_fetched_idx",
+          "columns": [
+            "fetched_at"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -1001,7 +1016,15 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "dividend_announcements_fetched_idx": {
+          "name": "dividend_announcements_fetched_idx",
+          "columns": [
+            "fetched_at"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "dividend_announcements_ticker_book_closure_start_announced_on_kind_pk": {

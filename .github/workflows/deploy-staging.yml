@@ -34,8 +34,9 @@ concurrency:
 # default branch's workflows restore.
 jobs:
   merge:
-    # Fork PRs get no secrets and must not reach the staging environment.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    # Fork PRs get no secrets and must not reach the staging environment. Dependabot bumps are not worth a staging
+    # deploy: every deploy migrates and seeds the staging database, which counts against the account's D1 daily limit.
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -119,6 +120,44 @@ jobs:
       - run: npx tsc --noEmit
       - name: Unit tests
         run: node --test 'tests/*.test.mjs'
+
+  # The full browser suite runs on the CI machine against the local sandbox (own SQLite databases), so it costs no
+  # Cloudflare D1 reads. Staging only gets the short @smoke run below, after the deploy.
+  e2e-sandbox:
+    needs: [merge, check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: staging
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run sandbox:setup
+      - name: Start the sandbox
+        run: |
+          nohup npm run sandbox:dev > sandbox.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:5191/api/me > /dev/null && exit 0
+            sleep 2
+          done
+          cat sandbox.log
+          exit 1
+      - run: npm run e2e:local
+        env:
+          CI: 'true'
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-sandbox
+          path: |
+            playwright-report
+            test-results
+            sandbox.log
+          retention-days: 7
 
   deploy:
     needs: [merge, check]
@@ -255,7 +294,7 @@ jobs:
       - if: steps.configured.outputs.ready == 'true'
         run: npx playwright install --with-deps chromium
       - if: steps.configured.outputs.ready == 'true'
-        run: npm run e2e:staging
+        run: npm run e2e:smoke
         env:
           CI: 'true'
       - if: failure() && steps.configured.outputs.ready == 'true'

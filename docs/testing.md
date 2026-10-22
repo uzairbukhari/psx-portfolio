@@ -43,6 +43,8 @@ The sandbox never touches `.wrangler/state`, the real local databases.
 
 ## Staging
 
+CI runs the full suite on the local sandbox (`e2e-sandbox` job in `deploy-staging.yml`, no Cloudflare reads) and only the `@smoke` tests on staging (`npm run e2e:smoke`), because staging shares the account-wide D1 daily limit with production. Tag a test `@smoke` in its title only if it must run against real staging.
+
 One-time setup:
 
 1. Pick a long random string and store it as the **`TEST_LOGIN_SECRET`** secret of the GitHub `staging` environment.

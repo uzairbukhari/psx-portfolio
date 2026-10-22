@@ -27,7 +27,8 @@
     "sandbox:reset": "node scripts/sandbox.mjs reset",
     "sandbox:dev": "vite dev --config vite.sandbox.config.ts",
     "e2e:local": "E2E_TARGET=local playwright test",
-    "e2e:staging": "E2E_TARGET=staging playwright test"
+    "e2e:staging": "E2E_TARGET=staging playwright test",
+    "e2e:smoke": "E2E_TARGET=staging playwright test --grep @smoke"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.131.0",

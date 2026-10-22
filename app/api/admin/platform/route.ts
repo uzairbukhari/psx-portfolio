@@ -1,4 +1,5 @@
-import { env } from 'cloudflare:workers';
+import { env, waitUntil } from 'cloudflare:workers';
+import { adminCached } from '@/lib/admin-cache';
 import { platformLimits, platformReport } from '@/lib/admin-platform';
 import { db, failure, requireSuperAdmin } from '@/lib/server';
 
@@ -6,6 +7,7 @@ import { db, failure, requireSuperAdmin } from '@/lib/server';
 export async function GET(req: Request) {
   try {
     await requireSuperAdmin(req);
-    return Response.json(await platformReport(db(), platformLimits(env)), { headers: { 'Cache-Control': 'no-store' } });
+    const report = await adminCached(req, 'platform', () => platformReport(db(), platformLimits(env)), waitUntil);
+    return Response.json(report, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) { return failure(e, undefined, req); }
 }
