@@ -11,6 +11,7 @@ import type { PicksBudget } from '@/lib/sip-blueprint-data';
 import { track } from './analytics';
 import PicksRecordDialog, { type PickBuyRow, type PickDestination } from './picks-record';
 import PicksShortlist, { MAX_SHORTLIST } from './picks-shortlist';
+import PicksTrackCard from './picks-track';
 import PicksTicket, { PicksDock } from './picks-ticket';
 import PicksWhy from './picks-why';
 import { TabLoader } from './tab-loader';
@@ -384,6 +385,8 @@ export default function MonthlyPicks({
         disabled={!canRecord}
         onRecord={() => setRecording(true)}
       />
+
+      <PicksTrackCard portfolio={portfolio} asOf={new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })} />
 
       {!!recs.history.length && (
         <details className="mp-history">

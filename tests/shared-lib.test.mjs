@@ -49,6 +49,7 @@ const SHARED = [
   'monthly-picks-ai',
   'company-facts',
   'facts-benchmarks',
+  'picks-track',
   'market-watch',
   'vault-crypto',
   'vault-client',

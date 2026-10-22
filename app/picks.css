@@ -183,3 +183,7 @@
   .mp2-dock small{display:block;font-size:11px;color:var(--muted-foreground)}
   .mp2-dock b{font-family:var(--font-geist-mono),monospace}
 }
+.mp2-track{width:100%;border-collapse:collapse;font-size:13px}
+.mp2-track th{padding:6px 8px;text-align:right;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);border-bottom:1px solid var(--border)}
+.mp2-track td{padding:9px 8px;text-align:right;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+.mp2-track th:first-child,.mp2-track td:first-child{text-align:left}
