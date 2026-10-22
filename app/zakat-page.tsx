@@ -903,7 +903,7 @@ function Setup({ parts, asOf, busy, onSave }: { parts: Parts; asOf: string; busy
           </>
         )}
         {error && <p className="notice error">{error}</p>}
-        <div className="row tx-actions zk-setup-actions">
+        <div className="zk-setup-actions">
           {step > 1 && (
             <button type="button" className="secondary" onClick={() => setStep(step - 1)}>
               Back
