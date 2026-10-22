@@ -635,8 +635,44 @@ test('sip.preview, sip.project and sip.rebalance answer the drafts the sheets sh
   const projection = run('sip.project', { monthly: '50000', years: '15', stepUp: '10' });
   assert.equal(projection.ok, true, projection.error);
   const annual = blendedReturn(b.targets, { ...DEFAULT_RETURNS, ...b.returns });
-  const points = projectSip({ monthly: 50_000, years: 15, annualPct: annual, stepUpPct: 10, inflationPct: LONG_RUN_INFLATION });
+  // It starts from what the SIP classes are worth today; the switch turns that off.
+  const heldNow = Math.round(classWeights(reference.portfolios, asOf, {}).total);
+  assert.equal(projection.value.held, heldNow);
+  assert.equal(projection.value.startValue, heldNow);
+  const points = projectSip({ monthly: 50_000, years: 15, annualPct: annual, stepUpPct: 10, inflationPct: LONG_RUN_INFLATION, startValue: heldNow });
   assert.deepEqual(projection.value.points, roundTrip(points));
+  const alone = run('sip.project', { monthly: '50000', years: '15', stepUp: '10', startFromHoldings: 'false' });
+  assert.deepEqual(alone.value.points, roundTrip(projectSip({ monthly: 50_000, years: 15, annualPct: annual, stepUpPct: 10, inflationPct: LONG_RUN_INFLATION })));
+  assert.equal(alone.value.startValue, 0);
+  assert.equal(alone.value.comparison, null);
+  assert.equal(alone.value.goal, null);
+  assert.ok(alone.value.presets.length >= 6);
+  // The look-ahead stops at 40 years.
+  assert.equal(run('sip.project', { years: '99' }).value.years, 40);
+
+  // What-ifs: the plan first, the change against it in words, and the same numbers the web page shows.
+  const { compareScenarios } = await import('../lib/sip-scenarios.ts');
+  const whatIfs = [{ key: 'stop', levers: { stopAfterYears: 3 } }];
+  const cmp = run('sip.project', { monthly: '50000', years: '20', stepUp: '0', startFromHoldings: 'false', whatIfs: JSON.stringify(whatIfs) });
+  assert.equal(cmp.ok, true, cmp.error);
+  const expected = compareScenarios({ monthly: 50_000, annualPct: annual, stepUpPct: 0, inflationPct: LONG_RUN_INFLATION, startValue: 0 }, whatIfs, 20, { startYear: Number(asOf.slice(0, 4)) });
+  assert.equal(cmp.value.comparison.takeaway, expected.takeaway);
+  assert.deepEqual(cmp.value.comparison.lines.map((l) => l.key), ['plan', 'stop']);
+  assert.equal(cmp.value.comparison.lines[1].deltaTone, 'down');
+  assert.match(cmp.value.comparison.lines[1].deltaLabel, /^-Rs /);
+  assert.equal(cmp.value.comparison.lines[1].checkpoints.length, 3);
+
+  // A goal with no year answers the year; with a year it also names the monthly amount and the yearly raise.
+  const open = run('sip.project', { monthly: '50000', stepUp: '0', startFromHoldings: 'false', goal: JSON.stringify({ target: 6e7 }) });
+  assert.equal(open.value.goal.deadlineYears, undefined);
+  assert.ok(open.value.goal.yearsToReach > 5);
+  assert.match(open.value.goal.takeaway, /you reach/);
+  const year = Number(asOf.slice(0, 4)) + 14;
+  const dated = run('sip.project', { monthly: '50000', stepUp: '0', startFromHoldings: 'false', goal: JSON.stringify({ target: 3e7, year }) });
+  assert.equal(dated.value.goal.deadlineYears, 14);
+  assert.equal(dated.value.goal.onTrack, false);
+  assert.ok(dated.value.goal.monthlyNeeded > 50_000);
+  assert.equal(dated.value.goal.lines.length, 3);
   assert.equal(projection.value.annual, annual);
   assert.equal(projection.value.last.year, 15);
   // Today's money is always the smaller of the two, and every milestone carries its words.

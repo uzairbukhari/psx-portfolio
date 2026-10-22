@@ -174,6 +174,7 @@ internal fun DrawScope.drawAxes(
     measurer: TextMeasurer,
     yLabel: (Double) -> String,
     xLabel: (Double) -> String,
+    xTicks: List<Double>? = null,
 ) {
     val dash = PathEffect.dashPathEffect(floatArrayOf(GRID_DASH.dp.toPx(), GRID_DASH.dp.toPx()))
     for (tick in niceTicks(plot.lo, plot.hi, GRID_TICKS)) {
@@ -183,8 +184,8 @@ internal fun DrawScope.drawAxes(
         val width = measurer.measure(text, ink.labelStyle).size.width
         drawText(measurer, text, Offset(size.width - width, y - LABEL_SP.sp.toPx() / 2 - 1.dp.toPx()), ink.labelStyle)
     }
-    for (i in 0 until X_LABELS) {
-        val x = plot.minX + plot.spanX * i / (X_LABELS - 1)
+    val ticks = xTicks ?: List(X_LABELS) { plot.minX + plot.spanX * it / (X_LABELS - 1) }
+    for (x in ticks) {
         val text = xLabel(x)
         if (text.isEmpty()) continue
         val layout = measurer.measure(text, ink.labelStyle)
@@ -264,6 +265,8 @@ fun AreaChart(
     scrubDetail: ((x: Double, ys: List<Double?>) -> String)? = null,
     references: List<ChartReference> = emptyList(),
     markers: List<ChartMarker> = emptyList(),
+    /** Where to put x labels; by default five evenly spaced ones. */
+    xTicks: List<Double>? = null,
 ) {
     val all = series.flatMap { it.points }
     if (all.size < 2) return
@@ -333,7 +336,7 @@ fun AreaChart(
                 lo = lo,
                 hi = hi,
             )
-        if (showAxes) drawAxes(plot, ink, measurer, yLabel, xLabel)
+        if (showAxes) drawAxes(plot, ink, measurer, yLabel, xLabel, xTicks)
         for (ref in references) {
             val y = plot.y(ref.y)
             val dash = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))
