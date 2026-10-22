@@ -1,4 +1,5 @@
-import { env } from 'cloudflare:workers';
+import { env, waitUntil } from 'cloudflare:workers';
+import { adminCached } from '@/lib/admin-cache';
 import { userDirectory } from '@/lib/admin-users-store';
 import { db, failure, requireSuperAdmin } from '@/lib/server';
 
@@ -7,6 +8,7 @@ export async function GET(req: Request) {
   try {
     await requireSuperAdmin(req);
     const includeInternal = new URL(req.url).searchParams.get('admin') === '1';
-    return Response.json(await userDirectory(db(), env.SESSION_SECRET ?? '', includeInternal), { headers: { 'Cache-Control': 'no-store' } });
+    const directory = await adminCached(req, `users:${includeInternal ? 1 : 0}`, () => userDirectory(db(), env.SESSION_SECRET ?? '', includeInternal), waitUntil);
+    return Response.json(directory, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return failure(error, undefined, req); }
 }

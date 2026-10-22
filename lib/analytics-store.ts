@@ -114,6 +114,15 @@ export async function purgeOldEvents(db: D1Database, now = new Date()) {
   await db.prepare('DELETE FROM analytics_events WHERE day<?').bind(cutoff).run();
 }
 
+/**
+ * Staging records no analytics (every deploy's test run would only fill the table and make the admin queries slower).
+ * Rows left over from before are removed a small chunk at a time, so cleaning up never spends many D1 writes at once.
+ */
+export async function purgeStagingEvents(db: D1Database, now = new Date(), chunk = 2000) {
+  await db.prepare('DELETE FROM analytics_events WHERE id IN (SELECT id FROM analytics_events WHERE day<? LIMIT ?)')
+    .bind(pktDay(now), chunk).run();
+}
+
 export type UsageReport = ReturnType<typeof shapeReport>;
 
 export const NOISE = ['account_state', 'screen_viewed', 'app_opened', 'signed_in', 'signed_up', 'landing_viewed', 'sign_in_clicked', 'client_error'];

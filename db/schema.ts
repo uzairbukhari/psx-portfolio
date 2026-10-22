@@ -222,7 +222,7 @@ export const aiUsage = sqliteTable(
     costUsd: real('cost_usd').notNull().default(0),
     createdAt: text('created_at').notNull(),
   },
-  (table) => [index('idx_ai_usage_user_created').on(table.userId, table.createdAt)],
+  (table) => [index('idx_ai_usage_user_created').on(table.userId, table.createdAt), index('idx_ai_usage_created').on(table.createdAt)],
 );
 
 // Shared, public PSX company-page facts (price, financials, ratios, announcements) used
@@ -234,7 +234,7 @@ export const companyFacts = sqliteTable('company_facts', {
   fetchedOn: text('fetched_on').notNull(),
   payload: text('payload').notNull(),
   fetchedAt: text('fetched_at').notNull(),
-});
+}, (t) => [index('company_facts_fetched_idx').on(t.fetchedAt)]);
 
 // One row ('latest') of public market breakpoints for the Monthly Picks score, taken from every cached company page
 // by the facts scraper once a day (lib/facts-benchmarks.ts). Public numbers only.
@@ -294,7 +294,7 @@ export const dividendAnnouncements = sqliteTable(
     perShareRs: real('per_share_rs'),
     fetchedAt: text('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.ticker, t.bookClosureStart, t.announcedOn, t.kind] })],
+  (t) => [primaryKey({ columns: [t.ticker, t.bookClosureStart, t.announcedOn, t.kind] }), index('dividend_announcements_fetched_idx').on(t.fetchedAt)],
 );
 
 // Per-ticker PSX price history for the company page chart. Written by the GitHub
@@ -379,6 +379,17 @@ export const platformMetrics = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.day, table.script] })],
 );
+
+// Cloudflare's own count of D1 rows read and written per UTC day for the whole account (all four databases share the
+// free daily limit), copied in by the cron Worker from the GraphQL Analytics API (lib/d1-usage.ts). `by_db` is a JSON
+// object of database id -> { reads, writes }. One row per day.
+export const d1UsageDays = sqliteTable('d1_usage_days', {
+  day: text('day').primaryKey(),
+  reads: integer('reads').notNull().default(0),
+  writes: integer('writes').notNull().default(0),
+  byDb: text('by_db').notNull().default('{}'),
+  fetchedAt: text('fetched_at').notNull(),
+});
 
 // Per-user fixed-window rate limits for expensive actions (forced PSX refreshes,
 // on-demand facts scrapes). One row per user and action.
@@ -538,7 +549,7 @@ export const metalRates = sqliteTable(
     sourceLabel: text('source_label'),
     fetchedAt: text('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] })],
+  (t) => [primaryKey({ columns: [t.date, t.metal, t.kind] }), index('metal_rates_fetched_idx').on(t.fetchedAt)],
 );
 
 // Shared foreign currency rates (rupees per one unit of USD, AED or SAR). Public data only; written by scripts/fx-rates-scrape.mjs.
@@ -655,6 +666,9 @@ export const analyticsEvents = sqliteTable(
   (table) => [
     index('analytics_events_day_idx').on(table.day, table.event),
     index('analytics_events_user_idx').on(table.userKey, table.day),
+    // The admin console and the alert check filter by event first (client_error counts by time, People milestones).
+    index('analytics_events_event_ts_idx').on(table.event, table.ts),
+    index('analytics_events_event_user_idx').on(table.event, table.userKey, table.day),
   ],
 );
 

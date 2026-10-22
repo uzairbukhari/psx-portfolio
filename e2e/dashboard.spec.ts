@@ -1,6 +1,6 @@
 import { expect, test, isLocal, pageText } from './fixtures';
 
-test('All view totals every asset class across the four portfolios', async ({ app }) => {
+test('All view totals every asset class across the four portfolios @smoke', async ({ app }) => {
   await expect(app.getByText(/Net worth/).first()).toBeVisible();
   await expect(app.getByText('4 portfolios').first()).toBeVisible();
   // The asset-mix donut is a canvas; its classes are listed beside it with the position count.
@@ -10,7 +10,7 @@ test('All view totals every asset class across the four portfolios', async ({ ap
   for (const name of ['AHL Core', 'Finqalab', 'Savings & Gold']) expect(text).toContain(name);
 });
 
-test('the portfolio switcher lists all four portfolios, one of them locked', async ({ app }) => {
+test('the portfolio switcher lists all four portfolios, one of them locked @smoke', async ({ app }) => {
   await app.getByRole('button', { name: 'Select portfolio' }).click();
   const options = await app.getByRole('menuitem').allInnerTexts();
   const names = (await app.locator('.pf-menu .pf-text b').allInnerTexts()).map((o) => o.trim());
@@ -21,5 +21,6 @@ test('the portfolio switcher lists all four portfolios, one of them locked', asy
 
 test('unread notifications show on the bell', async ({ app }) => {
   await expect(app.getByRole('button', { name: /Notifications/ })).toContainText(isLocal ? '2' : /\d/);
-  if (isLocal) await expect(app.getByText('Rs 8,117.95')).toBeVisible(); // dividends this tax year, from the seed
+  // Dividends this tax year, from the seed. The exact figure moves with the date (expected payouts settle once their date passes).
+  if (isLocal) await expect(app.getByText('Dividends, tax year').locator('xpath=..')).toContainText(/Rs\s*[\d,]+\.\d{2}/);
 });

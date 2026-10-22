@@ -4,6 +4,7 @@
 // (client_error events in the platform area). Counts only; no user data.
 import { serverErrorSummary, type ServerErrorSummary } from './server-errors.ts';
 import type { PipelineStatus } from './pipelines.ts';
+import { isBrownout, meterFrom, readD1Days, type D1Meter } from './d1-usage.ts';
 
 export const FREE_DAILY_REQUESTS = 100_000;
 export const FREE_CPU_MS = 10;
@@ -25,6 +26,8 @@ export type PlatformReport = {
   days: { day: string; requests: number; errors: number; limitHits: number }[];
   server: ServerErrorSummary;
   client: { code: string; n: number }[];
+  /** Account-wide D1 rows read and written today against the free daily allowance (needs the optional Cloudflare token). */
+  d1: { meter: D1Meter | null; days: { day: string; reads: number; writes: number }[]; brownout: boolean };
 };
 
 type Row = { day: string; script: string; requests: number; errors: number; limit_hits: number; cpu_p50: number | null; cpu_p99: number | null; statuses: string; fetched_at: string };
@@ -33,8 +36,11 @@ async function all<T>(db: D1Database, sql: string, ...args: unknown[]): Promise<
   try { return (await db.prepare(sql).bind(...args).all<T>()).results; } catch { return []; }
 }
 
-export function judgePlatform(r: Pick<PlatformReport, 'connected' | 'dailyRequestLimit' | 'cpuLimitMs' | 'today' | 'server'>): { status: PipelineStatus; headline: string } {
+export function judgePlatform(r: Pick<PlatformReport, 'connected' | 'dailyRequestLimit' | 'cpuLimitMs' | 'today' | 'server'> & { d1?: Pick<PlatformReport['d1'], 'meter'> }): { status: PipelineStatus; headline: string } {
   const t = r.today;
+  const d1 = r.d1?.meter;
+  if (d1 && d1.level === 'critical') return { status: 'failing', headline: `D1 is at ${Math.round(Math.max(d1.readShare, d1.writeShare) * 100)}% of today's free allowance: the app stops working at 100% until 00:00 UTC.` };
+  if (d1 && d1.level === 'warn') return { status: 'late', headline: `D1 is at ${Math.round(Math.max(d1.readShare, d1.writeShare) * 100)}% of today's free allowance; scrapers are slowed.` };
   if (t.limitHits > 0) return { status: 'failing', headline: `${t.limitHits.toLocaleString()} request${t.limitHits === 1 ? '' : 's'} hit a Cloudflare limit today.` };
   if (r.server.lastHour >= 20) return { status: 'failing', headline: `${r.server.lastHour} server errors in the last hour.` };
   if (r.connected && t.usedShare >= 0.8) return { status: 'late', headline: `Requests today are at ${Math.round(t.usedShare * 100)}% of the daily limit.` };
@@ -69,12 +75,19 @@ export async function platformReport(db: D1Database, opts: PlatformOptions = {})
   const client = await all<{ code: string; n: number }>(
     db, "SELECT json_extract(props,'$.code') AS code, COUNT(*) AS n FROM analytics_events WHERE event='client_error' AND json_extract(props,'$.area')='platform' AND ts>=? AND is_admin=0 GROUP BY code ORDER BY n DESC", sinceEvents);
   const server = await serverErrorSummary(db, now).catch((): ServerErrorSummary => ({ last24h: 0, previous24h: 0, lastHour: 0, byRoute: [], series: [] }));
+  const d1Rows = await readD1Days(db, now, 14);
+  const d1Today = d1Rows.find((r) => r.day === today);
+  const d1 = {
+    meter: d1Today && now.getTime() - Date.parse(d1Today.fetched_at) < 3 * 3_600_000 ? meterFrom(d1Today) : null,
+    days: d1Rows.map((r) => ({ day: r.day, reads: r.reads, writes: r.writes })),
+    brownout: await isBrownout(db, now),
+  };
   const cpus = scripts.map((s) => s.cpuP99).filter((v): v is number => v !== null);
   const partial = {
     connected, dailyRequestLimit, cpuLimitMs, server,
     today: { requests, errors: sum('errors'), limitHits: sum('limitHits'), cpuP99: cpus.length ? Math.max(...cpus) : null, usedShare: requests / dailyRequestLimit, scripts },
   };
-  return { now: now.toISOString(), ...judgePlatform(partial), lastSyncAt, syncError: lastRun && lastRun.ok === 0 ? lastRun.detail : null, syncRanAt: lastRun?.finished_at ?? null, days, client, ...partial };
+  return { now: now.toISOString(), ...judgePlatform({ ...partial, d1 }), d1, lastSyncAt, syncError: lastRun && lastRun.ok === 0 ? lastRun.detail : null, syncRanAt: lastRun?.finished_at ?? null, days, client, ...partial };
 }
 
 /** Limits from Worker settings (CF_DAILY_REQUEST_LIMIT, CF_CPU_LIMIT_MS); the Workers Free plan's numbers by default. */

@@ -29,7 +29,7 @@ test('reports cover stocks, metals, mutual funds and foreign currency', async ({
   for (const tab of ['Summary', 'Stocks', 'Gold & silver', 'Funds & plans', 'Currency']) await expect(app.getByRole('tab', { name: tab }).or(app.getByRole('button', { name: tab, exact: true })).first()).toBeVisible();
 });
 
-test('settings shows the super admin sections', async ({ app }) => {
+test('settings shows the super admin sections @smoke', async ({ app }) => {
   await app.goto('/settings');
   await expect(app.getByText('Super admin').first()).toBeVisible();
   for (const section of ['Portfolios', 'Security', 'Sync dividends', 'Research AI']) await expect(app.getByText(section, { exact: true }).first()).toBeVisible();

@@ -40,11 +40,12 @@ const SUCCESS: Record<string, string> = {
   directory: "SELECT MAX(last_success_at) AS t FROM refresh_state WHERE kind='directory'",
   'face-values': "SELECT MAX(last_success_at) AS t FROM refresh_state WHERE kind='face-value'",
   metals: 'SELECT MAX(fetched_at) AS t FROM metal_rates',
-  funds: 'SELECT MAX(fetched_at) AS t FROM fund_navs',
+  // Funds: the cron Worker and the manual scraper both record a job run, which is what the status reads (no table scan).
+  funds: 'SELECT NULL AS t',
   'ai-research': "SELECT MAX(started_at) AS t FROM ai_research_runs WHERE status IN ('completed','capped') AND models NOT LIKE 'face-value:%'",
 };
 const FAILURE: Record<string, string> = {
-  quotes: "SELECT last_error AS e, last_attempt_at AS at FROM refresh_state WHERE kind LIKE 'quote%' AND last_error IS NOT NULL ORDER BY last_attempt_at DESC LIMIT 1",
+  quotes: "SELECT last_error AS e, last_attempt_at AS at FROM refresh_state WHERE kind='quote' AND last_error IS NOT NULL ORDER BY last_attempt_at DESC LIMIT 1",
   facts: 'SELECT error AS e, attempted_at AS at FROM facts_requests WHERE error IS NOT NULL ORDER BY attempted_at DESC LIMIT 1',
   directory: "SELECT last_error AS e, last_attempt_at AS at FROM refresh_state WHERE kind='directory' AND last_error IS NOT NULL ORDER BY last_attempt_at DESC LIMIT 1",
   'face-values': "SELECT last_error AS e, last_attempt_at AS at FROM refresh_state WHERE kind='face-value' AND last_error IS NOT NULL ORDER BY last_attempt_at DESC LIMIT 1",

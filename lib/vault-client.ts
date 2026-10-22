@@ -82,7 +82,11 @@ export type VaultCache = {
 
 const memoryCache = (): VaultCache => ({ read: async () => null, write() {}, clear() {} });
 
-export const isOffline = (error: unknown) => error instanceof TransportError && error.status === 0;
+/**
+ * True when the server cannot be used right now but the device's cached copy can: no network, or the account's free daily
+ * database allowance is used up (the server answers 503 `db-limit` until 00:00 UTC). The vault then opens read-only.
+ */
+export const isOffline = (error: unknown) => error instanceof TransportError && (error.status === 0 || error.code === 'db-limit');
 
 export type VaultStatus =
   | { state: 'none' }
@@ -311,13 +315,13 @@ export class VaultSession {
       } catch (error) {
         if (!isOffline(error)) throw error;
         // Offline: keep what is already open rather than failing the whole screen.
-        this.offline = true;
+        if (!this.offline) { this.offline = true; this.changed(); }
         return { portfolio: this.portfolioFor(target), account: this.account, revision: this.revision };
       }
       const plain = await decryptPortfolio(key, stored.envelope, { vaultId: this.material.vaultId, keyVersion: this.material.keyVersion, revision: stored.revision });
       const account = parseAccount(plain);
       this.assertCurrent(epoch);
-      this.offline = false;
+      if (this.offline) { this.offline = false; this.changed(); }
       if (stored.revision < this.revision) return { portfolio: this.portfolioFor(target), account: this.account, revision: this.revision };
       this.account = account;
       this.revision = stored.revision;
