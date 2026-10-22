@@ -24,6 +24,7 @@ import {
   monthProgress,
   nextSipDay,
   planMonth,
+  roundTo,
   sipHistory,
   type MonthProgress,
   type SipBlueprint,
@@ -235,6 +236,26 @@ export function sipMonthState(
       monthsMet: history.rows.filter((r) => r.met && r.month.startsWith(yearPrefix)).length,
     },
   };
+}
+
+/**
+ * What Monthly Picks should spend this month: the blueprint's stocks amount minus stocks already bought (ledger or tick).
+ * `amount` is what is left, or the whole stocks amount once it is all bought (so a re-run still has a figure).
+ */
+export type PicksBudget = { month: string; planned: number; bought: number; amount: number; done: boolean };
+export function picksBudget(
+  b: SipBlueprint,
+  parts: (DisplayPart & { locked?: boolean })[],
+  asOf: string,
+  rates: SipRates = {},
+): PicksBudget | null {
+  const st = sipMonthState(b, parts, asOf, rates);
+  const planned = st.plan.stocks ?? 0;
+  if (planned <= 0) return null;
+  const bought = Math.round(st.actual.stocks ?? 0);
+  const left = Math.max(0, planned - bought);
+  const done = st.done.stocks === true;
+  return { month: st.month, planned, bought, amount: done || left <= 0 ? planned : roundTo(left, 100), done: done || left <= 0 };
 }
 
 // ───────────────────────── the whole screen, in words ─────────────────────────

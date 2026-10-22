@@ -192,7 +192,8 @@ import {
   setAccountMonthlyExpenses,
   setAccountSipBlueprint,
 } from '@/lib/portfolio-account';
-import { withQuickEntry, type QuickEntry } from '@/lib/sip-blueprint-data';
+import { picksBudget, withQuickEntry, type QuickEntry } from '@/lib/sip-blueprint-data';
+import { DEFAULT_PICKS_FEE_PCT } from '@/lib/monthly-picks';
 import type { SipBlueprint } from '@/lib/sip-blueprint';
 import { webPublicData } from './vault-transport';
 import { useCompanyLookup, type LookupView } from './use-company-lookup';
@@ -894,7 +895,7 @@ function DashboardContent({
     [failed, setFailed] = useState(false),
     [month, setMonth] = useState(today().slice(0, 7)),
     [picksHint, setPicksHint] = useState<{ avoid: string[] } | null>(null),
-    [fees, setFees] = useState(0),
+    [fees, setFees] = useState(DEFAULT_PICKS_FEE_PCT),
     [allowOld] = useState(false);
   const [trade, setTrade] = useState<Trade | null>(null),
     [ahlStatement, setAhlStatement] = useState<{
@@ -1650,10 +1651,29 @@ function DashboardContent({
       quotes,
       budgets: picksHome.portfolio.budgets,
       monthlyPicksShortlist: picksHome.portfolio.monthlyPicksShortlist,
+      monthlyPicksFeePct: picksHome.portfolio.monthlyPicksFeePct,
       monthlyPicksList: picksHome.portfolio.monthlyPicksList,
       monthlyPicksRuns: picksHome.portfolio.monthlyPicksRuns,
     };
   }, [workspace, picksHome, p]);
+  // The fee estimate is saved with the Monthly Picks inputs; until one is saved the default applies.
+  const savedPicksFee = picksHome?.portfolio.monthlyPicksFeePct;
+  useEffect(() => {
+    if (savedPicksFee !== undefined) setFees(savedPicksFee);
+  }, [savedPicksFee]);
+  // What the SIP Blueprint still wants spent on stocks this month: the starting amount for Monthly Picks.
+  const picksAmount = useMemo(
+    () =>
+      p?.sipBlueprint && workspace
+        ? picksBudget(p.sipBlueprint, workspace.account.portfolios, today(), {
+            metalRates: metalRates.rates,
+            fundNavs: fundData.navs,
+            planNavs,
+            fxRates: fxData.data.rates,
+          })
+        : null,
+    [p?.sipBlueprint, workspace, metalRates.rates, fundData.navs, planNavs, fxData.data.rates],
+  );
   if (!p && email && !(failed && message))
     return <DashboardSkeleton />;
   // Signed-out visitors never reach the dashboard: DashboardRoute (a Server Component) renders the landing.
@@ -3897,6 +3917,7 @@ function DashboardContent({
                 setMonth={setMonth}
                 feePct={fees}
                 setFeePct={setFees}
+                sipBudget={picksAmount}
                 busy={busy}
                 onSave={async (next, message) => {
                   if (!picksHome || workspace!.account.portfolios.length < 2)
@@ -3905,6 +3926,7 @@ function DashboardContent({
                     {
                       ...picksHome.portfolio,
                       monthlyPicksShortlist: next.monthlyPicksShortlist,
+                      monthlyPicksFeePct: next.monthlyPicksFeePct,
                       monthlyPicksList: next.monthlyPicksList,
                       budgets: next.budgets,
                       monthlyPicksRuns: next.monthlyPicksRuns,

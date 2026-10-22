@@ -17,6 +17,7 @@ type Props = {
   setAmount: (amount: number) => void;
   feePct: number;
   setFeePct: (fee: number) => void;
+  sipBudget: import('@/lib/sip-blueprint-data').PicksBudget | null;
   shortlist: string[];
   setShortlist: (next: string[]) => void;
   facts: Record<string, FactsInfo | undefined>;
@@ -100,7 +101,7 @@ export default function PicksSetup(props: Props) {
 
   const steps: [string, string][] = [
     ['Choose', `Up to ${MAX_SHORTLIST} PSX companies you would be happy to own, plus this month's money.`],
-    ['Score', 'Each company gets 0–100 from public PSX data: earnings yield, profit growth, margins and 52-week position.'],
+    ['Score', 'Each company gets 0–100 from public PSX data: earnings yield, profit growth, margin trend and one-year price change. Loss-making companies are never picked.'],
     ['Split', 'Top scorers share your money. Max 35% per pick and 20% of your portfolio per holding. Leftovers stay cash; nothing is sold.'],
     ['Review', 'You get whole-share estimates at the latest price. Nothing is recorded until you record the buys yourself.'],
   ];
@@ -158,7 +159,7 @@ export default function PicksSetup(props: Props) {
               onChange={(event) => {
                 const next = event.target.value || today().slice(0, 7);
                 props.setMonth(next);
-                props.setAmount(portfolio.budgets[next] ?? 100000);
+                if (props.sipBudget && next === props.sipBudget.month) props.setAmount(props.sipBudget.amount);
               }}
             />
           </label>
@@ -170,7 +171,15 @@ export default function PicksSetup(props: Props) {
               onChange={(event) => props.setAmount(Number(event.target.value))}
               aria-invalid={!amountValid}
             />
-            <small>{amountValid ? money(props.amount) : 'Invalid amount'}</small>
+            <small>
+              {!amountValid
+                ? 'Invalid amount'
+                : props.sipBudget
+                  ? props.sipBudget.done
+                    ? `${money(props.amount)} · stocks in your SIP are done this month`
+                    : `${money(props.amount)} · left of ${money(props.sipBudget.planned)} in your SIP Blueprint`
+                  : money(props.amount)}
+            </small>
           </label>
           <label>
             Est. fees (%)

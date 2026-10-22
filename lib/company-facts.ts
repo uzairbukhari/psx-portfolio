@@ -353,8 +353,21 @@ export type CompanyScore = {
   metrics: CompanyMetrics;
 };
 
-/** Minimum scored metrics for a company to be selectable. */
-export const MIN_EVIDENCE_METRICS = 2;
+/** Minimum scored metrics (of valuation, growth, profitability, momentum) for a company to be selectable. */
+export const MIN_EVIDENCE_METRICS = 3;
+
+/** Earnings over the last four quarters (or the published P/E) are zero or negative: never a pick, always ranked last on value. */
+export function isLossMaking(m: Pick<CompanyMetrics, 'epsTtm' | 'peTtm' | 'unavailable'>): boolean {
+  if (m.unavailable) return false;
+  return (m.epsTtm !== null && m.epsTtm <= 0) || (m.peTtm !== null && m.peTtm <= 0);
+}
+/** Why a scored company cannot be a pick, in words for the table; null when it can. */
+export function ineligibleReason(score: Pick<CompanyScore, 'metrics' | 'evidence'>): string | null {
+  if (score.metrics.unavailable) return 'No PSX data yet';
+  if (isLossMaking(score.metrics)) return 'Loss-making in the last four quarters';
+  if (score.evidence.metricCount < MIN_EVIDENCE_METRICS) return 'Too little data to score';
+  return null;
+}
 
 /** Average (mid) percentile ranks: ties share a rank, missing values stay null. */
 export function percentileRanks(values: (number | null)[]): (number | null)[] {
@@ -378,7 +391,8 @@ const SCORED = Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[];
 
 export function quantScore(metricsList: CompanyMetrics[]): CompanyScore[] {
   const only = (pick: (m: CompanyMetrics) => number | null) => metricsList.map((m) => (m.unavailable ? null : pick(m)));
-  const valuation = percentileRanks(only((m) => m.earningsYieldPct));
+  // A loss-maker has no earnings yield; it ranks below every profitable company instead of being left out of the average.
+  const valuation = percentileRanks(only((m) => (isLossMaking(m) ? -1e6 : m.earningsYieldPct)));
   const growth = percentileRanks(only((m) => m.epsYoYPct ?? m.epsAnnualCagrPct));
   const profitability = percentileRanks(only((m) => m.netMarginTrendPct));
   const momentum = percentileRanks(only((m) => m.change1yPct));
@@ -402,7 +416,7 @@ export function quantScore(metricsList: CompanyMetrics[]): CompanyScore[] {
 
 export type QuantPick = { ticker: string; allocationPct: number; score: number };
 export function quantAllocation(scores: CompanyScore[], threshold = 55, maxPicks = 5, capPct = 35): { picks: QuantPick[]; unallocatedPct: number } {
-  const candidates = scores.filter((s) => !s.metrics.unavailable && s.evidence.metricCount >= MIN_EVIDENCE_METRICS && s.score >= threshold)
+  const candidates = scores.filter((s) => ineligibleReason(s) === null && s.score >= threshold)
     .sort((a, b) => b.score - a.score).slice(0, maxPicks);
   if (!candidates.length) return { picks: [], unallocatedPct: 100 };
   // Same constraint set as the AI path (`constrainAllocations`): proportional to score, capped

@@ -178,7 +178,7 @@ export default function PicksResults({ run, portfolio, extraNames, onRefreshPric
                 </>
               ) : (
                 <>
-                  <span><b>{pick.shares.toLocaleString()}</b> whole shares</span>
+                  <span><b>{pick.shares.toLocaleString()}</b> whole shares{pick.extraShares ? ` (+${pick.extraShares} from leftover)` : ''}</span>
                   <span>{money(pick.price)} · {pick.priceDate}</span>
                   <span>≈ {money(pick.estimatedSpend)} incl. {run.feePct}% fees</span>
                 </>
@@ -265,7 +265,10 @@ export default function PicksResults({ run, portfolio, extraNames, onRefreshPric
                         <a href={`/company/${company.ticker}`} onClick={open_(company.ticker)}><b>{company.ticker}</b></a>
                         <small title={names.get(company.ticker)}>{names.get(company.ticker) ?? ''}</small>
                       </td>
-                      <td><span className={`mp-badge mp-badge--${outlookClass(company.outlook)}`}>{company.outlook === 'Insufficient evidence' ? 'No data' : company.outlook}</span></td>
+                      <td>
+                        <span className={`mp-badge mp-badge--${outlookClass(company.outlook)}`}>{company.outlook === 'Insufficient evidence' ? 'No data' : company.outlook}</span>
+                        {company.ineligibleReason && company.outlook !== 'Insufficient evidence' && <small className="muted" title={company.ineligibleReason}> not eligible</small>}
+                      </td>
                       <td>
                         {company.metrics?.score != null && company.assessmentStatus !== 'unassessed'
                           ? <span className="mp-score"><span className="mp-score__bar"><i style={{ width: `${company.metrics.score}%` }} /></span>{company.metrics.score}</span>
@@ -285,6 +288,7 @@ export default function PicksResults({ run, portfolio, extraNames, onRefreshPric
                       <tr className="mp-detail">
                         <td colSpan={7}>
                           <p>{company.summary}</p>
+                          {company.ineligibleReason && <p className="muted">Not eligible for a pick: {company.ineligibleReason}.</p>}
                           {company.dataGaps?.map((gap) => <p key={gap} className="muted">• {gap}</p>)}
                           <Sources items={sourceItems(company)} />
                         </td>

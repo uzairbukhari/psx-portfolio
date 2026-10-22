@@ -235,6 +235,8 @@ export type Portfolio = {
   quotes: Record<string, Quote>;
   budgets: Record<string, number>;
   monthlyPicksShortlist?: string[];
+  /** Estimated broker fees and taxes, in percent of a buy, used to count whole shares in Monthly Picks. Kept with the shortlist. */
+  monthlyPicksFeePct?: number;
   /** The person's own Monthly Picks candidate list. Separate from the ledger: nothing here is a holding or a saved company. */
   monthlyPicksList?: { ticker: string; name: string }[];
   /** Finished Monthly Picks runs, computed on the device and kept only inside the encrypted portfolio. */
@@ -1349,6 +1351,8 @@ export function validate(p: Portfolio) {
       budget > 1e9
     )
       throw new UserError('Invalid monthly budget.');
+  if (p.monthlyPicksFeePct !== undefined && (!Number.isFinite(p.monthlyPicksFeePct) || p.monthlyPicksFeePct < 0 || p.monthlyPicksFeePct > 10))
+    throw new UserError('Invalid Monthly Picks fee estimate.');
   if (p.monthlyPicksShortlist !== undefined) {
     if (
       !Array.isArray(p.monthlyPicksShortlist) ||

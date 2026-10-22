@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { money, type Portfolio } from '@/lib/portfolio';
+import { sizingIsStale } from '@/lib/monthly-picks-allocation';
+import { heldValues } from '@/lib/picks-local';
+import type { PicksBudget } from '@/lib/sip-blueprint-data';
 import PicksProgress from './picks-progress';
 import PicksResults from './picks-results';
 import PicksSetup, { MAX_SHORTLIST } from './picks-setup';
@@ -16,6 +19,8 @@ type Props = {
   setMonth: (month: string) => void;
   feePct: number;
   setFeePct: (fee: number) => void;
+  /** What the SIP Blueprint still wants spent on stocks this month; the amount starts here. */
+  sipBudget?: PicksBudget | null;
   busy: boolean;
   onSave: (next: Portfolio, message?: string) => Promise<void>;
   onRefreshPrices: () => Promise<void>;
@@ -30,7 +35,7 @@ type Props = {
 const STATUS_LABEL: Record<string, string> = { completed: 'Done', failed: 'Failed' };
 
 export default function MonthlyPicks({
-  portfolio, month, setMonth, feePct, setFeePct, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys, hint, onClearHint,
+  portfolio, month, setMonth, feePct, setFeePct, sipBudget, busy, onSave, onRefreshPrices, onManualPrice, onOpenCompany, onRecordBuys, hint, onClearHint,
 }: Props) {
   type Entry = { ticker: string; name: string };
   // The list is its own thing. Until the person edits it for the first time it mirrors their saved companies.
@@ -41,7 +46,19 @@ export default function MonthlyPicks({
     ? portfolio.monthlyPicksShortlist
     : portfolio.companies.filter((company) => company.target > 0).map((company) => company.ticker);
   const [shortlist, setShortlist] = useState<string[]>(initial.filter((t) => list.some((e) => e.ticker === t)).slice(0, MAX_SHORTLIST));
-  const [amount, setAmount] = useState(portfolio.budgets[month] ?? 100000);
+  // The amount starts from the SIP Blueprint's stocks share for the month, else the last run's, else a round number.
+  const [amount, setAmountState] = useState(
+    sipBudget?.amount ?? portfolio.monthlyPicksRuns?.[0]?.amount ?? portfolio.budgets[month] ?? 100000,
+  );
+  const amountTouched = useRef(false);
+  const setAmount = useCallback((next: number) => {
+    amountTouched.current = true;
+    setAmountState(next);
+  }, []);
+  const sipAmount = sipBudget?.amount;
+  useEffect(() => {
+    if (sipAmount !== undefined && !amountTouched.current) setAmountState(sipAmount);
+  }, [sipAmount]);
   const [starting, setStarting] = useState(false);
   const [expanded, setExpanded] = useState(false);
   // Coming from Insights to balance the portfolio: leave the heavy holdings out of this month's shortlist.
@@ -54,23 +71,23 @@ export default function MonthlyPicks({
   const { current } = recs;
 
   // List edits are instant on screen and saved in the background a moment after the last change (and when leaving).
-  const latest = useRef({ list, shortlist, portfolio, onSave });
+  const latest = useRef({ list, shortlist, portfolio, onSave, feePct });
   const dirty = useRef(false);
   const failures = useRef(0);
   const timer = useRef<number | undefined>(undefined);
   const setErrorRef = useRef(recs.setError);
   const flushRef = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
-    latest.current = { list, shortlist, portfolio, onSave };
+    latest.current = { list, shortlist, portfolio, onSave, feePct };
     setErrorRef.current = recs.setError;
   });
   const flush = useCallback(async () => {
     window.clearTimeout(timer.current);
     if (!dirty.current) return;
     dirty.current = false;
-    const { list: l, shortlist: sl, portfolio: pf, onSave: save } = latest.current;
+    const { list: l, shortlist: sl, portfolio: pf, onSave: save, feePct: fee } = latest.current;
     try {
-      await save({ ...pf, monthlyPicksList: l, monthlyPicksShortlist: sl }, 'Monthly Picks list saved.');
+      await save({ ...pf, monthlyPicksList: l, monthlyPicksShortlist: sl, monthlyPicksFeePct: fee }, 'Monthly Picks list saved.');
       failures.current = 0;
     } catch (error) {
       dirty.current = true;
@@ -137,10 +154,12 @@ export default function MonthlyPicks({
     try {
       const shortlistChanged = JSON.stringify(portfolio.monthlyPicksShortlist ?? []) !== JSON.stringify(shortlist);
       window.clearTimeout(timer.current);
-      if (shortlistChanged || dirty.current || portfolio.budgets[month] !== amount) {
+      // With a SIP Blueprint the amount comes from it and lives in the run; without one it is the month's budget.
+      const budgets = sipBudget ? portfolio.budgets : { ...portfolio.budgets, [month]: amount };
+      if (shortlistChanged || dirty.current || portfolio.monthlyPicksFeePct !== feePct || (!sipBudget && portfolio.budgets[month] !== amount)) {
         dirty.current = false;
         await onSave(
-          { ...portfolio, monthlyPicksList: list, monthlyPicksShortlist: shortlist, budgets: { ...portfolio.budgets, [month]: amount } },
+          { ...portfolio, monthlyPicksList: list, monthlyPicksShortlist: shortlist, monthlyPicksFeePct: feePct, budgets },
           'Monthly Picks inputs saved.',
         );
       }
@@ -174,6 +193,7 @@ export default function MonthlyPicks({
   }
 
   const active = recs.running;
+  const stale = showingSaved && !active && sizingIsStale(current.result?.sizing, heldValues(pricedPortfolio));
 
   if (!recs.loaded)
     return (
@@ -198,7 +218,8 @@ export default function MonthlyPicks({
         list={list} onAddToList={addToList} onRemoveFromList={removeFromList}
         month={month} setMonth={setMonth}
         amount={amount} setAmount={setAmount}
-        feePct={feePct} setFeePct={setFeePct}
+        feePct={feePct} setFeePct={(fee) => { setFeePct(fee); schedule(); }}
+        sipBudget={sipBudget ?? null}
         shortlist={shortlist} setShortlist={setShortlist}
         facts={recs.facts} dispatchEnabled={recs.dispatchEnabled}
         running={recs.running} refreshing={recs.refreshing}
@@ -254,6 +275,12 @@ export default function MonthlyPicks({
           The recommendation below is a saved run for {current.month}, {money(current.amount)}, {current.feePct}% fees and{' '}
           {current.shortlist.length} companies. Your form now has different {differences.join(', ')}; generate a new run to use them.
           <button type="button" className="link-button" onClick={() => selectRun(current)}>Reset form to this run</button>
+        </output>
+      )}
+
+      {stale && (
+        <output className="notice">
+          Your holdings changed since this ranking, so its limits may be out of date. Re-run to use today&apos;s holdings.
         </output>
       )}
 
