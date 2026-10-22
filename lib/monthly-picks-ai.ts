@@ -2,12 +2,12 @@
 // (`lib/company-facts.ts`). It runs on the user's device (lib/picks-local.ts): no AI provider is involved, so no
 // money, holdings or shortlist is ever sent to one. File name kept for history; there is no model call here.
 import type { CompanyMetrics, CompanyScore } from './company-facts.ts';
-import { quantAllocation } from './company-facts.ts';
+import { ineligibleReason, quantAllocation } from './company-facts.ts';
 import type { CompanyOutlook, MonthlyPick, MonthlyPicksResearch, PickMetrics, SourceDetail } from './monthly-picks.ts';
 
 export const WORKFLOW_VERSION = 10;
 /** Bump when scoring, eligibility or sizing rules change; stored with every result. */
-export const POLICY_VERSION = 3;
+export const POLICY_VERSION = 4;
 export const MODEL = 'quant-local';
 
 export type SnapshotCompany = {
@@ -20,6 +20,8 @@ export type SnapshotV8 = {
   shortlist: string[]; dataAsOf: string;
   companies: SnapshotCompany[];
   scores: CompanyScore[];
+  /** Companies the scores were ranked against (the tracked market); absent when they were ranked within the shortlist. */
+  benchmarkSample?: number | null;
 };
 
 function availableCompanies(snapshot: SnapshotV8) {
@@ -83,15 +85,19 @@ export function quantResult(snapshot: SnapshotV8): MonthlyPicksResearch {
       return { ticker, outlook: 'Insufficient evidence', summary: company?.metrics.unavailable ?? 'No PSX data available for this company today.', sourceUrls: [], assessmentStatus: 'unassessed', evidenceStatus: 'needs_repair', metrics, dataGaps: company?.metrics.dataGaps };
     }
     const { urls, details } = sourcesFor(company);
-    const outlook: CompanyOutlook['outlook'] = (score?.score ?? 0) >= 60 ? 'Positive' : (score?.score ?? 0) >= 40 ? 'Neutral' : 'Negative';
-    return { ticker, outlook, summary: quantSummary(company, score), sourceUrls: urls, sourceDetails: details, assessmentStatus: 'assessed', evidenceStatus: 'ready', metrics, dataGaps: company.metrics.dataGaps.length ? company.metrics.dataGaps : undefined };
+    const blocked = score ? ineligibleReason(score) : null;
+    const rank: CompanyOutlook['outlook'] = (score?.score ?? 0) >= 60 ? 'Positive' : (score?.score ?? 0) >= 40 ? 'Neutral' : 'Negative';
+    // A company that cannot be picked is never shown as a positive view, whatever its other figures say.
+    const outlook: CompanyOutlook['outlook'] = blocked && rank === 'Positive' ? 'Neutral' : rank;
+    return { ticker, outlook, ineligibleReason: blocked ?? undefined, summary: quantSummary(company, score), sourceUrls: urls, sourceDetails: details, assessmentStatus: 'assessed', evidenceStatus: 'ready', metrics, dataGaps: company.metrics.dataGaps.length ? company.metrics.dataGaps : undefined };
   });
   return {
     marketOutlook: (picks.length
-      ? `Quantitative ranking: ${availableCompanies(snapshot).length} of ${snapshot.shortlist.length} shortlisted companies ranked by a deterministic score (valuation, growth, profitability trend, momentum, catalyst recency) from PSX data as of ${snapshot.dataAsOf}, calculated on this device. No AI narrative review is performed, so nothing about your money or holdings is sent to an AI provider.`
-      : `No shortlisted company scored highly enough on the deterministic quant model (valuation, growth, profitability, momentum, catalyst recency) to recommend an allocation from PSX data as of ${snapshot.dataAsOf}.`),
+      ? `Quantitative ranking: ${availableCompanies(snapshot).length} of ${snapshot.shortlist.length} shortlisted companies ranked by a deterministic score (valuation, growth, profit margin trend and one-year price change) from PSX data as of ${snapshot.dataAsOf}, calculated on this device. No AI narrative review is performed, so nothing about your money or holdings is sent to an AI provider.`
+      : `No shortlisted company scored highly enough on the deterministic quant model (valuation, growth, profit margin trend and one-year price change) to recommend an allocation from PSX data as of ${snapshot.dataAsOf}.`),
     picks, coverage, unallocatedPct: allocation.unallocatedPct,
     assessedCount: coverage.filter((c) => c.assessmentStatus === 'assessed').length, totalCount: snapshot.shortlist.length,
     method: 'quant', dataAsOf: snapshot.dataAsOf, versions: versionsOf(),
+    ...(snapshot.benchmarkSample ? { scoredAgainst: snapshot.benchmarkSample } : {}),
   };
 }

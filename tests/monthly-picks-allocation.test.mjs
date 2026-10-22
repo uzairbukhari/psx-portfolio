@@ -11,11 +11,21 @@ test('weights under both caps are kept unchanged', () => {
   assert.equal(sum(r), 10_000_000);
 });
 
-test('an empty portfolio still limits one pick to 20% (concentration beats the 35% contribution cap)', () => {
+test('a small portfolio has no 20% holding limit yet: one pick is limited only by the 35% contribution cap', () => {
   const r = sizeAllocation([{ ticker: 'A', allocationPct: 100 }], [], 100_000);
-  assert.equal(r.picks[0].allocationPaisa, 2_000_000);
-  assert.equal(r.picks[0].constrainedBy, 'concentration_cap');
-  assert.equal(r.cashPaisa, 8_000_000);
+  assert.equal(r.picks[0].allocationPaisa, 3_500_000);
+  assert.equal(r.picks[0].constrainedBy, 'contribution_cap');
+  assert.equal(r.cashPaisa, 6_500_000);
+});
+
+test('the 20% holding limit starts once the stocks held are worth five times the money', () => {
+  const held = (rest) => [{ ticker: 'A', valuePkr: 100_000 }, { ticker: 'Z', valuePkr: rest }];
+  const below = sizeAllocation([{ ticker: 'A', allocationPct: 100 }], held(399_000), 100_000);
+  assert.equal(below.picks[0].constrainedBy, 'contribution_cap');
+  assert.equal(below.picks[0].allocationPaisa, 3_500_000);
+  const at = sizeAllocation([{ ticker: 'A', allocationPct: 100 }], held(400_000), 100_000);
+  assert.equal(at.picks[0].constrainedBy, 'concentration_cap');
+  assert.equal(at.picks[0].allocationPaisa, 2_000_000); // 20% of 600k is 120k; A holds 100k
 });
 
 test('purchases cannot lift a holding above 20% of portfolio plus fresh money', () => {

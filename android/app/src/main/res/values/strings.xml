@@ -522,7 +522,7 @@
     <string name="picks_title">Monthly Picks</string>
     <string name="picks_open">Monthly Picks</string>
     <string name="picks_experimental">Experimental. Ranks the companies you choose and suggests how to split this month’s money. Not financial advice.</string>
-    <string name="picks_how">Each company’s public PSX data is scored 0–100 (earnings yield, profit growth, margins, 52-week position). The best scorers share your money, capped at 35%% per pick and 20%% of your portfolio per holding. Nothing is sold, leftovers stay cash, and nothing is recorded until you confirm.</string>
+    <string name="picks_how">Each company’s public PSX data is scored 0–100 (earnings yield, profit growth, margin trend, one-year price change; loss-making companies are never picked). The best scorers share your money, capped at 35%% per pick and 20%% of your portfolio per holding. Nothing is sold, leftovers stay cash, and nothing is recorded until you confirm.</string>
     <string name="picks_read_only">%1$s is in the past, so picks are read only here.</string>
     <string name="picks_failed">The run failed. Try again.</string>
     <string name="picks_quant_note">Ranked by the numbers only, on this phone (no AI).</string>

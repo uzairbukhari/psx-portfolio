@@ -1,7 +1,7 @@
 import { dateOK, round, today, type Portfolio } from './portfolio.ts';
 import { latestCompletedSessionDate } from './psx-calendar.ts';
 import { UserError } from './user-error.ts';
-import type { MonthlyPicksSizing } from './monthly-picks-allocation.ts';
+import { CONTRIBUTION_CAP_PCT, type MonthlyPicksSizing } from './monthly-picks-allocation.ts';
 export type { MonthlyPicksSizing };
 
 export type SourceDetail = { url: string; title: string; date: string; sourceType?: 'primary' | 'secondary' | 'other' };
@@ -23,11 +23,17 @@ export type CompanyOutlook = {
   ticker: string; outlook: 'Positive' | 'Neutral' | 'Negative' | 'Insufficient evidence'; summary: string;
   sourceUrls: string[]; sourceDetails?: SourceDetail[]; assessmentStatus?: 'assessed' | 'unassessed';
   evidenceStatus?: 'ready' | 'needs_repair'; evidenceGap?: string; metrics?: PickMetrics; dataGaps?: string[];
+  /** Why this company cannot be a pick (loss-making, too little data), shown next to its score. */
+  ineligibleReason?: string;
 };
+/** Fee and tax estimate on a buy (percent) before the person sets their own: PSX commission, CDC, SECP and taxes. */
+export const DEFAULT_PICKS_FEE_PCT = 0.25;
 export type MonthlyPicksResearch = {
   marketOutlook: string; picks: MonthlyPick[]; coverage: CompanyOutlook[]; unallocatedPct: number;
   evidenceIssues?: EvidenceIssue[]; assessedCount?: number; totalCount?: number;
   method?: 'ai' | 'quant'; dataAsOf?: string;
+  /** How many tracked PSX companies each score was ranked against; absent when it was ranked within the shortlist only. */
+  scoredAgainst?: number;
   /** Why a quant result was used instead of the AI ranking, when that is worth telling the user. */
   fallbackReason?: string;
   /** Contribution/concentration limits applied when the run finished, against the holdings at that time. */
@@ -38,6 +44,8 @@ export type MonthlyPicksResearch = {
 export type MonthlyPickEstimate = MonthlyPick & {
   allocationPkr: number; price: number | null; priceDate: string | null; shares: number | null;
   estimatedSpend: number | null; cashRemaining: number | null;
+  /** Shares added from the money rounding left over (already included in `shares`). */
+  extraShares?: number;
 };
 const ageDays = (date: string) => Math.floor((Date.parse(today()) - Date.parse(date)) / 86_400_000);
 /** A price may size new buys only if it is from the latest completed session or later, and not from the future. */
@@ -46,8 +54,10 @@ const priceCurrent = (date: string, now: Date) => date >= latestCompletedSession
 export function estimateMonthlyPicks(result: MonthlyPicksResearch, portfolio: Portfolio, amount: number, feePct: number, now: Date = new Date()): MonthlyPickEstimate[] {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) throw new UserError('Investment amount must be between PKR 0 and PKR 1 billion.');
   if (!Number.isFinite(feePct) || feePct < 0 || feePct > 10) throw new UserError('Fee estimate must be between 0% and 10%.');
-  return result.picks.map((pick) => {
-    const allocationPkr = Math.floor(Math.floor(amount * 100) * pick.allocationPct / 100) / 100;
+  const sized = new Map((result.sizing?.picks ?? []).map((pick) => [pick.ticker, pick]));
+  const estimates = result.picks.map((pick): MonthlyPickEstimate => {
+    // The sizer already worked in whole paisa; only older runs without it fall back to the rounded percent.
+    const allocationPkr = sized.get(pick.ticker)?.allocationPkr ?? Math.floor(Math.floor(amount * 100) * pick.allocationPct / 100) / 100;
     const quote = portfolio.quotes[pick.ticker];
     const fresh = quote && Number.isFinite(quote.price) && quote.price > 0 && dateOK(quote.date) && priceCurrent(quote.date, now);
     if (!fresh || pick.evidenceStatus === 'needs_repair') return { ...pick, allocationPkr, price: null, priceDate: quote?.date ?? null, shares: null, estimatedSpend: null, cashRemaining: null };
@@ -56,6 +66,37 @@ export function estimateMonthlyPicks(result: MonthlyPicksResearch, portfolio: Po
     const estimatedSpend = round(shares * unitCost);
     return { ...pick, allocationPkr, price: quote.price, priceDate: quote.date, shares, estimatedSpend, cashRemaining: round(allocationPkr - estimatedSpend) };
   });
+  return spendLeftover(estimates, amount, feePct, sized);
+}
+
+/**
+ * Whole-share rounding leaves a little of each pick's money unspent. Pool it and buy one more share, best-ranked pick
+ * first, while it fits the money still unplanned and the pick stays within the per-pick cap. A pick the portfolio limit
+ * held back never grows, and nothing is spent beyond the fresh money.
+ */
+function spendLeftover(estimates: MonthlyPickEstimate[], amount: number, feePct: number, sized: Map<string, { constrainedBy: string | null }>): MonthlyPickEstimate[] {
+  if (estimates.some((pick) => pick.estimatedSpend === null)) return estimates;
+  const capPaisa = Math.floor((Math.floor(amount * 100) * CONTRIBUTION_CAP_PCT) / 100);
+  let pool = Math.round(estimates.reduce((sum, pick) => sum + (pick.cashRemaining ?? 0), 0) * 100);
+  const out = estimates.map((pick) => ({ ...pick }));
+  for (let grew = true; grew && pool > 0;) {
+    grew = false;
+    for (const pick of out) {
+      const limit = sized.get(pick.ticker)?.constrainedBy;
+      if (limit === 'concentration_cap' || limit === 'overweight') continue;
+      const unit = Math.round(Math.ceil(pick.price! * (1 + feePct / 100) * 100));
+      const spent = Math.round(pick.estimatedSpend! * 100);
+      if (unit > pool || spent + unit > capPaisa) continue;
+      pick.shares! += 1;
+      pick.extraShares = (pick.extraShares ?? 0) + 1;
+      pick.estimatedSpend = (spent + unit) / 100;
+      pick.cashRemaining = round(pick.allocationPkr - pick.estimatedSpend);
+      pool -= unit;
+      grew = true;
+      break;
+    }
+  }
+  return out;
 }
 
 export function validateMonthlyPicksResearch(value: unknown, shortlist: string[], allowedSources: Set<string>): MonthlyPicksResearch {
@@ -148,3 +189,4 @@ export function summarizeEstimates(estimates: MonthlyPickEstimate[], amount: num
     missingPrices,
   };
 }
+export type EstimateSummary = ReturnType<typeof summarizeEstimates>;
