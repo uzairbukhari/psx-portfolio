@@ -204,4 +204,10 @@ data class AssetsView(
 
 /** Which public price lists the ledger needs (`rates.wanted`), so a phone without gold or funds never asks for them. */
 @Serializable
-data class RatesWanted(val metals: Boolean = false, val funds: Boolean = false, val fx: Boolean = false)
+data class RatesWanted(
+    val metals: Boolean = false,
+    val funds: Boolean = false,
+    val fx: Boolean = false,
+    val plans: Boolean = false,
+    val fundIds: List<String> = emptyList(),
+)

@@ -115,17 +115,19 @@ class TodayViewModel(
             viewModelScope.launch {
                 try {
                     val closes = histories.load(force)
+                    // Funds, gold and plans move without any stock, so the Portfolios card is read even with no closes.
+                    val moves = ledger.view("today.portfolioMoves", mapOf("histories" to (closes?.recent ?: "{}")))
+                    val portfolioMoves = decodeView(ListSerializer(PortfolioMove.serializer()), moves).associate { it.id to it.move }
                     if (closes == null) {
-                        _ui.value = _ui.value.copy(move = null, track = null, historyFailed = false)
+                        _ui.value = _ui.value.copy(move = null, moves = portfolioMoves, track = null, historyFailed = false)
                         return@launch
                     }
                     val move = ledger.view("today.move", mapOf("histories" to closes.recent))
                     val track = ledger.view("track.view", mapOf("range" to _ui.value.range.key, "histories" to closes.full))
-                    val moves = ledger.view("today.portfolioMoves", mapOf("histories" to closes.recent))
                     _ui.value =
                         _ui.value.copy(
                             move = decodeView(DayMove.serializer(), move),
-                            moves = decodeView(ListSerializer(PortfolioMove.serializer()), moves).associate { it.id to it.move },
+                            moves = portfolioMoves,
                             track = decodeView(TrackView.serializer(), track),
                             historyFailed = false,
                         )

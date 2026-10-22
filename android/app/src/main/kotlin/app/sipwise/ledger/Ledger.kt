@@ -29,9 +29,11 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URLEncoder
+import java.time.LocalDate
 
 /** What kind of change was saved, so the notice can say it in words. */
 enum class LedgerAction { ENTRY, PRICE, RECEIVED, VOID, BUYS, BUDGET, TARGETS, CORRECTION, TAX, PORTFOLIOS, PICKS }
@@ -194,7 +196,7 @@ class Ledger(
     /** Public gold, silver and currency rates and fund prices, only for the kinds this ledger holds. They carry no parameters. */
     private suspend fun loadRates(client: ApiClient) {
         val wanted = ApiJson.decodeFromJsonElement(RatesWanted.serializer(), engine.call("rates.wanted"))
-        if (!wanted.metals && !wanted.funds && !wanted.fx) return
+        if (!wanted.metals && !wanted.funds && !wanted.fx && !wanted.plans) return
         val args = mutableMapOf<String, String>()
         if (wanted.metals) {
             val reply = client.get("/api/public-data/metals", JsonObject.serializer())
@@ -203,13 +205,36 @@ class Ledger(
         if (wanted.funds) {
             val reply = client.get("/api/public-data/funds", JsonObject.serializer())
             val latest = (reply["funds"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.get("latest") }.filter { it !is JsonNull }
-            args["navs"] = JsonArray(latest).toString()
+            args["navs"] = JsonArray(latest + recentFundNavs(client, wanted.fundIds)).toString()
+        }
+        if (wanted.plans) {
+            val reply = client.get("/api/public-data/plan-navs", JsonObject.serializer())
+            args["plans"] = (reply["navs"] ?: JsonArray(emptyList())).toString()
         }
         if (wanted.fx) {
             val reply = client.get("/api/public-data/fx", JsonObject.serializer())
             args["fx"] = (reply["rates"] ?: JsonArray(emptyList())).toString()
         }
         engine.call("rates.set", args)
+    }
+
+    /**
+     * The last couple of weeks of prices for the funds held, so Today can say how they moved over three days. A fund
+     * whose history cannot be read keeps only its newest price and simply has no move.
+     */
+    private suspend fun recentFundNavs(
+        client: ApiClient,
+        ids: List<String>,
+    ): List<JsonElement> {
+        val from = LocalDate.now().minusDays(FUND_HISTORY_DAYS).toString()
+        return ids.flatMap { id ->
+            try {
+                val reply = client.get("/api/public-data/funds?fund=${encode(listOf(id))}", JsonObject.serializer())
+                (reply["navs"] as? JsonArray).orEmpty().filter { ((it as? JsonObject)?.get("date") as? JsonPrimitive)?.content.orEmpty() >= from }
+            } catch (ignored: ApiRequestException) {
+                emptyList()
+            }
+        }
     }
 
     private suspend fun syncDividends() {
@@ -235,5 +260,6 @@ class Ledger(
 private const val PUBLIC_REFRESH_MS = 60_000L
 private const val MARKET_CHUNK = 100
 private const val LOOKUP_CHUNK = 50
+private const val FUND_HISTORY_DAYS = 14L
 
 class CompanyNotConfirmedException(message: String, cause: Throwable? = null) : Exception(message, cause)

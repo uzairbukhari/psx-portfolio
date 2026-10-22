@@ -121,16 +121,14 @@ fun TodayScreen(
         }
         view.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         val overview = ui.overview
-        if (overview != null && overview.classes.size > 1) {
-            item { NetWorthCard(overview, overview.portfolios.singleOrNull()?.name) }
-        } else {
+        ui.market?.takeIf { it.index != null }?.let { market -> item { MarketCard(market, ui.marketOpen) } }
+        if (overview != null && overview.portfolios.size > 1) {
+            item { PortfolioShares(overview, ui.moves, onOpenPortfolio) }
+        } else if (overview == null || overview.classes.size <= 1) {
             item { HeroCard(view.summary, view.openCount, view.breakdown, ui.showReturn, viewModel::toggleReturn) }
         }
         ui.move?.takeIf { it.available }?.let { move -> item { MoveCard(move, onOpenCompany) } }
-        if (ui.track?.value?.isChart == true || (ui.track == null && !ui.historyFailed)) item { ValueCard(ui, viewModel) }
         ui.sip?.let { sip -> item { SipTodayCard(sip, onOpenPlan) } }
-        ui.market?.takeIf { it.index != null }?.let { market -> item { MarketCard(market, ui.marketOpen) } }
-        if (overview != null && overview.portfolios.size > 1) item { PortfolioShares(overview, ui.moves, onOpenPortfolio) }
         if (ui.sip == null) item { MonthCard(view.progress) }
         if (view.upcoming.isNotEmpty()) {
             item { Text(stringResource(R.string.today_upcoming_title), style = MaterialTheme.typography.titleMedium) }
@@ -149,6 +147,7 @@ fun TodayScreen(
                 }
             }
         }
+        if (ui.track?.value?.isChart == true || (ui.track == null && !ui.historyFailed)) item { ValueCard(ui, viewModel) }
     }
 }
 
@@ -572,12 +571,15 @@ private fun PortfolioShares(
                     Text(sharePercent(p.share), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(horizontalAlignment = Alignment.End) {
                         MoneyText(moneyShort(p.value), style = SipwiseNumbers.small)
-                        // How much this portfolio went up or down on the last trading day; none for one without stocks.
+                        // How much this portfolio went up or down: stocks on the last trading day, funds, gold and plans over three days.
                         moves[p.id]?.takeIf { it.available }?.let { move ->
                             MoneyText("${signedMoney(move.amount)} (${signedPercent(move.percent)})", style = SipwiseNumbers.tiny, color = moveTone(move.amount))
                         }
                     }
                 }
+            }
+            if (moves.values.any { it.available }) {
+                Text(stringResource(R.string.today_moves_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
