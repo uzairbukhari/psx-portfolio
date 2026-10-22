@@ -42,7 +42,7 @@ html:root .pulse,html:root .panel,html:root .report-panel,html:root .card{box-sh
 
 /* ───────── Shell: sidebar (desktop) and floating bar (phone) ───────── */
 html:root .nav-add[data-slot]{display:none}
-html:root .side-tools,html:root .nav-badge{display:none}
+html:root .nav-badge{display:none}
 @media(min-width:761px){
   html:root{--side-w:248px}
   html:root[data-side=rail],html:root[data-side=auto]{--side-w:76px}
@@ -52,7 +52,6 @@ html:root .side-tools,html:root .nav-badge{display:none}
   html:root .app-header{display:contents}
   html:root .app-header::before{content:none}
   html:root .side{position:fixed;inset:0 auto 0 0;width:var(--side-w);z-index:50;display:flex;flex-direction:column;gap:6px;padding:16px 12px;background:var(--card);border-right:1px solid var(--border);transition:width .18s ease,box-shadow .18s ease}
-  html:root[data-side=auto] .side:is(:hover,:focus-within){width:248px;box-shadow:24px 0 60px -24px rgb(var(--ch-shadow) / .45)}
   html:root .side .header-brand-group{grid-column:auto;grid-row:auto;padding:4px 8px 14px;height:auto}
   html:root .side .brand{gap:12px}
   html:root .side .app-nav[data-slot=tabs-list]{grid-column:auto;grid-row:auto;position:static;flex:1;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:2px;width:auto;height:auto;max-width:none;overflow:visible;background:transparent;border:0;padding:0;box-shadow:none}
@@ -64,15 +63,10 @@ html:root .side-tools,html:root .nav-badge{display:none}
   html:root .side .app-nav-link .tab-short{display:none}
   html:root .nav-badge{display:inline-block;margin-left:auto;padding:2px 7px;border-radius:999px;border:1px solid var(--border);font-size:10.5px;font-weight:600;letter-spacing:.04em;color:var(--muted-foreground)}
   html:root .nav-sep{display:block;height:1px;margin:10px 8px;background:var(--border)}
-  html:root .side-tools{display:flex;margin-top:auto;flex-direction:column;gap:2px;padding-top:8px;border-top:1px solid var(--border)}
-  html:root .side-tool[data-active]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
-  html:root .side-tool{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border:0;border-radius:12px;background:transparent;color:var(--muted-foreground);font:500 13.5px var(--font-geist-sans),sans-serif;cursor:pointer}
-  html:root .side-tool:hover{background:var(--muted);color:var(--foreground)}
-  html:root .side-tool[aria-pressed=true]{color:var(--primary)}
   /* Collapsed rail: icons only, a tooltip names each page. */
-  html:root[data-side=rail] .side :is(.tab-long,.nav-badge,.logo-word,.header-portfolio-select),html:root[data-side=auto] .side:not(:hover):not(:focus-within) :is(.tab-long,.nav-badge,.logo-word){display:none}
-  html:root[data-side=rail] .side .app-nav-link,html:root[data-side=rail] .side .side-tool,html:root[data-side=auto] .side:not(:hover):not(:focus-within) :is(.app-nav-link,.side-tool){justify-content:center;padding:0}
-  html:root[data-side=rail] .side .app-nav-link:hover::before{content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);padding:6px 10px;border-radius:8px;background:var(--popover);color:var(--foreground);border:1px solid var(--border);box-shadow:0 10px 28px -12px rgb(var(--ch-shadow) / .5);font-size:12.5px;white-space:nowrap;pointer-events:none;z-index:60}
+  html:root[data-side=rail] .side :is(.tab-long,.nav-badge,.logo-word,.header-portfolio-select),html:root[data-side=auto] .side :is(.tab-long,.nav-badge,.logo-word){display:none}
+  html:root[data-side=rail] .side .app-nav-link,html:root[data-side=auto] .side .app-nav-link{justify-content:center;padding:0}
+  html:root[data-side=rail] .side .app-nav-link:hover::before,html:root[data-side=auto] .side .app-nav-link:hover::before{content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);padding:6px 10px;border-radius:8px;background:var(--popover);color:var(--foreground);border:1px solid var(--border);box-shadow:0 10px 28px -12px rgb(var(--ch-shadow) / .5);font-size:12.5px;white-space:nowrap;pointer-events:none;z-index:60}
   /* Top bar: portfolio picker on the left, actions on the right. */
   html:root .header-right{position:sticky;top:0;z-index:30;height:68px;margin:0 calc(-1 * var(--desk-pad)) 8px calc(-1 * var(--desk-pad));padding:0 var(--desk-pad);gap:10px;background:color-mix(in srgb,var(--background) 86%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
   html:root .header-right>.hdr-btn:first-child,html:root .header-right>:not(.hdr-btn):first-child+.hdr-btn{margin-left:auto}
@@ -81,7 +75,6 @@ html:root .side-tools,html:root .nav-badge{display:none}
 }
 @media(max-width:760px){
   html:root .side{display:contents}
-  html:root .side-tools{display:none}
   html:root .app-header.chromeless .app-nav{display:none}
   html:root .desk:has(.app-header.chromeless){padding-bottom:36px}
   html:root .app-header [data-slot=tabs-list]{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));width:auto;height:64px;padding:0 6px;border:1px solid var(--border);border-radius:24px;background:var(--card);box-shadow:0 18px 44px -14px rgb(var(--ch-shadow) / .55);align-items:center}

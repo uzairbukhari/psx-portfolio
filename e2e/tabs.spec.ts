@@ -42,13 +42,34 @@ test('theme switch applies to the page', async ({ app }) => {
   await expect(app.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
-test('sidebar unpins to a hover rail and remembers it', async ({ app }) => {
+test('sidebar collapses to an icon rail and remembers it', async ({ app }) => {
   const nav = app.getByRole('navigation', { name: 'Main' });
   await expect(nav.getByRole('link', { name: /Holdings/ })).toBeVisible();
-  await app.getByRole('button', { name: 'Unpin menu' }).click();
+  await app.getByRole('button', { name: 'Collapse sidebar' }).click();
   await expect(app.locator('html')).toHaveAttribute('data-side', 'auto');
   await app.reload();
   await expect(app.locator('html')).toHaveAttribute('data-side', 'auto');
-  await app.getByRole('button', { name: 'Pin menu' }).click();
+  await app.getByRole('button', { name: 'Expand sidebar' }).click();
   await expect(app.locator('html')).toHaveAttribute('data-side', 'pinned');
+});
+
+test('account menu opens beside the sidebar, switches theme, and closes with Escape', async ({ app }) => {
+  for (const mode of ['pinned', 'auto']) {
+    await app.evaluate((m) => localStorage.setItem('sipwise.sidebar', m), mode);
+    await app.reload();
+    await expect(app.getByRole('navigation', { name: 'Main' }).first()).toBeVisible();
+    await app.locator('.side-user .account-trigger').click();
+    const menu = app.locator('.account-menu');
+    await expect(menu).toBeVisible();
+    const side = await app.locator('.side').boundingBox();
+    const box = await menu.boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(side!.x + side!.width);
+    await app.getByRole('radio', { name: 'Light' }).click();
+    await expect(app.locator('html')).toHaveAttribute('data-theme', 'light');
+    await app.getByRole('radio', { name: 'Dark' }).click();
+    await expect(app.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await app.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+  }
+  await app.evaluate(() => localStorage.setItem('sipwise.sidebar', 'pinned'));
 });
