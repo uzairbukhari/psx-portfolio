@@ -104,7 +104,7 @@
 .mp2-steps li{display:inline-flex;gap:6px;align-items:center;padding:5px 11px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted-foreground)}
 .mp2-steps li[data-state=done]{color:var(--success);border-color:rgb(var(--ch-success) / .35)}
 .mp2-steps li[data-state=on]{color:var(--foreground);background:rgb(var(--ch-tint) / .08);border-color:var(--primary)}
-.mp2-cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:start}
+.mp2-cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:stretch}
 .mp2-card{display:grid;gap:14px;padding:18px 20px;border:1px solid var(--card-border);border-radius:var(--radius);background:var(--card);min-width:0}
 .mp2-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
 .mp2-head h3{margin:0;font-size:16px}
@@ -141,7 +141,8 @@
 .mp2-why__box ul{margin:0;padding-left:18px;font-size:13px;line-height:1.55}
 .mp2-note{margin:0;font-size:12px;color:var(--muted-foreground)}
 .mp2-note b{color:var(--foreground)}
-.mp2-ticket{position:sticky;top:16px;align-self:start}
+.mp2-ticket{display:flex;flex-direction:column;align-self:stretch}
+.mp2-ticket .mp2-actions{margin-top:auto}
 .mp2-alloc{display:flex;height:10px;gap:2px;border-radius:6px;overflow:hidden;background:rgb(var(--ch-tint) / .06)}
 .mp2-alloc i{display:block;height:100%}
 .mp2-line{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
@@ -169,7 +170,6 @@
 .mp2-record__meta label{display:grid;gap:5px;margin:0;font-size:12px;color:var(--muted-foreground)}
 @media (max-width:1000px){
   .mp2-cols{grid-template-columns:minmax(0,1fr)}
-  .mp2-ticket{position:static}
   .mp2-amount{align-items:flex-start;width:100%}
 }
 @media (max-width:720px){
