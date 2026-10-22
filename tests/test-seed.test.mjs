@@ -70,6 +70,14 @@ test('every enum value the app knows about appears in the seed', () => {
   const research = all((p) => p.research);
   for (const status of ['Queue', 'Researching', 'Complete', 'Update needed']) has(research, (r) => r.status === status, `research ${status}`);
 
+  const zakat = all((p) => (p.zakat ? [p.zakat] : []))[0];
+  assert.ok(zakat, 'seed is missing: zakat book');
+  for (const kind of ['cash', 'bank', 'jewellery', 'receivable', 'property', 'other', 'debt']) has(zakat.items, (i) => i.kind === kind, `zakat amount ${kind}`);
+  for (const kind of ['direct', 'organisation', 'bank', 'deducted', 'other']) has(zakat.payments, (x) => x.kind === kind, `zakat payment ${kind}`);
+  has(zakat.payments, (x) => x.voided, 'voided zakat payment');
+  has(zakat.years, () => true, 'closed zakat year');
+  has(zakat.trail, () => true, 'zakat trail point');
+
   const assets = all((p) => p.assets);
   const metals = assets.filter((a) => a.kind === 'metal');
   for (const metal of ['gold', 'silver']) has(metals, (a) => a.metal === metal, metal);

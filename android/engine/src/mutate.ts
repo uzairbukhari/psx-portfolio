@@ -9,7 +9,8 @@ import { setBudget } from '../../../mobile/src/data/sip.ts';
 import { withPicksInputs } from '../../../mobile/src/data/picks.ts';
 import { heldValues, recordRun, runLocalPicks } from '../../../lib/picks-local.ts';
 import { parsePublicAnalysis } from '../../../lib/api-validate.ts';
-import { accountSipBlueprint, setAccountSipBlueprint } from '../../../lib/portfolio-account.ts';
+import { accountSipBlueprint, setAccountSipBlueprint, accountZakat, setAccountZakat } from '../../../lib/portfolio-account.ts';
+import { MANUAL_KINDS, PAYMENT_KINDS, applySchool, closeYear, newBook, recordTrail, validateZakat, zakatBreakdown, type ZakatBook, type ZakatInputs, type ZakatManualKind, type ZakatPaymentKind, type ZakatSchool } from '../../../lib/zakat.ts';
 import { SIP_CLASSES, rebalanceEdit, validateBlueprint, type SipBlueprint, type SipClass, type SipMonth } from '../../../lib/sip-blueprint.ts';
 import { withQuickEntry, type QuickEntry } from '../../../lib/sip-blueprint-data.ts';
 import {
@@ -332,4 +333,63 @@ function nextBlueprint(current: SipBlueprint | null, op: string, p: Params): Sip
     default:
       throw new Error(`Unknown SIP change: ${op}`);
   }
+}
+
+/**
+ * Every Zakat change: setup, settings, manual amounts, payments and closing a year. [inputs] are the public rates the
+ * year is closed with; [asOf] is the device's today.
+ */
+export function mutateZakat(account: PortfolioAccount, op: string, p: Params, inputs: ZakatInputs, asOf: string): PortfolioAccount {
+  const book = accountZakat(account);
+  const need = (): ZakatBook => {
+    if (!book) throw new Error('Set up zakat first.');
+    return book;
+  };
+  const stamp = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  let next: ZakatBook | null;
+  if (op === 'setup') {
+    const startDate = str(p, 'startDate');
+    if (!isIsoDate(startDate)) throw new Error('Pick your zakat date.');
+    const school = (str(p, 'school') || 'hanafi') as ZakatSchool;
+    const fresh = newBook(startDate);
+    const settings = applySchool(fresh.settings, school);
+    next = { ...fresh, settings: { ...settings, shares: p.shares === 'proxy25' ? 'proxy25' : 'market', equityFunds: p.shares === 'proxy25' ? 'proxy25' : 'market' } };
+  } else if (op === 'remove') {
+    next = null;
+  } else if (op === 'item') {
+    const b = need();
+    const kind = str(p, 'kind') as ZakatManualKind;
+    const amount = num(p, 'amount');
+    if (!MANUAL_KINDS.includes(kind)) throw new Error('Choose what this amount is.');
+    if (amount === null || amount < 0) throw new Error('Enter the amount in rupees.');
+    const id = str(p, 'id') || stamp();
+    const item = { id, kind, amount, asOf, note: str(p, 'note').slice(0, 120) };
+    next = { ...b, items: b.items.some((x) => x.id === id) ? b.items.map((x) => (x.id === id ? item : x)) : [...b.items, item] };
+  } else if (op === 'item.remove') {
+    const b = need();
+    next = { ...b, items: b.items.filter((x) => x.id !== str(p, 'id')) };
+  } else if (op === 'payment') {
+    const b = need();
+    const kind = (str(p, 'kind') || 'direct') as ZakatPaymentKind;
+    const amount = num(p, 'amount');
+    const date = str(p, 'date') || asOf;
+    if (!PAYMENT_KINDS.includes(kind)) throw new Error('Choose how you paid.');
+    if (amount === null || amount <= 0) throw new Error('Enter the amount you paid.');
+    if (!isIsoDate(date)) throw new Error('Enter the date you paid.');
+    next = { ...b, payments: [...b.payments, { id: stamp(), date, amount, kind, note: str(p, 'note').slice(0, 120) }] };
+  } else if (op === 'payment.void') {
+    const b = need();
+    next = { ...b, payments: b.payments.map((x) => (x.id === str(p, 'id') ? { ...x, voided: true } : x)) };
+  } else if (op === 'close') {
+    const b = need();
+    const parts = account.portfolios;
+    next = closeYear(b, zakatBreakdown(parts, b, inputs, asOf), asOf, p.carryExtra === true);
+  } else if (op === 'trail') {
+    const b = need();
+    next = recordTrail(b, asOf, zakatBreakdown(account.portfolios, b, inputs, asOf).zakat);
+  } else {
+    throw new Error(`Unknown zakat change: ${op}`);
+  }
+  if (next !== null) validateZakat(next);
+  return setAccountZakat(account, next);
 }

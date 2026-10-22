@@ -9,6 +9,7 @@ import type { MetalAsset } from '../assets.ts';
 import type { CurrencyAsset } from '../currency.ts';
 import type { PlanAsset } from '../plans.ts';
 import { TEST_COMPANIES, TEST_FUNDS, priceOf } from './universe.ts';
+import { closeYear, defaultSettings, type ZakatBook } from '../zakat.ts';
 import { blankBlueprint, monthsBack, planMonth, type SipBlueprint } from '../sip-blueprint.ts';
 
 /** `YYYY-MM-DD` that is `days` before `today`. */
@@ -19,6 +20,47 @@ export function daysAgo(today: string, days: number): string {
 }
 const monthOf = (date: string) => date.slice(0, 7);
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** A zakat book with a payment of every kind, every manual amount kind, one closed year and a trail. */
+export function seedZakat(today: string): ZakatBook {
+  const settings = { ...defaultSettings(daysAgo(today, 400)), overrides: { HUBC: 'exclude' as const } };
+  const base: ZakatBook = {
+    version: 1,
+    settings,
+    items: [
+      { id: 'zi-cash', kind: 'cash', amount: 120_000, asOf: daysAgo(today, 20), note: '' },
+      { id: 'zi-bank', kind: 'bank', amount: 450_000, asOf: daysAgo(today, 20), note: 'Savings account' },
+      { id: 'zi-jew', kind: 'jewellery', amount: 600_000, asOf: daysAgo(today, 20), note: '' },
+      { id: 'zi-owed', kind: 'receivable', amount: 50_000, asOf: daysAgo(today, 20), note: '' },
+      { id: 'zi-prop', kind: 'property', amount: 800_000, asOf: daysAgo(today, 20), note: 'Plot' },
+      { id: 'zi-other', kind: 'other', amount: 10_000, asOf: daysAgo(today, 20), note: '' },
+      { id: 'zi-debt', kind: 'debt', amount: 120_000, asOf: daysAgo(today, 20), note: 'Car instalments' },
+    ],
+    payments: [
+      { id: 'zp-1', date: daysAgo(today, 380), amount: 20_000, kind: 'direct', note: 'Fictional', voided: false },
+      { id: 'zp-2', date: daysAgo(today, 90), amount: 11_250, kind: 'bank', note: '' },
+      { id: 'zp-3', date: daysAgo(today, 60), amount: 15_000, kind: 'organisation', note: 'Fictional fund' },
+      { id: 'zp-4', date: daysAgo(today, 30), amount: 5_000, kind: 'deducted', note: '' },
+      { id: 'zp-5', date: daysAgo(today, 10), amount: 2_000, kind: 'other', note: '', voided: true },
+    ],
+    years: [],
+    trail: [],
+  };
+  const first = closeYear(base, {
+    asOf: daysAgo(today, 40),
+    rows: [],
+    gross: 3_000_000,
+    debts: 120_000,
+    net: 2_880_000,
+    nisab: { value: 503_529, basis: 'official', rateDate: null },
+    aboveNisab: true,
+    rate: 0.025,
+    zakat: 72_000,
+    otherMethodZakat: null,
+    missing: [],
+  }, daysAgo(today, 40));
+  return { ...first, trail: [{ date: daysAgo(today, 14), zakat: 80_000 }, { date: daysAgo(today, 7), zakat: 82_000 }] };
+}
 
 function company(ticker: string, target: number, approved: boolean, today: string, extra: Partial<Company> = {}): Company {
   const c = TEST_COMPANIES.find((x) => x.ticker === ticker);
@@ -154,6 +196,7 @@ function ahlCore(today: string, now: Date): Portfolio {
     taxProfile: { filerStatus: 'filer' },
     monthlyExpenses: 80_000,
     sipBlueprint: seedBlueprint(today),
+    zakat: seedZakat(today),
     brokerFileHashes: ['a'.repeat(64)],
     brokerFormats: [{ broker: 'Fictional Securities', signature: 'date|scrip|side|qty|rate', report: 'trades', dateStyle: 'iso', columns: { ticker: 1, date: 0, side: 2, shares: 3, price: 4, fees: null, reference: null } }],
     monthlyPicksShortlist: ['MEBL', 'LUCK', 'FFC', 'TRG'],

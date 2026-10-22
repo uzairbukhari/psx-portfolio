@@ -11,6 +11,7 @@ const SHARED = [
   'analytics-diff',
   'portfolio',
   'portfolio-account',
+  'zakat',
   'account-overview',
   'insights',
   'asset-reports',

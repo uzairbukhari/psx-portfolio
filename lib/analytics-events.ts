@@ -9,7 +9,7 @@ export type Platform = (typeof PLATFORMS)[number];
 
 const SCREENS = [
   'landing', 'privacy', 'terms', 'sign_in', 'holdings', 'reports', 'sip', 'activity', 'overview', 'company',
-  'settings', 'notifications', 'inbox', 'today', 'portfolio', 'plan', 'more', 'gold_silver', 'funds', 'plans', 'future',
+  'settings', 'notifications', 'inbox', 'today', 'portfolio', 'plan', 'more', 'gold_silver', 'funds', 'plans', 'future', 'zakat',
 ] as const;
 const IMPORT_SOURCES = ['ahl', 'finqalab', 'broker', 'ipo', 'backup'] as const;
 const ENTRY_KINDS = ['buy', 'sell', 'dividend', 'bonus', 'split', 'opening', 'other'] as const;
@@ -61,6 +61,9 @@ export const EVENT_CATALOG = {
   notifications_enabled: {},
   theme_changed: { theme: ['light', 'dark', 'midnight', 'paper', 'system'] },
   sip_whatif_used: { kind: ['stop', 'raise', 'later', 'break', 'skip', 'extra', 'returns', 'fall', 'goal', 'custom'] },
+  zakat_setup_done: { school: ['hanafi', 'shafii', 'maliki', 'hanbali', 'custom'], nisab: ['silver', 'gold'], year: ['lunar', 'solar'] },
+  zakat_payment_logged: { kind: ['direct', 'organisation', 'bank', 'deducted', 'other'] },
+  zakat_year_closed: { state: ['paid', 'partial', 'below_nisab'] },
   chart_range_changed: { range: ['1w', '1m', '3m', '6m', '1y', 'all'] },
   // Onboarding and help
   onboarding_step_done: { step: ['vault', 'first_holding', 'tax', 'backup', 'sip_budget', 'insights'] },

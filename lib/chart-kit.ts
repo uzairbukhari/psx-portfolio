@@ -1072,6 +1072,82 @@ export function linesOption(t: ChartTokens, c: LinesCfg): EChartsOption {
   } as EChartsOption;
 }
 
+// ───────────────────────── zakat trail ─────────────────────────
+
+export type ZakatTrailCfg = {
+  /** Estimated zakat over time: [ISO date, rupees]. */
+  estimate: [string, number][];
+  /** Cumulative payments as a step line: [ISO date, rupees]. */
+  paid: [string, number][];
+  start: string;
+  due: string;
+  today: string;
+  valueFormat: (n: number) => string;
+  dateLabel: (iso: string) => string;
+};
+
+/** What you would owe through the year against what you have paid, with the due date marked. */
+export function zakatTrailOption(t: ChartTokens, c: ZakatTrailCfg): EChartsOption {
+  const o = base(t, { top: 16, right: 12 });
+  const ts = (d: string) => Date.parse(`${d}T00:00:00Z`);
+  const paidEnd: [number, number][] = c.paid.map(([d, v]) => [ts(d), v]);
+  const last = paidEnd[paidEnd.length - 1];
+  if (last && last[0] < ts(c.today)) paidEnd.push([ts(c.today), last[1]]);
+  const marks = [
+    { xAxis: ts(c.today), label: { formatter: 'Today', color: t.muted, fontSize: 10 }, lineStyle: { color: t.muted, type: 'solid' as const, width: 1 } },
+    { xAxis: ts(c.due), label: { formatter: 'Due', color: t.warn, fontSize: 10 }, lineStyle: { color: t.warn, type: 'dashed' as const, width: 1 } },
+  ];
+  return {
+    ...o,
+    legend: { show: false },
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'axis',
+      axisPointer: { type: 'line', lineStyle: { color: t.muted, type: 'dashed' } },
+      formatter: (params: unknown) => {
+        const ps = (Array.isArray(params) ? params : [params]) as { seriesName: string; value: [number, number]; color: string; axisValue: number }[];
+        const rows: TipRow[] = ps.filter((p) => p.value).map((p) => ({ label: p.seriesName, value: c.valueFormat(p.value[1] ?? 0), color: p.color }));
+        if (!rows.length) return '';
+        return tipHtml(t, c.dateLabel(new Date(ps[0].axisValue).toISOString().slice(0, 10)), rows);
+      },
+    },
+    xAxis: {
+      type: 'time',
+      min: ts(c.start),
+      max: ts(c.due),
+      ...axisCommon(t),
+      axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true, fontFamily: t.mono, formatter: (v: number) => c.dateLabel(new Date(v).toISOString().slice(0, 10)) },
+    },
+    yAxis: { ...valueAxis(t, compact, { scale: false, min: 0 }) },
+    series: [
+      {
+        name: 'Estimated zakat',
+        type: 'line' as const,
+        data: c.estimate.map(([d, v]) => [ts(d), v]),
+        showSymbol: c.estimate.length < 3,
+        symbolSize: 7,
+        smooth: false,
+        lineStyle: { width: 2.2, color: t.primary },
+        itemStyle: { color: t.primary },
+        areaStyle: { color: rgba(t.rgb.primary, 0.1) },
+        emphasis: { focus: 'series' as const },
+        markLine: { silent: true, symbol: 'none', animation: false, data: marks },
+      },
+      {
+        name: 'Paid',
+        type: 'line' as const,
+        step: 'end' as const,
+        data: paidEnd,
+        showSymbol: true,
+        symbolSize: 7,
+        lineStyle: { width: 2.4, color: t.success },
+        itemStyle: { color: t.success },
+        emphasis: { focus: 'series' as const },
+      },
+    ],
+  } as EChartsOption;
+}
+
 // ───────────────────────── combo: bars plus a cumulative line ─────────────────────────
 
 export type ComboCfg = {

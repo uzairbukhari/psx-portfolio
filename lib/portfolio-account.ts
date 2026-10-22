@@ -1,4 +1,5 @@
 import type { SipBlueprint } from './sip-blueprint.ts';
+import type { ZakatBook } from './zakat.ts';
 import {
   blankPortfolio,
   DISPLAY_PARTS,
@@ -448,6 +449,25 @@ export function setAccountSipBlueprint(
     }),
   };
 }
+/** Zakat records: one book for the whole account, written into every portfolio (a setting, not a ledger record). */
+export function accountZakat(account: PortfolioAccount): ZakatBook | null {
+  return account.portfolios[0]?.portfolio.zakat ?? null;
+}
+export function setAccountZakat(
+  account: PortfolioAccount,
+  book: ZakatBook | null,
+): PortfolioAccount {
+  return {
+    ...account,
+    portfolios: account.portfolios.map((p) => {
+      const { zakat: _old, ...rest } = p.portfolio;
+      return {
+        ...p,
+        portfolio: book === null ? rest : { ...rest, zakat: book },
+      };
+    }),
+  };
+}
 export function assertAccountWritable(
   previous: PortfolioAccount,
   next: PortfolioAccount,
@@ -469,7 +489,8 @@ export function dashboardPortfolio(
   const taxProfile = accountTaxProfile(account);
   const monthlyExpenses = accountMonthlyExpenses(account) ?? undefined;
   const sipBlueprint = accountSipBlueprint(account) ?? undefined;
-  const withTax = (p: Portfolio): Portfolio => ({ ...p, taxProfile, monthlyExpenses, sipBlueprint });
+  const zakat = accountZakat(account) ?? undefined;
+  const withTax = (p: Portfolio): Portfolio => ({ ...p, taxProfile, monthlyExpenses, sipBlueprint, zakat });
   if (account.portfolios.length === 1) return account.portfolios[0].portfolio;
   if (selected !== ALL_PORTFOLIOS)
     return withTax(portfolioAt(account, { id: selected }));
@@ -477,6 +498,7 @@ export function dashboardPortfolio(
   result.taxProfile = taxProfile;
   result.monthlyExpenses = monthlyExpenses;
   result.sipBlueprint = sipBlueprint;
+  result.zakat = zakat;
   result[DISPLAY_PARTS] = account.portfolios;
   result.dividends = [];
   const companies = new Map<string, Portfolio['companies'][number]>();
