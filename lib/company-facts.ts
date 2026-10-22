@@ -425,7 +425,9 @@ export function quantScore(metricsList: CompanyMetrics[], benchmarks?: FactsBenc
 }
 
 export type QuantPick = { ticker: string; allocationPct: number; score: number };
-export function quantAllocation(scores: CompanyScore[], threshold = 55, maxPicks = 5, capPct = 35): { picks: QuantPick[]; unallocatedPct: number } {
+/** A company needs at least this score to receive money. */
+export const PICK_THRESHOLD = 55;
+export function quantAllocation(scores: CompanyScore[], threshold = PICK_THRESHOLD, maxPicks = 5, capPct = 35): { picks: QuantPick[]; unallocatedPct: number } {
   const candidates = scores.filter((s) => ineligibleReason(s) === null && s.score >= threshold)
     .sort((a, b) => b.score - a.score).slice(0, maxPicks);
   if (!candidates.length) return { picks: [], unallocatedPct: 100 };

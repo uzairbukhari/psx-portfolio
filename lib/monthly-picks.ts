@@ -189,3 +189,4 @@ export function summarizeEstimates(estimates: MonthlyPickEstimate[], amount: num
     missingPrices,
   };
 }
+export type EstimateSummary = ReturnType<typeof summarizeEstimates>;

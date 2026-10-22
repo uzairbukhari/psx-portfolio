@@ -64,6 +64,8 @@ export type Trade = {
   inferred?: InferredAcquisition;
   /** Id of the trade that replaced this inferred acquisition once the real purchase was imported (audit trail). */
   supersededBy?: string;
+  /** The Monthly Picks ranking this buy followed, so the track record can match what you bought to what was suggested. */
+  picksRunId?: string;
 };
 /** Provenance of an acquisition the user asked us to assume so a sale has a cost basis. */
 export type InferredAcquisition = {
