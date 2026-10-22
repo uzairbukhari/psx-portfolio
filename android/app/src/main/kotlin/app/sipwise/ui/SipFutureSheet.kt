@@ -140,6 +140,7 @@ private fun PlanChart(
     fun paid(p: SipProjectionPoint) = if (real) p.realInvested else p.invested
 
     fun worth(p: SipProjectionPoint) = if (real) p.realValue else p.value
+
     StackedAreaChart(
         layers =
             listOf(
@@ -390,53 +391,70 @@ private fun WhatIfBuilder(
     viewModel: SipViewModel,
 ) {
     val set: (SipLevers) -> Unit = viewModel::editBuilder
-    val monthly = projection.monthly
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(stringResource(R.string.sip_whatif_builder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Lever(R.string.sip_lever_stop, levers.stopAfterYears != null, { on -> set(levers.copy(stopAfterYears = if (on) STOP_DEFAULT else null)) }) {
-            Step("${levers.stopAfterYears ?: STOP_DEFAULT} yr", { set(levers.copy(stopAfterYears = ((levers.stopAfterYears ?: STOP_DEFAULT) - 1).coerceAtLeast(1))) }) {
-                set(levers.copy(stopAfterYears = ((levers.stopAfterYears ?: STOP_DEFAULT) + 1).coerceAtMost(MAX_STOP)))
-            }
-        }
-        Lever(R.string.sip_lever_raise, levers.stepUp != null, { on -> set(levers.copy(stepUp = if (on) RAISE_DEFAULT else null)) }) {
-            val v = levers.stepUp ?: RAISE_DEFAULT
-            Step("${v.roundToInt()}%", { set(levers.copy(stepUp = (v - 1).coerceAtLeast(0.0))) }) { set(levers.copy(stepUp = (v + 1).coerceAtMost(MAX_RAISE))) }
-        }
-        Lever(R.string.sip_lever_monthly, levers.monthly != null, { on -> set(levers.copy(monthly = if (on) monthly else null)) }) {
-            val v = levers.monthly ?: monthly
-            Step(moneyShort(v), { set(levers.copy(monthly = (v - MONTHLY_STEP).coerceAtLeast(MONTHLY_STEP))) }) { set(levers.copy(monthly = v + MONTHLY_STEP)) }
-        }
-        Lever(R.string.sip_lever_later, levers.startDelayYears != null, { on -> set(levers.copy(startDelayYears = if (on) LATER_DEFAULT else null)) }) {
-            val v = levers.startDelayYears ?: LATER_DEFAULT
-            Step("$v yr", { set(levers.copy(startDelayYears = (v - 1).coerceAtLeast(1))) }) { set(levers.copy(startDelayYears = (v + 1).coerceAtMost(MAX_LATER))) }
-        }
-        Lever(R.string.sip_lever_break, levers.pause != null, { on -> set(levers.copy(pause = if (on) SipPause(2, BREAK_DEFAULT) else null)) }) {
-            val v = levers.pause ?: SipPause(2, BREAK_DEFAULT)
-            Step("${v.months} mo", { set(levers.copy(pause = v.copy(months = (v.months - 1).coerceAtLeast(1)))) }) { set(levers.copy(pause = v.copy(months = (v.months + 1).coerceAtMost(MAX_BREAK)))) }
-        }
-        Lever(R.string.sip_lever_skip, levers.skipMonthsPerYear != null, { on -> set(levers.copy(skipMonthsPerYear = if (on) SKIP_DEFAULT else null)) }) {
-            val v = levers.skipMonthsPerYear ?: SKIP_DEFAULT
-            Step("$v mo", { set(levers.copy(skipMonthsPerYear = (v - 1).coerceAtLeast(1))) }) { set(levers.copy(skipMonthsPerYear = (v + 1).coerceAtMost(MAX_SKIP))) }
-        }
-        Lever(R.string.sip_lever_extra, levers.extra != null, { on -> set(levers.copy(extra = if (on) SipExtra(EXTRA_DEFAULT, 1, true) else null)) }) {
-            val v = levers.extra ?: SipExtra(EXTRA_DEFAULT, 1, true)
-            Step(moneyShort(v.amount), { set(levers.copy(extra = v.copy(amount = (v.amount - EXTRA_STEP).coerceAtLeast(EXTRA_STEP)))) }) { set(levers.copy(extra = v.copy(amount = v.amount + EXTRA_STEP))) }
-            TextButton(onClick = { set(levers.copy(extra = v.copy(yearly = !v.yearly))) }) {
-                Text(stringResource(if (v.yearly) R.string.sip_lever_extra_yearly else R.string.sip_lever_extra_once))
-            }
-        }
-        Lever(R.string.sip_lever_return, levers.annualPct != null, { on -> set(levers.copy(annualPct = if (on) (projection.annual - RETURN_DROP).coerceAtLeast(0.0).roundToInt().toDouble() else null)) }) {
-            val v = levers.annualPct ?: projection.annual
-            Step("${v.roundToInt()}%", { set(levers.copy(annualPct = (v - 1).coerceAtLeast(0.0))) }) { set(levers.copy(annualPct = (v + 1).coerceAtMost(MAX_RETURN))) }
-        }
-        Lever(R.string.sip_lever_fall, levers.fall != null, { on -> set(levers.copy(fall = if (on) SipFall(FALL_DEFAULT, 5) else null)) }) {
-            val v = levers.fall ?: SipFall(FALL_DEFAULT, 5)
-            Step("${v.pct.roundToInt()}%", { set(levers.copy(fall = v.copy(pct = (v.pct - FALL_STEP).coerceAtLeast(FALL_STEP)))) }) { set(levers.copy(fall = v.copy(pct = (v.pct + FALL_STEP).coerceAtMost(MAX_FALL)))) }
-        }
+        TimingLevers(levers, set)
+        MoneyLevers(levers, set, projection)
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             OutlinedButton(onClick = viewModel::cancelBuilder) { Text(stringResource(R.string.sip_whatif_cancel)) }
             Button(onClick = viewModel::applyBuilder, enabled = levers != SipLevers()) { Text(stringResource(R.string.sip_whatif_compare)) }
         }
+    }
+}
+
+@Composable
+private fun TimingLevers(
+    levers: SipLevers,
+    set: (SipLevers) -> Unit,
+) {
+    Lever(R.string.sip_lever_stop, levers.stopAfterYears != null, { on -> set(levers.copy(stopAfterYears = if (on) STOP_DEFAULT else null)) }) {
+        Step("${levers.stopAfterYears ?: STOP_DEFAULT} yr", { set(levers.copy(stopAfterYears = ((levers.stopAfterYears ?: STOP_DEFAULT) - 1).coerceAtLeast(1))) }) {
+            set(levers.copy(stopAfterYears = ((levers.stopAfterYears ?: STOP_DEFAULT) + 1).coerceAtMost(MAX_STOP)))
+        }
+    }
+    Lever(R.string.sip_lever_later, levers.startDelayYears != null, { on -> set(levers.copy(startDelayYears = if (on) LATER_DEFAULT else null)) }) {
+        val v = levers.startDelayYears ?: LATER_DEFAULT
+        Step("$v yr", { set(levers.copy(startDelayYears = (v - 1).coerceAtLeast(1))) }) { set(levers.copy(startDelayYears = (v + 1).coerceAtMost(MAX_LATER))) }
+    }
+    Lever(R.string.sip_lever_break, levers.pause != null, { on -> set(levers.copy(pause = if (on) SipPause(2, BREAK_DEFAULT) else null)) }) {
+        val v = levers.pause ?: SipPause(2, BREAK_DEFAULT)
+        Step("${v.months} mo", { set(levers.copy(pause = v.copy(months = (v.months - 1).coerceAtLeast(1)))) }) { set(levers.copy(pause = v.copy(months = (v.months + 1).coerceAtMost(MAX_BREAK)))) }
+    }
+    Lever(R.string.sip_lever_skip, levers.skipMonthsPerYear != null, { on -> set(levers.copy(skipMonthsPerYear = if (on) SKIP_DEFAULT else null)) }) {
+        val v = levers.skipMonthsPerYear ?: SKIP_DEFAULT
+        Step("$v mo", { set(levers.copy(skipMonthsPerYear = (v - 1).coerceAtLeast(1))) }) { set(levers.copy(skipMonthsPerYear = (v + 1).coerceAtMost(MAX_SKIP))) }
+    }
+}
+
+@Composable
+private fun MoneyLevers(
+    levers: SipLevers,
+    set: (SipLevers) -> Unit,
+    projection: SipProjection,
+) {
+    val monthly = projection.monthly
+    Lever(R.string.sip_lever_raise, levers.stepUp != null, { on -> set(levers.copy(stepUp = if (on) RAISE_DEFAULT else null)) }) {
+        val v = levers.stepUp ?: RAISE_DEFAULT
+        Step("${v.roundToInt()}%", { set(levers.copy(stepUp = (v - 1).coerceAtLeast(0.0))) }) { set(levers.copy(stepUp = (v + 1).coerceAtMost(MAX_RAISE))) }
+    }
+    Lever(R.string.sip_lever_monthly, levers.monthly != null, { on -> set(levers.copy(monthly = if (on) monthly else null)) }) {
+        val v = levers.monthly ?: monthly
+        Step(moneyShort(v), { set(levers.copy(monthly = (v - MONTHLY_STEP).coerceAtLeast(MONTHLY_STEP))) }) { set(levers.copy(monthly = v + MONTHLY_STEP)) }
+    }
+    Lever(R.string.sip_lever_extra, levers.extra != null, { on -> set(levers.copy(extra = if (on) SipExtra(EXTRA_DEFAULT, 1, true) else null)) }) {
+        val v = levers.extra ?: SipExtra(EXTRA_DEFAULT, 1, true)
+        Step(moneyShort(v.amount), { set(levers.copy(extra = v.copy(amount = (v.amount - EXTRA_STEP).coerceAtLeast(EXTRA_STEP)))) }) { set(levers.copy(extra = v.copy(amount = v.amount + EXTRA_STEP))) }
+        TextButton(onClick = { set(levers.copy(extra = v.copy(yearly = !v.yearly))) }) {
+            Text(stringResource(if (v.yearly) R.string.sip_lever_extra_yearly else R.string.sip_lever_extra_once))
+        }
+    }
+    Lever(R.string.sip_lever_return, levers.annualPct != null, { on -> set(levers.copy(annualPct = if (on) (projection.annual - RETURN_DROP).coerceAtLeast(0.0).roundToInt().toDouble() else null)) }) {
+        val v = levers.annualPct ?: projection.annual
+        Step("${v.roundToInt()}%", { set(levers.copy(annualPct = (v - 1).coerceAtLeast(0.0))) }) { set(levers.copy(annualPct = (v + 1).coerceAtMost(MAX_RETURN))) }
+    }
+    Lever(R.string.sip_lever_fall, levers.fall != null, { on -> set(levers.copy(fall = if (on) SipFall(FALL_DEFAULT, 5) else null)) }) {
+        val v = levers.fall ?: SipFall(FALL_DEFAULT, 5)
+        Step("${v.pct.roundToInt()}%", { set(levers.copy(fall = v.copy(pct = (v.pct - FALL_STEP).coerceAtLeast(FALL_STEP)))) }) { set(levers.copy(fall = v.copy(pct = (v.pct + FALL_STEP).coerceAtMost(MAX_FALL)))) }
     }
 }
 

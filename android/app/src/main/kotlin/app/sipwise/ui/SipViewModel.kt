@@ -193,7 +193,12 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
                             put("whatIfs", LEVER_JSON.encodeToString(ListSerializer(SipWhatIf.serializer()), query.whatIfs))
                         }
                         query.goal?.let { g ->
-                            put("goal", buildJsonObject { put("target", g.target); g.year?.let { put("year", it) } }.toString())
+                            val goal =
+                                buildJsonObject {
+                                    put("target", g.target)
+                                    g.year?.let { put("year", it) }
+                                }
+                            put("goal", goal.toString())
                         }
                     }
                 try {
