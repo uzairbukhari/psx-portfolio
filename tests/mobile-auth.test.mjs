@@ -105,7 +105,7 @@ async function loadServer(via) {
     .replace("import { getCurrentUser } from '@/lib/auth';", `const getCurrentUser = async () => (globalThis.__via ? { email: 'a@example.com', via: globalThis.__via } : null);`)
     .replace("import { getUserRole, isSuperAdmin } from '@/lib/roles';", 'const getUserRole = async () => "user"; const isSuperAdmin = () => false;')
     .replace("import { classifyServerError, recordServerError, routeLabel } from '@/lib/server-errors';", 'const classifyServerError = () => "server_error"; const recordServerError = async () => {}; const routeLabel = () => "/";')
-    .replace("import { UserError, publicError } from '@/lib/user-error';", `import { UserError, publicError } from '${new URL('lib/user-error.ts', base).href}';`);
+    .replace("import { DB_LIMIT_CODE, UserError, publicError, secondsUntilUtcMidnight } from '@/lib/user-error';", `import { DB_LIMIT_CODE, UserError, publicError, secondsUntilUtcMidnight } from '${new URL('lib/user-error.ts', base).href}';`);
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
   globalThis.__via = via;
   return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}#${via}`);

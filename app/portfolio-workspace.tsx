@@ -390,6 +390,12 @@ export default function PortfolioWorkspace({
   );
   return (
     <>
+      {session.offline ? (
+        <p role="status" className="notice">
+          Read-only: this is the last copy saved on this device, because the server could not be reached or today&apos;s free database allowance is used up.{' '}
+          <button type="button" data-slot="button" onClick={() => void session.reload().catch(() => {})}>Try again</button>
+        </p>
+      ) : null}
       <div key={`${target.id}:${version}`}>
         {children({
           target,

@@ -287,3 +287,12 @@ test('vault reset (both secrets lost) erases ciphertext; a new vault can then be
   const again = await c.prepareVault(transport, PASSWORD);
   assert.equal((await again.finish()).portfolio.companies.length, 0);
 });
+
+import { publicError, isDbLimit } from '../lib/user-error.ts';
+test('D1 free-tier limit errors map to a 503 db-limit', () => {
+  const e = new Error("D1_ERROR: Exceeded D1's free tier daily row read limit");
+  assert.equal(isDbLimit(e), true);
+  const out = publicError(e, 500);
+  assert.equal(out.status, 503);
+  assert.equal(out.code, 'db-limit');
+});
