@@ -2,7 +2,7 @@ import { env, waitUntil } from 'cloudflare:workers';
 import { getCurrentUser } from '@/lib/auth';
 import { getUserRole, isSuperAdmin } from '@/lib/roles';
 import { classifyServerError, recordServerError, routeLabel } from '@/lib/server-errors';
-import { UserError, publicError } from '@/lib/user-error';
+import { DB_LIMIT_CODE, UserError, publicError, secondsUntilUtcMidnight } from '@/lib/user-error';
 export async function identity(req: Request, write = false) {
   const user = await getCurrentUser();
   if (!user) throw new UserError('Sign in to access your portfolio.', 401);
@@ -38,7 +38,7 @@ export function failure(e: unknown, status?: number, req?: Request) {
   if (out.status >= 500) noteServerError(e, out.status, req);
   return Response.json(
     out.code ? { error: out.message, code: out.code } : { error: out.message },
-    { status: out.status, headers: { 'Cache-Control': 'no-store' } },
+    { status: out.status, headers: { 'Cache-Control': 'no-store', ...(out.code === DB_LIMIT_CODE ? { 'Retry-After': String(secondsUntilUtcMidnight()) } : {}) } },
   );
 }
 

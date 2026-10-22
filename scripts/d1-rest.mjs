@@ -54,6 +54,28 @@ export async function trackedTickers(tickerArg) {
 }
 
 /**
+ * D1 brownout (the cron Worker sets it from 80% of the account's free daily rows, see lib/d1-usage.ts): GitHub's own
+ * `schedule` runs of the frequent scrapers then stand down when the same job finished OK less than `minMinutes` ago. The
+ * cron Worker's dispatches keep their reduced cadence, so prices stay fresh while the database keeps its headroom.
+ * Never throws; any doubt means "run".
+ */
+export async function standDownForBrownout(job, minMinutes, { dryRun = false } = {}) {
+  if (dryRun || process.env.GITHUB_EVENT_NAME !== 'schedule') return false;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const flag = await d1("SELECT last_success_at AS day FROM refresh_state WHERE kind='limits' AND key='brownout'");
+    if (flag[0]?.day !== today) return false;
+    const last = await d1('SELECT MAX(started_at) AS at FROM job_runs WHERE job=? AND ok=1', [job]);
+    const at = last[0]?.at ? Date.parse(last[0].at) : 0;
+    const quiet = Date.now() - at < minMinutes * 60_000;
+    if (quiet) console.log(`D1 brownout: the last ${job} run was under ${minMinutes} minutes ago, standing down.`);
+    return quiet;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Records this run in `job_runs` for the admin console when the script ends: success when the exit code is 0, failure
  * with the error message otherwise. Call it first thing in main(); it does nothing on a dry run or without credentials.
  * Never throws and never changes the exit code.
