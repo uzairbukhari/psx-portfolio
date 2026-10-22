@@ -6,10 +6,13 @@ import app.sipwise.ledger.Ledger
 import app.sipwise.ledger.LedgerAction
 import app.sipwise.model.ScopeList
 import app.sipwise.model.SipClass
+import app.sipwise.model.SipLevers
 import app.sipwise.model.SipPreview
 import app.sipwise.model.SipProjection
 import app.sipwise.model.SipRebalance
 import app.sipwise.model.SipView
+import app.sipwise.model.SipWhatIf
+import app.sipwise.model.SipWhatIfPreset
 import app.sipwise.network.ApiRequestException
 import app.sipwise.session.ConflictException
 import app.sipwise.session.EngineException
@@ -23,6 +26,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -52,6 +57,24 @@ data class SipDraft(
     val preset: String = "balanced",
 )
 
+/** "I want [target] rupees, by [year] (optional)". */
+data class SipGoalQuery(val target: Double, val year: Int? = null)
+
+/** A what-if being built: which one (an existing index, or the next free one) and the changes so far. */
+data class SipBuilder(val index: Int, val levers: SipLevers = SipLevers())
+
+/** What the Future you sheet has asked the engine: the plan's inputs, the what-ifs on top and an optional goal. */
+data class SipFutureQuery(
+    val monthly: Double? = null,
+    val years: Int = SipViewModel.DEFAULT_YEARS,
+    val stepUp: Double? = null,
+    val fromHoldings: Boolean = true,
+    val real: Boolean = false,
+    val whatIfs: List<SipWhatIf> = emptyList(),
+    val goal: SipGoalQuery? = null,
+    val builder: SipBuilder? = null,
+)
+
 data class SipUi(
     val view: SipView? = null,
     /** The live answer for the draft in the wizard or the edit sheet. */
@@ -59,6 +82,7 @@ data class SipUi(
     val draft: SipDraft? = null,
     val step: Int = 0,
     val projection: SipProjection? = null,
+    val future: SipFutureQuery = SipFutureQuery(),
     val sheet: SipSheet? = null,
     val busy: Boolean = false,
     val error: String? = null,
@@ -72,6 +96,7 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
     private val _ui = MutableStateFlow(SipUi())
     val ui: StateFlow<SipUi> = _ui.asStateFlow()
     private var previewJob: Job? = null
+    private var projectJob: Job? = null
 
     init {
         viewModelScope.launch { ledger.version.collect { load() } }
@@ -146,31 +171,81 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
             }
     }
 
-    /** "Future you": where this much a month, growing by the step-up, lands over [years]. */
-    fun project(
-        monthly: Double? = null,
-        years: Int = DEFAULT_YEARS,
-        stepUp: Double? = null,
-    ) {
-        viewModelScope.launch {
-            val args =
-                buildMap {
-                    put("years", years.toString())
-                    monthly?.let { put("monthly", it.toString()) }
-                    stepUp?.let { put("stepUp", it.toString()) }
+    /**
+     * "Future you": where this much a month, growing by the step-up, lands over the look-ahead, with the what-ifs and the
+     * goal on top. [change] edits the question; the engine answers it again.
+     */
+    fun project(change: (SipFutureQuery) -> SipFutureQuery = { it }) {
+        val query = change(_ui.value.future)
+        _ui.value = _ui.value.copy(future = query)
+        projectJob?.cancel()
+        projectJob =
+            viewModelScope.launch {
+                delay(PREVIEW_DEBOUNCE_MS)
+                val args =
+                    buildMap {
+                        put("years", query.years.toString())
+                        query.monthly?.let { put("monthly", it.toString()) }
+                        query.stepUp?.let { put("stepUp", it.toString()) }
+                        put("startFromHoldings", query.fromHoldings.toString())
+                        put("real", query.real.toString())
+                        if (query.whatIfs.isNotEmpty()) {
+                            put("whatIfs", LEVER_JSON.encodeToString(ListSerializer(SipWhatIf.serializer()), query.whatIfs))
+                        }
+                        query.goal?.let { g ->
+                            val goal =
+                                buildJsonObject {
+                                    put("target", g.target)
+                                    g.year?.let { put("year", it) }
+                                }
+                            put("goal", goal.toString())
+                        }
+                    }
+                try {
+                    val reply = withContext(NonCancellable) { ledger.engine.call("sip.project", args) }
+                    _ui.value = _ui.value.copy(projection = decodeView(SipProjection.serializer(), reply))
+                } catch (e: EngineException) {
+                    _ui.value = _ui.value.copy(error = e.message)
                 }
-            try {
-                val reply = ledger.engine.call("sip.project", args)
-                _ui.value = _ui.value.copy(projection = decodeView(SipProjection.serializer(), reply))
-            } catch (e: EngineException) {
-                _ui.value = _ui.value.copy(error = e.message)
             }
-        }
     }
+
+    /** Puts a ready-made what-if on the chart, or takes it off again. At most two at a time. */
+    fun togglePreset(preset: SipWhatIfPreset) =
+        project { q ->
+            val on = q.whatIfs.any { it.key == preset.key }
+            val next =
+                when {
+                    on -> q.whatIfs.filterNot { it.key == preset.key }
+                    q.whatIfs.size < MAX_WHAT_IFS -> q.whatIfs + SipWhatIf(preset.key, preset.levers, preset.label)
+                    else -> q.whatIfs
+                }
+            q.copy(whatIfs = next)
+        }
+
+    fun removeWhatIf(key: String) = project { q -> q.copy(whatIfs = q.whatIfs.filterNot { it.key == key }) }
+
+    fun openBuilder(index: Int) =
+        project { q -> q.copy(builder = SipBuilder(index, q.whatIfs.getOrNull(index)?.levers ?: SipLevers())) }
+
+    fun editBuilder(levers: SipLevers) = project { q -> q.copy(builder = q.builder?.copy(levers = levers)) }
+
+    fun cancelBuilder() = project { q -> q.copy(builder = null) }
+
+    /** Puts what the builder holds on the chart (replacing the one it was editing). */
+    fun applyBuilder() =
+        project { q ->
+            val b = q.builder ?: return@project q
+            val made = SipWhatIf("custom-${b.index}-${b.levers.hashCode()}", b.levers)
+            val rest = q.whatIfs.filterIndexed { i, _ -> i != b.index }
+            q.copy(whatIfs = (rest.take(b.index) + made + rest.drop(b.index)).take(MAX_WHAT_IFS), builder = null)
+        }
+
+    fun setGoal(goal: SipGoalQuery?) = project { q -> q.copy(goal = goal) }
 
     fun open(sheet: SipSheet?) {
         _ui.value = _ui.value.copy(sheet = sheet, error = null)
-        if (sheet == SipSheet.Future && _ui.value.projection == null) project()
+        if (sheet == SipSheet.Future) project()
         if (sheet == SipSheet.Edit) startDraft(SipSheet.Edit)
     }
 
@@ -361,8 +436,10 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
         _ui.value = _ui.value.copy(busy = false, error = message)
     }
 
-    private companion object {
+    companion object {
         const val DEFAULT_YEARS = 15
+        const val MAX_WHAT_IFS = 2
+        private val LEVER_JSON = Json { explicitNulls = false }
         const val PREVIEW_DEBOUNCE_MS = 120L
         const val MONTH_LENGTH = 7
     }

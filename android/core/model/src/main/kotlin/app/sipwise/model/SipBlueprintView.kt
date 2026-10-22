@@ -210,6 +210,94 @@ data class SipMarks(val nominal: List<SipMilestone> = emptyList(), val real: Lis
 @Serializable
 data class SipSkipCost(val nominal: Double = 0.0, val real: Double = 0.0)
 
+/** A break from the SIP: [months] months off from the start of [fromYear] (1 is the first year). */
+@Serializable
+data class SipPause(val fromYear: Int, val months: Int)
+
+/** Extra money at the start of [year], once or every year from then on. */
+@Serializable
+data class SipExtra(val amount: Double, val year: Int, val yearly: Boolean)
+
+/** A one-time fall of [pct] percent at the start of [year]. */
+@Serializable
+data class SipFall(val pct: Double, val year: Int)
+
+/** The changes a what-if makes on top of the plan; none set means the plan itself. Mirrors `SipLevers` in lib. */
+@Serializable
+data class SipLevers(
+    val monthly: Double? = null,
+    val stepUp: Double? = null,
+    val stopAfterYears: Int? = null,
+    val startDelayYears: Int? = null,
+    val pause: SipPause? = null,
+    val skipMonthsPerYear: Int? = null,
+    val extra: SipExtra? = null,
+    val annualPct: Double? = null,
+    val fall: SipFall? = null,
+)
+
+/** A one-tap what-if sized from the person's own plan. */
+@Serializable
+data class SipWhatIfPreset(val key: String, val label: String, val levers: SipLevers)
+
+/** A what-if on the way to the engine. */
+@Serializable
+data class SipWhatIf(val key: String, val levers: SipLevers, val label: String? = null)
+
+/** One checkpoint year of a line, with its change against the plan in words. */
+@Serializable
+data class SipCheckpoint(
+    val year: Int,
+    val valueLabel: String,
+    val deltaLabel: String = "",
+    val deltaTone: String = "same",
+)
+
+/** The plan or one what-if over the look-ahead, with everything the table shows already worded. */
+@Serializable
+data class SipScenarioLine(
+    val key: String,
+    val label: String,
+    val points: List<SipProjectionPoint> = emptyList(),
+    val valueLabel: String = "",
+    val investedLabel: String = "",
+    val growthLabel: String = "",
+    val multipleLabel: String = "",
+    val reachedYear: Int? = null,
+    val deltaLabel: String = "",
+    val deltaTone: String = "same",
+    val checkpoints: List<SipCheckpoint> = emptyList(),
+)
+
+/** The plan and up to two what-ifs side by side, with a one-sentence takeaway. */
+@Serializable
+data class SipComparison(
+    val years: Int,
+    val takeaway: String = "",
+    val lines: List<SipScenarioLine> = emptyList(),
+)
+
+/** A line on the goal chart (the plan, or a way to close the gap). */
+@Serializable
+data class SipGoalLine(val name: String, val dashed: Boolean = false, val points: List<SipProjectionPoint> = emptyList())
+
+/** "I want Rs X [by year Y]": the year the plan gets there and, before a deadline, the ways to close a gap. */
+@Serializable
+data class SipGoal(
+    val target: Double,
+    val yearsToReach: Int? = null,
+    val deadlineYears: Int? = null,
+    val onTrack: Boolean? = null,
+    val monthlyNeeded: Double? = null,
+    val stepUpNeeded: Double? = null,
+    val takeaway: String = "",
+    val targetLabel: String = "",
+    val monthlyLabel: String = "",
+    val monthlyMoreLabel: String = "",
+    val reachedYear: Int? = null,
+    val lines: List<SipGoalLine> = emptyList(),
+)
+
 /** "Future you" (`sip.project`). */
 @Serializable
 data class SipProjection(
@@ -220,10 +308,18 @@ data class SipProjection(
     val annual: Double = 0.0,
     val inflation: Double = 0.0,
     val defaults: Map<String, Double> = emptyMap(),
+    val startYear: Int = 0,
+    /** What the SIP classes are worth today. */
+    val held: Double = 0.0,
+    /** What the projection starts from: [held], or zero when the person looks at the SIP alone. */
+    val startValue: Double = 0.0,
     val points: List<SipProjectionPoint> = emptyList(),
     val last: SipProjectionPoint? = null,
     val marks: SipMarks = SipMarks(),
     val skip: SipSkipCost = SipSkipCost(),
+    val presets: List<SipWhatIfPreset> = emptyList(),
+    val comparison: SipComparison? = null,
+    val goal: SipGoal? = null,
 )
 
 /** One stepper move, before it is saved (`sip.rebalance`). */

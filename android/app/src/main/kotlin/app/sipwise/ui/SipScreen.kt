@@ -35,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -45,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sipwise.R
 import app.sipwise.designsystem.BrandColors
-import app.sipwise.designsystem.ChartLayer
 import app.sipwise.designsystem.DeltaPill
 import app.sipwise.designsystem.HabitSquare
 import app.sipwise.designsystem.HabitState
@@ -61,7 +59,6 @@ import app.sipwise.designsystem.SipwiseNumbers
 import app.sipwise.designsystem.SipwiseTheme
 import app.sipwise.designsystem.SlabColors
 import app.sipwise.designsystem.Spacing
-import app.sipwise.designsystem.StackedAreaChart
 import app.sipwise.designsystem.StatTile
 import app.sipwise.model.SipClass
 import app.sipwise.model.SipRow
@@ -355,85 +352,6 @@ private fun FutureCard(onOpen: () -> Unit) {
         }
     }
 }
-
-/** Where this plan lands: money of the day against today's money, with the milestones it passes. */
-@Composable
-private fun FutureSheet(
-    ui: SipUi,
-    viewModel: SipViewModel,
-) {
-    val projection = ui.projection
-    var real by remember { mutableStateOf(false) }
-    var years by remember(projection) { mutableStateOf((projection?.years ?: 15).toFloat()) }
-    ModalBottomSheet(onDismissRequest = { viewModel.open(null) }) {
-        Column(Modifier.padding(start = Spacing.xl, end = Spacing.xl, bottom = Spacing.xxl), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text(stringResource(R.string.sip_future), style = MaterialTheme.typography.titleLarge)
-            if (projection == null) {
-                Text(stringResource(R.string.sip_future_loading))
-                return@Column
-            }
-            val last = projection.last
-            val value = if (real) last?.realValue else last?.value
-            val invested = if (real) last?.realInvested else last?.invested
-            MoneyText(moneyShort(value ?: 0.0), style = SipwiseNumbers.hero)
-            Text(
-                pluralStringResource(R.plurals.sip_future_summary, projection.years, projection.years, moneyShort(invested ?: 0.0), "%.1f".format(projection.annual)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val chart = SipwiseTheme.chart
-            val context = LocalContext.current
-            StackedAreaChart(
-                layers =
-                    listOf(
-                        ChartLayer(
-                            stringResource(R.string.sip_future_invested),
-                            projection.points.map { listOf(it.year.toDouble(), if (real) it.realInvested else it.invested) },
-                            chart.neutral,
-                        ),
-                        ChartLayer(
-                            stringResource(R.string.sip_future_growth),
-                            projection.points.map {
-                                val v = if (real) it.realValue else it.value
-                                val paid = if (real) it.realInvested else it.invested
-                                listOf(it.year.toDouble(), (v - paid).coerceAtLeast(0.0))
-                            },
-                            chart.up,
-                        ),
-                    ),
-                description = stringResource(R.string.sip_future_chart),
-                xLabel = { context.getString(R.string.sip_future_year, it.toInt()) },
-                yLabel = { moneyShort(it) },
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.sip_future_today_money), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = real, onCheckedChange = { real = it })
-            }
-            Text(pluralStringResource(R.plurals.sip_future_years, years.toInt(), years.toInt()), style = MaterialTheme.typography.bodyMedium)
-            Slider(
-                value = years,
-                onValueChange = { years = it },
-                onValueChangeFinished = { viewModel.project(years = years.toInt()) },
-                valueRange = MIN_YEARS..MAX_YEARS,
-            )
-            val marks = (if (real) projection.marks.real else projection.marks.nominal).filter { it.year != null }
-            for (mark in marks) {
-                Text(
-                    stringResource(R.string.sip_future_mark, mark.label, mark.year ?: 0),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                stringResource(R.string.sip_future_skip, moneyShort(if (real) projection.skip.real else projection.skip.nominal)),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
-}
-
-private const val MIN_YEARS = 3f
-private const val MAX_YEARS = 30f
 
 /** Record a gold or currency purchase for one row: the rupees, and the grams or units the public rate works out. */
 @Composable

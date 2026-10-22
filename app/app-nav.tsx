@@ -28,6 +28,7 @@ export const PAGE_TITLES: Record<string, string> = {
   reports: 'Insights',
   'sip-plan': 'Plan',
   'sip-tracker': 'SIP Blueprint',
+  future: 'Future you',
   history: 'Activity',
   sip: 'Monthly Picks',
   settings: 'Settings',

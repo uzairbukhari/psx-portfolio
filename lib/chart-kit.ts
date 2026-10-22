@@ -981,6 +981,97 @@ export function stackedAreaOption(t: ChartTokens, c: StackedAreaCfg): EChartsOpt
   } as EChartsOption;
 }
 
+// ───────────────────────── scenario lines ─────────────────────────
+
+export type LinesCfg = {
+  /** One label per point (for example the year). */
+  cats: string[];
+  /** `dash` draws the baseline dashed; `inData` adds a faint dotted money-in line in the same colour. */
+  series: { name: string; data: number[]; color: string; dash?: boolean; inData?: number[] }[];
+  valueFormat: (n: number) => string;
+  /** A dashed reference such as a goal. */
+  refLine?: { y: number; label: string; color?: string };
+};
+
+/** Several value lines on one scale (your plan against what-ifs); hover reads every line for that year. */
+export function linesOption(t: ChartTokens, c: LinesCfg): EChartsOption {
+  const o = base(t, { top: 28, right: 12 });
+  const ref =
+    c.refLine && Number.isFinite(c.refLine.y)
+      ? {
+          silent: true,
+          symbol: 'none',
+          animation: false,
+          lineStyle: { color: c.refLine.color ?? t.warn, type: 'dashed' as const, width: 1 },
+          label: {
+            formatter: c.refLine.label,
+            color: c.refLine.color ?? t.warn,
+            fontSize: 10,
+            position: 'insideStartTop' as const,
+          },
+          data: [{ yAxis: c.refLine.y }],
+        }
+      : undefined;
+  const lines = c.series.flatMap((s, i) => {
+    const main = {
+      name: s.name,
+      type: 'line' as const,
+      data: s.data,
+      showSymbol: false,
+      smooth: false,
+      lineStyle: { width: 2.4, color: s.color, type: s.dash ? ('dashed' as const) : ('solid' as const), cap: 'round' as const },
+      itemStyle: { color: s.color },
+      emphasis: { focus: 'series' as const },
+      markLine: i === 0 ? ref : undefined,
+    };
+    if (!s.inData) return [main];
+    return [
+      main,
+      {
+        name: `${s.name} money in`,
+        type: 'line' as const,
+        data: s.inData,
+        showSymbol: false,
+        silent: true,
+        lineStyle: { width: 1.2, color: s.color, type: 'dotted' as const, opacity: 0.7 },
+        itemStyle: { color: s.color },
+      },
+    ];
+  });
+  return {
+    ...o,
+    legend: { show: false },
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'axis',
+      axisPointer: { type: 'line', lineStyle: { color: t.muted, type: 'dashed' } },
+      formatter: (params: unknown) => {
+        const ps = (Array.isArray(params) ? params : [params]) as {
+          seriesName: string;
+          value: number;
+          color: string;
+          axisValue: string;
+        }[];
+        if (!ps.length) return '';
+        const rows: TipRow[] = ps.map((p) => ({ label: p.seriesName, value: c.valueFormat(p.value ?? 0), color: p.color }));
+        return tipHtml(t, ps[0].axisValue, rows);
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: c.cats,
+      boundaryGap: false,
+      ...axisCommon(t),
+      axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true, fontFamily: t.mono },
+    },
+    yAxis: {
+      ...valueAxis(t, compact, { scale: false }),
+      ...(ref ? { max: (v: { max: number }) => Math.max(v.max, c.refLine!.y * 1.05) } : {}),
+    },
+    series: lines,
+  } as EChartsOption;
+}
+
 // ───────────────────────── combo: bars plus a cumulative line ─────────────────────────
 
 export type ComboCfg = {

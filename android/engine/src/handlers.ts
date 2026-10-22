@@ -81,13 +81,23 @@ import {
   mixAfter,
   planMonth,
   presetTargets,
+  projectScenario,
   projectSip,
   rebalanceEdit,
   skipCost,
   targetsTotal,
   type SipClass,
+  type SipLevers,
 } from '../../../lib/sip-blueprint.ts';
 import { LONG_RUN_INFLATION, classWeights, rowHint, sipView } from '../../../lib/sip-blueprint-data.ts';
+import {
+  MAX_LOOK_AHEAD,
+  compareScenarios,
+  goalTakeaway,
+  goalWays,
+  scenarioPresets,
+  type ScenarioLine,
+} from '../../../lib/sip-scenarios.ts';
 import { describePieces, valueAsset, valueMetal, type Asset, type MetalAsset } from '../../../lib/assets.ts';
 import { valueCurrency, type CurrencyAsset } from '../../../lib/currency.ts';
 import type { FxRateRow } from '../../../lib/fx-rates.ts';
@@ -756,7 +766,7 @@ const handlers: Record<string, Handler> = {
       return Number.isFinite(n) ? n : fallback;
     };
     const monthly = nOr('monthly', b?.budget ?? SIP_BUDGET_PILLS[1]);
-    const years = Math.max(1, Math.round(nOr('years', 15)));
+    const years = Math.min(MAX_LOOK_AHEAD, Math.max(1, Math.round(nOr('years', 15))));
     const stepUp = nOr('stepUp', b?.stepUp ?? 10);
     const returns = { ...DEFAULT_RETURNS, ...b?.returns } as Record<SipClass, number>;
     if (args.returns) {
@@ -765,9 +775,59 @@ const handlers: Record<string, Handler> = {
     }
     const targets = b?.targets ?? blankBlueprint(today().slice(0, 7)).targets;
     const annual = blendedReturn(targets, returns);
-    const points = projectSip({ monthly, years, annualPct: annual, stepUpPct: stepUp, inflationPct: LONG_RUN_INFLATION });
+    // What the SIP classes are worth today; the projection starts from it unless the person switched that off.
+    const held = Math.round(classWeights(account.portfolios, today(), sipRates()).total);
+    const startValue = args.startFromHoldings === 'false' ? 0 : held;
+    const real = args.real === 'true';
+    const startYear = Number(today().slice(0, 4));
+    const base = { monthly, annualPct: annual, stepUpPct: stepUp, inflationPct: LONG_RUN_INFLATION, startValue };
+    const points = projectSip({ ...base, years });
     const last = points[points.length - 1];
     const levels = [1e6, 5e6, 1e7, 2.5e7, 5e7, 1e8];
+    const tone = (n: number) => (Math.abs(n) < 1 ? 'same' : n > 0 ? 'up' : 'down');
+    const change = (n: number) => (Math.abs(n) < 1 ? 'same' : `${n > 0 ? '+' : '-'}${lakh(Math.abs(n))}`);
+    const lineView = (l: ScenarioLine, plan: ScenarioLine) => ({
+      key: l.key,
+      label: l.label,
+      levers: l.levers,
+      points: l.points,
+      valueLabel: lakh(l.summary.value),
+      investedLabel: lakh(l.summary.invested),
+      growthLabel: lakh(l.summary.growth),
+      multipleLabel: l.summary.multiple === null ? '' : `Rs ${l.summary.multiple.toFixed(1)}`,
+      reachedYear: l.summary.yearReached === null ? null : startYear + l.summary.yearReached,
+      deltaLabel: l.delta ? change(l.delta.value) : '',
+      deltaTone: l.delta ? tone(l.delta.value) : 'same',
+      checkpoints: l.summary.checkpoints.map((c, i) => {
+        const d = c.value - plan.summary.checkpoints[i].value;
+        return { year: c.year, valueLabel: lakh(c.value), deltaLabel: l.delta ? change(d) : '', deltaTone: l.delta ? tone(d) : 'same' };
+      }),
+    });
+    const whatIfs = args.whatIfs ? (JSON.parse(text(args, 'whatIfs')) as { key: string; levers: SipLevers; label?: string }[]) : [];
+    const cmp = whatIfs.length ? compareScenarios(base, whatIfs, years, { real, startYear }) : null;
+    const goalArg = args.goal ? (JSON.parse(text(args, 'goal')) as { target: number; year?: number | null }) : null;
+    let goal = null;
+    if (goalArg && goalArg.target > 0) {
+      const deadline = goalArg.year ? goalArg.year - startYear : undefined;
+      const g = goalWays(base, goalArg.target, deadline && deadline >= 1 && deadline <= 50 ? deadline : undefined);
+      const horizon = Math.min(MAX_LOOK_AHEAD + 10, Math.max(5, (g.deadlineYears ?? g.yearsToReach ?? 20) + 1));
+      const lines: { name: string; dashed: boolean; points: ReturnType<typeof projectScenario> }[] = [
+        { name: 'Your plan', dashed: true, points: projectScenario(base, {}, horizon) },
+      ];
+      if (g.deadlineYears !== undefined && !g.onTrack) {
+        if (g.monthlyNeeded) lines.push({ name: `${lakh(g.monthlyNeeded)} a month`, dashed: false, points: projectScenario(base, { monthly: g.monthlyNeeded }, horizon) });
+        if (g.stepUpNeeded) lines.push({ name: `Raise ${g.stepUpNeeded}% a year`, dashed: false, points: projectScenario(base, { stepUp: g.stepUpNeeded }, horizon) });
+      }
+      goal = {
+        ...g,
+        takeaway: goalTakeaway(g, startYear),
+        targetLabel: lakh(g.target),
+        monthlyLabel: g.monthlyNeeded === null || g.monthlyNeeded === undefined ? '' : lakh(g.monthlyNeeded),
+        monthlyMoreLabel: g.monthlyNeeded ? lakh(Math.max(0, g.monthlyNeeded - monthly)) : '',
+        reachedYear: g.yearsToReach === null ? null : startYear + g.yearsToReach,
+        lines,
+      };
+    }
     return {
       monthly,
       years,
@@ -776,6 +836,9 @@ const handlers: Record<string, Handler> = {
       annual,
       inflation: LONG_RUN_INFLATION,
       defaults: DEFAULT_RETURNS,
+      startYear,
+      held,
+      startValue,
       points,
       last,
       marks: {
@@ -786,6 +849,9 @@ const handlers: Record<string, Handler> = {
         nominal: skipCost(monthly, years, annual),
         real: skipCost(monthly, years, annual) / Math.pow(1 + LONG_RUN_INFLATION / 100, years),
       },
+      presets: scenarioPresets(base),
+      comparison: cmp ? { years: cmp.years, takeaway: cmp.takeaway, lines: cmp.lines.map((l) => lineView(l, cmp.lines[0])) } : null,
+      goal,
     };
   },
 

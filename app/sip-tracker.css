@@ -275,3 +275,59 @@ html:root .sg-amt.is-done{color:var(--success)}
 html:root .sg-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
 html:root .sg-cta{width:auto;height:36px;padding:0 16px;border-radius:11px;font-size:13px;gap:6px}
 html:root .sg-next{font-size:13px;font-weight:500;color:var(--success)}
+
+/* What-ifs for "Future you": chips, builder, comparison, goal */
+html:root .sp-future-split i[data-k="held"]{background:var(--asset-gold)}
+html:root .sp-holdings{margin:0}
+html:root label.sp-check{display:inline-flex;flex-direction:row;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--muted-foreground);cursor:pointer}
+html:root label.sp-check input,html:root .sp-lever>label input{-webkit-appearance:auto;appearance:auto;width:16px;height:16px;min-height:0;padding:0;margin:0;flex:none}
+html:root .sp-whatif{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--card-border)}
+html:root .sp-whatif-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px}
+html:root .sp-whatif-head b{font-size:15px}
+html:root .sp-chips{display:flex;flex-wrap:wrap;gap:8px}
+html:root [data-slot="sp-chip"]{width:auto;height:auto;min-height:34px;padding:6px 12px;border-radius:999px;border:1px solid var(--card-border);background:rgb(var(--ch-tint) / .04);color:var(--foreground);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+html:root [data-slot="sp-chip"]:hover:not(:disabled){background:rgb(var(--ch-tint) / .08)}
+html:root [data-slot="sp-chip"][data-on]{border-color:var(--success);background:rgb(var(--ch-success) / .1)}
+html:root [data-slot="sp-chip"][data-ghost]{border-style:dashed;color:var(--muted-foreground);background:transparent}
+html:root [data-slot="sp-chip"]:disabled{opacity:.45;cursor:default}
+html:root [data-slot="sp-icon"]{display:inline-grid;place-items:center;width:26px;height:26px;padding:0;border-radius:8px;border:1px solid var(--card-border);background:transparent;color:var(--muted-foreground);font-size:12px;cursor:pointer}
+html:root [data-slot="sp-icon"]:hover{color:var(--foreground);background:rgb(var(--ch-tint) / .08)}
+html:root .sp-compare{display:grid;gap:12px;min-width:0}
+html:root .sp-take{margin:0;padding:12px 14px;border-radius:12px;border:1px solid rgb(var(--ch-success) / .28);background:linear-gradient(135deg,rgb(var(--ch-success) / .1),rgb(var(--ch-primary) / .06));font-size:14px;line-height:1.5}
+html:root .sp-legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+html:root .sp-legend-item{display:inline-flex;align-items:center;gap:7px;padding:4px 6px 4px 10px;border-radius:12px;border:1px solid var(--card-border);font-size:13px}
+html:root .sp-legend-item[data-plan]{padding-right:10px}
+html:root .sp-legend-item i,html:root .sp-table th i{display:inline-block;width:10px;height:10px;border-radius:999px;margin-right:6px}
+html:root .sp-legend-item i{margin-right:0}
+html:root .sp-compare-canvas{min-height:260px}
+html:root .sp-table-wrap{overflow-x:auto}
+html:root .sp-table{width:100%;border-collapse:collapse;font-size:13px}
+html:root .sp-table th,html:root .sp-table td{padding:8px 8px;text-align:right;border-bottom:1px solid var(--card-border);vertical-align:top}
+html:root .sp-table th:first-child{text-align:left;font-weight:400;color:var(--muted-foreground)}
+html:root .sp-table thead th{font-weight:600;color:var(--foreground);font-size:12px}
+html:root .sp-table tr[data-end] th,html:root .sp-table tr[data-end] td{font-weight:600;color:var(--foreground)}
+html:root .sp-table small{display:block;font-size:11px}
+html:root [data-tone="up"]{color:var(--success)}
+html:root [data-tone="down"]{color:var(--danger)}
+html:root [data-tone="same"]{color:var(--muted-foreground)}
+html:root .sp-fallback{min-height:260px;border-radius:12px;background:rgb(var(--ch-tint) / .04)}
+html:root .sp-builder{display:grid;gap:6px;padding:14px;border-radius:14px;border:1px solid var(--card-border);background:rgb(var(--ch-tint) / .03)}
+html:root .sp-lever{display:grid;gap:8px;padding:8px 0;border-bottom:1px solid var(--card-border)}
+html:root .sp-lever>label{display:flex;align-items:center;gap:10px;margin:0;font-size:14px;cursor:pointer}
+html:root .sp-lever>label small{display:block;font-size:12px;color:var(--muted-foreground)}
+html:root .sp-lever-body{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-left:26px}
+html:root .sp-step{display:inline-flex;align-items:center;gap:8px;font-size:13px}
+html:root .sp-step b{min-width:64px;text-align:center}
+html:root .sp-builder-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding-top:6px}
+html:root .sp-goal{display:grid;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--card-border);background:rgb(var(--ch-tint) / .03)}
+html:root .sp-goal-form{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:14px}
+html:root .sp-money-in{display:inline-flex;align-items:center;gap:6px;padding:0 8px;border-radius:10px;border:1px solid var(--card-border)}
+html:root .sp-money-in input,html:root .sp-money-in select,html:root .sp-year-in{width:auto;height:34px;border:0;background:transparent;color:var(--foreground);font:500 14px var(--font-geist-mono),monospace}
+html:root .sp-money-in input{width:56px;text-align:right}
+html:root .sp-year-in{width:140px;padding:0 10px;border:1px solid var(--card-border);border-radius:10px}
+html:root .sp-ways{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+html:root .sp-ways>div{display:grid;gap:4px;align-content:start;padding:12px;border-radius:12px;border:1px solid var(--card-border);font-size:13px;color:var(--muted-foreground)}
+html:root .sp-ways>div[data-best]{border-color:var(--success)}
+html:root .sp-ways b{font-size:18px;color:var(--foreground)}
+html:root .sp-ways button{width:auto;justify-self:start;margin-top:4px}
+html:root .sp-money-in select{width:84px}

@@ -10,6 +10,7 @@ import {
   hBarOption,
   sparklineOption,
   stackedAreaOption,
+  linesOption,
   comboOption,
   waterfallOption,
   treemapOption,
@@ -373,4 +374,22 @@ test('heatmap scales colour to the largest cell and handles an empty grid', () =
   });
   assert.equal(o.visualMap.max, 20);
   assert.equal(heatmapOption(t, { cols: [], rows: [], cells: [], color: t.success, valueFormat: money }).visualMap.max, 1);
+});
+
+test('lines: the baseline is dashed, money-in lines are optional, the goal line stays on the chart', () => {
+  const o = linesOption(t, {
+    cats: ['2026', '2027'],
+    series: [
+      { name: 'Your plan', data: [1, 2], color: 'blue', dash: true, inData: [1, 1] },
+      { name: '<i>A</i>', data: [1, 3], color: 'green' },
+    ],
+    valueFormat: money,
+    refLine: { y: 10, label: 'Goal' },
+  });
+  assert.equal(o.series.length, 3);
+  assert.equal(o.series[0].lineStyle.type, 'dashed');
+  assert.equal(o.series[1].silent, true);
+  assert.equal(o.yAxis.max({ max: 3 }), 10.5);
+  const html = o.tooltip.formatter([{ seriesName: '<i>A</i>', value: 3, color: 'green', axisValue: '2027' }]);
+  assert.ok(!html.includes('<i>A</i>'));
 });
