@@ -579,7 +579,7 @@ private fun GoalResult(
             WayCard(
                 stringResource(R.string.sip_goal_way_monthly),
                 if (goal.monthlyNeeded == null) stringResource(R.string.sip_goal_not_enough) else goal.monthlyLabel,
-                if (goal.monthlyNeeded != null && goal.monthlyNeeded > 0) stringResource(R.string.sip_goal_more_than_now, goal.monthlyMoreLabel) else "",
+                if ((goal.monthlyNeeded ?: 0.0) > 0) stringResource(R.string.sip_goal_more_than_now, goal.monthlyMoreLabel) else "",
             )
             WayCard(
                 stringResource(R.string.sip_goal_way_raise, moneyShort(monthly)),

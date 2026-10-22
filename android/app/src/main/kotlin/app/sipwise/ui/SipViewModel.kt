@@ -436,7 +436,7 @@ class SipViewModel(private val ledger: Ledger) : ViewModel() {
         _ui.value = _ui.value.copy(busy = false, error = message)
     }
 
-    private companion object {
+    companion object {
         const val DEFAULT_YEARS = 15
         const val MAX_WHAT_IFS = 2
         private val LEVER_JSON = Json { explicitNulls = false }
