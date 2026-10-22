@@ -1,0 +1,119 @@
+/* Zakat page. Theme tokens only (no colour literals), so Light, Dark, Midnight and Paper all work. */
+html:root .zk-page{display:grid;gap:16px;max-width:1180px;margin:0 auto;padding:0 16px 104px}
+@media(min-width:900px){html:root .zk-page{padding-bottom:40px}}
+html:root .zk-page>*{min-width:0;margin:0}
+html:root .zk-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
+html:root .zk-sub{margin:4px 0 0;font-size:13px;line-height:1.5;color:var(--muted-foreground)}
+html:root .zk-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+html:root .zk-actions .compact{display:inline-flex;align-items:center;gap:6px}
+html:root .zk-fine{margin:0;font-size:12px;color:var(--muted-foreground)}
+html:root .zk-note{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted-foreground)}
+html:root .zk-note[data-tone="warn"]{color:var(--warn-ink)}
+html:root .zk-card{display:grid;gap:14px;align-content:start;padding:20px}
+html:root .zk-card h2{margin:0;font-size:17px;letter-spacing:-.2px}
+html:root .zk-card-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px}
+html:root .zk-grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:1000px){html:root .zk-grid{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:start}}
+html:root .zk-stack{display:grid;gap:16px}
+
+/* Banner */
+html:root .zk-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:12px 16px;border-radius:14px;border:1px solid var(--card-border);background:var(--card);font-size:13.5px}
+html:root .zk-banner[data-tone="warn"]{border-color:rgb(var(--ch-warn) / .4);background:rgb(var(--ch-warn) / .1);color:var(--warn-ink)}
+html:root .zk-banner b{font-weight:600}
+
+/* Slab */
+html:root .zk-slab{display:grid;gap:22px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:900px){html:root .zk-slab{grid-template-columns:minmax(0,1.4fr) auto;align-items:center}}
+html:root .zk-big{font-size:clamp(34px,6vw,48px);line-height:1.05;letter-spacing:-.03em;font-weight:600;margin:8px 0 12px}
+html:root .zk-chips{display:flex;flex-wrap:wrap;gap:8px}
+html:root .zk-chip,html:root [data-slot="zk-chip"]{display:inline-flex;align-items:center;gap:6px;width:auto;height:auto;padding:4px 11px;border-radius:999px;border:1px solid var(--card-border);background:rgb(var(--ch-tint) / .06);color:var(--foreground);font-size:12px;font-weight:500;white-space:nowrap}
+html:root .zk-chip[data-tone="ok"]{border-color:rgb(var(--ch-success) / .4);background:rgb(var(--ch-success) / .1);color:var(--success)}
+html:root .zk-chip[data-tone="warn"]{border-color:rgb(var(--ch-warn) / .4);background:rgb(var(--ch-warn) / .1);color:var(--warn-ink)}
+html:root [data-slot="zk-chip"]{cursor:pointer;padding:6px 12px;box-shadow:none}
+html:root [data-slot="zk-chip"][aria-pressed="true"]{border-color:var(--success);background:rgb(var(--ch-success) / .1)}
+html:root .zk-yearbar{position:relative;height:50px;margin-top:20px}
+html:root .zk-track,html:root .zk-fill{position:absolute;left:0;top:14px;height:6px;border-radius:6px}
+html:root .zk-track{right:0;background:rgb(var(--ch-tint) / .12)}
+html:root .zk-fill{background:linear-gradient(90deg,var(--success),var(--primary))}
+html:root .zk-pay-dot{position:absolute;top:10px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--success);border:3px solid var(--popover)}
+html:root .zk-now{position:absolute;top:4px;width:2px;height:26px;background:var(--foreground)}
+html:root .zk-ticks{position:absolute;left:0;right:0;top:32px;display:flex;font-size:11px;color:var(--muted-foreground)}
+html:root .zk-slab-side{display:flex;align-items:center;gap:18px}
+html:root .zk-ring{--p:0%;width:128px;height:128px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--success) 0 var(--p),rgb(var(--ch-tint) / .14) var(--p) 100%)}
+html:root .zk-ring>div{width:100px;height:100px;border-radius:50%;background:var(--popover);display:grid;place-items:center;align-content:center;text-align:center}
+html:root .zk-ring b{font-size:22px;display:block}
+html:root .zk-ring small{font-size:11px;color:var(--muted-foreground)}
+html:root .zk-legend{margin:0;display:grid;gap:10px;font-size:13px}
+html:root .zk-legend dt{display:flex;align-items:center;gap:6px;color:var(--muted-foreground)}
+html:root .zk-legend dd{margin:0;font-size:17px;font-weight:600}
+html:root .zk-legend i{width:8px;height:8px;border-radius:50%}
+html:root .zk-legend i[data-c="paid"]{background:var(--success)}
+html:root .zk-legend i[data-c="left"]{background:rgb(var(--ch-tint) / .3)}
+html:root .zk-legend small{color:var(--muted-foreground);font-size:12px}
+
+/* Chart */
+html:root .zk-chart{height:240px;min-height:240px}
+
+/* Table */
+html:root .zk-table{width:100%;border-collapse:collapse;font-size:13px}
+html:root .zk-table th{text-align:right;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600;border-bottom:1px solid var(--card-border)}
+html:root .zk-table td{text-align:right;border-bottom:1px solid var(--card-border);vertical-align:top}
+html:root .zk-table th:first-child,html:root .zk-table td:first-child{text-align:left}
+html:root .zk-table td small{display:block;margin-top:2px;max-width:none;color:var(--muted-foreground)}
+html:root .zk-table tr[data-kind="debt"] td{color:var(--danger-ink)}
+html:root .zk-table .zk-sum td{font-weight:600;border-bottom:0}
+html:root .zk-table .zk-total td{font-size:15px;font-weight:600;color:var(--success);border-top:1px solid var(--border);border-bottom:0}
+
+/* Payments */
+html:root .zk-pay-list{list-style:none;margin:0;padding:0;display:grid}
+html:root .zk-pay-list li{border-bottom:1px solid var(--card-border)}
+html:root [data-slot="zk-row"]{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;height:auto;padding:10px 4px;border:0;border-radius:10px;background:none;color:var(--foreground);text-align:left;font-size:14px;cursor:pointer;box-shadow:none}
+html:root [data-slot="zk-row"]:hover{background:rgb(var(--ch-tint) / .05)}
+html:root .zk-pay-ic{width:36px;height:36px;border-radius:10px;background:rgb(var(--ch-success) / .12);position:relative}
+html:root .zk-pay-ic::after{content:"";position:absolute;inset:11px;border-radius:50%;background:var(--success)}
+html:root .zk-pay-ic[data-kind="bank"]::after{border-radius:3px}
+html:root .zk-pay-text{display:grid;gap:2px;min-width:0}
+html:root .zk-pay-text small{font-size:12px;color:var(--muted-foreground)}
+html:root .zk-totals{margin:0;display:grid;gap:6px;padding:12px;border-radius:12px;border:1px solid var(--card-border);background:rgb(var(--ch-tint) / .04);font-size:13px}
+html:root .zk-totals div{display:flex;justify-content:space-between;gap:12px}
+html:root .zk-totals dt{color:var(--muted-foreground)}
+html:root .zk-totals dd{margin:0;font-weight:600}
+html:root .zk-totals dd[data-tone="ok"]{color:var(--success)}
+html:root .zk-past h3{margin:0 0 6px;font-size:13px}
+html:root .zk-past ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:12.5px;color:var(--muted-foreground)}
+html:root .zk-past li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px}
+
+/* Dialog */
+html:root .zk-dialog{max-width:480px!important}
+html:root .zk-dialog label small{font-size:12px;color:var(--muted-foreground)}
+html:root .zk-field{display:grid;gap:8px;font-size:14px;font-weight:500;margin:18px 0}
+html:root .zk-kinds{display:flex;flex-wrap:wrap;gap:6px}
+
+/* Rules */
+html:root .zk-rules{display:grid}
+html:root .zk-rule{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 16px;padding:12px 0;border-bottom:1px solid var(--card-border)}
+html:root .zk-rule b{display:block;font-size:14px;font-weight:600}
+html:root .zk-rule small{display:block;max-width:46ch;margin-top:2px;font-size:12px;color:var(--muted-foreground)}
+html:root .zk-rule-switch{justify-content:space-between!important}
+html:root .zk-amounts{display:grid;gap:4px 14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+html:root .zk-amounts label{margin:10px 0}
+html:root .zk-amounts small{font-size:12px;font-weight:400;color:var(--muted-foreground)}
+
+/* Setup */
+html:root .zk-setup{display:grid;gap:24px;padding:22px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:900px){html:root .zk-setup{grid-template-columns:240px minmax(0,1fr);gap:36px;padding:28px}}
+html:root .zk-steps{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:12px;align-content:start}
+@media(min-width:900px){html:root .zk-steps{display:grid;gap:16px}}
+html:root .zk-steps li{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted-foreground)}
+html:root .zk-steps i{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid var(--card-border);font-style:normal;font-size:12px;font-weight:600}
+html:root .zk-steps li[data-on]{color:var(--foreground)}
+html:root .zk-steps li[data-on] i{background:var(--success);border-color:var(--success);color:var(--background)}
+html:root .zk-steps li[data-done] i{border-color:var(--success);color:var(--success)}
+html:root .zk-setup-body{display:grid;gap:14px;align-content:start;max-width:640px}
+html:root .zk-setup-body h2{margin:0;font-size:24px;letter-spacing:-.4px}
+html:root .zk-quick{display:flex;gap:8px}
+html:root .zk-date{max-width:260px}
+html:root .zk-hijri{display:grid;gap:4px;padding:14px 16px;border-radius:14px;border:1px solid var(--card-border);background:rgb(var(--ch-tint) / .04);font-size:13.5px}
+html:root .zk-hijri>b{font-size:22px}
+html:root .zk-hijri small{font-size:12px;color:var(--muted-foreground)}
+html:root .zk-setup-actions{margin-top:6px}

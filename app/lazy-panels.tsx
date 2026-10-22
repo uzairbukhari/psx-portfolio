@@ -64,6 +64,7 @@ export const LedgerTimeline = lazyView(() => import('./ledger-timeline'));
 export const PlanPage = lazyView(() => import('./plan-page'));
 export const SipTracker = lazyView(() => import('./sip-tracker'));
 export const FutureYou = lazyView(() => import('./future-you'));
+export const ZakatPage = lazyView(() => import('./zakat-page'));
 export const MonthlyPicks =lazyView(() => import('./monthly-picks'));
 export const CompanyDetail = lazyView(() => import('./company-detail'));
 export const GoldSilverSection = lazyView(() => import('./gold-silver'));
@@ -93,6 +94,7 @@ export function preloadTab(tab: string) {
     'sip-plan': PlanPage,
     'sip-tracker': SipTracker,
     future: FutureYou,
+    zakat: ZakatPage,
     settings: SettingsView,
   };
   views[tab]?.preload();

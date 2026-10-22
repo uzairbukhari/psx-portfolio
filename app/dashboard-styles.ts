@@ -9,6 +9,7 @@ import './insights-guided.css';
 import './account-overview.css';
 import './settings.css';
 import './sip-tracker.css';
+import './zakat.css';
 import './redesign.css';
 import './holdings-home.css';
 import './redesign-admin.css';
