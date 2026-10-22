@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -112,7 +113,7 @@ private fun Overview(
     NightSlab(Modifier.fillMaxWidth()) {
         Overline(stringResource(R.string.zakat_year, p.name), color = SlabColors.muted)
         MoneyText(moneyShort(p.estimate), color = SlabColors.ink)
-        Text(stringResource(R.string.zakat_due, mediumDate(view.dueDate), view.dueHijri, p.daysLeft), color = SlabColors.muted)
+        Text(stringResource(R.string.zakat_due, mediumDate(view.dueDate), view.dueHijri, pluralStringResource(R.plurals.zakat_days_left, p.daysLeft, p.daysLeft)), color = SlabColors.muted)
         LinearProgressIndicator(progress = { (p.percentPaid / PERCENT).toFloat() }, modifier = Modifier.fillMaxWidth())
         Text(stringResource(R.string.zakat_paid_line, moneyShort(p.paid), moneyShort(p.remaining)), color = SlabColors.ink)
     }

@@ -294,7 +294,11 @@
     <string name="zakat_shares_proxy">25% of value</string>
     <string name="zakat_start">Start tracking</string>
     <string name="zakat_year">Zakat year %1$s</string>
-    <string name="zakat_due">Zakat day %1$s (%2$s) · %3$d days left</string>
+    <string name="zakat_due">Zakat day %1$s (%2$s) · %3$s</string>
+    <plurals name="zakat_days_left">
+        <item quantity="one">%d day left</item>
+        <item quantity="other">%d days left</item>
+    </plurals>
     <string name="zakat_paid_line">Paid %1$s · %2$s to go</string>
     <string name="zakat_below_nisab">Your wealth is below the nisab of %1$s today, so no zakat is due yet.</string>
     <string name="zakat_paid">Paid</string>
