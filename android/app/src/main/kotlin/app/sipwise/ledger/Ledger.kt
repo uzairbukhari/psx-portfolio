@@ -196,7 +196,7 @@ class Ledger(
     /** Public gold, silver and currency rates and fund prices, only for the kinds this ledger holds. They carry no parameters. */
     private suspend fun loadRates(client: ApiClient) {
         val wanted = ApiJson.decodeFromJsonElement(RatesWanted.serializer(), engine.call("rates.wanted"))
-        if (!wanted.metals && !wanted.funds && !wanted.fx && !wanted.plans) return
+        if (!wanted.any) return
         val args = mutableMapOf<String, String>()
         if (wanted.metals) {
             val reply = client.get("/api/public-data/metals", JsonObject.serializer())

@@ -210,4 +210,6 @@ data class RatesWanted(
     val fx: Boolean = false,
     val plans: Boolean = false,
     val fundIds: List<String> = emptyList(),
-)
+) {
+    val any: Boolean get() = metals || funds || fx || plans
+}
