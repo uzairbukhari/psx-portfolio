@@ -1,13 +1,16 @@
 // Portfolio-aware sizing for Monthly Picks. The AI chooses picks and relative weights; this
 // code only enforces the hard limits on them, in integer paisa so the budget always adds up:
 //   - at most CONTRIBUTION_CAP_PCT of the fresh money in any one pick, and
-//   - no holding above CONCENTRATION_CAP_PCT of (existing portfolio value + fresh money) after buying.
+//   - no holding above CONCENTRATION_CAP_PCT of (existing portfolio value + fresh money) after buying, once the stocks
+//     held are worth at least CONCENTRATION_MIN_MULTIPLE times the fresh money.
 // Constrained money is redistributed pro rata among picks that still have room; what cannot
 // be placed stays cash. Nothing is ever sold. If a held position has no usable valuation the
 // concentration limit cannot be evaluated, so the result is flagged incomplete rather than
 // treating that position as worth zero.
 export const CONTRIBUTION_CAP_PCT = 35;
 export const CONCENTRATION_CAP_PCT = 20;
+/** The per-holding limit only applies once the stocks held are worth this many times the month's money; before that it would leave most of a small portfolio's contribution as cash. */
+export const CONCENTRATION_MIN_MULTIPLE = 5;
 
 export type HoldingValue = { ticker: string; valuePkr: number | null };
 export type WeightedPick = { ticker: string; allocationPct: number };
@@ -40,7 +43,8 @@ export function sizeAllocation(
   const missingValuations = holdings.filter((h) => h.valuePkr === null).map((h) => h.ticker);
   const incomplete = missingValuations.length > 0;
   const portfolioPaisa = holdings.reduce((sum, h) => sum + (h.valuePkr === null ? 0 : paisa(h.valuePkr)), 0);
-  const concentrationLimit = Math.floor(((portfolioPaisa + total) * CONCENTRATION_CAP_PCT) / 100);
+  const concentrationApplies = incomplete || portfolioPaisa >= total * CONCENTRATION_MIN_MULTIPLE;
+  const concentrationLimit = concentrationApplies ? Math.floor(((portfolioPaisa + total) * CONCENTRATION_CAP_PCT) / 100) : Infinity;
   const contributionLimit = Math.floor((total * CONTRIBUTION_CAP_PCT) / 100);
 
   const items = picks
@@ -95,6 +99,9 @@ export type MonthlyPicksSizing = {
   /** Hash of the holdings the limits were applied against; a different fingerprint means a recalculation. */
   holdingsFingerprint: string;
   computedAt: string;
+  /** Held tickers and their combined value when the limits were applied, to tell a stale run from a current one. */
+  heldTickers?: string[];
+  portfolioPkr?: number;
   incomplete: boolean;
   missingValuations: string[];
   cashPkr: number;
@@ -133,12 +140,27 @@ export function applySizing<T extends SizableResult>(result: T, holdings: Holdin
     sizing: {
       holdingsFingerprint: holdingsFingerprint(holdings),
       computedAt: now.toISOString(),
+      heldTickers: holdings.filter((h) => (h.valuePkr ?? 1) > 0).map((h) => h.ticker).sort(),
+      portfolioPkr: Math.round(holdings.reduce((sum, h) => sum + (h.valuePkr ?? 0), 0)),
       incomplete: sized.incomplete,
       missingValuations: sized.missingValuations,
       cashPkr: sized.cashPaisa / 100,
       picks: sized.picks.map((p) => ({ ticker: p.ticker, requestedPct: p.requestedPct, allocationPkr: p.allocationPaisa / 100, constrainedBy: p.constrainedBy })),
     },
   };
+}
+
+/**
+ * True when the holdings a saved result was sized against have clearly moved on: a different set of held companies, or
+ * a portfolio worth over a tenth more or less. Price moves of a few percent are not worth telling anyone about.
+ */
+export function sizingIsStale(sizing: MonthlyPicksSizing | undefined, holdings: HoldingValue[]): boolean {
+  if (!sizing?.heldTickers || sizing.portfolioPkr === undefined) return false;
+  const now = holdings.filter((h) => (h.valuePkr ?? 1) > 0).map((h) => h.ticker).sort();
+  if (now.length !== sizing.heldTickers.length || now.some((t, i) => t !== sizing.heldTickers![i])) return true;
+  const value = holdings.reduce((sum, h) => sum + (h.valuePkr ?? 0), 0);
+  const before = sizing.portfolioPkr;
+  return before > 0 ? Math.abs(value - before) / before > 0.1 : value > 0;
 }
 
 const REASON_TEXT: Record<ConstraintReason, string> = {

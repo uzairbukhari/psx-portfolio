@@ -9,7 +9,8 @@
 import { pathToFileURL } from 'node:url';
 import { d1, trackedTickers, trackRun } from './d1-rest.mjs';
 import { scrapeExitCode } from './scrape-exit.mjs';
-import { fetchCompanyFacts } from '../lib/company-facts.ts';
+import { computeMetrics, fetchCompanyFacts } from '../lib/company-facts.ts';
+import { buildBenchmarks } from '../lib/facts-benchmarks.ts';
 
 const CONCURRENCY = 3;
 const dryRun = process.argv.includes('--dry-run');
@@ -50,6 +51,27 @@ async function recordFailure(ticker, message) {
   );
 }
 
+/** Once the cache is fresh, take the market breakpoints from every cached company page (public numbers only). */
+async function refreshBenchmarks() {
+  const day = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
+  const rows = await d1('SELECT payload FROM company_facts');
+  const metrics = rows.flatMap((row) => {
+    try {
+      return [computeMetrics(JSON.parse(String(row.payload)), day)];
+    } catch {
+      return [];
+    }
+  });
+  const benchmarks = buildBenchmarks(metrics, day);
+  if (!benchmarks) return console.log(`Market breakpoints: only ${metrics.length} cached companies, need at least 15. Not written.`);
+  await d1(
+    `INSERT INTO facts_benchmarks (id,payload,computed_on,sample) VALUES ('latest',?,?,?)
+     ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, computed_on=excluded.computed_on, sample=excluded.sample`,
+    [JSON.stringify(benchmarks), benchmarks.computedOn, benchmarks.sample],
+  );
+  console.log(`Market breakpoints written from ${benchmarks.sample} companies.`);
+}
+
 async function main() {
   trackRun('facts', { dryRun });
   const tickers = await targetTickers();
@@ -75,6 +97,7 @@ async function main() {
   console.log(
     `PSX facts: ${ok.length}/${tickers.length} tickers` + (failed.length ? `. Failed: ${failed.join('; ')}` : '.'),
   );
+  if (!dryRun && ok.length) await refreshBenchmarks().catch((error) => console.log(`Market breakpoints failed: ${error instanceof Error ? error.message : error}`));
   process.exitCode = scrapeExitCode(tickers.length, failed.length);
 }
 

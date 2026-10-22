@@ -7,6 +7,7 @@
 import { quoteDate } from './psx-quotes.ts';
 import { fetchPsx } from './psx-fetch.ts';
 import { constrainAllocations } from './allocation.ts';
+import { benchmarkValue, rankAgainst, type BenchmarkKey, type FactsBenchmarks } from './facts-benchmarks.ts';
 
 export type FinancialPeriod = { period: string; revenue: number | null; pat: number | null; eps: number | null };
 export type Announcement = { date: string; title: string; category: 'Financial Results' | 'Board Meetings' | 'Others'; url: string | null };
@@ -353,8 +354,21 @@ export type CompanyScore = {
   metrics: CompanyMetrics;
 };
 
-/** Minimum scored metrics for a company to be selectable. */
-export const MIN_EVIDENCE_METRICS = 2;
+/** Minimum scored metrics (of valuation, growth, profitability, momentum) for a company to be selectable. */
+export const MIN_EVIDENCE_METRICS = 3;
+
+/** Earnings over the last four quarters (or the published P/E) are zero or negative: never a pick, always ranked last on value. */
+export function isLossMaking(m: Pick<CompanyMetrics, 'epsTtm' | 'peTtm' | 'unavailable'>): boolean {
+  if (m.unavailable) return false;
+  return (m.epsTtm !== null && m.epsTtm <= 0) || (m.peTtm !== null && m.peTtm <= 0);
+}
+/** Why a scored company cannot be a pick, in words for the table; null when it can. */
+export function ineligibleReason(score: Pick<CompanyScore, 'metrics' | 'evidence'>): string | null {
+  if (score.metrics.unavailable) return 'No PSX data yet';
+  if (isLossMaking(score.metrics)) return 'Loss-making in the last four quarters';
+  if (score.evidence.metricCount < MIN_EVIDENCE_METRICS) return 'Too little data to score';
+  return null;
+}
 
 /** Average (mid) percentile ranks: ties share a rank, missing values stay null. */
 export function percentileRanks(values: (number | null)[]): (number | null)[] {
@@ -376,12 +390,22 @@ export function percentileRanks(values: (number | null)[]): (number | null)[] {
 const WEIGHTS = { valuation: 0.35, growth: 0.35, profitability: 0.15, momentum: 0.15 } as const;
 const SCORED = Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[];
 
-export function quantScore(metricsList: CompanyMetrics[]): CompanyScore[] {
+/**
+ * Scores each company 0 to 100. With market breakpoints (`benchmarks`) a company is ranked against all tracked PSX
+ * companies, so its score does not depend on what else is on the shortlist. Without them (a thin market, or no row yet)
+ * it is ranked against the other companies in `metricsList`, as before.
+ */
+export function quantScore(metricsList: CompanyMetrics[], benchmarks?: FactsBenchmarks | null): CompanyScore[] {
   const only = (pick: (m: CompanyMetrics) => number | null) => metricsList.map((m) => (m.unavailable ? null : pick(m)));
-  const valuation = percentileRanks(only((m) => m.earningsYieldPct));
-  const growth = percentileRanks(only((m) => m.epsYoYPct ?? m.epsAnnualCagrPct));
-  const profitability = percentileRanks(only((m) => m.netMarginTrendPct));
-  const momentum = percentileRanks(only((m) => m.change1yPct));
+  const rank = (key: BenchmarkKey, values: (number | null)[]) => {
+    const points = benchmarks?.points[key];
+    return points?.length ? values.map((v) => (v === null ? null : v <= -1e5 ? 0 : rankAgainst(points, v))) : percentileRanks(values);
+  };
+  // A loss-maker has no earnings yield; it ranks below every profitable company instead of being left out of the average.
+  const valuation = rank('valuation', only((m) => (isLossMaking(m) ? -1e6 : m.earningsYieldPct)));
+  const growth = rank('growth', only((m) => benchmarkValue('growth', m)));
+  const profitability = rank('profitability', only((m) => m.netMarginTrendPct));
+  const momentum = rank('momentum', only((m) => m.change1yPct));
   // Announcement recency is context only: it is shown but never scored as a positive catalyst.
   const catalyst = percentileRanks(only((m) => (m.mostRecentAnnouncement ? -m.mostRecentAnnouncement.ageDays : null)));
   return metricsList.map((metrics, i) => {
@@ -401,8 +425,10 @@ export function quantScore(metricsList: CompanyMetrics[]): CompanyScore[] {
 }
 
 export type QuantPick = { ticker: string; allocationPct: number; score: number };
-export function quantAllocation(scores: CompanyScore[], threshold = 55, maxPicks = 5, capPct = 35): { picks: QuantPick[]; unallocatedPct: number } {
-  const candidates = scores.filter((s) => !s.metrics.unavailable && s.evidence.metricCount >= MIN_EVIDENCE_METRICS && s.score >= threshold)
+/** A company needs at least this score to receive money. */
+export const PICK_THRESHOLD = 55;
+export function quantAllocation(scores: CompanyScore[], threshold = PICK_THRESHOLD, maxPicks = 5, capPct = 35): { picks: QuantPick[]; unallocatedPct: number } {
+  const candidates = scores.filter((s) => ineligibleReason(s) === null && s.score >= threshold)
     .sort((a, b) => b.score - a.score).slice(0, maxPicks);
   if (!candidates.length) return { picks: [], unallocatedPct: 100 };
   // Same constraint set as the AI path (`constrainAllocations`): proportional to score, capped

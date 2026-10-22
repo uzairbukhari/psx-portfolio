@@ -6,6 +6,7 @@ import { today } from './portfolio.ts';
 import { readFacts } from './company-facts-store.ts';
 import { computeMetrics, overlayQuote, quantScore, type CompanyMetrics } from './company-facts.ts';
 import { readQuoteRows } from './quote-cache.ts';
+import { readBenchmarks } from './facts-benchmarks-store.ts';
 import { FACTS_MAX_AGE_DAYS, unavailableReason } from './monthly-picks-flow.ts';
 import type { PublicAnalysis } from './public-analysis-types.ts';
 import type { SnapshotCompany } from './monthly-picks-ai.ts';
@@ -23,7 +24,7 @@ async function indexContext(db: D1Database) {
 
 export async function buildPublicAnalysis(db: D1Database, tickers: string[]): Promise<PublicAnalysis> {
   const dataAsOf = today();
-  const entries = await readFacts(db, tickers);
+  const [entries, benchmarks] = await Promise.all([readFacts(db, tickers), readBenchmarks(db)]);
   const quotes = new Map((await readQuoteRows(db).catch(() => [])).map((quote) => [quote.ticker, quote]));
   const overlayFor = (ticker: string, facts: NonNullable<(typeof entries)[number]['facts']>) => {
     const quote = quotes.get(ticker);
@@ -51,11 +52,12 @@ export async function buildPublicAnalysis(db: D1Database, tickers: string[]): Pr
   return {
     dataAsOf,
     companies,
-    scores: quantScore(metrics),
+    scores: quantScore(metrics, benchmarks),
     index: await indexContext(db),
     facts: entries.map(({ status }) => ({
       ticker: status.ticker, state: status.state, fetchedOn: status.fetchedOn, ageDays: status.ageDays, error: status.error,
     })),
     factsMaxAgeDays: FACTS_MAX_AGE_DAYS,
+    benchmark: benchmarks ? { sample: benchmarks.sample, computedOn: benchmarks.computedOn } : null,
   };
 }

@@ -37,11 +37,11 @@ test('picks: only researched, verified, convincing companies get money, in ranke
   assert.equal(result.picks[0].name, 'Alpha');
   assert.deepEqual(result.excluded.map((e) => e.ticker).sort(), ['BBB', 'CCC', 'DDD', 'EEE']);
   assert.match(result.excluded.find((e) => e.ticker === 'EEE').reason, /No AI research/);
-  // The model suggests 30%, but with an empty portfolio the 20% concentration limit caps one pick at 20% of the money.
-  assert.equal(result.picks[0].allocationPct, 20);
-  assert.equal(result.unallocatedPct, 80);
-  assert.equal(result.sizing.cashPkr, 80_000);
-  assert.equal(result.sizing.picks[0].constrainedBy, 'concentration_cap');
+  // The model suggests 30%; a small portfolio has no 20% holding limit yet, so only the 35% per-pick cap could bind.
+  assert.equal(result.picks[0].allocationPct, 30);
+  assert.equal(result.unallocatedPct, 70);
+  assert.equal(result.sizing.cashPkr, 70_000);
+  assert.equal(result.sizing.picks[0].constrainedBy, null);
 });
 
 test('picks: the 35% and 20% limits still apply on the device, and an overweight holding gets nothing new', () => {
@@ -77,8 +77,8 @@ test('picks: share estimates come from fresh PSX quotes through the Monthly Pick
   const real = new Date();
   const portfolio = { ...blankPortfolio(), quotes: { AAA: { price: 100, date: latestCompletedSessionDate(real), source: 'psx' } } };
   const [estimate] = estimateAiLabBuys(result, portfolio, 100_000, 0.5, real);
-  assert.equal(estimate.allocationPkr, 20_000);
-  assert.ok(estimate.shares > 150 && estimate.shares <= 200);
+  assert.equal(estimate.allocationPkr, 30_000);
+  assert.ok(estimate.shares > 250 && estimate.shares <= 300);
   const [noQuote] = estimateAiLabBuys(result, blankPortfolio(), 100_000, 0.5, real);
   assert.equal(noQuote.shares, null);
 });
