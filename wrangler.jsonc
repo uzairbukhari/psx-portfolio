@@ -48,7 +48,7 @@
 		// Deployment label; the staging Worker sets "staging", which shows a STAGING badge.
 		"APP_ENV": "production",
 		// Optional "or email us" address on the feedback page; hidden while empty.
-		"SUPPORT_EMAIL": "",
+		"SUPPORT_EMAIL": "support@sipwise.trade",
 		// Cloudflare Turnstile site key (public) for the signed-out feedback form. Also needs the TURNSTILE_SECRET_KEY
 		// Worker secret; signed-out sending stays off until both are set.
 		"TURNSTILE_SITE_KEY": ""
@@ -85,7 +85,7 @@
 				"GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
 				"GITHUB_REPO": "uzairbukhari/psx-portfolio",
 				"APP_ENV": "staging",
-				"SUPPORT_EMAIL": "",
+				"SUPPORT_EMAIL": "support@sipwise.trade",
 				// Cloudflare's published always-pass test key; pair it with the test secret 1x0000000000000000000000000000000AA.
 				"TURNSTILE_SITE_KEY": "1x00000000000000000000AA"
 			}
