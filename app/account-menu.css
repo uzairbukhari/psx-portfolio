@@ -68,3 +68,9 @@ html:root .more-actions{display:grid;grid-auto-flow:column;grid-auto-columns:1fr
 html:root .more-action{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border:1px solid var(--border);border-radius:14px;background:transparent;color:var(--foreground);font:600 14.5px/1 var(--font-geist-sans),sans-serif;cursor:pointer}
 html:root .more-action[data-primary]{background:var(--accent);border-color:rgb(var(--ch-primary) / .35)}
 html:root .more-action svg{width:18px;height:18px}
+
+/* Settings has nothing in the top bar (no search, refresh or bell), so the page starts at the top. */
+@media(min-width:761px){
+  html:root .header-right.is-settings{height:0;margin-bottom:0;overflow:visible}
+  html:root .settings-shell .back-link{margin-top:8px}
+}
