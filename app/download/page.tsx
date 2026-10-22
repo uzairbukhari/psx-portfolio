@@ -1,5 +1,6 @@
 import { LandingFooter, LandingNav } from '../landing/landing-chrome';
 import { CfBeacon } from '../cf-beacon';
+import { env } from 'cloudflare:workers';
 import { edgeCached } from '@/lib/edge-cache';
 
 export const metadata = {
@@ -14,17 +15,25 @@ type Download = { version: string; apk: string; sizeMb: number; sha256Url: strin
 
 type Release = { tag_name: string; prerelease: boolean; draft: boolean; assets: { name: string; browser_download_url: string; size: number }[] };
 
-/** The newest promoted Android build (the in-app updater's rule), or the newest pre-release while none is promoted. */
+/** The newest promoted (not pre-release) Android build, the same rule the in-app updater uses. */
 async function latestApk(): Promise<Download> {
   try {
+    // Unauthenticated calls from Cloudflare's shared addresses get rate limited, so use the repo token when the Worker has one.
+    const token = (env as { GITHUB_DISPATCH_TOKEN?: string }).GITHUB_DISPATCH_TOKEN;
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, {
-      headers: { accept: 'application/vnd.github+json', 'user-agent': 'sipwise-download-page' },
+      headers: {
+        accept: 'application/vnd.github+json',
+        'user-agent': 'sipwise-download-page',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error('Download page: GitHub releases answered', res.status);
+      return null;
+    }
     const releases = (await res.json()) as Release[];
-    // Promoted builds first (what the in-app updater offers); until one exists, the newest pre-release.
-    const android = releases.filter((r) => !r.draft && r.tag_name.startsWith('android-v'));
-    for (const r of [...android.filter((x) => !x.prerelease), ...android.filter((x) => x.prerelease)]) {
+    for (const r of releases) {
+      if (r.draft || r.prerelease || !r.tag_name.startsWith('android-v')) continue;
       const apk = r.assets.find((a) => /^sipwise-\d[^/]*\.apk$/.test(a.name));
       if (!apk) continue;
       const sums = r.assets.find((a) => a.name === 'SHA256SUMS');
@@ -35,8 +44,9 @@ async function latestApk(): Promise<Download> {
         sha256Url: sums?.browser_download_url ?? null,
       };
     }
-  } catch {
+  } catch (e) {
     // The page still works with the plain releases link.
+    console.error('Download page: could not read releases', e);
   }
   return null;
 }
@@ -60,7 +70,7 @@ export default async function Page() {
           <a className="dl-btn" href={latest?.apk ?? `${RELEASES}/latest`}>
             {latest ? 'Download the APK' : 'Open the latest release'}
           </a>
-          <p>{latest ? `Sipwise ${latest.version} for Android` : 'Pick the file named sipwise-<version>.apk'}</p>
+          <p>{latest ? `Sipwise ${latest.version} for Android` : 'Pick the file named sipwise-<version>.apk on the release page'}</p>
         </div>
         <h2>Install it</h2>
         <ol>
