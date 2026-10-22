@@ -95,3 +95,38 @@ test('Monthly Picks starts from what the SIP Blueprint still wants spent on stoc
   assert.equal(picksBudget(ticked, parts, asOf).done, true);
   assert.equal(picksBudget({ ...blueprint, targets: { stocks: 0, funds: 100, gold: 0, currency: 0 } }, parts, asOf), null);
 });
+
+import { buildBenchmarks, parseBenchmarks, rankAgainst, MIN_BENCHMARK_SAMPLE } from '../lib/facts-benchmarks.ts';
+
+const market = (n) => Array.from({ length: n }, (_, i) => m({
+  ticker: `M${i}`, earningsYieldPct: 2 + i, epsYoYPct: i * 2 - 10, netMarginTrendPct: i - 5, change1yPct: i * 3 - 20, epsTtm: 5, peTtm: 10,
+}));
+
+test('a score ranks against the market, so it does not change with the rest of the shortlist', () => {
+  const bench = buildBenchmarks(market(30), '2026-10-22');
+  assert.equal(bench.sample, 30);
+  const mid = m({ ticker: 'MID', earningsYieldPct: 16, epsYoYPct: 20, netMarginTrendPct: 10, change1yPct: 30 });
+  const alone = quantScore([mid], bench)[0].score;
+  const withStar = quantScore([mid, m({ ticker: 'STAR', earningsYieldPct: 99, epsYoYPct: 500, netMarginTrendPct: 80, change1yPct: 400 })], bench).find((s) => s.ticker === 'MID').score;
+  assert.equal(alone, withStar);
+  assert.ok(alone > 40 && alone < 70, `a middling company scores in the middle, got ${alone}`);
+  // Without breakpoints a lone company is the whole market and scores 50 on every part.
+  assert.equal(quantScore([mid])[0].score, 50);
+});
+
+test('a loss-maker still ranks last on value against the market', () => {
+  const bench = buildBenchmarks(market(30), '2026-10-22');
+  const loss = m({ ticker: 'LOSS', peTtm: null, earningsYieldPct: null, epsTtm: -2, epsYoYPct: 20, netMarginTrendPct: 10, change1yPct: 30 });
+  assert.equal(quantScore([loss], bench)[0].components.valuation, 0);
+});
+
+test('breakpoints need a real market and a fresh row', () => {
+  assert.equal(buildBenchmarks(market(MIN_BENCHMARK_SAMPLE - 1), '2026-10-22'), null);
+  const bench = buildBenchmarks(market(MIN_BENCHMARK_SAMPLE), '2026-10-22');
+  assert.ok(parseBenchmarks(JSON.parse(JSON.stringify(bench)), '2026-11-01'));
+  assert.equal(parseBenchmarks(JSON.parse(JSON.stringify(bench)), '2026-12-15'), null, 'older than 30 days');
+  assert.equal(parseBenchmarks({ computedOn: '2026-10-22', sample: 20, points: { valuation: [1, 2] } }, '2026-10-22'), null);
+  assert.equal(rankAgainst([0, 10, 20], -5), 0);
+  assert.equal(rankAgainst([0, 10, 20], 99), 100);
+  assert.equal(rankAgainst([0, 10, 20], 5), 25);
+});

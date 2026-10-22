@@ -7,6 +7,7 @@
 import { quoteDate } from './psx-quotes.ts';
 import { fetchPsx } from './psx-fetch.ts';
 import { constrainAllocations } from './allocation.ts';
+import { benchmarkValue, rankAgainst, type BenchmarkKey, type FactsBenchmarks } from './facts-benchmarks.ts';
 
 export type FinancialPeriod = { period: string; revenue: number | null; pat: number | null; eps: number | null };
 export type Announcement = { date: string; title: string; category: 'Financial Results' | 'Board Meetings' | 'Others'; url: string | null };
@@ -389,13 +390,22 @@ export function percentileRanks(values: (number | null)[]): (number | null)[] {
 const WEIGHTS = { valuation: 0.35, growth: 0.35, profitability: 0.15, momentum: 0.15 } as const;
 const SCORED = Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[];
 
-export function quantScore(metricsList: CompanyMetrics[]): CompanyScore[] {
+/**
+ * Scores each company 0 to 100. With market breakpoints (`benchmarks`) a company is ranked against all tracked PSX
+ * companies, so its score does not depend on what else is on the shortlist. Without them (a thin market, or no row yet)
+ * it is ranked against the other companies in `metricsList`, as before.
+ */
+export function quantScore(metricsList: CompanyMetrics[], benchmarks?: FactsBenchmarks | null): CompanyScore[] {
   const only = (pick: (m: CompanyMetrics) => number | null) => metricsList.map((m) => (m.unavailable ? null : pick(m)));
+  const rank = (key: BenchmarkKey, values: (number | null)[]) => {
+    const points = benchmarks?.points[key];
+    return points?.length ? values.map((v) => (v === null ? null : v <= -1e5 ? 0 : rankAgainst(points, v))) : percentileRanks(values);
+  };
   // A loss-maker has no earnings yield; it ranks below every profitable company instead of being left out of the average.
-  const valuation = percentileRanks(only((m) => (isLossMaking(m) ? -1e6 : m.earningsYieldPct)));
-  const growth = percentileRanks(only((m) => m.epsYoYPct ?? m.epsAnnualCagrPct));
-  const profitability = percentileRanks(only((m) => m.netMarginTrendPct));
-  const momentum = percentileRanks(only((m) => m.change1yPct));
+  const valuation = rank('valuation', only((m) => (isLossMaking(m) ? -1e6 : m.earningsYieldPct)));
+  const growth = rank('growth', only((m) => benchmarkValue('growth', m)));
+  const profitability = rank('profitability', only((m) => m.netMarginTrendPct));
+  const momentum = rank('momentum', only((m) => m.change1yPct));
   // Announcement recency is context only: it is shown but never scored as a positive catalyst.
   const catalyst = percentileRanks(only((m) => (m.mostRecentAnnouncement ? -m.mostRecentAnnouncement.ageDays : null)));
   return metricsList.map((metrics, i) => {

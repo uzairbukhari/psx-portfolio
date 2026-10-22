@@ -228,7 +228,12 @@ export default function PicksResults({ run, portfolio, extraNames, onRefreshPric
         <div className="mp-coverage__top">
           <div>
             <h3>Every shortlisted company</h3>
-            <p className="muted">Outlook and data quality are separate: a data gap is not a negative view.</p>
+            <p className="muted">
+              Outlook and data quality are separate: a data gap is not a negative view.{' '}
+              {result.scoredAgainst
+                ? `Each score compares a company with the ${result.scoredAgainst} PSX companies we track, so it does not change when you edit your list.`
+                : 'Scores compare the companies on your shortlist with each other until enough market data is available.'}
+            </p>
           </div>
           <label className="mp-sort">
             Sort

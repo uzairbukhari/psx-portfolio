@@ -10,4 +10,6 @@ export type PublicAnalysis = {
   index: { code: string; close: number; asOf: string } | null;
   facts: { ticker: string; state: FactsState; fetchedOn: string | null; ageDays: number | null; error: string | null }[];
   factsMaxAgeDays: number;
+  /** Set when scores are ranked against the whole tracked market; null when they are ranked within the shortlist. */
+  benchmark: { sample: number; computedOn: string } | null;
 };

@@ -56,6 +56,7 @@ function snapshotFor(input: LocalRunInput, day: string): SnapshotV8 {
     dataAsOf: input.analysis.dataAsOf,
     companies: input.analysis.companies.filter((company) => wanted.has(company.ticker)),
     scores: input.analysis.scores.filter((score) => wanted.has(score.ticker)),
+    benchmarkSample: input.analysis.benchmark?.sample ?? null,
   };
 }
 

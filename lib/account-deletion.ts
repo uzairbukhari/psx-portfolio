@@ -33,6 +33,7 @@ export const SHARED_TABLES: readonly string[] = [
   'quote_refreshes',
   'company_facts',
   'facts_requests',
+  'facts_benchmarks',
   'market_summary_refreshes',
   'dividend_announcements',
   'price_history',

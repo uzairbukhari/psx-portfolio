@@ -20,6 +20,8 @@ export type SnapshotV8 = {
   shortlist: string[]; dataAsOf: string;
   companies: SnapshotCompany[];
   scores: CompanyScore[];
+  /** Companies the scores were ranked against (the tracked market); absent when they were ranked within the shortlist. */
+  benchmarkSample?: number | null;
 };
 
 function availableCompanies(snapshot: SnapshotV8) {
@@ -96,5 +98,6 @@ export function quantResult(snapshot: SnapshotV8): MonthlyPicksResearch {
     picks, coverage, unallocatedPct: allocation.unallocatedPct,
     assessedCount: coverage.filter((c) => c.assessmentStatus === 'assessed').length, totalCount: snapshot.shortlist.length,
     method: 'quant', dataAsOf: snapshot.dataAsOf, versions: versionsOf(),
+    ...(snapshot.benchmarkSample ? { scoredAgainst: snapshot.benchmarkSample } : {}),
   };
 }

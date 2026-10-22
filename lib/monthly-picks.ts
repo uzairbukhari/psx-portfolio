@@ -32,6 +32,8 @@ export type MonthlyPicksResearch = {
   marketOutlook: string; picks: MonthlyPick[]; coverage: CompanyOutlook[]; unallocatedPct: number;
   evidenceIssues?: EvidenceIssue[]; assessedCount?: number; totalCount?: number;
   method?: 'ai' | 'quant'; dataAsOf?: string;
+  /** How many tracked PSX companies each score was ranked against; absent when it was ranked within the shortlist only. */
+  scoredAgainst?: number;
   /** Why a quant result was used instead of the AI ranking, when that is worth telling the user. */
   fallbackReason?: string;
   /** Contribution/concentration limits applied when the run finished, against the holdings at that time. */
