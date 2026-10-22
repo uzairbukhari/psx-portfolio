@@ -137,6 +137,7 @@ private fun PlanChart(
     real: Boolean,
 ) {
     val chart = SipwiseTheme.chart
+
     fun paid(p: SipProjectionPoint) = if (real) p.realInvested else p.invested
 
     fun worth(p: SipProjectionPoint) = if (real) p.realValue else p.value
