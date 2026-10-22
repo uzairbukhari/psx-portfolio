@@ -63,12 +63,10 @@ import {
   ScrollText,
   FlaskConical,
   Microscope,
-  LockKeyhole,
-  ShieldCheck,
   TrendingUp,
   PanelLeft,
-  Pin,
-  PinOff,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sparkles,
   Target,
 } from 'lucide-react';
@@ -144,8 +142,7 @@ import type { OwnedFund } from './mutual-funds';
 import { buildAssetEntries, buildEntries } from '@/lib/ledger-entries';
 import { CompanyNavProvider } from './ticker-link';
 import { LoadError } from './sign-in';
-import { UserAvatar } from './user-avatar';
-import { ThemeMenuItems } from './theme-menu';
+import { AccountMenu } from './account-menu';
 import { HelpPanel } from './help-panel';
 import { ChecklistStrip, PageTip, StartScreen } from './onboarding-ui';
 import { ProductTour, TourOffer } from './product-tour';
@@ -3004,68 +3001,22 @@ function DashboardContent({
     });
   }
   const accountMenu = (withName: boolean) => email ? (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="account-trigger">
-        <UserAvatar name={name} email={email} picture={picture} />
-        {withName && (
-            <span className="account-who">
-              <b>{name || email}</b>
-              <small>{vault ? 'Vault unlocked' : 'Signed in'}</small>
-            </span>
-          )}
-          {withName ? (
-            <LockKeyhole size={15} className="account-chevron" />
-          ) : (
-            <ChevronDown size={14} className="account-chevron" />
-          )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="account-menu">
-        <div className="account-menu-header">
-          <UserAvatar
-            name={name}
-            email={email}
-            picture={picture}
-            large
-          />
-          <div>
-            {name && (
-              <span className="account-menu-name">{name}</span>
-            )}
-            <span className="account-menu-email">{email}</span>
-          </div>
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setTab('settings')}>
-          <Settings size={15} /> Settings
-        </DropdownMenuItem>
-        {isAdmin && (
-          <DropdownMenuItem onClick={() => window.location.assign('/admin')}>
-            <ShieldCheck size={15} /> Admin console
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem
-          onClick={() => {
-            track('help_opened', { item: 'panel' });
-            setHelpOpen(true);
-          }}
-        >
-          <LifeBuoy size={15} /> Help
-        </DropdownMenuItem>
-        <ThemeMenuItems />
-        {vault && (
-          <DropdownMenuItem onClick={vault.lock}>
-            <LockKeyhole size={15} /> Lock vault
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          onClick={signOut}
-        >
-          <LogOut size={15} /> Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <AccountMenu
+      name={name}
+      email={email}
+      picture={picture}
+      isAdmin={isAdmin}
+      unlocked={!!vault}
+      sideMode={withName ? side.mode : 'phone'}
+      onSettings={() => setTab('settings')}
+      onHelp={() => {
+        track('help_opened', { item: 'panel' });
+        setHelpOpen(true);
+      }}
+      onAdmin={isAdmin ? () => window.location.assign('/admin') : undefined}
+      onLock={vault?.lock}
+      onSignOut={signOut}
+    />
   ) : null;
 
   return (
@@ -3158,6 +3109,16 @@ function DashboardContent({
                 <LogoMark size={28} />
                 <Wordmark />
               </button>
+              <button
+                type="button"
+                data-slot="side-collapse"
+                className="side-collapse"
+                aria-label={side.mode === 'pinned' ? 'Collapse sidebar' : 'Expand sidebar'}
+                title={(side.mode === 'pinned' ? 'Collapse sidebar' : 'Expand sidebar') + ' ( [ )'}
+                onClick={() => side.setMode(side.mode === 'pinned' ? 'auto' : 'pinned')}
+              >
+                {side.mode === 'pinned' ? <PanelLeftClose size={18} aria-hidden="true" /> : <PanelLeftOpen size={18} aria-hidden="true" />}
+              </button>
             </div>
             {!emptyStart && tab !== 'settings' && <div className="side-portfolio" data-tour="portfolios">{workspace?.selector}</div>}
             {!emptyStart && (
@@ -3171,37 +3132,9 @@ function DashboardContent({
                 moreActive={moreOpen}
               />
             )}
-            {(
-              <div className="side-tools">
-                <button
-                  type="button"
-                  data-slot="side-tool"
-                  className="side-tool"
-                  aria-pressed={side.mode !== 'auto'}
-                  aria-label={side.mode === 'auto' ? 'Pin menu' : 'Unpin menu'}
-                  title={(side.mode === 'auto' ? 'Pin menu' : 'Unpin menu') + ' ( [ )'}
-                  onClick={() => side.setMode(side.mode === 'auto' ? 'pinned' : 'auto')}
-                >
-                  {side.mode === 'auto' ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
-                  <span className="tab-long">{side.mode === 'auto' ? 'Pin menu' : 'Unpin'}</span>
-                </button>
-                <button
-                  type="button"
-                  data-slot="side-tool"
-                  className="side-tool"
-                  data-active={tab === 'settings' || undefined}
-                  aria-label="Settings"
-                  data-tip="Settings"
-                  onClick={() => setTab('settings')}
-                >
-                  <Settings size={20} aria-hidden="true" />
-                  <span className="tab-long">Settings</span>
-                </button>
-              </div>
-            )}
             {email && <div className="side-user" data-tour="profile">{accountMenu(true)}</div>}
             </div>
-            <div className="header-right">
+            <div className={'header-right' + (tab === 'settings' ? ' is-settings' : '')}>
               {tab === 'sip-plan' && <PlanMonthNav month={month} setMonth={setMonth} />}
               {tab !== 'settings' && tab !== 'company' && tab !== 'sip-plan' && (
                 <div className="page-id">
@@ -3234,112 +3167,114 @@ function DashboardContent({
                   <RefreshCw size={18} />
                 </button>
               )}
-              <Popover
-                open={bellOpen}
-                onOpenChange={(next) => {
-                  // Phones skip the popover (it can't fit): go straight to the page.
-                  if (next && window.matchMedia('(max-width:760px)').matches) {
-                    setTab('notifications');
-                    return;
-                  }
-                  setBellOpen(next);
-                }}
-              >
-                <PopoverTrigger
-                  className="bell-trigger hdr-btn"
-                  data-tour="bell"
-                  aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+              {tab !== 'settings' && (
+                <Popover
+                  open={bellOpen}
+                  onOpenChange={(next) => {
+                    // Phones skip the popover (it can't fit): go straight to the page.
+                    if (next && window.matchMedia('(max-width:760px)').matches) {
+                      setTab('notifications');
+                      return;
+                    }
+                    setBellOpen(next);
+                  }}
                 >
-                  <Bell size={18} />
-                  <span className="hdr-label">Notifications</span>
-                  {unreadCount > 0 && (
-                    <span className="bell-badge">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </PopoverTrigger>
-                <PopoverContent align="end" className="notice-panel">
-                  <div className="notice-head">
-                    <strong>Notifications</strong>
-                    <span className="row">
+                  <PopoverTrigger
+                    className="bell-trigger hdr-btn"
+                    data-tour="bell"
+                    aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+                  >
+                    <Bell size={18} />
+                    <span className="hdr-label">Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="bell-badge">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="notice-panel">
+                    <div className="notice-head">
+                      <strong>Notifications</strong>
+                      <span className="row">
+                        <button
+                          type="button"
+                          data-slot="link"
+                          className="link-button"
+                          disabled={busy || !unreadCount}
+                          onClick={() =>
+                            updateNotifications((list) =>
+                              list.map((n) => ({ ...n, read: true })),
+                            )
+                          }
+                        >
+                          Mark all read
+                        </button>
+                        <button
+                          type="button"
+                          data-slot="link"
+                          className="link-button"
+                          disabled={busy || !notifications.length}
+                          onClick={() => {
+                            const at = new Date().toISOString();
+                            updateNotifications((list) =>
+                              list.map((n) =>
+                                n.clearedAt
+                                  ? n
+                                  : { ...n, read: true, clearedAt: at },
+                              ),
+                            );
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    </div>
+                    {notifications.length === 0 ? (
+                      <p className="muted notice-empty">
+                        Nothing yet. Dividends recorded from PSX announcements and
+                        new payout announcements for your holdings appear here.
+                      </p>
+                    ) : (
+                      <ul className="notice-list">
+                        {notifications.map((n) => (
+                          <li key={n.id} className={n.read ? '' : 'unread'}>
+                            <button
+                              type="button"
+                              data-slot="link"
+                              className="notice-item"
+                              onClick={() => {
+                                if (!n.read)
+                                  updateNotifications((list) =>
+                                    list.map((x) =>
+                                      x.id === n.id ? { ...x, read: true } : x,
+                                    ),
+                                  );
+                              }}
+                            >
+                              <strong>{n.title}</strong>
+                              <span>{n.body}</span>
+                              <small>{new Date(n.at).toLocaleString()}</small>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="notice-foot">
                       <button
                         type="button"
                         data-slot="link"
                         className="link-button"
-                        disabled={busy || !unreadCount}
-                        onClick={() =>
-                          updateNotifications((list) =>
-                            list.map((n) => ({ ...n, read: true })),
-                          )
-                        }
-                      >
-                        Mark all read
-                      </button>
-                      <button
-                        type="button"
-                        data-slot="link"
-                        className="link-button"
-                        disabled={busy || !notifications.length}
                         onClick={() => {
-                          const at = new Date().toISOString();
-                          updateNotifications((list) =>
-                            list.map((n) =>
-                              n.clearedAt
-                                ? n
-                                : { ...n, read: true, clearedAt: at },
-                            ),
-                          );
+                          setBellOpen(false);
+                          setTab('notifications');
                         }}
                       >
-                        Clear
+                        View all notifications
                       </button>
-                    </span>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <p className="muted notice-empty">
-                      Nothing yet. Dividends recorded from PSX announcements and
-                      new payout announcements for your holdings appear here.
-                    </p>
-                  ) : (
-                    <ul className="notice-list">
-                      {notifications.map((n) => (
-                        <li key={n.id} className={n.read ? '' : 'unread'}>
-                          <button
-                            type="button"
-                            data-slot="link"
-                            className="notice-item"
-                            onClick={() => {
-                              if (!n.read)
-                                updateNotifications((list) =>
-                                  list.map((x) =>
-                                    x.id === n.id ? { ...x, read: true } : x,
-                                  ),
-                                );
-                            }}
-                          >
-                            <strong>{n.title}</strong>
-                            <span>{n.body}</span>
-                            <small>{new Date(n.at).toLocaleString()}</small>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="notice-foot">
-                    <button
-                      type="button"
-                      data-slot="link"
-                      className="link-button"
-                      onClick={() => {
-                        setBellOpen(false);
-                        setTab('notifications');
-                      }}
-                    >
-                      View all notifications
-                    </button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
               {tab === 'holdings' && !isAll && !locked && !emptyStart && (p.companies.length > 0 || hasAssets) && (
                 <AddAssetMenu onPick={pickAsset} disabled={busy} header />
               )}

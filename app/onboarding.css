@@ -44,11 +44,6 @@ html:root .more-row svg{width:20px;height:20px;flex:none;color:var(--muted-foreg
 html:root .more-row[aria-current=page]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
 html:root .more-row:hover{background:var(--muted)}
 html:root .more-badge{display:inline-block;margin-left:auto}
-html:root .more-signout{margin-top:6px;border-top:1px solid var(--border);border-radius:0 0 12px 12px;color:var(--danger)}
-html:root .more-signout svg{color:var(--danger)}
-html:root .more-theme{display:flex;width:100%}
-html:root .more-theme button{flex:1;padding:10px 4px}
-html:root .more-theme button[aria-pressed=true]{background:var(--card);color:var(--foreground);box-shadow:var(--shadow-card,none)}
 
 /* ───────── New-user start screen and Getting started checklist ───────── */
 html:root .ob-ring{display:inline-grid;place-items:center;width:54px;height:54px;flex:none;border-radius:50%;background:conic-gradient(var(--success) var(--p),var(--muted) 0)}

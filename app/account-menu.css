@@ -1,0 +1,76 @@
+/* Sidebar footer (account card), the account menu that opens beside it, the collapse button and the theme swatches. */
+html:root .side-user{display:none}
+html:root .side-collapse{display:none}
+@media(min-width:761px){
+  html:root .side-user{display:block;padding-top:8px;border-top:1px solid var(--border)}
+  html:root .side-user .account-trigger{width:100%;height:auto;gap:10px;padding:8px;border:1px solid transparent;border-radius:14px;background:transparent;box-shadow:none;backdrop-filter:none;transition:background-color .15s ease,border-color .15s ease}
+  html:root .side-user .account-trigger:hover{background:var(--muted);box-shadow:none}
+  html:root .side-user .account-trigger[data-popup-open]{background:var(--muted);border-color:rgb(var(--ch-primary) / .45);box-shadow:none}
+  html:root .side-user .account-who{display:flex;flex-direction:column;align-items:flex-start;min-width:0;flex:1;line-height:1.25;text-align:left}
+  html:root .side-user .account-who b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;font-weight:600}
+  html:root .side-user .account-who small{font-size:11.5px;color:var(--muted-foreground)}
+  html:root .side-user .account-chevron{flex:none}
+  html:root .side-user .account-trigger[data-popup-open] .account-chevron{transform:none}
+  html:root .side-user .user-avatar{width:34px;height:34px}
+  /* Collapsed rail: the avatar alone. */
+  html:root[data-side=rail] .side-user .account-trigger,html:root[data-side=auto] .side-user .account-trigger{width:48px;height:48px;margin:0 auto;padding:0;justify-content:center;border-radius:14px}
+  html:root[data-side=rail] .side-user :is(.account-who,.account-chevron),html:root[data-side=auto] .side-user :is(.account-who,.account-chevron){display:none}
+
+  /* Collapse / expand: a panel button beside the wordmark; in the rail it sits on the logo and shows on hover or focus. */
+  html:root .side .header-brand-group{position:relative;display:flex;align-items:center}
+  html:root .side-collapse{display:grid;place-items:center;margin-left:auto;width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:var(--muted-foreground);cursor:pointer}
+  html:root .side-collapse:hover,html:root .side-collapse:focus-visible{background:var(--muted);color:var(--foreground)}
+  html:root[data-side=auto] .side .header-brand-group{justify-content:center}
+  html:root[data-side=auto] .side-collapse{position:absolute;inset:0 0 10px;margin:auto;opacity:0;background:var(--card);transition:opacity .12s ease}
+  html:root[data-side=auto] .side .header-brand-group:hover .side-collapse,html:root[data-side=auto] .side-collapse:focus-visible{opacity:1}
+}
+
+/* The menu */
+.account-menu{width:296px;border-radius:18px;padding:6px;background:var(--popover);box-shadow:0 24px 60px -18px rgb(var(--ch-shadow) / .7),0 2px 6px rgb(var(--ch-shadow) / .25)}
+.acct-av{position:relative;display:inline-flex;flex:none}
+.acct-dot{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:var(--success);box-shadow:0 0 0 2.5px var(--card)}
+.account-menu .acct-dot{box-shadow:0 0 0 2.5px var(--popover)}
+.account-menu .account-menu-header{padding:12px 12px 8px!important}
+.account-menu .account-menu-name{display:block;font-size:14.5px}
+.account-menu .account-menu-email{display:block;font-size:12.5px}
+.acct-chips{display:flex;gap:6px;padding:0 12px 10px}
+.acct-chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--chip);color:var(--muted-foreground);font-size:11.5px;font-weight:600}
+.acct-chip[data-ok]{background:var(--gain-bg);color:var(--success)}
+.acct-chip i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.account-menu [data-slot=dropdown-menu-item]{height:38px;gap:12px;padding:0 10px;border-radius:10px;font-size:13.5px;font-weight:500}
+.account-menu [data-slot=dropdown-menu-item] svg{color:var(--muted-foreground)}
+.account-menu .acct-ext{margin-left:auto}
+.account-menu .acct-signout:is(:hover,:focus-visible,[data-highlighted]),.account-menu .acct-signout:is(:hover,:focus-visible,[data-highlighted]) svg{color:var(--danger)}
+.acct-theme{padding:8px 10px 10px}
+.acct-theme p{margin:0 0 8px;font-size:12px;color:var(--muted-foreground)}
+.acct-legal{display:flex;gap:6px;padding:8px 10px 6px;font-size:11.5px;color:var(--muted-foreground)}
+.acct-legal a:hover{color:var(--foreground)}
+
+/* Theme swatches: the page colour with the accent as a dot. */
+.theme-swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.theme-swatches [data-slot=theme-swatch]{position:relative;display:grid;place-items:center;height:34px;border-radius:10px;border:1px solid var(--border);cursor:pointer;color:var(--muted-foreground);background:var(--muted)}
+.theme-swatches [data-slot=theme-swatch] i{width:12px;height:12px;border-radius:50%}
+.theme-swatches [data-slot=theme-swatch][aria-checked=true]{box-shadow:0 0 0 2px var(--primary);border-color:transparent}
+.theme-swatches [data-slot=theme-swatch]:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* Phone More sheet */
+html:root .more-chips{padding:0 4px 10px}
+html:root .more-head{padding:14px 4px 10px}
+html:root .more-sheet .acct-dot{box-shadow:0 0 0 2.5px var(--card)}
+html:root .more-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+html:root .more-head>div{display:grid;gap:2px;min-width:0}
+html:root .more-tile{min-width:0;overflow:hidden;display:flex;align-items:center;gap:10px;min-height:52px;padding:0 12px;border:0;border-radius:14px;background:var(--muted);color:var(--foreground);font:500 13.5px/1.2 var(--font-geist-sans),sans-serif;text-align:left;cursor:pointer;text-decoration:none}
+html:root .more-tile svg{width:19px;height:19px;flex:none;color:var(--muted-foreground)}
+html:root .more-tile span:first-of-type{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html:root .more-tile[aria-current=page]{background:var(--tab-active-bg);color:var(--tab-active-ink)}
+html:root .more-tile .more-badge{margin-left:auto;flex:none;font-size:10px;padding:2px 6px}
+html:root .more-actions{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px;padding-top:12px;border-top:1px solid var(--border)}
+html:root .more-action{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border:1px solid var(--border);border-radius:14px;background:transparent;color:var(--foreground);font:600 14.5px/1 var(--font-geist-sans),sans-serif;cursor:pointer}
+html:root .more-action[data-primary]{background:var(--accent);border-color:rgb(var(--ch-primary) / .35)}
+html:root .more-action svg{width:18px;height:18px}
+
+/* Settings has nothing in the top bar (no search, refresh or bell), so the page starts at the top. */
+@media(min-width:761px){
+  html:root .header-right.is-settings{height:0;margin-bottom:0;overflow:visible}
+  html:root .settings-shell .back-link{margin-top:8px}
+}
