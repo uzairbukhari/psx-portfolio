@@ -687,6 +687,50 @@ test('SIP blueprint changes go through mutate.account and return the next accoun
   assert.equal(run('mutate.account', { op: 'sip.nope', params: JSON.stringify({ month }) }).ok, false);
 });
 
+test('saving a SIP blueprint from the phone form fills in the preset and keeps a month-shaped start', async () => {
+  const { accountSipBlueprint } = await import('../lib/portfolio-account.ts');
+  const { SIP_CLASSES } = await import('../lib/sip-blueprint.ts');
+  run('account.load', { json: JSON.stringify(seed()) });
+  const cleared = run('mutate.account', { op: 'sip.clear', params: '{}' });
+  assert.equal(cleared.ok, true, cleared.error);
+  run('account.load', { json: cleared.value.account });
+  const targets = Object.fromEntries(SIP_CLASSES.map((k, i) => [k, i === 0 ? 100 : 0]));
+  const saved = run('mutate.account', {
+    op: 'sip.save',
+    params: JSON.stringify({
+      month: '2026-10',
+      blueprint: JSON.stringify({ budget: 50000, targets, strict: false, notify: false, since: '2026-10', months: {} }),
+    }),
+  });
+  assert.equal(saved.ok, true, saved.error);
+  const b = accountSipBlueprint(JSON.parse(saved.value.account));
+  assert.equal(b.preset, 'custom');
+  assert.equal(b.since, '2026-10');
+  assert.equal(b.budget, 50000);
+});
+
+test("each portfolio's own move today is listed, and agrees with the combined one", () => {
+  const account = seed();
+  run('account.load', { json: JSON.stringify(account) });
+  const reference = normalizeAccount(seed(), false);
+  const { held } = safeHoldings(dashboardPortfolio(reference, ALL_PORTFOLIOS));
+  const histories = {};
+  for (const h of openPositions(held).filter((x) => x.quote)) {
+    const [y, m, d] = h.quote.date.split('-').map(Number);
+    histories[h.ticker] = [[Date.UTC(y, m - 1, d - 1) / 1000, h.quote.price / 2]];
+  }
+  const moves = run('today.portfolioMoves', { histories: JSON.stringify(histories) });
+  assert.equal(moves.ok, true, moves.error);
+  assert.equal(moves.value.length, account.portfolios.length);
+  const open = moves.value.filter((m) => m.move.available);
+  assert.ok(open.length > 0);
+  const total = open.reduce((sum, m) => sum + m.move.amount, 0);
+  const all = run('today.move', { scope: 'all', histories: JSON.stringify(histories) }).value;
+  assert.ok(Math.abs(total - all.amount) < 1, `${total} vs ${all.amount}`);
+  const none = run('today.portfolioMoves', { histories: '{}' });
+  assert.ok(none.value.every((m) => !m.move.available));
+});
+
 test('a gold or currency purchase logged from the SIP Blueprint lands in the ledger as an asset entry', () => {
   const asOf = today();
   const account = seed();

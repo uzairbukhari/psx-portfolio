@@ -9,6 +9,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -313,6 +315,7 @@ fun StackedAreaChart(
 }
 
 /** Legend chips under a chart; with [onToggle] a tap hides or shows that layer. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChartLegend(
     layers: List<ChartLayer>,
@@ -321,9 +324,11 @@ fun ChartLegend(
     onToggle: ((String) -> Unit)? = null,
 ) {
     val muted = if (onSlab) SlabColors.muted else MaterialTheme.colorScheme.onSurfaceVariant
-    Row(
+    // Chips wrap onto a new line instead of squeezing the last label into a column of single letters.
+    FlowRow(
         Modifier.padding(top = 8.dp).fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         for (layer in layers) {
             val off = layer.label in hidden

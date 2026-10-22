@@ -199,6 +199,7 @@
     <string name="company_cost">Cost</string>
     <string name="company_value">Value</string>
     <string name="company_unrealised">Unrealised gain</string>
+    <string name="company_unrealised_on_cost">%1$s on cost</string>
     <string name="company_realised">Realised gain</string>
     <string name="company_cost_unknown">Cost is not known. Edit the opening entry to add its cost.</string>
     <string name="company_change_up">Up %1$s (%2$s) over %3$s</string>
@@ -561,14 +562,12 @@
     <string name="admin_title">Admin</string>
     <string name="admin_hint">The Research desk opens in your browser, not in the app.</string>
     <string name="admin_open">Research desk on the web</string>
-    <string name="holdings_refresh_prices">Refresh prices</string>
     <string name="holdings_refreshing">Refreshing…</string>
     <string name="market_title">Market pulse</string>
     <string name="market_open">Market open</string>
     <string name="market_closed">Market closed</string>
     <string name="market_chart_description">KSE-100 through the day</string>
     <string name="market_breadth">Up %1$d · Down %2$d · Unchanged %3$d</string>
-    <string name="holdings_prices_hint">Prices come from PSX and refresh on request.</string>
     <string name="settings_usage">AI usage this month</string>
     <string name="settings_usage_spent">Spent: $%1$.3f</string>
     <string name="settings_usage_tokens">Tokens: %1$,d</string>
