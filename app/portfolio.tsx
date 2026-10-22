@@ -3134,7 +3134,7 @@ function DashboardContent({
             )}
             {email && <div className="side-user" data-tour="profile">{accountMenu(true)}</div>}
             </div>
-            <div className="header-right">
+            <div className={'header-right' + (tab === 'settings' ? ' is-settings' : '')}>
               {tab === 'sip-plan' && <PlanMonthNav month={month} setMonth={setMonth} />}
               {tab !== 'settings' && tab !== 'company' && tab !== 'sip-plan' && (
                 <div className="page-id">
@@ -3167,112 +3167,114 @@ function DashboardContent({
                   <RefreshCw size={18} />
                 </button>
               )}
-              <Popover
-                open={bellOpen}
-                onOpenChange={(next) => {
-                  // Phones skip the popover (it can't fit): go straight to the page.
-                  if (next && window.matchMedia('(max-width:760px)').matches) {
-                    setTab('notifications');
-                    return;
-                  }
-                  setBellOpen(next);
-                }}
-              >
-                <PopoverTrigger
-                  className="bell-trigger hdr-btn"
-                  data-tour="bell"
-                  aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+              {tab !== 'settings' && (
+                <Popover
+                  open={bellOpen}
+                  onOpenChange={(next) => {
+                    // Phones skip the popover (it can't fit): go straight to the page.
+                    if (next && window.matchMedia('(max-width:760px)').matches) {
+                      setTab('notifications');
+                      return;
+                    }
+                    setBellOpen(next);
+                  }}
                 >
-                  <Bell size={18} />
-                  <span className="hdr-label">Notifications</span>
-                  {unreadCount > 0 && (
-                    <span className="bell-badge">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </PopoverTrigger>
-                <PopoverContent align="end" className="notice-panel">
-                  <div className="notice-head">
-                    <strong>Notifications</strong>
-                    <span className="row">
+                  <PopoverTrigger
+                    className="bell-trigger hdr-btn"
+                    data-tour="bell"
+                    aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+                  >
+                    <Bell size={18} />
+                    <span className="hdr-label">Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="bell-badge">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="notice-panel">
+                    <div className="notice-head">
+                      <strong>Notifications</strong>
+                      <span className="row">
+                        <button
+                          type="button"
+                          data-slot="link"
+                          className="link-button"
+                          disabled={busy || !unreadCount}
+                          onClick={() =>
+                            updateNotifications((list) =>
+                              list.map((n) => ({ ...n, read: true })),
+                            )
+                          }
+                        >
+                          Mark all read
+                        </button>
+                        <button
+                          type="button"
+                          data-slot="link"
+                          className="link-button"
+                          disabled={busy || !notifications.length}
+                          onClick={() => {
+                            const at = new Date().toISOString();
+                            updateNotifications((list) =>
+                              list.map((n) =>
+                                n.clearedAt
+                                  ? n
+                                  : { ...n, read: true, clearedAt: at },
+                              ),
+                            );
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    </div>
+                    {notifications.length === 0 ? (
+                      <p className="muted notice-empty">
+                        Nothing yet. Dividends recorded from PSX announcements and
+                        new payout announcements for your holdings appear here.
+                      </p>
+                    ) : (
+                      <ul className="notice-list">
+                        {notifications.map((n) => (
+                          <li key={n.id} className={n.read ? '' : 'unread'}>
+                            <button
+                              type="button"
+                              data-slot="link"
+                              className="notice-item"
+                              onClick={() => {
+                                if (!n.read)
+                                  updateNotifications((list) =>
+                                    list.map((x) =>
+                                      x.id === n.id ? { ...x, read: true } : x,
+                                    ),
+                                  );
+                              }}
+                            >
+                              <strong>{n.title}</strong>
+                              <span>{n.body}</span>
+                              <small>{new Date(n.at).toLocaleString()}</small>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="notice-foot">
                       <button
                         type="button"
                         data-slot="link"
                         className="link-button"
-                        disabled={busy || !unreadCount}
-                        onClick={() =>
-                          updateNotifications((list) =>
-                            list.map((n) => ({ ...n, read: true })),
-                          )
-                        }
-                      >
-                        Mark all read
-                      </button>
-                      <button
-                        type="button"
-                        data-slot="link"
-                        className="link-button"
-                        disabled={busy || !notifications.length}
                         onClick={() => {
-                          const at = new Date().toISOString();
-                          updateNotifications((list) =>
-                            list.map((n) =>
-                              n.clearedAt
-                                ? n
-                                : { ...n, read: true, clearedAt: at },
-                            ),
-                          );
+                          setBellOpen(false);
+                          setTab('notifications');
                         }}
                       >
-                        Clear
+                        View all notifications
                       </button>
-                    </span>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <p className="muted notice-empty">
-                      Nothing yet. Dividends recorded from PSX announcements and
-                      new payout announcements for your holdings appear here.
-                    </p>
-                  ) : (
-                    <ul className="notice-list">
-                      {notifications.map((n) => (
-                        <li key={n.id} className={n.read ? '' : 'unread'}>
-                          <button
-                            type="button"
-                            data-slot="link"
-                            className="notice-item"
-                            onClick={() => {
-                              if (!n.read)
-                                updateNotifications((list) =>
-                                  list.map((x) =>
-                                    x.id === n.id ? { ...x, read: true } : x,
-                                  ),
-                                );
-                            }}
-                          >
-                            <strong>{n.title}</strong>
-                            <span>{n.body}</span>
-                            <small>{new Date(n.at).toLocaleString()}</small>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="notice-foot">
-                    <button
-                      type="button"
-                      data-slot="link"
-                      className="link-button"
-                      onClick={() => {
-                        setBellOpen(false);
-                        setTab('notifications');
-                      }}
-                    >
-                      View all notifications
-                    </button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
               {tab === 'holdings' && !isAll && !locked && !emptyStart && (p.companies.length > 0 || hasAssets) && (
                 <AddAssetMenu onPick={pickAsset} disabled={busy} header />
               )}
