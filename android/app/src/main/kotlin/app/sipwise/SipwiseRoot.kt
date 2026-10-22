@@ -120,6 +120,8 @@ import app.sipwise.ui.UnlockScreen
 import app.sipwise.ui.UpdatePrompt
 import app.sipwise.ui.VaultFailedScreen
 import app.sipwise.ui.VaultSetupScreen
+import app.sipwise.ui.ZakatScreen
+import app.sipwise.ui.ZakatViewModel
 import app.sipwise.ui.findFragmentActivity
 import app.sipwise.update.UpdateViewModel
 import app.sipwise.vault.VaultUi
@@ -150,6 +152,8 @@ import kotlinx.serialization.Serializable
 )
 
 @Serializable object Targets
+
+@Serializable object ZakatRoute
 
 @Serializable object Portfolios
 
@@ -189,6 +193,7 @@ private fun screenName(destination: NavDestination?): String? =
         destination.hasRoute(CompanyRoute::class) -> "company"
         destination.hasRoute(Inbox::class) -> "inbox"
         destination.hasRoute(Insights::class) -> "reports"
+        destination.hasRoute(ZakatRoute::class) -> "zakat"
         else -> null
     }
 
@@ -411,7 +416,7 @@ private fun MainShell(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { scope.launch { unlocked.ledger.refreshPublic() } }
     LaunchedEffect(Unit) { (context.applicationContext as SipwiseApp).container.syncPush() }
     val onAddScreen = entry?.destination?.hasRoute(AddEntry::class) == true || entry?.destination?.hasRoute(Targets::class) == true
-    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class, Picks::class, Inbox::class, Insights::class).any { entry?.destination?.hasRoute(it) == true }
+    val noAddButton = listOf(CompanyRoute::class, More::class, Portfolios::class, Picks::class, Inbox::class, Insights::class, ZakatRoute::class).any { entry?.destination?.hasRoute(it) == true }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
@@ -527,6 +532,11 @@ private fun MainShell(
                     viewModel(key = "PortfoliosViewModel-$gen", factory = viewModelFactory { initializer { PortfoliosViewModel(unlocked.ledger) } })
                 PortfoliosScreen(portfolios)
             }
+            composable<ZakatRoute> {
+                val zakat: ZakatViewModel =
+                    viewModel(key = "ZakatViewModel-$gen", factory = viewModelFactory { initializer { ZakatViewModel(unlocked.ledger) } })
+                ZakatScreen(zakat)
+            }
             composable<Targets> {
                 val targets: TargetsViewModel =
                     viewModel(key = "TargetsViewModel-$gen", factory = viewModelFactory { initializer { TargetsViewModel(unlocked.ledger) } })
@@ -549,6 +559,7 @@ private fun MainShell(
                     onManagePortfolios = { nav.navigate(Portfolios) },
                     onOpenTargetPlan = { nav.navigate(TargetPlan) },
                     onEditTargets = { nav.navigate(Targets) },
+                    onOpenZakat = { nav.navigate(ZakatRoute) },
                     updates = updates,
                 )
             }
@@ -609,6 +620,7 @@ private fun subScreenTitle(
     when {
         destination.hasRoute(CompanyRoute::class) -> entry?.toRoute<CompanyRoute>()?.ticker.orEmpty()
         destination.hasRoute(Targets::class) -> stringResource(R.string.targets_title)
+        destination.hasRoute(ZakatRoute::class) -> stringResource(R.string.zakat_title)
         destination.hasRoute(TargetPlan::class) -> stringResource(R.string.settings_targets_plan)
         destination.hasRoute(Portfolios::class) -> stringResource(R.string.portfolios_title)
         destination.hasRoute(Picks::class) -> stringResource(R.string.picks_title)

@@ -807,3 +807,40 @@ test('a gold or currency purchase logged from the SIP Blueprint lands in the led
   assert.ok(metal.some((a) => a.entries.some((e) => e.date === asOf && e.amount === 20000)));
   assert.equal(run('mutate', { portfolio: owner.id, op: 'sip.log', params: JSON.stringify({ class: 'gold', date: asOf, amount: '0', grams: '5.8' }) }).ok, false);
 });
+
+test('zakat.view matches the shared maths, and the zakat ops set up, log and close a year', () => {
+  const asOf = today();
+  const blank = run('account.blank').value;
+  assert.equal(run('account.load', { json: JSON.stringify(blank) }).ok, true);
+  const empty = run('zakat.view', { asOf }).value;
+  assert.equal(empty.setup, true);
+  assert.ok(empty.hijri.length > 0);
+
+  assert.equal(run('account.load', { json: JSON.stringify(seed()) }).ok, true);
+  const seeded = run('zakat.view', { asOf });
+  assert.equal(seeded.ok, true, seeded.error);
+  assert.equal(seeded.value.setup, false);
+  assert.equal(seeded.value.breakdown.zakat, seeded.value.progress.estimate);
+
+  // Setup on an account without a book, then a manual amount and a payment, each saved through mutate.account.
+  const base = run('account.load', { json: JSON.stringify(blank) });
+  assert.equal(base.ok, true);
+  const apply = (op, params) => {
+    const out = run('mutate.account', { op, params: JSON.stringify(params) });
+    assert.equal(out.ok, true, out.error);
+    assert.equal(run('account.load', { json: out.value.account }).ok, true);
+  };
+  apply('zakat.setup', { startDate: '2026-02-18', school: 'hanafi' });
+  apply('zakat.item', { kind: 'cash', amount: 900000, note: 'bank' });
+  apply('zakat.payment', { amount: 5000, date: asOf, kind: 'direct' });
+  const view = run('zakat.view', { asOf: '2026-03-01' }).value;
+  assert.equal(view.setup, false);
+  assert.equal(view.items.length, 1);
+  assert.equal(view.progress.paid, 5000);
+  assert.ok(view.breakdown.zakat > 0);
+  const bad = run('mutate.account', { op: 'zakat.payment', params: JSON.stringify({ amount: -1 }) });
+  assert.equal(bad.ok, false);
+  apply('zakat.close', {});
+  const closed = run('zakat.view', { asOf: '2026-03-01' }).value;
+  assert.equal(closed.years.length, 1);
+});

@@ -25,7 +25,8 @@ import { contentsLabel, portfolioContents } from '../../../mobile/src/data/scope
 import { activityEntries, companyDividends, readOnlyReason } from '../../../mobile/src/data/derive.ts';
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
-import { mutateAccount, mutateBlueprint } from './mutate.ts';
+import { mutateAccount, mutateBlueprint, mutateZakat } from './mutate.ts';
+import { MANUAL_KINDS, PAYMENT_KINDS, activePayments, hijriLabel, manualLabel, paidSteps, shouldRecordTrail, toHijri, upcomingReminders, yearDue, zakatBreakdown, zakatProgress, type ZakatBook } from '../../../lib/zakat.ts';
 import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-form.ts';
 import { buildPlan, currentMonth, monthBuys, unifiedPlanSource } from '../../../mobile/src/data/sip.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
@@ -65,7 +66,7 @@ import { accountOverview } from '../../../lib/account-overview.ts';
 import { dividendPayments, realisedProfit, tradeMarkers, weightInStocks } from '../../../lib/company-view.ts';
 import { formatStat, keyStats, type CompanyStats } from '../../../lib/company-stats.ts';
 import { faceValueFor } from '../../../lib/face-values.ts';
-import { accountSipBlueprint } from '../../../lib/portfolio-account.ts';
+import { accountSipBlueprint, accountZakat } from '../../../lib/portfolio-account.ts';
 import {
   DEFAULT_RETURNS,
   SIP_CLASSES,
@@ -423,7 +424,7 @@ const handlers: Record<string, Handler> = {
   'rates.wanted': () => {
     const assets = requireAccount().portfolios.flatMap((x) => x.portfolio.assets ?? []);
     return {
-      metals: assets.some((a) => a.kind === 'metal'),
+      metals: assets.some((a) => a.kind === 'metal') || accountZakat(requireAccount()) !== null,
       funds: assets.some((a) => a.kind === 'fund'),
       fx: assets.some((a) => a.kind === 'currency'),
       plans: assets.some((a) => a.kind === 'plan'),
@@ -670,6 +671,40 @@ const handlers: Record<string, Handler> = {
   },
 
   // ───────────────────────── SIP Blueprint (the new Plan tab) ─────────────────────────
+
+  /**
+   * The Zakat screen: nothing but the setup defaults while no zakat date exists, otherwise the live estimate for the
+   * open zakat year, what has been paid, the breakdown, past years and the reminders coming up.
+   */
+  'zakat.view': (args) => {
+    const account = viewAccount();
+    const asOf = isoOr(args.asOf, today());
+    const book: ZakatBook | null = accountZakat(account);
+    const canLog = account.portfolios.some((p) => !p.locked);
+    const kinds = { manual: MANUAL_KINDS.map((k) => ({ key: k, label: manualLabel(k) })), payment: PAYMENT_KINDS };
+    if (!book) return { setup: true, asOf, canLog, hijri: hijriLabel(toHijri(asOf)), kinds };
+    const breakdown = zakatBreakdown(account.portfolios, book, sipRates(), asOf);
+    const progress = zakatProgress(book, breakdown, asOf);
+    return {
+      setup: false,
+      asOf,
+      canLog,
+      kinds,
+      settings: book.settings,
+      items: book.items.map((i) => ({ ...i, label: manualLabel(i.kind) })),
+      payments: activePayments(book),
+      allPayments: book.payments,
+      years: book.years.map((y) => ({ id: y.id, start: y.start, due: y.due, amountDue: y.amountDue })),
+      breakdown,
+      progress,
+      steps: paidSteps(book),
+      trail: book.trail,
+      recordTrail: shouldRecordTrail(book, asOf),
+      dueDate: progress.year.due,
+      dueHijri: hijriLabel(toHijri(yearDue(book.settings, progress.year.index))),
+      reminders: upcomingReminders(book, asOf),
+    };
+  },
 
   /**
    * The whole SIP Blueprint screen for the running month: hero wording, one row per class with what to do next, the
@@ -1134,6 +1169,7 @@ const handlers: Record<string, Handler> = {
     }
     if (op === 'inbox') return { account: JSON.stringify(changeInbox(requireAccount(), params)) };
     // Every SIP Blueprint change (the plan itself, a month's ticks and stepper edits) goes through one op family.
+    if (op.startsWith('zakat.')) return { account: JSON.stringify(mutateZakat(requireAccount(), op.slice(6), params, sipRates(), today())) };
     if (op.startsWith('sip.')) return { account: JSON.stringify(mutateBlueprint(requireAccount(), op.slice(4), params)) };
     const id = typeof params.id === 'string' ? params.id : '';
     const account = requireAccount();

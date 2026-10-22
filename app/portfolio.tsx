@@ -68,6 +68,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
+  HandCoins,
   Target,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
@@ -119,6 +120,7 @@ import {
   PlanPage,
   SipTracker,
   FutureYou,
+  ZakatPage,
   CompanyDetail,
   GoldSilverSection,
   ForeignCurrencySection,
@@ -191,7 +193,10 @@ import {
   setAccountFilerStatus,
   setAccountMonthlyExpenses,
   setAccountSipBlueprint,
+  accountZakat,
+  setAccountZakat,
 } from '@/lib/portfolio-account';
+import type { ZakatBook } from '@/lib/zakat';
 import { withQuickEntry, type QuickEntry } from '@/lib/sip-blueprint-data';
 import type { SipBlueprint } from '@/lib/sip-blueprint';
 import { webPublicData } from './vault-transport';
@@ -224,6 +229,7 @@ const TAB_PATHS: Record<string, string> = {
   'sip-plan': '/plan',
   'sip-tracker': '/sip-tracker',
   future: '/future',
+  zakat: '/zakat',
   sip: '/sip',
   history: '/activity',
   'research-desk': '/research-desk',
@@ -1540,6 +1546,7 @@ function DashboardContent({
   const metalRates = useMetalRates(
     tab === 'sip-tracker' ||
       tab === 'future' ||
+      tab === 'zakat' ||
       !!(isAll
         ? p?.[DISPLAY_PARTS]?.some((part) =>
             part.portfolio.assets?.some((a) => a.kind === 'metal'),
@@ -1549,6 +1556,7 @@ function DashboardContent({
   const fxData = useFxRates(
     tab === 'sip-tracker' ||
       tab === 'future' ||
+      tab === 'zakat' ||
       !!(isAll
         ? p?.[DISPLAY_PARTS]?.some((part) =>
             part.portfolio.assets?.some((a) => a.kind === 'currency'),
@@ -1627,7 +1635,7 @@ function DashboardContent({
           : 'holdings'
         : tab === 'history'
           ? 'activity'
-          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'future' || tab === 'settings' || tab === 'notifications'
+          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'future' || tab === 'zakat' || tab === 'settings' || tab === 'notifications'
             ? tab
             : null;
     if (screen) track('screen_viewed', { screen });
@@ -2041,6 +2049,16 @@ function DashboardContent({
     );
     await load();
     notify(message);
+  };
+  /** Zakat: one book for the whole account, written into every portfolio like the tax status. An empty message saves quietly. */
+  const saveZakat = async (next: ZakatBook, message: string) => {
+    await vault!.session.saveAccount(
+      setAccountZakat(vault!.session.account, next),
+      revision,
+      { replaceAll: true },
+    );
+    await load();
+    if (message) notify(message);
   };
   /** SIP Blueprint: add a purchase to one portfolio and save the ticked step in the same encrypted write. */
   const logSipEntry = async (entry: QuickEntry, next: SipBlueprint) => {
@@ -2983,6 +3001,7 @@ function DashboardContent({
       : []),
     { tab: 'sip-tracker', href: '/sip-tracker', label: 'SIP Blueprint', short: 'Blueprint', extra: true, icon: <Target className="tab-icon" aria-hidden="true" /> },
     { tab: 'future', href: '/future', label: 'Future you', short: 'Future', extra: true, icon: <Sparkles className="tab-icon" aria-hidden="true" /> },
+    { tab: 'zakat', href: '/zakat', label: 'Zakat', short: 'Zakat', title: 'New feature', badge: 'Beta', extra: true, icon: <HandCoins className="tab-icon" aria-hidden="true" /> },
     ...(hasStocks
       ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
       : []),
@@ -3876,6 +3895,20 @@ function DashboardContent({
               busy={busy}
               onSave={saveSipBlueprint}
               onOpenBlueprint={() => setTab('sip-tracker')}
+            />
+          </NavPanel>
+          <NavPanel id="zakat" tab={tab}>
+            <ZakatPage
+              parts={workspace?.account.portfolios ?? []}
+              book={workspace ? accountZakat(workspace.account) : null}
+              rates={{
+                metalRates: metalRates.rates,
+                fundNavs: fundData.navs,
+                planNavs,
+                fxRates: fxData.data.rates,
+              }}
+              busy={busy}
+              onSave={saveZakat}
             />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>
