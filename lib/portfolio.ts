@@ -4,6 +4,7 @@ import { UserError } from './user-error.ts';
 import { faceValueFor, type FaceValueEvidence } from './face-values.ts';
 import { validateAssets, type Asset } from './assets.ts';
 import { validateBlueprint } from './sip-blueprint.ts';
+import { validateZakat } from './zakat.ts';
 export const SECTORS = [
   'Bank',
   'Fertilizer',
@@ -253,6 +254,8 @@ export type Portfolio = {
   monthlyExpenses?: number;
   /** SIP Blueprint: monthly budget, split and checklist progress. Account-wide setting kept only inside the encrypted portfolio. */
   sipBlueprint?: import('./sip-blueprint.ts').SipBlueprint;
+  /** Zakat tracking: the person's zakat date, method, payments and closed years. Account-wide, kept only inside the encrypted portfolio. */
+  zakat?: import('./zakat.ts').ZakatBook;
   research?: ResearchCompany[];
   researchSettings?: ResearchSettings;
   aiReview?: {
@@ -1623,6 +1626,13 @@ export function validate(p: Portfolio) {
       validateBlueprint(p.sipBlueprint);
     } catch (error) {
       throw new UserError(error instanceof Error ? error.message : 'Invalid SIP blueprint.');
+    }
+  }
+  if (p.zakat !== undefined) {
+    try {
+      validateZakat(p.zakat);
+    } catch (error) {
+      throw new UserError(error instanceof Error ? error.message : 'Invalid zakat records.');
     }
   }
   try {
