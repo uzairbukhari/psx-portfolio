@@ -1,5 +1,6 @@
 // Server Component shared by every app route (/, /reports, /activity, /company/[ticker], ...).
 // Signed out: the static landing (no client bundle). Signed in: the client dashboard.
+import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { getViewer } from '@/lib/auth';
 import Dashboard from './portfolio';
@@ -12,13 +13,17 @@ export async function DashboardRoute({
   returnTo,
   searchParams,
   adminOnly = false,
+  signedOutView,
 }: {
   returnTo: string;
   searchParams?: SearchParams;
   adminOnly?: boolean;
+  /** Shown instead of the landing page to signed-out visitors (public pages such as /feedback). */
+  signedOutView?: ReactNode;
 }) {
   const user = await getViewer();
   if (!user) {
+    if (signedOutView) return signedOutView;
     const error = (await searchParams)?.error;
     return (
       <>

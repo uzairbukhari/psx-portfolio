@@ -3,7 +3,7 @@
 // the same place whether the sidebar is open or collapsed, and closes when the sidebar changes width so it never has
 // to follow a moving anchor.
 import { useEffect, useId, useRef, useState } from 'react';
-import { ChevronsUpDown, ExternalLink, LifeBuoy, LockKeyhole, LogOut, Settings, ShieldCheck } from 'lucide-react';
+import { ChevronsUpDown, ExternalLink, LifeBuoy, LockKeyhole, LogOut, MessageSquareText, Settings, ShieldCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ export function AccountMenu({
   sideMode,
   onSettings,
   onHelp,
+  onFeedback,
   onAdmin,
   onLock,
   onSignOut,
@@ -36,6 +37,7 @@ export function AccountMenu({
   sideMode: string;
   onSettings: () => void;
   onHelp: () => void;
+  onFeedback: () => void;
   onAdmin?: () => void;
   onLock?: () => void;
   onSignOut: () => void;
@@ -90,6 +92,9 @@ export function AccountMenu({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onHelp}>
           <LifeBuoy size={16} /> Help and tour
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onFeedback}>
+          <MessageSquareText size={16} /> Contact and feedback
         </DropdownMenuItem>
         {onAdmin && (
           <DropdownMenuItem onClick={onAdmin}>

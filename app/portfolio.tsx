@@ -69,6 +69,7 @@ import {
   PanelLeftOpen,
   Sparkles,
   HandCoins,
+  MessageSquareText,
   Target,
 } from 'lucide-react';
 import { LogoMark, Wordmark } from '@/components/logo';
@@ -121,6 +122,7 @@ import {
   SipTracker,
   FutureYou,
   ZakatPage,
+  FeedbackPage,
   CompanyDetail,
   GoldSilverSection,
   ForeignCurrencySection,
@@ -232,6 +234,7 @@ const TAB_PATHS: Record<string, string> = {
   'sip-tracker': '/sip-tracker',
   future: '/future',
   zakat: '/zakat',
+  feedback: '/feedback',
   sip: '/sip',
   history: '/activity',
   'research-desk': '/research-desk',
@@ -1634,7 +1637,7 @@ function DashboardContent({
           : 'holdings'
         : tab === 'history'
           ? 'activity'
-          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'future' || tab === 'zakat' || tab === 'settings' || tab === 'notifications'
+          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'future' || tab === 'zakat' || tab === 'feedback' || tab === 'settings' || tab === 'notifications'
             ? tab
             : null;
     if (screen) track('screen_viewed', { screen });
@@ -3067,6 +3070,7 @@ function DashboardContent({
       ? [{ tab: 'sip', href: '/sip', label: 'Monthly Picks', short: 'Picks', title: 'Experimental feature', badge: 'Beta', extra: true, icon: <FlaskConical className="tab-icon tab-flask" aria-hidden="true" /> }]
       : []),
     { tab: 'history', href: '/activity', label: 'Activity', short: 'Activity', icon: <ScrollText className="tab-icon" aria-hidden="true" /> },
+    { tab: 'feedback', href: '/feedback', label: 'Feedback', short: 'Feedback', extra: true, divider: true, icon: <MessageSquareText className="tab-icon" aria-hidden="true" /> },
     ...(isAdmin
       ? [
           { tab: 'research-desk', href: '/research-desk', label: 'Research desk', short: 'Research', badge: 'Admin', extra: true, divider: true, icon: <FlaskConical className="tab-icon" aria-hidden="true" /> },
@@ -3093,6 +3097,7 @@ function DashboardContent({
         track('help_opened', { item: 'panel' });
         setHelpOpen(true);
       }}
+      onFeedback={() => setTab('feedback')}
       onAdmin={isAdmin ? () => window.location.assign('/admin') : undefined}
       onLock={vault?.lock}
       onSignOut={signOut}
@@ -3124,6 +3129,11 @@ function DashboardContent({
                   onb.show();
                 }
           }
+          onFeedback={() => {
+            track('help_opened', { item: 'contact' });
+            setHelpOpen(false);
+            setTab('feedback');
+          }}
           checklistNote={`${onbItems.filter((i) => i.done).length} of ${onbItems.length} done`}
           onTips={() => {
             onb.resetTips();
@@ -3971,6 +3981,9 @@ function DashboardContent({
               busy={busy}
               onSave={saveZakat}
             />
+          </NavPanel>
+          <NavPanel id="feedback" tab={tab}>
+            <FeedbackPage email={email ?? ''} />
           </NavPanel>
           <NavPanel id="sip" tab={tab}>
             {pageTip('picks')}
