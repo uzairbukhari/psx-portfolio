@@ -160,7 +160,7 @@ export async function runDirectory(io: RunIo, options: RunOptions): Promise<RunR
   const plan = planRun(
     requested.length ? merged.filter((m) => requested.includes(m.row.ticker)) : merged,
     options.mode,
-    { limit: options.limit },
+    { limit: options.limit, retryUnresolved: requested.length > 0 },
   );
   log(`Discovered ${universe.length} symbols (${plan.created.length} new, ${plan.changed.length} changed); ${plan.profiles.length} need a profile.`);
 
