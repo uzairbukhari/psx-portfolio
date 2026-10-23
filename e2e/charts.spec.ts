@@ -31,6 +31,8 @@ test('reports render interactive canvas charts', async ({ app }) => {
 test('Guided insights open on plain-English cards with an Advanced switch', async ({ app }) => {
   await app.goto('/insights');
   await expect(app.getByText(/net worth/i).first()).toBeVisible({ timeout: 60_000 });
+  // The page is shared across specs and the mode is remembered per device; the test above left it on Advanced.
+  await app.getByRole('button', { name: 'Guided', exact: true }).click();
   await expect(app.getByText('Investing habit')).toBeVisible();
   await expect(app.getByText('Where your money is')).toBeVisible();
   await expect(app.getByText('How you compare')).toBeVisible();
