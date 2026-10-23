@@ -57,7 +57,7 @@ production), only ever signs in the test account, is rate limited and same-origi
 
 ```bash
 node scripts/seed-test-account.mjs --target=staging   # reset the staging vault to the full seed
-npm run e2e:staging                                   # seed + smoke suite against https://staging.sipwise.trade
+npm run e2e:staging                                   # seed + smoke suite against https://psx-portfolio-sip-staging.uahmed.workers.dev
 ```
 
 CI: `deploy-staging.yml` runs the `e2e` job after every staging deploy (skipped until the secret exists). Override the
@@ -65,7 +65,7 @@ URL with `E2E_BASE_URL`. Staging prices are real and move, so specs assert exact
 
 ## Exploring by hand (Claude in Chrome)
 
-1. Local: open `http://127.0.0.1:5191`. Staging: open `https://staging.sipwise.trade/api/auth/test-login`, enter the secret.
+1. Local: open `http://127.0.0.1:5191`. Staging: open `https://psx-portfolio-sip-staging.uahmed.workers.dev/api/auth/test-login`, enter the secret.
 2. At the vault gate type the vault password and tick **Keep me unlocked in this tab** (reloads then stay unlocked).
 3. Use the header switcher: All, AHL Core, Finqalab, Savings & Gold, Empty.
 

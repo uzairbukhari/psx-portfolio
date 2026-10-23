@@ -2,7 +2,7 @@ import type { ExpoConfig } from 'expo/config';
 
 // One codebase, three installable variants that can sit side by side on a phone.
 // Public identifiers (not secrets) used when an `eas update` runs without the EAS environment variables.
-const STAGING_API = 'https://psx-portfolio-sip-staging.suzairbukhari.workers.dev';
+const STAGING_API = 'https://psx-portfolio-sip-staging.uahmed.workers.dev';
 const WEB_CLIENT_ID = '50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com';
 
 const VARIANTS = {
