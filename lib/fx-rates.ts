@@ -251,6 +251,15 @@ export function unpackYears(
   return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
+/** The recent rates and the stored history as one list, so a rate can be found for any past day (the recent ones win on the same day). */
+export function fxRowsWithHistory(data: FxRatesResponse): FxRateRow[] {
+  const seen = new Set(data.rates.map((r) => `${r.currency}|${r.kind}|${r.date}`));
+  const old = data.history
+    .filter((h) => !seen.has(`${h.currency}|${h.kind}|${h.date}`))
+    .map((h): FxRateRow => ({ date: h.date, currency: h.currency, kind: h.kind, pkrPerUnit: h.rate, sourceUrl: '', fetchedAt: '' }));
+  return [...old, ...data.rates];
+}
+
 export type FxRatesResponse = {
   rates: FxRateRow[];
   history: {

@@ -6,6 +6,7 @@ import { CalendarDays, Plus, Settings2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { PortfolioAccount } from '@/lib/portfolio-account';
 import { today } from '@/lib/portfolio';
+import { fxRowsWithHistory, type FxRatesResponse } from '@/lib/fx-rates';
 import type { PricePoint } from '@/lib/price-history';
 import {
   PAYMENT_KINDS,
@@ -19,6 +20,7 @@ import {
   lockPending,
   manualLabel,
   newBook,
+  reopenLastYear,
   toHijri,
   upcomingReminders,
   yearDue,
@@ -35,6 +37,7 @@ import {
   type ZakatYear,
 } from '@/lib/zakat';
 import { track } from './analytics';
+import { webPublicData } from './vault-transport';
 import { Segmented } from './ui-kit';
 
 const num0 = (n: number) => Math.round(n).toLocaleString('en-PK');
@@ -67,19 +70,25 @@ export default function ZakatPage({
   parts,
   book,
   rates,
+  fxHistory,
+  ready,
   busy,
   onSave,
 }: {
   parts: Parts;
   book: ZakatBook | null;
   rates: ZakatInputs;
+  /** The stored foreign currency history, for rates of past days. */
+  fxHistory: FxRatesResponse['history'];
+  /** The public rates and prices this page needs have finished loading. */
+  ready: boolean;
   busy: boolean;
   /** An empty message saves quietly (used for the weekly trail point). */
   onSave: Save;
 }) {
   const asOf = today();
   const [view, setView] = useState<'overview' | 'method'>('overview');
-  const lockError = useAutoLock(book, parts, rates, asOf, busy, onSave);
+  const lockError = useAutoLock(book, parts, rates, fxHistory, ready, asOf, busy, onSave);
   useEffect(() => {
     if (!book) setView('overview');
   }, [book]);
@@ -105,15 +114,26 @@ export default function ZakatPage({
  * year is saved. If they cannot be loaded nothing is fixed (the amount is never taken from a later day by accident) and
  * the next visit tries again.
  */
-function useAutoLock(book: ZakatBook | null, parts: Parts, rates: ZakatInputs, asOf: string, busy: boolean, onSave: Save): string {
+function useAutoLock(
+  book: ZakatBook | null,
+  parts: Parts,
+  rates: ZakatInputs,
+  fxHistory: FxRatesResponse['history'],
+  ready: boolean,
+  asOf: string,
+  busy: boolean,
+  onSave: Save,
+): string {
   const [error, setError] = useState('');
   const tried = useRef('');
   useEffect(() => {
-    if (!book || busy || !lockPending(book, asOf)) return;
+    // Wait until the public rates and prices are loaded: fixing a year before that would leave assets out of it.
+    if (!book || busy || !ready || !lockPending(book, asOf)) return;
     const key = `${book.years.length}:${asOf}`;
     if (tried.current === key) return;
     tried.current = key;
     const tickers = [...new Set(parts.flatMap((p) => p.portfolio.companies.map((c) => c.ticker)))];
+    const fundIds = [...new Set(parts.flatMap((p) => (p.portfolio.assets ?? []).flatMap((a) => (a.kind === 'fund' ? [a.mufapId] : []))))];
     void (async () => {
       try {
         let closes: Record<string, PricePoint[]> = {};
@@ -125,7 +145,11 @@ function useAutoLock(book: ZakatBook | null, parts: Parts, rates: ZakatInputs, a
             Object.entries(d.histories).map(([t, h]) => [t, h.eod.filter((x) => Number.isFinite(x[0]) && Number.isFinite(x[1]) && x[1] > 0).map((x): PricePoint => [x[0], x[1]]).sort((a, b) => a[0] - b[0])]),
           );
         }
-        const next = lockDueYears(book, parts, { ...rates, closes }, asOf);
+        // Funds and currencies are valued at their price of the zakat day, so their history is needed, not just today's price.
+        const histories = await Promise.all(fundIds.map((id) => webPublicData.fundHistory?.(id)));
+        const fundNavs = [...(rates.fundNavs ?? []), ...histories.flatMap((h) => h?.navs ?? [])];
+        const fxRates = fxRowsWithHistory({ rates: rates.fxRates ?? [], history: fxHistory });
+        const next = lockDueYears(book, parts, { ...rates, closes, fundNavs, fxRates }, asOf);
         const fixed = next.years.slice(book.years.length);
         await onSave(next, fixed.length === 1 ? `Zakat for your year ending ${longDate(fixed[0].due)} is fixed at ${rs(fixed[0].amountDue)}.` : 'Your zakat years are fixed from their zakat days.');
         for (const y of fixed) track('zakat_year_closed', { state: y.amountDue === 0 ? 'below_nisab' : 'partial' });
@@ -134,7 +158,7 @@ function useAutoLock(book: ZakatBook | null, parts: Parts, rates: ZakatInputs, a
         setError("Your zakat day has passed but its prices could not be loaded, so the amount isn't fixed yet. It will try again next time you open this page.");
       }
     })();
-  }, [book, parts, rates, asOf, busy, onSave]);
+  }, [book, parts, rates, fxHistory, ready, asOf, busy, onSave]);
   return error;
 }
 
@@ -162,6 +186,7 @@ function Overview({
   // Only the progress is used: the amount of a year is whatever was fixed on its zakat day, never a running estimate.
   const progress = useMemo(() => zakatProgress(book, zakatBreakdown(parts, book, rates, asOf), asOf), [parts, book, rates, asOf]);
   const [payment, setPayment] = useState<ZakatPayment | 'new' | null>(null);
+  const [error, setError] = useState('');
   const { year } = progress;
 
   const reminder = upcomingReminders(book, asOf).find((r) => daysBetween(asOf, r.date) <= 14);
@@ -295,10 +320,20 @@ function Overview({
                 Your portfolio was valued on {longDate(latest.due)} ({hijriDayMonth(toHijri(latest.due))} {toHijri(latest.due).year}). This amount is fixed and does not move.
               </p>
             </div>
-            <span className="zk-chip">
-              Nisab {rs(latestClosed.snapshot.nisab.value)}
-            </span>
+            <div className="zk-actions">
+              <span className="zk-chip">Nisab {rs(latestClosed.snapshot.nisab.value)}</span>
+              <button
+                type="button"
+                data-slot="sp-ghost"
+                disabled={busy}
+                title="Works this year out again from the values of its zakat day"
+                onClick={() => void onSave(reopenLastYear(book), 'Working this year out again from its zakat day.').catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not recalculate.'))}
+              >
+                Recalculate
+              </button>
+            </div>
           </div>
+          {error && <p className="notice error">{error}</p>}
           <SnapshotTable year={latestClosed} />
         </section>
       )}
@@ -466,6 +501,11 @@ function SnapshotTable({ year }: { year: ZakatYear }) {
         </table>
       </div>
       {s.rows.length === 0 && <p className="zk-sub">Nothing counted on that day.</p>}
+      {s.missing && s.missing.length > 0 && (
+        <p className="zk-note" data-tone="warn">
+          Left out because they could not be valued on that day: {s.missing.join('; ')}.
+        </p>
+      )}
       {s.net < s.nisab.value && <p className="zk-note">Below the nisab of {rs(s.nisab.value)} on that day, so nothing was due.</p>}
       {s.valuedOnDay === false && <p className="zk-note" data-tone="warn">The closing prices of that day were not available, so the latest prices of {longDate(year.closedAt)} were used.</p>}
     </>
