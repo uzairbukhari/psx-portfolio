@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react';
+import { Lock, Play } from 'lucide-react';
 import { GoogleButton } from './google-button';
 import { NetWorthPreview } from './net-worth-preview';
 
@@ -35,6 +35,9 @@ export function Hero({
             <Lock size={15} aria-hidden="true" />
             End-to-end encrypted. Nothing is shared, and no orders are placed.
           </div>
+          <a className="watch-link" href="#how">
+            <Play size={14} aria-hidden="true" /> Watch how it works · 2 min
+          </a>
         </div>
         <NetWorthPreview />
       </div>

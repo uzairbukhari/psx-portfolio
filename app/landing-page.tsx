@@ -3,6 +3,7 @@ import { LandingFooter, LandingNav } from './landing/landing-chrome';
 import { Hero } from './landing/hero';
 import {
   AssetsSection,
+  HowItWorksSection,
   DevicesSection,
   FinalCta,
   PlanSection,
@@ -36,6 +37,7 @@ export function LandingPage({
     <main className="landing always-dark">
       <LandingNav returnTo={returnTo} onLanding />
       <Hero returnTo={returnTo} error={error} />
+      <HowItWorksSection returnTo={returnTo} />
       <AssetsSection />
       <PlanSection />
       <PrivacySection />

@@ -172,3 +172,11 @@
 .landing .lp-legal .dl-card{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:24px 0 8px;padding:20px;border:1px solid var(--border);border-radius:16px;background:rgb(var(--ch-primary) / .08)}
 .landing .lp-legal .dl-card p{margin:0;font-size:14px}
 .landing .lp-legal .dl-btn{display:inline-block;font-size:16px;font-weight:600;padding:12px 22px;border-radius:12px;background:rgb(var(--ch-primary));color:var(--primary-foreground);text-decoration:none}
+
+.landing .watch-link{display:inline-flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;font-weight:600;color:var(--primary-2);text-decoration:none}
+.landing .watch-link:hover{text-decoration:underline}
+.landing .how-video{display:block;width:100%;max-width:960px;aspect-ratio:16/9;background:#000;border:1px solid rgb(var(--ch-line) / .25);border-radius:14px;box-shadow:0 30px 70px -30px rgb(var(--ch-primary) / .45)}
+.landing .how-video--portrait{display:none;max-width:340px;aspect-ratio:9/16;margin:0 auto}
+.landing .how-cta{margin-top:28px}
+@media (max-width:640px){.landing .how-video--landscape{display:none}.landing .how-video--portrait{display:block}.landing .how-cta{text-align:center}}
+.landing #how{scroll-margin-top:72px}
