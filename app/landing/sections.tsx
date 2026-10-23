@@ -276,6 +276,10 @@ export function DevicesSection() {
 }
 
 const VIDEO = '/videos/sipwise-getting-started';
+const LANGS = [
+  { id: 'ur', label: 'Sipwise getting started video, in Urdu' },
+  { id: 'en', label: 'Sipwise getting started video, in English' },
+];
 
 export function HowItWorksSection({ returnTo }: { returnTo: string }) {
   return (
@@ -288,20 +292,35 @@ export function HowItWorksSection({ returnTo }: { returnTo: string }) {
           check everything before it is saved. This walkthrough uses a made-up
           account and statement.
         </p>
-        {['landscape', 'portrait'].map((shape) => (
-          <video
-            key={shape}
-            className={`how-video how-video--${shape}`}
-            controls
-            playsInline
-            preload="none"
-            poster={`/videos/poster-${shape}.jpg`}
-            aria-label="Sipwise getting started video"
-          >
-            <source src={`${VIDEO}-${shape}.mp4`} type="video/mp4" />
-            <track kind="captions" src={`${VIDEO}-${shape}.vtt`} srcLang="en" label="English" default />
-          </video>
-        ))}
+        {/* Language switch without client JS: two radios and sibling selectors in landing.css (Urdu is the default). */}
+        <div className="how-player">
+          <input type="radio" name="how-lang" id="how-ur" className="how-radio" defaultChecked />
+          <input type="radio" name="how-lang" id="how-en" className="how-radio" />
+          <div className="how-lang">
+            <label htmlFor="how-ur" lang="ur">اردو</label>
+            <label htmlFor="how-en">English</label>
+          </div>
+          {LANGS.flatMap((lang) =>
+            ['landscape', 'portrait'].map((shape) => (
+              // The Urdu cut is narration only, by design (no captions); the English cut has them.
+              // oxlint-disable-next-line jsx-a11y/media-has-caption
+              <video
+                key={`${lang.id}-${shape}`}
+                className={`how-video how-video--${shape} how-lang-${lang.id}`}
+                controls
+                playsInline
+                preload="none"
+                poster={`/videos/poster-${lang.id === 'ur' ? 'urdu-' : ''}${shape}.jpg`}
+                aria-label={lang.label}
+              >
+                <source src={`${VIDEO}-${lang.id === 'ur' ? 'urdu-' : ''}${shape}.mp4`} type="video/mp4" />
+                {lang.id === 'en' && (
+                  <track kind="captions" src={`${VIDEO}-${shape}.vtt`} srcLang="en" label="English" default />
+                )}
+              </video>
+            )),
+          )}
+        </div>
         <div className="how-cta">
           <GoogleButton returnTo={returnTo} />
         </div>
