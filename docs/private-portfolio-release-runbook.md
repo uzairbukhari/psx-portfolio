@@ -18,7 +18,7 @@ database (`VAULT_DB`). Fresh start: nothing is migrated from the old plaintext `
 
 1. Every same-repo PR deploys staging. `deploy-staging.yml` runs `scripts/ensure-vault-db.mjs --env staging --create`, which
    creates `psx_portfolio_sip_staging_vault` once and patches its id.
-2. Open https://psx-portfolio-sip-staging.suzairbukhari.workers.dev on the web: create the vault, save the recovery key,
+2. Open https://psx-portfolio-sip-staging.uahmed.workers.dev on the web: create the vault, save the recovery key,
    add a trade, lock, unlock, reload, sign in on a second browser and unlock there, change the password, restore an
    encrypted backup, run Monthly Picks, delete the account.
 3. Rehearse the deletion tool against staging: `D1_DATABASE_ID=<staging id> node scripts/reset-legacy-private-data.mjs --target=staging`

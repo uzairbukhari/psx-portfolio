@@ -7,7 +7,7 @@ import { TEST_ACCOUNT_EMAIL } from '../lib/test-account.ts';
 
 export const TARGETS = {
   local: { url: 'http://127.0.0.1:5191', login: false },
-  staging: { url: 'https://staging.sipwise.trade', login: true },
+  staging: { url: 'https://psx-portfolio-sip-staging.uahmed.workers.dev', login: true },
 };
 
 /** Reads KEY=value lines from a git-ignored env file into process.env (without overriding what is already set). */
