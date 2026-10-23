@@ -10,7 +10,7 @@ import { withPicksInputs } from '../../../mobile/src/data/picks.ts';
 import { heldValues, recordRun, runLocalPicks } from '../../../lib/picks-local.ts';
 import { parsePublicAnalysis } from '../../../lib/api-validate.ts';
 import { accountSipBlueprint, setAccountSipBlueprint, accountZakat, setAccountZakat } from '../../../lib/portfolio-account.ts';
-import { MANUAL_KINDS, PAYMENT_KINDS, applySchool, closeYear, newBook, recordTrail, validateZakat, zakatBreakdown, type ZakatBook, type ZakatInputs, type ZakatManualKind, type ZakatPaymentKind, type ZakatSchool } from '../../../lib/zakat.ts';
+import { MANUAL_KINDS, PAYMENT_KINDS, applySchool, newBook, recordTrail, validateZakat, zakatBreakdown, type ZakatBook, type ZakatInputs, type ZakatManualKind, type ZakatPaymentKind, type ZakatSchool } from '../../../lib/zakat.ts';
 import { SIP_CLASSES, rebalanceEdit, validateBlueprint, type SipBlueprint, type SipClass, type SipMonth } from '../../../lib/sip-blueprint.ts';
 import { withQuickEntry, type QuickEntry } from '../../../lib/sip-blueprint-data.ts';
 import {
@@ -336,7 +336,7 @@ function nextBlueprint(current: SipBlueprint | null, op: string, p: Params): Sip
 }
 
 /**
- * Every Zakat change: setup, settings, manual amounts, payments and closing a year. [inputs] are the public rates the
+ * Every Zakat change: setup, manual amounts, payments and the weekly trail point (years are fixed on the web, from their zakat day's closing prices). [inputs] are the public rates the
  * year is closed with; [asOf] is the device's today.
  */
 export function mutateZakat(account: PortfolioAccount, op: string, p: Params, inputs: ZakatInputs, asOf: string): PortfolioAccount {
@@ -380,10 +380,6 @@ export function mutateZakat(account: PortfolioAccount, op: string, p: Params, in
   } else if (op === 'payment.void') {
     const b = need();
     next = { ...b, payments: b.payments.map((x) => (x.id === str(p, 'id') ? { ...x, voided: true } : x)) };
-  } else if (op === 'close') {
-    const b = need();
-    const parts = account.portfolios;
-    next = closeYear(b, zakatBreakdown(parts, b, inputs, asOf), asOf, p.carryExtra === true);
   } else if (op === 'trail') {
     const b = need();
     next = recordTrail(b, asOf, zakatBreakdown(account.portfolios, b, inputs, asOf).zakat);

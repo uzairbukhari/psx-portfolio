@@ -60,3 +60,12 @@ test('a foreign currency purchase is saved with the public rate filled in and su
   // The panel was left open, and a panel you open stays open in this browser.
   await expect(app.getByText('650 USD')).toBeVisible({ timeout: 60_000 });
 });
+
+// Last on purpose: it removes the seeded zakat records, and the next seed resets them.
+test('zakat: start over removes the records and opens the setup again', async ({ app }) => {
+  await app.goto('/zakat');
+  await app.getByRole('button', { name: /How it.s counted/ }).click();
+  await app.getByRole('button', { name: 'Start zakat over' }).click();
+  await app.getByRole('button', { name: 'Remove and start over' }).click();
+  await expect(app.getByRole('heading', { name: 'When does your zakat year start?' })).toBeVisible({ timeout: 60_000 });
+});

@@ -118,3 +118,7 @@ html:root .zk-hijri>b{font-size:22px}
 html:root .zk-hijri small{font-size:12px;color:var(--muted-foreground)}
 html:root .zk-setup-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
 @media(max-width:640px){html:root .zk-table th:nth-child(3),html:root .zk-table td:nth-child(3){display:none}html:root .zk-table td small{font-size:11px}html:root .zk-card{padding:16px}}
+html:root .zk-fixed{flex-basis:100%;margin-top:2px}
+html:root .zk-fixed summary{cursor:pointer;color:var(--soft-ink)}
+html:root .zk-fixed table{width:100%;margin-top:6px}
+html:root .zk-fixed small{display:block;margin-top:4px}

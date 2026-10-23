@@ -808,7 +808,7 @@ test('a gold or currency purchase logged from the SIP Blueprint lands in the led
   assert.equal(run('mutate', { portfolio: owner.id, op: 'sip.log', params: JSON.stringify({ class: 'gold', date: asOf, amount: '0', grams: '5.8' }) }).ok, false);
 });
 
-test('zakat.view matches the shared maths, and the zakat ops set up, log and close a year', () => {
+test('zakat.view matches the shared maths, and the zakat ops set up, add an amount and log a payment', () => {
   const asOf = today();
   const blank = run('account.blank').value;
   assert.equal(run('account.load', { json: JSON.stringify(blank) }).ok, true);
@@ -840,7 +840,6 @@ test('zakat.view matches the shared maths, and the zakat ops set up, log and clo
   assert.ok(view.breakdown.zakat > 0);
   const bad = run('mutate.account', { op: 'zakat.payment', params: JSON.stringify({ amount: -1 }) });
   assert.equal(bad.ok, false);
-  apply('zakat.close', {});
-  const closed = run('zakat.view', { asOf: '2026-03-01' }).value;
-  assert.equal(closed.years.length, 1);
+  assert.equal(run('zakat.view', { asOf: '2026-03-01' }).value.lockPending, false);
+  assert.equal(run('zakat.view', { asOf: '2027-12-30' }).value.lockPending, true);
 });
