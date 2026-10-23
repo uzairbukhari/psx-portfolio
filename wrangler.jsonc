@@ -2,11 +2,14 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "psx-portfolio-sip",
 	"compatibility_date": "2026-05-22",
-	// Custom domain: deploy attaches sipwise.trade to this Worker and Cloudflare creates the DNS
+	// Custom domains: deploy attaches sipwise.trade (marketing site) and app.sipwise.trade (the app) to this Worker and Cloudflare creates the DNS
 	// record and certificate (the zone is in this account; the deploy API token needs Zone Read,
 	// DNS Edit and Workers Routes Edit on it). workers_dev stays on so the old *.workers.dev URL
 	// keeps working (installed mobile builds point at it); wrangler turns it off by default once routes exist.
-	"routes": [{ "pattern": "sipwise.trade", "custom_domain": true }],
+	"routes": [
+		{ "pattern": "sipwise.trade", "custom_domain": true },
+		{ "pattern": "app.sipwise.trade", "custom_domain": true }
+	],
 	"workers_dev": true,
 	"d1_databases": [
 		{
@@ -49,6 +52,9 @@
 		"APP_ENV": "production",
 		// Optional "or email us" address on the feedback page; hidden while empty.
 		"SUPPORT_EMAIL": "support@sipwise.trade",
+		// Two public hosts on this one Worker (lib/hosts.ts): the marketing site and the app. Leave both empty for one host.
+		"MARKETING_HOST": "sipwise.trade",
+		"APP_HOST": "app.sipwise.trade",
 		// Cloudflare Turnstile site key (public) for the signed-out feedback form. Also needs the TURNSTILE_SECRET_KEY
 		// Worker secret; signed-out sending stays off until both are set.
 		"TURNSTILE_SITE_KEY": "0x4AAAAAAFhK1XMrEwcSRy8j"

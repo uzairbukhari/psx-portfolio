@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { safeRelativeReturnPath } from '@/lib/auth';
+import { parseSignupSource } from '@/lib/hosts';
 import { serializeCookie } from '@/lib/session';
 
 export async function GET(req: Request) {
@@ -23,5 +24,8 @@ export async function GET(req: Request) {
     'Set-Cookie',
     serializeCookie('oauth_return_to', returnTo, { maxAge: 300 }),
   );
+  // Which marketing button sent the visitor (closed list); kept only until the callback records it for a new account.
+  const src = parseSignupSource(url.searchParams.get('src'));
+  if (src) headers.append('Set-Cookie', serializeCookie('oauth_src', src, { maxAge: 300 }));
   return new Response(null, { status: 302, headers });
 }

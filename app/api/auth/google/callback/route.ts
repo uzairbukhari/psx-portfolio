@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { safeRelativeReturnPath } from '@/lib/auth';
 import { emailAllowed, safeGooglePicture } from '@/lib/google-id-token';
 import { noteSignIn } from '@/lib/analytics-store';
+import { parseSignupSource } from '@/lib/hosts';
 import { getUserRole, isInternal } from '@/lib/roles';
 import {
   readCookieValue,
@@ -78,7 +79,7 @@ async function handleCallback(req: Request): Promise<Response> {
     picture,
   );
 
-  await noteSignIn(env.DB, email, 'web', env.SESSION_SECRET, isInternal(await getUserRole(email)), new Date(), { name, picture });
+  await noteSignIn(env.DB, email, 'web', env.SESSION_SECRET, isInternal(await getUserRole(email)), new Date(), { name, picture, signupSrc: parseSignupSource(readCookieValue(cookieHeader, 'oauth_src')) });
 
   const headers = new Headers({
     Location: new URL(returnTo, url.origin).toString(),
@@ -89,6 +90,7 @@ async function handleCallback(req: Request): Promise<Response> {
   );
   headers.append('Set-Cookie', serializeExpiredCookie('oauth_state'));
   headers.append('Set-Cookie', serializeExpiredCookie('oauth_return_to'));
+  headers.append('Set-Cookie', serializeExpiredCookie('oauth_src'));
   return new Response(null, { status: 302, headers });
 }
 
