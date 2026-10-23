@@ -183,6 +183,10 @@ test('planRun and coverageReport', () => {
   assert.deepEqual(planRun(merged, 'incremental').profiles, ['BBB', 'AAA'], 'new symbols need profiles; never-profiled first');
   assert.deepEqual(planRun(merged.map((m) => ({ ...m, created: false, changed: false })), 'incremental').profiles, [], 'unchanged resolved rows need nothing');
   assert.equal(planRun(merged, 'full', { limit: 1 }).profiles.length, 1);
+  const givenUp = merged.map((m) => ({ ...m, created: false, changed: false, row: { ...m.row, resolutionStatus: 'unresolved' } }));
+  assert.deepEqual(planRun(givenUp, 'incremental').profiles, [], 'rows given up on are not retried every day');
+  assert.equal(planRun(givenUp, 'incremental', { retryUnresolved: true }).profiles.length, 2, 'a lookup of those tickers still retries them');
+  assert.equal(planRun(givenUp, 'full').profiles.length, 2, 'a full run retries them');
   const report = coverageReport(merged.map((m) => m.row), { screener: ['AAA'], listings: ['BBB'], allShare: ['CCC'] });
   assert.deepEqual([report.screenerOnly, report.listingsOnly, report.allShareOnly], [['AAA'], ['BBB'], ['CCC']]);
 });

@@ -317,7 +317,7 @@ export type RunPlan = {
 export function planRun(
   merged: { row: DirectoryRow; changed: boolean; created: boolean }[],
   mode: RunMode,
-  options: { limit?: number } = {},
+  options: { limit?: number; retryUnresolved?: boolean } = {},
 ): RunPlan {
   const created = merged.filter((m) => m.created).map((m) => m.row.ticker);
   const changed = merged.filter((m) => !m.created && m.changed).map((m) => m.row.ticker);
@@ -325,7 +325,11 @@ export function planRun(
     const { row } = m;
     if (mode === 'full') return true;
     if (mode === 'bootstrap') return !row.profileFetchedAt;
-    return m.created || m.changed || row.resolutionStatus !== 'resolved';
+    if (m.created || m.changed) return true;
+    // Rows given up on as `unresolved` (rights, GEM board, suspended: PSX shows no name or sector) are not retried
+    // every day; a full run or a lookup of that ticker still tries them.
+    if (row.resolutionStatus === 'unresolved') return !!options.retryUnresolved;
+    return row.resolutionStatus !== 'resolved';
   });
   // Never-fetched first, then least recently fetched, so a bounded run always makes progress.
   needs.sort((a, b) => (a.row.profileFetchedAt ?? '').localeCompare(b.row.profileFetchedAt ?? '') || a.row.ticker.localeCompare(b.row.ticker));
