@@ -23,6 +23,7 @@ export function LandingNav({
           <Wordmark />
         </a>
         <div className="nav-links">
+          <a href={`${home}#how`}>How it works</a>
           <a href={`${home}#assets`}>What it tracks</a>
           <a href={`${home}#plan`}>Monthly plan</a>
           <a href={`${home}#privacy`}>Privacy</a>
