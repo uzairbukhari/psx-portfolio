@@ -4,14 +4,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, Plus, Settings2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { zakatTrailOption } from '@/lib/chart-kit';
 import type { PortfolioAccount } from '@/lib/portfolio-account';
 import { today } from '@/lib/portfolio';
 import type { PricePoint } from '@/lib/price-history';
 import {
   PAYMENT_KINDS,
   activePayments,
-  addDays,
   applySchool,
   daysBetween,
   firstOfHijriMonth,
@@ -21,9 +19,6 @@ import {
   lockPending,
   manualLabel,
   newBook,
-  paidSteps,
-  recordTrail,
-  shouldRecordTrail,
   toHijri,
   upcomingReminders,
   yearDue,
@@ -37,19 +32,15 @@ import {
   type ZakatPaymentKind,
   type ZakatSchool,
   type ZakatSettings,
+  type ZakatYear,
 } from '@/lib/zakat';
 import { track } from './analytics';
-import { EChart } from './charts/echart';
 import { Segmented } from './ui-kit';
 
 const num0 = (n: number) => Math.round(n).toLocaleString('en-PK');
 const rs = (n: number) => `Rs ${num0(n)}`;
 const longDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-const shortDate = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const monthYear = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' });
 const weekday = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
 
@@ -168,47 +159,29 @@ function Overview({
   onSave: SaveBook;
   onMethod: () => void;
 }) {
-  const breakdown = useMemo(() => zakatBreakdown(parts, book, rates, asOf), [parts, book, rates, asOf]);
-  const progress = useMemo(() => zakatProgress(book, breakdown, asOf), [book, breakdown, asOf]);
+  // Only the progress is used: the amount of a year is whatever was fixed on its zakat day, never a running estimate.
+  const progress = useMemo(() => zakatProgress(book, zakatBreakdown(parts, book, rates, asOf), asOf), [parts, book, rates, asOf]);
   const [payment, setPayment] = useState<ZakatPayment | 'new' | null>(null);
-  const [error, setError] = useState('');
   const { year } = progress;
 
-  // Record one estimate a week while the page is open, so the chart shows how the amount moved.
-  const recorded = useRef('');
-  useEffect(() => {
-    if (busy || !shouldRecordTrail(book, asOf) || recorded.current === asOf) return;
-    recorded.current = asOf;
-    void onSave(recordTrail(book, asOf, breakdown.zakat), '').catch(() => undefined);
-  }, [book, asOf, breakdown.zakat, busy, onSave]);
-
-  const trail = useMemo(() => {
-    const points = book.trail.filter((t) => t.date >= year.start && t.date < asOf).map((t) => [t.date, t.zakat] as [string, number]);
-    return [...points, [asOf, breakdown.zakat] as [string, number]];
-  }, [book.trail, year.start, asOf, breakdown.zakat]);
-  const paid = useMemo(() => paidSteps(book), [book]);
   const reminder = upcomingReminders(book, asOf).find((r) => daysBetween(asOf, r.date) <= 14);
-  const stale = book.items.filter((i) => daysBetween(i.asOf, asOf) > 60);
-  const payments = activePayments(book)
-    .filter((p) => p.date >= year.start || progress.past.length === 0)
-    .reverse();
-  const startH = toHijri(year.start);
+  const payments = activePayments(book).slice().reverse();
   const dueH = toHijri(year.due);
-  const fill = Math.min(100, Math.round((progress.elapsed / progress.length) * 100));
-  const ramadan = payments.find((p) => p.kind === 'bank');
   const latest = progress.past[progress.past.length - 1];
   const latestClosed = latest ? book.years.find((c) => c.id === latest.id) : undefined;
+  const older = progress.past.slice(0, -1).reverse();
   const pastDue = progress.past.reduce((n, y) => n + y.amountDue, 0);
   const pastPaid = progress.past.reduce((n, y) => n + Math.min(y.paid, y.amountDue), 0);
   const pastPercent = pastDue > 0 ? Math.min(100, Math.round((pastPaid / pastDue) * 100)) : 100;
+  const advance = progress.paid;
+  const ramadan = payments.find((p) => p.kind === 'bank');
 
   return (
     <>
       <header className="zk-head">
         <div>
           <p className="zk-sub">
-            Your zakat year from {hijriDayMonth(startH)}, worked out from what you hold. {SCHOOL_LABELS[book.settings.school]} ·{' '}
-            {book.settings.nisab} nisab · {book.settings.year} year
+            Your zakat day is {hijriDayMonth(dueH)} every year. {SCHOOL_LABELS[book.settings.school]} · {book.settings.nisab} nisab · {book.settings.year} year
           </p>
         </div>
         <div className="zk-actions">
@@ -248,15 +221,8 @@ function Overview({
           )}
         </div>
       )}
-      {progress.arrears > 0 && (
-        <div className="zk-banner" data-tone="warn">
-          <div>
-            <b>{rs(progress.arrears)} is still unpaid from an earlier year.</b> New payments clear it first.
-          </div>
-        </div>
-      )}
 
-      {latest && (
+      {latest ? (
         <section className="slab zk-slab" aria-label="Zakat to pay">
           <div className="zk-slab-main">
             <p className="lbl">
@@ -270,7 +236,7 @@ function Overview({
               <span className="zk-chip">
                 Valued on {hijriDayMonth(toHijri(latest.due))} {toHijri(latest.due).year} · {longDate(latest.due)}
               </span>
-              {progress.past.length > 1 && <span className="zk-chip">{progress.past.length} fixed years</span>}
+              {advance > 0 && <span className="zk-chip" data-tone="ok">Extra {rs(advance)} counts toward next year</span>}
             </div>
           </div>
           <div className="zk-slab-side">
@@ -299,104 +265,26 @@ function Overview({
             </dl>
           </div>
         </section>
-      )}
-
-      <section className={`slab zk-slab${latest ? ' zk-next' : ''}`}>
-        <div className="zk-slab-main">
-          <p className="lbl">
-            {latest ? `Next: zakat year ${progress.name} · estimate` : `Zakat year ${progress.name} · estimate`}, fixed on {longDate(year.due)}
-          </p>
-          <div className="zk-big num">{rs(breakdown.zakat)}</div>
-          <div className="zk-chips">
-            {breakdown.aboveNisab ? (
-              <span className="zk-chip" data-tone="ok">
-                Above nisab
+      ) : (
+        <section className="slab zk-slab" aria-label="First zakat day">
+          <div className="zk-slab-main">
+            <p className="lbl">Your first zakat day</p>
+            <div className="zk-big num">{longDate(year.due)}</div>
+            <div className="zk-chips">
+              <span className="zk-chip">
+                {hijriDayMonth(dueH)} {dueH.year}
               </span>
-            ) : (
-              <span className="zk-chip" data-tone="warn">
-                Below nisab: nothing due if it stays this way
+              <span className="zk-chip" data-tone={progress.daysLeft <= 14 ? 'warn' : undefined}>
+                {progress.closeDue ? 'Zakat day reached' : `${progress.daysLeft} ${progress.daysLeft === 1 ? 'day' : 'days'} left`}
               </span>
-            )}
-            <span className="zk-chip">
-              Fixed on {hijriDayMonth(dueH)} {dueH.year} · {weekday(year.due).slice(0, 3)} {longDate(year.due)}
-            </span>
-            <span className="zk-chip" data-tone={progress.daysLeft <= 14 ? 'warn' : undefined}>
-              {progress.closeDue ? 'Year ended' : `${progress.daysLeft} ${progress.daysLeft === 1 ? 'day' : 'days'} left`}
-            </span>
-          </div>
-          <div className="zk-yearbar" role="img" aria-label={`${fill}% of the zakat year has passed`}>
-            <div className="zk-track" />
-            <div className="zk-fill" style={{ width: `${fill}%` }} />
-            {paid.slice(1).map(([date], i) => (
-              <i
-                key={`${date}-${i}`}
-                className="zk-pay-dot"
-                style={{ left: `${Math.max(0, Math.min(100, (daysBetween(year.start, date) / progress.length) * 100))}%` }}
-              />
-            ))}
-            <i className="zk-now" style={{ left: `${fill}%` }} />
-            <div className="zk-ticks">
-              <span>{shortDate(year.start)}</span>
-              <span style={{ marginLeft: 'auto' }}>{shortDate(year.due)} · due</span>
             </div>
-          </div>
-        </div>
-        <div className="zk-slab-side">
-          <div className="zk-ring" style={{ '--p': `${progress.percentPaid}%` } as React.CSSProperties}>
-            <div>
-              <b className="num">{progress.percentPaid}%</b>
-              <small>paid</small>
-            </div>
-          </div>
-          <dl className="zk-legend">
-            <div>
-              <dt>
-                <i data-c="paid" />
-                Paid this year
-              </dt>
-              <dd className="num">{rs(progress.paid)}</dd>
-            </div>
-            <div>
-              <dt>
-                <i data-c="left" />
-                {progress.extra > 0 ? 'Paid extra' : 'Left to pay'}
-              </dt>
-              <dd className="num">{rs(progress.extra > 0 ? progress.extra : progress.remaining)}</dd>
-            </div>
-            <small>
-              {payments.length} {payments.length === 1 ? 'payment' : 'payments'}
-              {payments[0] ? ` · last on ${shortDate(payments[0].date)}` : ''}
-            </small>
-          </dl>
-        </div>
-      </section>
-
-      <section className="panel zk-card">
-        <div className="zk-card-head">
-          <div>
-            <h2>Through the year</h2>
             <p className="zk-sub">
-              What you would owe each week against what you have paid. The estimate moves with prices until your zakat day, when the amount is fixed.
+              Nothing is due yet. On that day your portfolio is valued and the amount is fixed here, with everything you held at that moment.
+              {advance > 0 ? ` You have already paid ${rs(advance)}, which will count toward it.` : ''}
             </p>
           </div>
-        </div>
-        <div className="zk-chart">
-          <EChart
-            label={`Estimated zakat of ${rs(breakdown.zakat)} against ${rs(progress.paid)} paid this year`}
-            build={(t) =>
-              zakatTrailOption(t, {
-                estimate: trail,
-                paid,
-                start: year.start,
-                due: year.due,
-                today: asOf < year.due ? asOf : year.due,
-                valueFormat: rs,
-                dateLabel: monthYear,
-              })
-            }
-          />
-        </div>
-      </section>
+        </section>
+      )}
 
       {latest && latestClosed && (
         <section className="panel zk-card">
@@ -407,241 +295,116 @@ function Overview({
                 Your portfolio was valued on {longDate(latest.due)} ({hijriDayMonth(toHijri(latest.due))} {toHijri(latest.due).year}). This amount is fixed and does not move.
               </p>
             </div>
+            <span className="zk-chip">
+              Nisab {rs(latestClosed.snapshot.nisab.value)}
+            </span>
           </div>
-          <div className="scroll">
-            <table className="zk-table">
-              <thead>
-                <tr>
-                  <th>Wealth</th>
-                  <th>Value</th>
-                  <th>Counts</th>
-                  <th>Zakatable</th>
-                </tr>
-              </thead>
-              <tbody>
-                {latestClosed.snapshot.rows.map((r) => (
-                  <tr key={r.key} data-kind={r.kind}>
-                    <td>
-                      {r.label}
-                      <small>{r.detail}</small>
-                    </td>
-                    <td className="num">{r.kind === 'debt' ? '' : num0(r.value)}</td>
-                    <td className="num">{r.kind === 'debt' ? '' : `${Math.round(r.share * 100)}%`}</td>
-                    <td className="num">
-                      {r.kind === 'debt' ? '−' : ''}
-                      {num0(r.counted)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="zk-total">
-                  <td>Zakat at {(latestClosed.snapshot.rate * 100).toFixed(latestClosed.snapshot.rate === 0.025 ? 1 : 3)}%</td>
-                  <td />
-                  <td />
-                  <td className="num">{rs(latestClosed.amountDue)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          {latestClosed.snapshot.valuedOnDay === false && (
-            <p className="zk-note" data-tone="warn">
-              The closing prices of that day were not available, so the latest prices of {longDate(latestClosed.closedAt)} were used.
-            </p>
-          )}
+          <SnapshotTable year={latestClosed} />
         </section>
       )}
 
-      <div className="zk-grid">
-        <section className="panel zk-card">
-          <div className="zk-card-head">
-            <div>
-              <h2>{latest ? `Next year (${progress.name}): estimate so far` : 'How it’s worked out'}</h2>
-              <p className="zk-sub">
-                {progress.closeDue
-                  ? 'Today’s values, while the amount for your zakat day is being fixed.'
-                  : `Today’s values, as an estimate. On ${longDate(year.due)} (${hijriDayMonth(dueH)} ${dueH.year}) your portfolio is valued and the amount for this year is fixed.`}
-              </p>
-            </div>
-            <span className="zk-chip">
-              Nisab {rs(breakdown.nisab.value)} ·{' '}
-              {breakdown.nisab.basis === 'official' ? 'official 1447 figure' : `${breakdown.nisab.basis}${breakdown.nisab.rateDate ? `, ${shortDate(breakdown.nisab.rateDate)}` : ''}`}
-            </span>
+      <section className="panel zk-card">
+        <div className="zk-card-head">
+          <div>
+            <h2>Payments</h2>
+            <p className="zk-sub">Payments clear the oldest fixed year first. Anything extra is kept and counts toward the next year.</p>
           </div>
-          <div className="scroll">
-            <table className="zk-table">
-              <thead>
-                <tr>
-                  <th>Wealth</th>
-                  <th>Value</th>
-                  <th>Counts</th>
-                  <th>Zakatable</th>
-                </tr>
-              </thead>
-              <tbody>
-                {breakdown.rows.map((r) => (
-                  <tr key={r.key} data-kind={r.kind}>
-                    <td>
-                      {r.label}
-                      <small>{r.detail}</small>
-                    </td>
-                    <td className="num">{r.kind === 'debt' ? '' : num0(r.value)}</td>
-                    <td className="num">{r.kind === 'debt' ? '' : `${Math.round(r.share * 100)}%`}</td>
-                    <td className="num">
-                      {r.kind === 'debt' ? '−' : ''}
-                      {num0(r.counted)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="zk-sum">
-                  <td>Net zakatable wealth</td>
-                  <td />
-                  <td />
-                  <td className="num">{num0(breakdown.net)}</td>
-                </tr>
-                <tr className="zk-total">
-                  <td>Zakat at {(breakdown.rate * 100).toFixed(breakdown.rate === 0.025 ? 1 : 3)}%</td>
-                  <td />
-                  <td />
-                  <td className="num">{rs(breakdown.zakat)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          {breakdown.rows.length === 0 && <p className="zk-sub">Nothing counted yet. Add holdings, or the amounts the app cannot see, in How it&apos;s counted.</p>}
-          {breakdown.missing.length > 0 && (
-            <p className="zk-note" data-tone="warn">
-              Left out because they could not be valued: {breakdown.missing.join('; ')}.
-            </p>
-          )}
-          {stale.length > 0 && (
-            <p className="zk-note" data-tone="warn">
-              {stale.map((i) => manualLabel(i.kind)).join(', ')} {stale.length === 1 ? 'was' : 'were'} last checked over two months ago.{' '}
-              <button type="button" data-slot="sp-link" onClick={onMethod}>
-                Update
-              </button>
-            </p>
-          )}
-          {breakdown.otherMethodZakat !== null && (
-            <p className="zk-note">
-              Other method: counting {book.settings.shares === 'market' ? 'shares at 25% of market value (held long term for dividends)' : 'shares at full market value'} gives{' '}
-              <b className="num">{rs(breakdown.otherMethodZakat)}</b>.{' '}
-              <button type="button" data-slot="sp-link" onClick={onMethod}>
-                Change
-              </button>
-            </p>
-          )}
-        </section>
-
-        <section className="panel zk-card">
-          <div className="zk-card-head">
-            <div>
-              <h2>Payments this year</h2>
-              <p className="zk-sub">Paid during the year counts toward this year (advance payment).</p>
-            </div>
-            <button type="button" data-slot="sp-ghost" disabled={busy} onClick={() => setPayment('new')}>
-              <Plus size={15} aria-hidden="true" /> Log
-            </button>
-          </div>
-          {payments.length === 0 ? (
-            <p className="zk-sub">No payments yet. If your bank deducted zakat on 1 Ramadan, log it here so you do not pay twice.</p>
-          ) : (
-            <ul className="zk-pay-list">
-              {payments.map((p) => (
-                <li key={p.id}>
-                  <button type="button" data-slot="zk-row" onClick={() => setPayment(p)} aria-label={`Edit payment of ${rs(p.amount)} on ${longDate(p.date)}`}>
-                    <span className="zk-pay-ic" data-kind={p.kind} aria-hidden="true" />
-                    <span className="zk-pay-text">
-                      <b>{p.note || PAYMENT_LABELS[p.kind]}</b>
-                      <small>
-                        {p.note ? `${PAYMENT_LABELS[p.kind]} · ` : ''}
-                        {longDate(p.date)} · {hijriDayMonth(toHijri(p.date))}
-                      </small>
-                    </span>
-                    <b className="num">{rs(p.amount)}</b>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <button type="button" data-slot="sp-ghost" disabled={busy} onClick={() => setPayment('new')}>
+            <Plus size={15} aria-hidden="true" /> Log
+          </button>
+        </div>
+        {payments.length === 0 ? (
+          <p className="zk-sub">No payments yet. If your bank deducted zakat on 1 Ramadan, log it here so you do not pay twice.</p>
+        ) : (
+          <ul className="zk-pay-list">
+            {payments.map((p) => (
+              <li key={p.id}>
+                <button type="button" data-slot="zk-row" onClick={() => setPayment(p)} aria-label={`Edit payment of ${rs(p.amount)} on ${longDate(p.date)}`}>
+                  <span className="zk-pay-ic" data-kind={p.kind} aria-hidden="true" />
+                  <span className="zk-pay-text">
+                    <b>{p.note || PAYMENT_LABELS[p.kind]}</b>
+                    <small>
+                      {p.note ? `${PAYMENT_LABELS[p.kind]} · ` : ''}
+                      {longDate(p.date)} · {hijriDayMonth(toHijri(p.date))}
+                    </small>
+                  </span>
+                  <b className="num">{rs(p.amount)}</b>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {latest && (
           <dl className="zk-totals">
             <div>
-              <dt>Estimated due</dt>
-              <dd className="num">{rs(breakdown.zakat)}</dd>
+              <dt>Zakat fixed</dt>
+              <dd className="num">{rs(pastDue)}</dd>
             </div>
             <div>
-              <dt>Paid</dt>
+              <dt>Paid toward it</dt>
               <dd className="num" data-tone="ok">
-                {rs(progress.paid)}
+                {rs(pastPaid)}
               </dd>
             </div>
             <div>
               <dt>Left to pay</dt>
-              <dd className="num">{rs(progress.remaining)}</dd>
+              <dd className="num">{rs(progress.arrears)}</dd>
             </div>
+            {advance > 0 && (
+              <div>
+                <dt>Extra, for next year</dt>
+                <dd className="num" data-tone="ok">
+                  {rs(advance)}
+                </dd>
+              </div>
+            )}
           </dl>
-          {!ramadan && (
-            <p className="zk-note">
-              Banks deduct 2.5% on 1 Ramadan from savings accounts above the nisab. That counts as zakat paid: log it when it happens.
-            </p>
-          )}
-          {progress.past.length > 0 && (
-            <div className="zk-past">
-              <h3>Fixed years</h3>
-              <ul>
-                {progress.past.map((y) => {
-                  const closed = book.years.find((c) => c.id === y.id);
-                  return (
-                    <li key={y.id}>
-                      <span>
-                        {y.name} · valued on {longDate(y.due)}
-                      </span>
-                      <span className="num">
-                        {y.remaining === 0 ? `Fully paid (${rs(y.amountDue)})` : `${rs(y.remaining)} still to pay of ${rs(y.amountDue)}`}
-                      </span>
-                      {closed && (
-                        <details className="zk-fixed">
-                          <summary>Values on {longDate(y.due)}</summary>
-                          <table className="zk-table">
-                            <tbody>
-                              {closed.snapshot.rows.map((r) => (
-                                <tr key={r.key} data-kind={r.kind}>
-                                  <td>{r.label}</td>
-                                  <td className="num">{r.kind === 'debt' ? '−' : ''}{num0(r.counted)}</td>
-                                </tr>
-                              ))}
-                              <tr>
-                                <td>
-                                  <b>Zakat at {Math.round(closed.snapshot.rate * 1000) / 10}%</b>
-                                </td>
-                                <td className="num">
-                                  <b>{rs(closed.amountDue)}</b>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                          {closed.snapshot.valuedOnDay === false && (
-                            <small>The closing prices of that day were not available, so the latest prices of {longDate(closed.closedAt)} were used.</small>
-                          )}
-                        </details>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+        )}
+        {!ramadan && (
+          <p className="zk-note">Banks deduct 2.5% on 1 Ramadan from savings accounts above the nisab. That counts as zakat paid: log it when it happens.</p>
+        )}
+      </section>
+
+      {older.length > 0 && (
+        <section className="panel zk-card">
+          <div className="zk-card-head">
+            <div>
+              <h2>Earlier years</h2>
             </div>
-          )}
+          </div>
+          <div className="zk-past">
+            <ul>
+              {older.map((y) => {
+                const closed = book.years.find((c) => c.id === y.id);
+                return (
+                  <li key={y.id}>
+                    <span>
+                      {y.name} · valued on {longDate(y.due)}
+                    </span>
+                    <span className="num">{y.remaining === 0 ? `Fully paid (${rs(y.amountDue)})` : `${rs(y.remaining)} still to pay of ${rs(y.amountDue)}`}</span>
+                    {closed && (
+                      <details className="zk-fixed">
+                        <summary>Values on {longDate(y.due)}</summary>
+                        <SnapshotTable year={closed} />
+                      </details>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </section>
-      </div>
+      )}
 
       <p className="zk-fine">
         A calculator based on common scholarly defaults in Pakistan, not a fatwa. If you are unsure how your wealth should count, ask your scholar.
       </p>
-      {error && <p className="notice error">{error}</p>}
 
       {payment && (
         <PaymentDialog
           key={payment === 'new' ? 'new' : payment.id}
           book={book}
-          remaining={progress.arrears > 0 ? progress.arrears : progress.remaining}
+          remaining={progress.arrears}
           existing={payment === 'new' ? null : payment}
           asOf={asOf}
           busy={busy}
@@ -653,6 +416,58 @@ function Overview({
           }}
         />
       )}
+    </>
+  );
+}
+
+/** The frozen figures of a fixed year: what was held on its zakat day and how the amount came out. */
+function SnapshotTable({ year }: { year: ZakatYear }) {
+  const s = year.snapshot;
+  return (
+    <>
+      <div className="scroll">
+        <table className="zk-table">
+          <thead>
+            <tr>
+              <th>Wealth</th>
+              <th>Value</th>
+              <th>Counts</th>
+              <th>Zakatable</th>
+            </tr>
+          </thead>
+          <tbody>
+            {s.rows.map((r) => (
+              <tr key={r.key} data-kind={r.kind}>
+                <td>
+                  {r.label}
+                  <small>{r.detail}</small>
+                </td>
+                <td className="num">{r.kind === 'debt' ? '' : num0(r.value)}</td>
+                <td className="num">{r.kind === 'debt' ? '' : `${Math.round(r.share * 100)}%`}</td>
+                <td className="num">
+                  {r.kind === 'debt' ? '−' : ''}
+                  {num0(r.counted)}
+                </td>
+              </tr>
+            ))}
+            <tr className="zk-sum">
+              <td>Net zakatable wealth</td>
+              <td />
+              <td />
+              <td className="num">{num0(s.net)}</td>
+            </tr>
+            <tr className="zk-total">
+              <td>Zakat at {(s.rate * 100).toFixed(s.rate === 0.025 ? 1 : 3)}%</td>
+              <td />
+              <td />
+              <td className="num">{rs(year.amountDue)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {s.rows.length === 0 && <p className="zk-sub">Nothing counted on that day.</p>}
+      {s.net < s.nisab.value && <p className="zk-note">Below the nisab of {rs(s.nisab.value)} on that day, so nothing was due.</p>}
+      {s.valuedOnDay === false && <p className="zk-note" data-tone="warn">The closing prices of that day were not available, so the latest prices of {longDate(year.closedAt)} were used.</p>}
     </>
   );
 }
