@@ -2,12 +2,14 @@
 // `fund_navs` tables. Public data only. Runs on Cloudflare (MUFAP answers Cloudflare egress, but blocks GitHub's runners).
 import { parseMufapNavs, parseMufapPayouts } from './mufap.ts';
 
-/** Fetches a MUFAP page; on a refusal the error names the status and the block page's server/mitigation headers and first words, so a log says why. Retries once after a pause. */
-async function fetchMufap(url: string) {
+/** Fetches a MUFAP page (directly, or through `fetcher`: the cron Worker passes one that runs near Pakistan, see workers/quote-refresh); on a refusal the error names the status and the block page's server/mitigation headers and first words, so a log says why. Retries once after a pause. */
+export type MufapFetcher = (url: string, init: RequestInit) => Promise<Response>;
+
+async function fetchMufap(url: string, fetcher: MufapFetcher = fetch) {
   let last = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     if (attempt) await new Promise((r) => setTimeout(r, 5000));
-    const response = await fetch(url, {
+    const response = await fetcher(url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -44,8 +46,8 @@ const MAX_PER_REQUEST = 50;
 const MAX_TRACKED = 3000;
 const RETRY_GAP_MS = 2 * 60_000;
 
-export async function refreshFunds(db: FundDb) {
-  const response = await fetchMufap(URL_);
+export async function refreshFunds(db: FundDb, fetcher?: MufapFetcher) {
+  const response = await fetchMufap(URL_, fetcher);
   const { catalog, navs } = parseMufapNavs(await response.text());
   if (catalog.length < MIN_FUNDS)
     throw new Error(
@@ -152,8 +154,8 @@ export async function trackFunds(db: FundDb, ids: unknown, retry = false) {
  * fund added later then already has its history. The page shows each fund's latest payout, so a night that fails to run
  * loses a daily payer's day; clients then fall back to matching their statement.
  */
-export async function refreshFundPayouts(db: FundDb) {
-  const response = await fetchMufap(PAYOUTS_URL);
+export async function refreshFundPayouts(db: FundDb, fetcher?: MufapFetcher) {
+  const response = await fetchMufap(PAYOUTS_URL, fetcher);
   const payouts = parseMufapPayouts(await response.text());
   if (payouts.length < MIN_PAYOUTS)
     throw new Error(
