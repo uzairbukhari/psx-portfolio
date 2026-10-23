@@ -2,12 +2,12 @@ import { expect, test } from './fixtures';
 
 // Zakat (Beta): the seeded account has a zakat book with a closed year, an open year and payments. Read-only checks here;
 // the payment that is logged lives in the shared vault, so it is voided again at the end.
-test('zakat: overview shows the estimate, payments and how it is worked out', async ({ app }) => {
+test('zakat: overview shows the fixed amount to pay, payments and how it is worked out', async ({ app }) => {
   await app.goto('/zakat');
   await expect(app.getByRole('heading', { name: 'Zakat' }).first()).toBeVisible({ timeout: 60_000 });
-  await expect(app.getByText(/estimate, fixed on/i)).toBeVisible();
-  await expect(app.getByRole('heading', { name: /zakat was worked out|How it.s worked out/ })).toBeVisible();
-  await expect(app.getByRole('heading', { name: 'Payments this year' })).toBeVisible();
+  await expect(app.getByText(/Zakat to pay/i)).toBeVisible();
+  await expect(app.getByRole('heading', { name: /zakat was worked out/ })).toBeVisible();
+  await expect(app.getByRole('heading', { name: 'Payments' })).toBeVisible();
   await expect(app.getByText('Net zakatable wealth')).toBeVisible();
   await app.screenshot({ path: process.env.ZAKAT_SHOT ?? 'test-results/zakat.png', fullPage: true });
 });
