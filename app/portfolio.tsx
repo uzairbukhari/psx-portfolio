@@ -1575,15 +1575,21 @@ function DashboardContent({
     const tab = ({ fund: 'funds', metal: 'metal', currency: 'currency', plan: 'plan' } as Record<string, HoldingsTab>)[assetAdd.kind ?? ''];
     if (tab && assetAdd.n > 0) setHoldingsTab(tab);
   }, [assetAdd]);
+  // The Zakat page values the whole account (every portfolio) on past days, whichever portfolio is selected.
+  const accountAssets = workspace?.account.portfolios.flatMap((x) => x.portfolio.assets ?? []) ?? [];
+  const hasFund = accountAssets.some((a) => a.kind === 'fund');
+  const hasPlanFund = accountAssets.some((a) => a.kind === 'plan' && !!a.subFund);
   const fundData = useFundCatalog(
-    !!(isAll
+    (tab === 'zakat' && hasFund) ||
+      !!(isAll
       ? p?.[DISPLAY_PARTS]?.some((part) =>
           part.portfolio.assets?.some((a) => a.kind === 'fund'),
         )
       : p?.assets?.some((a) => a.kind === 'fund')) || holdingsTab === 'funds',
   );
   const planNavData = usePlanNavs(
-    (isAll
+    (tab === 'zakat' && hasPlanFund) ||
+      (isAll
       ? (p?.[DISPLAY_PARTS]?.flatMap((part) => part.portfolio.assets ?? []) ??
         [])
       : (p?.assets ?? [])
@@ -3978,6 +3984,13 @@ function DashboardContent({
                 planNavs,
                 fxRates: fxData.data.rates,
               }}
+              fxHistory={fxData.data.history}
+              ready={
+                metalRates.loaded &&
+                fxData.loaded &&
+                (planNavData.loaded || !hasPlanFund) &&
+                (fundData.loaded || !hasFund)
+              }
               busy={busy}
               onSave={saveZakat}
             />
