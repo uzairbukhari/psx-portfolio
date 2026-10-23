@@ -16,7 +16,7 @@ test('patching changes only the vault database id and keeps every other id', () 
   assert.equal(configuredId(patched, VAULT_DB_NAMES.staging), ID);
   assert.equal(configuredId(patched, VAULT_DB_NAMES.production), configuredId(config, VAULT_DB_NAMES.production));
   assert.equal(configuredId(patched, 'psx-portfolio-sip'), 'f72a6264-371b-49ff-89e3-20eef1ce2b19');
-  assert.equal(configuredId(patched, 'psx_portfolio_sip_staging'), 'f4ee7f4b-bfe7-4dc3-95ab-475917aee59b');
+  assert.equal(configuredId(patched, 'psx_portfolio_sip_staging'), '575a9a5d-3a71-4ca7-a50b-82fae5d59390');
   assert.throws(() => patchConfig(config, VAULT_DB_NAMES.staging, 'not-an-id'));
   assert.throws(() => patchConfig(config, 'psx-missing', ID));
 });
