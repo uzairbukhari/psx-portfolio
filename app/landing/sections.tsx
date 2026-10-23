@@ -275,6 +275,41 @@ export function DevicesSection() {
   );
 }
 
+const VIDEO = '/videos/sipwise-getting-started';
+
+export function HowItWorksSection({ returnTo }: { returnTo: string }) {
+  return (
+    <section className="block" id="how">
+      <div className="lp-wrap">
+        <div className="kicker">See it in 2 minutes</div>
+        <h2>From sign-in to your holdings.</h2>
+        <p className="sub">
+          Sign in, set your vault password, then import a broker statement and
+          check everything before it is saved. This walkthrough uses a made-up
+          account and statement.
+        </p>
+        {['landscape', 'portrait'].map((shape) => (
+          <video
+            key={shape}
+            className={`how-video how-video--${shape}`}
+            controls
+            playsInline
+            preload="none"
+            poster={`/videos/poster-${shape}.jpg`}
+            aria-label="Sipwise getting started video"
+          >
+            <source src={`${VIDEO}-${shape}.mp4`} type="video/mp4" />
+            <track kind="captions" src={`${VIDEO}-${shape}.vtt`} srcLang="en" label="English" default />
+          </video>
+        ))}
+        <div className="how-cta">
+          <GoogleButton returnTo={returnTo} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function FinalCta({ returnTo }: { returnTo: string }) {
   return (
     <section className="final">
