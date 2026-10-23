@@ -7,7 +7,7 @@ const PAGES: [string, RegExp][] = [
   ['/plan', /Your staircase/i],
   ['/sip-tracker', /A plan you can follow every month|This month’s plan/],
   ['/future', /Future you|Set up your SIP first/],
-  ['/zakat', /estimate, fixed on|When does your zakat year start/],
+  ['/zakat', /Zakat to pay|Your first zakat day|When does your zakat year start/],
   ['/sip', /Where should .* go this month/],
   ['/monthly-picks', /Where should .* go this month/],
   ['/activity', /Every trade, dividend and asset entry/],
