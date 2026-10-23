@@ -61,6 +61,8 @@
 		"staging": {
 			"name": "psx-portfolio-sip-staging",
 			// No custom domain: staging runs in its own Cloudflare account, which does not hold the sipwise.trade zone.
+			// Empty on purpose: routes would otherwise be inherited from the production config above.
+			"routes": [],
 			"workers_dev": true,
 			"d1_databases": [
 				{
