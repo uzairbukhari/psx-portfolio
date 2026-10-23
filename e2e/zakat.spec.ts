@@ -6,7 +6,7 @@ test('zakat: overview shows the estimate, payments and how it is worked out', as
   await app.goto('/zakat');
   await expect(app.getByRole('heading', { name: 'Zakat' }).first()).toBeVisible({ timeout: 60_000 });
   await expect(app.getByText(/estimate, fixed on/i)).toBeVisible();
-  await expect(app.getByRole('heading', { name: /How it.s worked out/ })).toBeVisible();
+  await expect(app.getByRole('heading', { name: /zakat was worked out|How it.s worked out/ })).toBeVisible();
   await expect(app.getByRole('heading', { name: 'Payments this year' })).toBeVisible();
   await expect(app.getByText('Net zakatable wealth')).toBeVisible();
   await app.screenshot({ path: process.env.ZAKAT_SHOT ?? 'test-results/zakat.png', fullPage: true });

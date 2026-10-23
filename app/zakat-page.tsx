@@ -196,6 +196,11 @@ function Overview({
   const dueH = toHijri(year.due);
   const fill = Math.min(100, Math.round((progress.elapsed / progress.length) * 100));
   const ramadan = payments.find((p) => p.kind === 'bank');
+  const latest = progress.past[progress.past.length - 1];
+  const latestClosed = latest ? book.years.find((c) => c.id === latest.id) : undefined;
+  const pastDue = progress.past.reduce((n, y) => n + y.amountDue, 0);
+  const pastPaid = progress.past.reduce((n, y) => n + Math.min(y.paid, y.amountDue), 0);
+  const pastPercent = pastDue > 0 ? Math.min(100, Math.round((pastPaid / pastDue) * 100)) : 100;
 
   return (
     <>
@@ -251,9 +256,56 @@ function Overview({
         </div>
       )}
 
-      <section className="slab zk-slab">
+      {latest && (
+        <section className="slab zk-slab" aria-label="Zakat to pay">
+          <div className="zk-slab-main">
+            <p className="lbl">
+              Zakat to pay · year {latest.name}, fixed on {longDate(latest.due)}
+            </p>
+            <div className="zk-big num">{rs(progress.arrears)}</div>
+            <div className="zk-chips">
+              <span className="zk-chip" data-tone={progress.arrears > 0 ? 'warn' : 'ok'}>
+                {progress.arrears > 0 ? 'Still to pay' : 'All paid'}
+              </span>
+              <span className="zk-chip">
+                Valued on {hijriDayMonth(toHijri(latest.due))} {toHijri(latest.due).year} · {longDate(latest.due)}
+              </span>
+              {progress.past.length > 1 && <span className="zk-chip">{progress.past.length} fixed years</span>}
+            </div>
+          </div>
+          <div className="zk-slab-side">
+            <div className="zk-ring" style={{ '--p': `${pastPercent}%` } as React.CSSProperties}>
+              <div>
+                <b className="num">{pastPercent}%</b>
+                <small>paid</small>
+              </div>
+            </div>
+            <dl className="zk-legend">
+              <div>
+                <dt>
+                  <i data-c="paid" />
+                  Paid
+                </dt>
+                <dd className="num">{rs(pastPaid)}</dd>
+              </div>
+              <div>
+                <dt>
+                  <i data-c="left" />
+                  Left to pay
+                </dt>
+                <dd className="num">{rs(progress.arrears)}</dd>
+              </div>
+              <small>Fixed amount: {rs(pastDue)}</small>
+            </dl>
+          </div>
+        </section>
+      )}
+
+      <section className={`slab zk-slab${latest ? ' zk-next' : ''}`}>
         <div className="zk-slab-main">
-          <p className="lbl">Zakat year {progress.name} · estimate, fixed on {longDate(year.due)}</p>
+          <p className="lbl">
+            {latest ? `Next: zakat year ${progress.name} · estimate` : `Zakat year ${progress.name} · estimate`}, fixed on {longDate(year.due)}
+          </p>
           <div className="zk-big num">{rs(breakdown.zakat)}</div>
           <div className="zk-chips">
             {breakdown.aboveNisab ? (
@@ -346,11 +398,63 @@ function Overview({
         </div>
       </section>
 
+      {latest && latestClosed && (
+        <section className="panel zk-card">
+          <div className="zk-card-head">
+            <div>
+              <h2>How your {latest.name} zakat was worked out</h2>
+              <p className="zk-sub">
+                Your portfolio was valued on {longDate(latest.due)} ({hijriDayMonth(toHijri(latest.due))} {toHijri(latest.due).year}). This amount is fixed and does not move.
+              </p>
+            </div>
+          </div>
+          <div className="scroll">
+            <table className="zk-table">
+              <thead>
+                <tr>
+                  <th>Wealth</th>
+                  <th>Value</th>
+                  <th>Counts</th>
+                  <th>Zakatable</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latestClosed.snapshot.rows.map((r) => (
+                  <tr key={r.key} data-kind={r.kind}>
+                    <td>
+                      {r.label}
+                      <small>{r.detail}</small>
+                    </td>
+                    <td className="num">{r.kind === 'debt' ? '' : num0(r.value)}</td>
+                    <td className="num">{r.kind === 'debt' ? '' : `${Math.round(r.share * 100)}%`}</td>
+                    <td className="num">
+                      {r.kind === 'debt' ? '−' : ''}
+                      {num0(r.counted)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="zk-total">
+                  <td>Zakat at {(latestClosed.snapshot.rate * 100).toFixed(latestClosed.snapshot.rate === 0.025 ? 1 : 3)}%</td>
+                  <td />
+                  <td />
+                  <td className="num">{rs(latestClosed.amountDue)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {latestClosed.snapshot.valuedOnDay === false && (
+            <p className="zk-note" data-tone="warn">
+              The closing prices of that day were not available, so the latest prices of {longDate(latestClosed.closedAt)} were used.
+            </p>
+          )}
+        </section>
+      )}
+
       <div className="zk-grid">
         <section className="panel zk-card">
           <div className="zk-card-head">
             <div>
-              <h2>How it&apos;s worked out</h2>
+              <h2>{latest ? `Next year (${progress.name}): estimate so far` : 'How it’s worked out'}</h2>
               <p className="zk-sub">
                 {progress.closeDue
                   ? 'Today’s values, while the amount for your zakat day is being fixed.'
@@ -537,7 +641,7 @@ function Overview({
         <PaymentDialog
           key={payment === 'new' ? 'new' : payment.id}
           book={book}
-          remaining={progress.remaining}
+          remaining={progress.arrears > 0 ? progress.arrears : progress.remaining}
           existing={payment === 'new' ? null : payment}
           asOf={asOf}
           busy={busy}
