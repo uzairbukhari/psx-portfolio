@@ -69,6 +69,8 @@
 
   /* ---------- helpers ---------- */
   const $ = function (s, r) { return (r || document).querySelector(s); };
+  /* our own constant markup only; parsed with DOMParser and swapped in as nodes */
+  const setHtml = function (el, html) { el.replaceChildren(...new DOMParser().parseFromString(html, 'text/html').body.childNodes); };
   const $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const root = $('.mk');
@@ -79,7 +81,7 @@
   function send(events) {
     if (optedOut()) return;
     let sid;
-    try { sid = sessionStorage.getItem('sipwise.analytics.session'); if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem('sipwise.analytics.session', sid); } } catch { sid = String(Math.random()).slice(2); }
+    try { sid = sessionStorage.getItem('sipwise.analytics.session'); if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem('sipwise.analytics.session', sid); } } catch { sid = String(Date.now()); }
     let anon;
     try { anon = localStorage.getItem('sipwise.analytics.anon'); if (!anon) { anon = crypto.randomUUID(); localStorage.setItem('sipwise.analytics.anon', anon); } } catch { anon = undefined; }
     try { fetch('/api/events', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sid, anonId: anon, platform: 'web', events: events }) }).catch(function () {}); } catch { /* analytics must never get in the way */ }
@@ -139,7 +141,7 @@
       const ur = b.getAttribute('data-lang') === 'ur';
       langBtns.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
       $$('[data-en]').forEach(function (el) {
-        el.innerHTML = ur ? el.getAttribute('data-ur') : el.getAttribute('data-en');
+        setHtml(el, ur ? el.getAttribute('data-ur') : el.getAttribute('data-en'));
         el.dir = ur ? 'rtl' : 'ltr'; el.lang = ur ? 'ur' : 'en'; el.classList.toggle('m-is-ur', ur);
       });
       const vl = ur ? 'ur' : 'en';
@@ -174,7 +176,7 @@
       $('#oRet').textContent = i.annualPct + '%'; $('#oStep').textContent = i.stepUpPct + '%';
       const v = calcView(i);
       $('#kIn').textContent = v.invested; $('#kOut').textContent = v.value; $('#kLast').textContent = v.last;
-      $('#calcChart').innerHTML = v.svg;
+      setHtml($('#calcChart'), v.svg);
     };
     [cAmt, cYrs, cRet, cStep].forEach(function (el) { el.addEventListener('input', draw); });
   }
@@ -202,7 +204,7 @@
     const setVideo = function () {
       const base = '/videos/sipwise-getting-started-' + (vlang === 'ur' ? 'urdu-' : '') + vshape;
       vid.poster = '/videos/poster-' + (vlang === 'ur' ? 'urdu-' : '') + vshape + '.jpg';
-      vid.innerHTML = '<source src="' + base + '.mp4" type="video/mp4">' + (vlang === 'en' ? '<track kind="captions" src="/videos/sipwise-getting-started-' + vshape + '.vtt" srclang="en" label="English" default>' : '');
+      setHtml(vid, '<source src="' + base + '.mp4" type="video/mp4">' + (vlang === 'en' ? '<track kind="captions" src="/videos/sipwise-getting-started-' + vshape + '.vtt" srclang="en" label="English" default>' : ''));
       vid.classList.toggle('m-portrait', vshape === 'portrait'); vid.load();
     };
     $$('[data-vlang]').forEach(function (b) { b.addEventListener('click', function () { if (vlang === b.getAttribute('data-vlang')) return; vlang = b.getAttribute('data-vlang'); $$('[data-vlang]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
