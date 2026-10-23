@@ -8,6 +8,8 @@ import {
   applySchool,
   closeYear,
   firstOfHijriMonth,
+  lockDueYears,
+  lockPending,
   fromHijri,
   newBook,
   openYear,
@@ -185,4 +187,32 @@ test('validation accepts the seed and rejects bad records', () => {
   bad((x) => (x.payments[1].id = x.payments[0].id));
   bad((x) => (x.items[0].kind = 'gold'));
   bad((x) => (x.settings.nisab = 'copper'));
+});
+
+test('a year is fixed from its zakat day: later prices never change it, and several missed years are fixed one by one', () => {
+  const account = buildTestAccount(today());
+  const core = account.portfolios[0].portfolio;
+  const parts = [{ id: 'core', name: 'Core', portfolio: core }];
+  const book = { ...newBook('2025-01-04'), items: [item('c', 'cash', 900_000)], settings: { ...newBook('2025-01-04').settings, portfolioIds: ['core'] } };
+  const due = openYear(book).due;
+  const sec = (date) => Date.parse(`${date}T12:00:00Z`) / 1000;
+  const closesFor = (laterPrice) =>
+    Object.fromEntries(core.companies.map((c) => [c.ticker, [[sec(addDays(due, -3)), 10], [sec(addDays(due, 5)), laterPrice]]]));
+  const onDay = zakatBreakdown(parts, book, { closes: closesFor(10) }, due);
+  const later = zakatBreakdown(parts, book, { closes: closesFor(5000) }, due);
+  assert.equal(onDay.valuedOnDay, true);
+  assert.equal(onDay.zakat, later.zakat);
+  assert.equal(lockPending(book, due), false);
+  assert.equal(lockPending(book, addDays(due, 1)), true);
+
+  const fixed = lockDueYears(book, parts, { closes: closesFor(5000) }, addDays(due, 1));
+  assert.equal(fixed.years.length, 1);
+  assert.equal(fixed.years[0].amountDue, onDay.zakat);
+  assert.equal(fixed.years[0].snapshot.valuedOnDay, true);
+  assert.equal(lockDueYears(fixed, parts, {}, addDays(due, 1)).years.length, 1);
+
+  const twice = lockDueYears(book, parts, { closes: closesFor(10) }, addDays(yearDue(book.settings, 1), 2));
+  assert.equal(twice.years.length, 2);
+  // Without closes the snapshot says the latest prices were used.
+  assert.equal(lockDueYears(book, parts, {}, addDays(due, 1)).years[0].snapshot.valuedOnDay, undefined);
 });

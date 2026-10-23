@@ -26,7 +26,7 @@ import { activityEntries, companyDividends, readOnlyReason } from '../../../mobi
 import { parseEod, parseIntraday, rangeChange, sliceRange, type HistoryRange } from '../../../lib/price-history.ts';
 import { filterActivity, groupByMonth, type ActivityFilter } from '../../../mobile/src/data/activity-view.ts';
 import { mutateAccount, mutateBlueprint, mutateZakat } from './mutate.ts';
-import { MANUAL_KINDS, PAYMENT_KINDS, activePayments, hijriLabel, manualLabel, paidSteps, shouldRecordTrail, toHijri, upcomingReminders, yearDue, zakatBreakdown, zakatProgress, type ZakatBook } from '../../../lib/zakat.ts';
+import { MANUAL_KINDS, PAYMENT_KINDS, activePayments, hijriLabel, manualLabel, paidSteps, lockPending, shouldRecordTrail, toHijri, upcomingReminders, yearDue, zakatBreakdown, zakatProgress, type ZakatBook } from '../../../lib/zakat.ts';
 import { tradeTotals, filterCompanies } from '../../../mobile/src/data/entry-form.ts';
 import { buildPlan, currentMonth, monthBuys, unifiedPlanSource } from '../../../mobile/src/data/sip.ts';
 import { parseReview, type ReviewRow } from '../../../mobile/src/data/record-buys.ts';
@@ -700,6 +700,7 @@ const handlers: Record<string, Handler> = {
       steps: paidSteps(book),
       trail: book.trail,
       recordTrail: shouldRecordTrail(book, asOf),
+      lockPending: lockPending(book, asOf),
       dueDate: progress.year.due,
       dueHijri: hijriLabel(toHijri(yearDue(book.settings, progress.year.index))),
       reminders: upcomingReminders(book, asOf),

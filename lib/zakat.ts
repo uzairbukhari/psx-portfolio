@@ -13,7 +13,8 @@ import type { FxRateRow } from './fx-rates.ts';
 import { chooseRate, type MetalRateRow } from './metal-rates.ts';
 import type { FundNavRow } from './mufap.ts';
 import type { PlanNavRow } from './plans.ts';
-import { holdings, round, type DisplayPart } from './portfolio.ts';
+import { holdings, positionTimeline, round, type DisplayPart } from './portfolio.ts';
+import { pktDate, type PricePoint } from './price-history.ts';
 
 export const TOLA_SILVER_NISAB = 52.5;
 export const TOLA_GOLD_NISAB = 7.5;
@@ -98,6 +99,8 @@ export type ZakatBreakdown = {
   otherMethodZakat: number | null;
   /** Things that could not be valued, in words. Never counted as zero silently. */
   missing: string[];
+  /** Stocks were valued with the closing prices of `asOf` (not the latest prices). */
+  valuedOnDay?: boolean;
 };
 export type ZakatYear = {
   id: string;
@@ -107,7 +110,7 @@ export type ZakatYear = {
   amountDue: number;
   carriedIn: number;
   /** The figures the amount was worked out from, frozen at closing. */
-  snapshot: Pick<ZakatBreakdown, 'rows' | 'gross' | 'debts' | 'net' | 'nisab' | 'rate' | 'zakat'> & { asOf: string; settings: Pick<ZakatSettings, 'year' | 'nisab' | 'school' | 'shares' | 'equityFunds' | 'plans' | 'jewellery' | 'debts'> };
+  snapshot: Pick<ZakatBreakdown, 'rows' | 'gross' | 'debts' | 'net' | 'nisab' | 'rate' | 'zakat' | 'valuedOnDay'> & { asOf: string; settings: Pick<ZakatSettings, 'year' | 'nisab' | 'school' | 'shares' | 'equityFunds' | 'plans' | 'jewellery' | 'debts'> };
 };
 export type ZakatTrailPoint = { date: string; zakat: number };
 export type ZakatBook = {
@@ -251,6 +254,8 @@ export type ZakatInputs = {
   fundNavs?: FundNavRow[];
   planNavs?: PlanNavRow[];
   fxRates?: FxRateRow[];
+  /** Daily closes per ticker. With them, stocks are valued on `asOf` itself (shares held then times the close on or before it). */
+  closes?: Record<string, PricePoint[]>;
 };
 
 const stockShare = (settings: ZakatSettings, ticker: string, treatment: 'market' | 'proxy25') => {
@@ -278,6 +283,25 @@ function nisabFor(settings: ZakatSettings, rates: MetalRateRow[], asOf: string):
   return { value: round(rate.pkrPerTola * tolas), basis: metal, rateDate: rate.date };
 }
 
+/** Open stock positions with their value: on `asOf` from the daily closes when given, otherwise at the latest price. */
+function stockPositions(portfolio: Parameters<typeof holdings>[0], asOf: string, closes?: Record<string, PricePoint[]>) {
+  const now = holdings(portfolio).filter((x) => x.shares > 0);
+  if (!closes) return now.map((h) => ({ ticker: h.ticker, value: h.value, onDay: false }));
+  const out: { ticker: string; value: number | null | undefined; onDay: boolean }[] = [];
+  for (const company of portfolio.companies) {
+    const timeline = positionTimeline(portfolio, company.ticker);
+    let shares = 0;
+    for (const point of timeline) if (point.date <= asOf) shares = point.shares;
+    if (shares <= 0) continue;
+    let close: number | null = null;
+    for (const [sec, price] of closes[company.ticker] ?? []) if (pktDate(sec) <= asOf && price > 0) close = price;
+    if (close !== null) out.push({ ticker: company.ticker, value: shares * close, onDay: true });
+    // No history for that day: the latest price stands in and the snapshot says so.
+    else out.push({ ticker: company.ticker, value: now.find((h) => h.ticker === company.ticker)?.value ?? null, onDay: false });
+  }
+  return out;
+}
+
 function wealth(
   parts: (DisplayPart & { locked?: boolean })[],
   book: ZakatBook,
@@ -299,12 +323,14 @@ function wealth(
   let stockCounted = 0;
   let stockCount = 0;
   const unpriced: string[] = [];
+  let onDay = Boolean(inputs.closes);
   for (const part of chosen)
-    for (const h of holdings(part.portfolio).filter((x) => x.shares > 0)) {
+    for (const h of stockPositions(part.portfolio, asOf, inputs.closes)) {
       if (h.value === null || h.value === undefined) {
         unpriced.push(h.ticker);
         continue;
       }
+      if (!h.onDay) onDay = false;
       stockCount += 1;
       stockValue += h.value;
       stockCounted += h.value * stockShare(settings, h.ticker, treatment.shares);
@@ -393,7 +419,7 @@ function wealth(
     });
   }
   const gross = round(rows.filter((r) => r.kind !== 'debt').reduce((n, r) => n + r.counted, 0));
-  return { rows, gross, debts: round(debts), missing };
+  return { rows, gross, debts: round(debts), missing, onDay };
 }
 
 export function zakatBreakdown(
@@ -427,6 +453,7 @@ export function zakatBreakdown(
     zakat,
     otherMethodZakat: hasEquity && otherZakat !== zakat ? otherZakat : null,
     missing: main.missing,
+    ...(inputs.closes ? { valuedOnDay: main.onDay } : {}),
   };
 }
 
@@ -549,6 +576,7 @@ export function closeYear(book: ZakatBook, breakdown: ZakatBreakdown, asOf: stri
       nisab: breakdown.nisab,
       rate: breakdown.rate,
       zakat: breakdown.zakat,
+      ...(breakdown.valuedOnDay !== undefined ? { valuedOnDay: breakdown.valuedOnDay } : {}),
       settings: {
         year: book.settings.year,
         nisab: book.settings.nisab,
@@ -570,6 +598,28 @@ export function closeYear(book: ZakatBook, breakdown: ZakatBreakdown, asOf: stri
     ...(carryExtra && surplus > 0 ? { carriedIn: surplus } : {}),
     // Payments made after this year's due date count toward the next year; those inside it already belong to the closed one.
   };
+}
+
+/** True once a zakat day has passed with its year still open: the amount is due to be fixed from that day's values. */
+export const lockPending = (book: ZakatBook, today: string) => openYear(book).due < today;
+
+/**
+ * Fixes every year whose zakat day has passed, each from the portfolio as it stood on that day (stocks from `inputs.closes`
+ * when given). A year is never fixed from a later day's values by accident: without closes the snapshot says it used the
+ * latest prices. Money paid beyond a year's amount carries into the next one.
+ */
+export function lockDueYears(
+  book: ZakatBook,
+  parts: (DisplayPart & { locked?: boolean })[],
+  inputs: ZakatInputs,
+  today: string,
+): ZakatBook {
+  let next = book;
+  for (let i = 0; i < MAX_ZAKAT_YEARS && lockPending(next, today); i += 1) {
+    const { due } = openYear(next);
+    next = closeYear(next, zakatBreakdown(parts, next, inputs, due), today, true);
+  }
+  return next;
 }
 
 // ───────────────────────── The trail chart ─────────────────────────

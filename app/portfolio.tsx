@@ -2072,7 +2072,7 @@ function DashboardContent({
     notify(message);
   };
   /** Zakat: one book for the whole account, written into every portfolio like the tax status. An empty message saves quietly. */
-  const saveZakat = async (next: ZakatBook, message: string) => {
+  const saveZakat = async (next: ZakatBook | null, message: string) => {
     await vault!.session.saveAccount(
       setAccountZakat(vault!.session.account, next),
       revision,

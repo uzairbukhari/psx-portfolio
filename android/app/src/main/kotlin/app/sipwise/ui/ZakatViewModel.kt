@@ -85,8 +85,6 @@ class ZakatViewModel(private val ledger: Ledger) : ViewModel() {
 
     fun voidPayment(id: String) = change("zakat.payment.void") { put("id", id) }
 
-    fun closeYear(carryExtra: Boolean) = change("zakat.close") { put("carryExtra", carryExtra) }
-
     fun stop() = change("zakat.remove") {}
 
     fun clearError() {

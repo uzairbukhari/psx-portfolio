@@ -15,7 +15,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,7 +42,7 @@ import app.sipwise.model.mediumDate
 import app.sipwise.model.money
 import app.sipwise.model.moneyShort
 
-private enum class ZakatDialog { Pay, Item, Close, Stop }
+private enum class ZakatDialog { Pay, Item, Stop }
 
 @Composable
 fun ZakatScreen(viewModel: ZakatViewModel) {
@@ -125,11 +124,7 @@ private fun Overview(
     Button(onClick = { dialog = ZakatDialog.Pay }, enabled = !busy && view.canLog, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.zakat_log_payment))
     }
-    if (p.closeDue) {
-        OutlinedButton(onClick = { dialog = ZakatDialog.Close }, enabled = !busy && view.canLog, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.zakat_close_year))
-        }
-    }
+    if (view.lockPending) Text(stringResource(R.string.zakat_lock_pending), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
     BreakdownCard(view)
     ItemsCard(view, busy, onAdd = { dialog = ZakatDialog.Item }, onRemove = viewModel::removeItem)
     PaymentsCard(view, busy, viewModel::voidPayment)
@@ -148,21 +143,6 @@ private fun Overview(
                 viewModel.addItem(kind, amount, note)
                 dialog = null
             }
-        ZakatDialog.Close ->
-            AlertDialog(
-                onDismissRequest = { dialog = null },
-                title = { Text(stringResource(R.string.zakat_close_year)) },
-                text = { Text(stringResource(R.string.zakat_close_body, money(p.estimate))) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            viewModel.closeYear(false)
-                            dialog = null
-                        },
-                    ) { Text(stringResource(R.string.zakat_close_confirm)) }
-                },
-                dismissButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.zakat_cancel)) } },
-            )
         ZakatDialog.Stop ->
             AlertDialog(
                 onDismissRequest = { dialog = null },
