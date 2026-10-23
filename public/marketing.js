@@ -239,8 +239,8 @@
       vid.replaceChildren(...parts);
       vid.classList.toggle('m-portrait', vshape === 'portrait'); vid.load();
     };
-    $$('[data-vlang]').forEach(function (b) { b.addEventListener('click', function () { if (vlang === b.getAttribute('data-vlang')) return; vlang = b.getAttribute('data-vlang'); $$('[data-vlang]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
-    $$('[data-vshape]').forEach(function (b) { b.addEventListener('click', function () { vshape = b.getAttribute('data-vshape'); $$('[data-vshape]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
+    $$('[data-vlang]').forEach(function (b) { b.addEventListener('click', function () { if (vlang === b.getAttribute('data-vlang')) return; vlang = b.getAttribute('data-vlang') === 'en' ? 'en' : 'ur'; $$('[data-vlang]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
+    $$('[data-vshape]').forEach(function (b) { b.addEventListener('click', function () { vshape = b.getAttribute('data-vshape') === 'portrait' ? 'portrait' : 'landscape'; $$('[data-vshape]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
     $$('#mk-chapters button').forEach(function (b) { b.addEventListener('click', function () { vid.currentTime = +b.getAttribute('data-t'); const p = vid.play(); if (p && p.catch) p.catch(function () {}); }); });
     // On a phone start with the portrait cut. Waits until the page has finished loading so it never changes markup React is still hydrating.
     if (window.matchMedia('(max-width: 760px)').matches) {
