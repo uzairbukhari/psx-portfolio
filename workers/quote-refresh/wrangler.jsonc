@@ -11,6 +11,8 @@
     "APP_ENV": "production",
     "CF_ACCOUNT_ID": "78c9e0cc85767a65d0ff868ce76c6bba"
   },
+  "durable_objects": { "bindings": [{ "name": "MUFAP_FETCHER", "class_name": "MufapFetch" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MufapFetch"] }],
   "d1_databases": [
     {
       "binding": "DB",

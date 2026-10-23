@@ -1,4 +1,5 @@
-import { refreshFundPayouts, refreshFunds } from '../../../lib/mufap-refresh';
+import { refreshFundPayouts, refreshFunds, type MufapFetcher } from '../../../lib/mufap-refresh';
+import { DurableObject } from 'cloudflare:workers';
 import { refreshPlanNavs } from '../../../lib/plan-navs';
 import { sendAdminAlerts } from '../../../lib/admin-alerts';
 import { syncPlatformMetrics } from '../../../lib/cf-analytics';
@@ -10,6 +11,7 @@ import { dispatchWorkflow, dueWorkflows, isFundRefreshTime, isPlatformTime } fro
 // This Worker has no VAULT_DB binding and no way to learn what any user holds: it only starts public scrapers.
 interface Env {
   DB: D1Database;
+  MUFAP_FETCHER: DurableObjectNamespace<MufapFetch>;
   GITHUB_DISPATCH_TOKEN?: string;
   GITHUB_REPO?: string;
   APP_ENV?: string;
@@ -20,6 +22,25 @@ interface Env {
   CF_ACCOUNT_ID?: string;
   /** Optional: Firebase service account JSON; switches on push to the native Android app. */
   FCM_SERVICE_ACCOUNT_JSON?: string;
+}
+
+/**
+ * MUFAP's Cloudflare protection challenges the machines a Cron Trigger lands on (403 "Just a moment"), but answers
+ * requests leaving near Pakistan (the admin button works). A Durable Object runs in one place, chosen by a location
+ * hint when it is first created, so the cron's MUFAP fetches go through one placed in the Middle East.
+ */
+export class MufapFetch extends DurableObject {
+  async fetch(request: Request) {
+    const target = new URL(request.url).searchParams.get('url') ?? '';
+    // Only MUFAP pages: this is not a general proxy.
+    if (!target.startsWith('https://www.mufap.com.pk/')) return new Response('Not allowed', { status: 400 });
+    return fetch(target, { headers: request.headers, signal: AbortSignal.timeout(25_000) });
+  }
+}
+
+function nearPakistanFetcher(env: Env): MufapFetcher {
+  const stub = env.MUFAP_FETCHER.get(env.MUFAP_FETCHER.idFromName('mufap'), { locationHint: 'me' });
+  return (url, init) => stub.fetch(`https://mufap-fetch/?url=${encodeURIComponent(url)}`, init);
 }
 
 /**
@@ -96,7 +117,7 @@ export default {
         (async () => {
           // Two independent public sources: one failing must not stop the other.
           const startedAt = new Date().toISOString();
-          await refreshFunds(env.DB)
+          await refreshFunds(env.DB, nearPakistanFetcher(env))
             .then(async (r) => {
               console.log('Fund prices stored', r);
               await recordJobRun(env.DB, { job: 'funds', source: 'cron', startedAt, ok: true, detail: `${r.funds} funds, ${r.prices} prices` }).catch(() => {});
@@ -105,7 +126,7 @@ export default {
               console.error('Fund price refresh failed', e);
               await recordJobRun(env.DB, { job: 'funds', source: 'cron', startedAt, ok: false, detail: e instanceof Error ? e.message : String(e) }).catch(() => {});
             });
-          await refreshFundPayouts(env.DB)
+          await refreshFundPayouts(env.DB, nearPakistanFetcher(env))
             .then((r) => console.log('Fund payouts stored', r))
             .catch((e) => console.error('Fund payout refresh failed', e instanceof Error ? e.message : e));
           await refreshPlanNavs(env.DB)
