@@ -60,7 +60,7 @@ export async function noteSignIn(
   secret: string,
   isAdmin: boolean,
   now = new Date(),
-  profile: { name?: string | null; picture?: string | null } = {},
+  profile: { name?: string | null; picture?: string | null; signupSrc?: string | null } = {},
 ): Promise<void> {
   try {
     const addr = email.trim().toLowerCase();
@@ -70,8 +70,8 @@ export async function noteSignIn(
     const picture = profile.picture && profile.picture.length <= 500 ? profile.picture : null;
     const existing = await db.prepare('SELECT 1 AS x FROM app_users WHERE email=?').bind(addr).first();
     if (!existing) {
-      await db.prepare('INSERT OR IGNORE INTO app_users (email,first_seen_at,first_platform,last_seen_at,last_platform,origin,name,picture) VALUES (?,?,?,?,?,?,?,?)')
-        .bind(addr, ts, platform, ts, platform, 'unknown', name, picture).run();
+      await db.prepare('INSERT OR IGNORE INTO app_users (email,first_seen_at,first_platform,last_seen_at,last_platform,origin,name,picture,signup_src) VALUES (?,?,?,?,?,?,?,?,?)')
+        .bind(addr, ts, platform, ts, platform, 'unknown', name, picture, profile.signupSrc ?? null).run();
     } else {
       await db.prepare('UPDATE app_users SET last_seen_at=?, last_platform=?, name=COALESCE(?,name), picture=COALESCE(?,picture) WHERE email=?')
         .bind(ts, platform, name, picture, addr).run();

@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { getViewer } from '@/lib/auth';
+import { appOrigin } from '@/lib/hosts';
+import { currentHostRole, hostConfig } from '@/lib/hosts-server';
 import Dashboard from './portfolio';
 import { CfBeacon } from './cf-beacon';
 import { LandingPage } from './landing-page';
@@ -21,6 +23,8 @@ export async function DashboardRoute({
   /** Shown instead of the landing page to signed-out visitors (public pages such as /feedback). */
   signedOutView?: ReactNode;
 }) {
+  // App pages live on the app host; the marketing host only serves the public pages (those pass signedOutView).
+  if (!signedOutView && (await currentHostRole()) === 'marketing') redirect(`${appOrigin(hostConfig())}${returnTo}`);
   const user = await getViewer();
   if (!user) {
     if (signedOutView) return signedOutView;
