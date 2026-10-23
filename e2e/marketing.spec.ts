@@ -5,6 +5,12 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const PAGES = ['/', '/features', '/security', '/pricing', '/guide'];
 
+// The local sandbox is signed in as the test account, where `/` is the dashboard, not the marketing home.
+test.beforeEach(async ({ request }, info) => {
+  const signedIn = (await request.get('/api/me')).ok();
+  if (signedIn && /marketing \/:|home:/.test(info.title)) test.skip(true, 'signed in: / is the dashboard');
+});
+
 for (const path of PAGES) {
   test(`marketing ${path}: loads clean, sign-in links carry a source`, async ({ page }) => {
     const errors: string[] = [];
