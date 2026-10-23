@@ -69,8 +69,23 @@
 
   /* ---------- helpers ---------- */
   const $ = function (s, r) { return (r || document).querySelector(s); };
-  /* our own constant markup only; parsed with DOMParser and swapped in as nodes */
-  const setHtml = function (el, html) { el.replaceChildren(...new DOMParser().parseFromString(html, 'text/html').body.childNodes); };
+  /* SVG text from our own chart builder (no entities) turned into elements one tag at a time, never parsed as HTML */
+  const svgInto = function (el, str) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const stack = [el];
+    const re = /<(\/?)([a-zA-Z]+)([^>]*?)(\/?)>|([^<]+)/g;
+    let m;
+    while ((m = re.exec(str))) {
+      if (m[5] !== undefined) { stack[stack.length - 1].append(document.createTextNode(m[5])); continue; }
+      if (m[1]) { stack.pop(); continue; }
+      const node = document.createElementNS(NS, m[2]);
+      const at = /([\w-]+)="([^"]*)"/g;
+      let a;
+      while ((a = at.exec(m[3]))) node.setAttribute(a[1], a[2]);
+      stack[stack.length - 1].append(node);
+      if (!m[4]) stack.push(node);
+    }
+  };
   const $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const root = $('.mk');
@@ -141,7 +156,16 @@
       const ur = b.getAttribute('data-lang') === 'ur';
       langBtns.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
       $$('[data-en]').forEach(function (el) {
-        setHtml(el, ur ? el.getAttribute('data-ur') : el.getAttribute('data-en'));
+        const txt = ur ? el.getAttribute('data-ur') : el.getAttribute('data-en');
+        if (el.hasAttribute('data-lines')) {
+          const cls = ['m-l', 'm-l m-grad', 'm-l m-l3'];
+          el.replaceChildren(...txt.split('|').map(function (line, k) {
+            const span = document.createElement('span');
+            span.className = cls[k] + (ur ? ' m-ur-copy' : '');
+            span.textContent = line;
+            return span;
+          }));
+        } else el.textContent = txt;
         el.dir = ur ? 'rtl' : 'ltr'; el.lang = ur ? 'ur' : 'en'; el.classList.toggle('m-is-ur', ur);
       });
       const vl = ur ? 'ur' : 'en';
@@ -176,7 +200,7 @@
       $('#oRet').textContent = i.annualPct + '%'; $('#oStep').textContent = i.stepUpPct + '%';
       const v = calcView(i);
       $('#kIn').textContent = v.invested; $('#kOut').textContent = v.value; $('#kLast').textContent = v.last;
-      setHtml($('#calcChart'), v.svg);
+      $('#calcChart').replaceChildren(); svgInto($('#calcChart'), v.svg);
     };
     [cAmt, cYrs, cRet, cStep].forEach(function (el) { el.addEventListener('input', draw); });
   }
@@ -204,7 +228,15 @@
     const setVideo = function () {
       const base = '/videos/sipwise-getting-started-' + (vlang === 'ur' ? 'urdu-' : '') + vshape;
       vid.poster = '/videos/poster-' + (vlang === 'ur' ? 'urdu-' : '') + vshape + '.jpg';
-      setHtml(vid, '<source src="' + base + '.mp4" type="video/mp4">' + (vlang === 'en' ? '<track kind="captions" src="/videos/sipwise-getting-started-' + vshape + '.vtt" srclang="en" label="English" default>' : ''));
+      const src = document.createElement('source');
+      src.src = base + '.mp4'; src.type = 'video/mp4';
+      const parts = [src];
+      if (vlang === 'en') {
+        const tr = document.createElement('track');
+        tr.kind = 'captions'; tr.src = '/videos/sipwise-getting-started-' + vshape + '.vtt'; tr.srclang = 'en'; tr.label = 'English'; tr.default = true;
+        parts.push(tr);
+      }
+      vid.replaceChildren(...parts);
       vid.classList.toggle('m-portrait', vshape === 'portrait'); vid.load();
     };
     $$('[data-vlang]').forEach(function (b) { b.addEventListener('click', function () { if (vlang === b.getAttribute('data-vlang')) return; vlang = b.getAttribute('data-vlang'); $$('[data-vlang]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
