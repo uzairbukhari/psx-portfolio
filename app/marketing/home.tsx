@@ -9,7 +9,8 @@ import { GoogleCta, Icon, Svg } from './parts';
 import { MarketingShell } from './shell';
 
 const EN_H1 = '<span class="m-l">Invest monthly.</span><span class="m-l m-grad">See everything.</span><span class="m-l m-l3">Share nothing.</span>';
-const UR_H1 = '<span class="m-l m-ur-copy">ہر مہینے سرمایہ کاری۔</span><span class="m-l m-grad m-ur-copy">سب کچھ ایک نظر میں۔</span><span class="m-l m-l3 m-ur-copy">کسی سے کچھ شیئر نہیں۔</span>';
+const EN_LINES = 'Invest monthly.|See everything.|Share nothing.';
+const UR_LINES = 'ہر مہینے سرمایہ کاری۔|سب کچھ ایک نظر میں۔|کسی سے کچھ شیئر نہیں۔';
 const EN_LEDE = 'Sipwise keeps your PSX shares, mutual funds, gold, savings plans and dollars in one encrypted ledger. It plans next month’s investment and shows where the habit takes you.';
 const UR_LEDE = 'سپ وائز آپ کے پی ایس ایکس شیئرز، میوچل فنڈز، سونا، بچت اسکیمیں اور ڈالر ایک خفیہ لیجر میں رکھتا ہے۔';
 
@@ -30,7 +31,7 @@ function Hero() {
       <div className="m-wrap m-hero-grid">
         <div>
           <span className="m-pill"><b>Free</b> Early access · made for PSX investors</span>
-          <h1 data-en={EN_H1} data-ur={UR_H1} dangerouslySetInnerHTML={{ __html: EN_H1 }} />
+          <h1 data-lines data-en={EN_LINES} data-ur={UR_LINES} dangerouslySetInnerHTML={{ __html: EN_H1 }} />
           <p className="m-lede" data-en={EN_LEDE} data-ur={UR_LEDE}>{EN_LEDE}</p>
           <div className="m-cta-row">
             <GoogleCta cfg={cfg} src="home_hero">Continue with Google</GoogleCta>

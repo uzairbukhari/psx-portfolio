@@ -69,6 +69,23 @@
 
   /* ---------- helpers ---------- */
   const $ = function (s, r) { return (r || document).querySelector(s); };
+  /* SVG text from our own chart builder (no entities) turned into elements one tag at a time, never parsed as HTML */
+  const svgInto = function (el, str) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const stack = [el];
+    const re = /<(\/?)([a-zA-Z]+)([^>]*?)(\/?)>|([^<]+)/g;
+    let m;
+    while ((m = re.exec(str))) {
+      if (m[5] !== undefined) { stack[stack.length - 1].append(document.createTextNode(m[5])); continue; }
+      if (m[1]) { stack.pop(); continue; }
+      const node = document.createElementNS(NS, m[2]);
+      const at = /([\w-]+)="([^"]*)"/g;
+      let a;
+      while ((a = at.exec(m[3]))) node.setAttribute(a[1], a[2]);
+      stack[stack.length - 1].append(node);
+      if (!m[4]) stack.push(node);
+    }
+  };
   const $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const root = $('.mk');
@@ -79,7 +96,7 @@
   function send(events) {
     if (optedOut()) return;
     let sid;
-    try { sid = sessionStorage.getItem('sipwise.analytics.session'); if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem('sipwise.analytics.session', sid); } } catch { sid = String(Math.random()).slice(2); }
+    try { sid = sessionStorage.getItem('sipwise.analytics.session'); if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem('sipwise.analytics.session', sid); } } catch { sid = String(Date.now()); }
     let anon;
     try { anon = localStorage.getItem('sipwise.analytics.anon'); if (!anon) { anon = crypto.randomUUID(); localStorage.setItem('sipwise.analytics.anon', anon); } } catch { anon = undefined; }
     try { fetch('/api/events', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sid, anonId: anon, platform: 'web', events: events }) }).catch(function () {}); } catch { /* analytics must never get in the way */ }
@@ -139,7 +156,16 @@
       const ur = b.getAttribute('data-lang') === 'ur';
       langBtns.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
       $$('[data-en]').forEach(function (el) {
-        el.innerHTML = ur ? el.getAttribute('data-ur') : el.getAttribute('data-en');
+        const txt = ur ? el.getAttribute('data-ur') : el.getAttribute('data-en');
+        if (el.hasAttribute('data-lines')) {
+          const cls = ['m-l', 'm-l m-grad', 'm-l m-l3'];
+          el.replaceChildren(...txt.split('|').map(function (line, k) {
+            const span = document.createElement('span');
+            span.className = cls[k] + (ur ? ' m-ur-copy' : '');
+            span.textContent = line;
+            return span;
+          }));
+        } else el.textContent = txt;
         el.dir = ur ? 'rtl' : 'ltr'; el.lang = ur ? 'ur' : 'en'; el.classList.toggle('m-is-ur', ur);
       });
       const vl = ur ? 'ur' : 'en';
@@ -174,7 +200,7 @@
       $('#oRet').textContent = i.annualPct + '%'; $('#oStep').textContent = i.stepUpPct + '%';
       const v = calcView(i);
       $('#kIn').textContent = v.invested; $('#kOut').textContent = v.value; $('#kLast').textContent = v.last;
-      $('#calcChart').innerHTML = v.svg;
+      $('#calcChart').replaceChildren(); svgInto($('#calcChart'), v.svg);
     };
     [cAmt, cYrs, cRet, cStep].forEach(function (el) { el.addEventListener('input', draw); });
   }
@@ -202,11 +228,19 @@
     const setVideo = function () {
       const base = '/videos/sipwise-getting-started-' + (vlang === 'ur' ? 'urdu-' : '') + vshape;
       vid.poster = '/videos/poster-' + (vlang === 'ur' ? 'urdu-' : '') + vshape + '.jpg';
-      vid.innerHTML = '<source src="' + base + '.mp4" type="video/mp4">' + (vlang === 'en' ? '<track kind="captions" src="/videos/sipwise-getting-started-' + vshape + '.vtt" srclang="en" label="English" default>' : '');
+      const src = document.createElement('source');
+      src.src = base + '.mp4'; src.type = 'video/mp4';
+      const parts = [src];
+      if (vlang === 'en') {
+        const tr = document.createElement('track');
+        tr.kind = 'captions'; tr.src = '/videos/sipwise-getting-started-' + vshape + '.vtt'; tr.srclang = 'en'; tr.label = 'English'; tr.default = true;
+        parts.push(tr);
+      }
+      vid.replaceChildren(...parts);
       vid.classList.toggle('m-portrait', vshape === 'portrait'); vid.load();
     };
-    $$('[data-vlang]').forEach(function (b) { b.addEventListener('click', function () { if (vlang === b.getAttribute('data-vlang')) return; vlang = b.getAttribute('data-vlang'); $$('[data-vlang]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
-    $$('[data-vshape]').forEach(function (b) { b.addEventListener('click', function () { vshape = b.getAttribute('data-vshape'); $$('[data-vshape]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
+    $$('[data-vlang]').forEach(function (b) { b.addEventListener('click', function () { if (vlang === b.getAttribute('data-vlang')) return; vlang = b.getAttribute('data-vlang') === 'en' ? 'en' : 'ur'; $$('[data-vlang]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
+    $$('[data-vshape]').forEach(function (b) { b.addEventListener('click', function () { vshape = b.getAttribute('data-vshape') === 'portrait' ? 'portrait' : 'landscape'; $$('[data-vshape]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); setVideo(); }); });
     $$('#mk-chapters button').forEach(function (b) { b.addEventListener('click', function () { vid.currentTime = +b.getAttribute('data-t'); const p = vid.play(); if (p && p.catch) p.catch(function () {}); }); });
     // On a phone start with the portrait cut. Waits until the page has finished loading so it never changes markup React is still hydrating.
     if (window.matchMedia('(max-width: 760px)').matches) {
