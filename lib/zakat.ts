@@ -110,7 +110,7 @@ export type ZakatYear = {
   amountDue: number;
   carriedIn: number;
   /** The figures the amount was worked out from, frozen at closing. */
-  snapshot: Pick<ZakatBreakdown, 'rows' | 'gross' | 'debts' | 'net' | 'nisab' | 'rate' | 'zakat' | 'valuedOnDay'> & { asOf: string; settings: Pick<ZakatSettings, 'year' | 'nisab' | 'school' | 'shares' | 'equityFunds' | 'plans' | 'jewellery' | 'debts'> };
+  snapshot: Pick<ZakatBreakdown, 'rows' | 'gross' | 'debts' | 'net' | 'nisab' | 'rate' | 'zakat' | 'valuedOnDay'> & { asOf: string; /** What could not be valued on that day and was left out. */ missing?: string[]; settings: Pick<ZakatSettings, 'year' | 'nisab' | 'school' | 'shares' | 'equityFunds' | 'plans' | 'jewellery' | 'debts'> };
 };
 export type ZakatTrailPoint = { date: string; zakat: number };
 export type ZakatBook = {
@@ -577,6 +577,7 @@ export function closeYear(book: ZakatBook, breakdown: ZakatBreakdown, asOf: stri
       rate: breakdown.rate,
       zakat: breakdown.zakat,
       ...(breakdown.valuedOnDay !== undefined ? { valuedOnDay: breakdown.valuedOnDay } : {}),
+      ...(breakdown.missing.length ? { missing: breakdown.missing } : {}),
       settings: {
         year: book.settings.year,
         nisab: book.settings.nisab,
@@ -598,6 +599,14 @@ export function closeYear(book: ZakatBook, breakdown: ZakatBreakdown, asOf: stri
     ...(carryExtra && surplus > 0 ? { carriedIn: surplus } : {}),
     // Payments made after this year's due date count toward the next year; those inside it already belong to the closed one.
   };
+}
+
+/** Takes the newest fixed year back to open, so it is worked out again from its zakat day's values. */
+export function reopenLastYear(book: ZakatBook): ZakatBook {
+  const last = book.years[book.years.length - 1];
+  if (!last) return book;
+  const { carriedIn: _old, ...rest } = book;
+  return { ...rest, years: book.years.slice(0, -1), trail: [], ...(last.carriedIn > 0 ? { carriedIn: last.carriedIn } : {}) };
 }
 
 /** True once a zakat day has passed with its year still open: the amount is due to be fixed from that day's values. */

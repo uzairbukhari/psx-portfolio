@@ -8,7 +8,8 @@ test('zakat: overview shows the fixed amount to pay, payments and how it is work
   await expect(app.getByText(/Zakat to pay/i)).toBeVisible();
   await expect(app.getByRole('heading', { name: /zakat was worked out/ })).toBeVisible();
   await expect(app.getByRole('heading', { name: 'Payments' })).toBeVisible();
-  await expect(app.getByText('Net zakatable wealth')).toBeVisible();
+  await expect(app.getByText('Net zakatable wealth').first()).toBeVisible();
+  await expect(app.getByRole('button', { name: 'Recalculate' })).toBeVisible();
   await app.screenshot({ path: process.env.ZAKAT_SHOT ?? 'test-results/zakat.png', fullPage: true });
 });
 

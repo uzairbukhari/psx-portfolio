@@ -15,6 +15,7 @@ import {
   openYear,
   paidSteps,
   recordTrail,
+  reopenLastYear,
   toHijri,
   upcomingReminders,
   validateZakat,
@@ -23,6 +24,7 @@ import {
   zakatBreakdown,
   zakatProgress,
 } from '../lib/zakat.ts';
+import { fxRowsWithHistory } from '../lib/fx-rates.ts';
 import { blankPortfolio } from '../lib/portfolio.ts';
 import { buildTestAccount } from '../lib/test-seed/account.ts';
 import { today } from '../lib/portfolio.ts';
@@ -215,4 +217,36 @@ test('a year is fixed from its zakat day: later prices never change it, and seve
   assert.equal(twice.years.length, 2);
   // Without closes the snapshot says the latest prices were used.
   assert.equal(lockDueYears(book, parts, {}, addDays(due, 1)).years[0].snapshot.valuedOnDay, undefined);
+});
+
+test('a past day is valued with the history of rates, and what cannot be valued is recorded', () => {
+  const dollars = {
+    id: 'usd', kind: 'currency', name: 'Dollars', currency: 'USD', note: '',
+    entries: [{ id: 'e1', date: '2025-01-01', type: 'buy', units: 100, pkr: 28000, note: '' }],
+  };
+  const parts = part({ ...blankPortfolio(), assets: [dollars] });
+  const book = { ...newBook('2025-06-15'), settings: { ...newBook('2025-06-15').settings, nisab: 'silver' } };
+  const due = yearDue(book.settings, 0);
+  const later = addDays(due, 1);
+  const recent = [{ date: later, currency: 'USD', kind: 'open_market', pkrPerUnit: 300, sourceUrl: '', fetchedAt: '' }];
+  const history = [{ currency: 'USD', kind: 'open_market', date: due, rate: 281 }];
+  // Only today's rates: nothing known for the zakat day, so the dollars are left out and the snapshot says so.
+  const without = lockDueYears(book, parts, { metalRates: rates(), fxRates: recent }, later);
+  assert.equal(without.years[0].snapshot.rows.some((r) => r.key === 'currency'), false);
+  assert.ok(without.years[0].snapshot.missing?.[0].includes('Dollars'));
+  // With the history, they are worth the rate of that day.
+  const rows = fxRowsWithHistory({ rates: recent, history });
+  const withHistory = lockDueYears(book, parts, { metalRates: rates(), fxRates: rows }, later);
+  assert.equal(withHistory.years[0].snapshot.rows.find((r) => r.key === 'currency')?.value, 28100);
+  assert.equal(withHistory.years[0].snapshot.missing, undefined);
+});
+
+test('reopening the newest fixed year restores the book before it was fixed', () => {
+  const book = { ...bookWith([item('c', 'cash', 1_000_000)]), payments: [pay('p1', '2026-12-01', 40000)] };
+  const closed = closeYear(book, zakatBreakdown(part(), book, { metalRates: rates() }, '2026-12-31'), '2027-01-05', true);
+  assert.equal(closed.years.length, 1);
+  const reopened = reopenLastYear(closed);
+  assert.equal(reopened.years.length, 0);
+  assert.equal(reopened.carriedIn, undefined);
+  assert.equal(reopenLastYear(reopened), reopened);
 });
