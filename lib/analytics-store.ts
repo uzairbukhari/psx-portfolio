@@ -118,7 +118,8 @@ export async function purgeOldEvents(db: D1Database, now = new Date()) {
  * Staging records no analytics (every deploy's test run would only fill the table and make the admin queries slower).
  * Rows left over from before are removed a small chunk at a time, so cleaning up never spends many D1 writes at once.
  */
-export async function purgeStagingEvents(db: D1Database, now = new Date(), chunk = 2000) {
+// Each deleted row also rewrites its four index entries (about five writes), so staging cleans up a trickle at a time.
+export async function purgeStagingEvents(db: D1Database, now = new Date(), chunk = 100) {
   await db.prepare('DELETE FROM analytics_events WHERE id IN (SELECT id FROM analytics_events WHERE day<? LIMIT ?)')
     .bind(pktDay(now), chunk).run();
 }
