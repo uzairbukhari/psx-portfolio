@@ -7,16 +7,18 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { zakatTrailOption } from '@/lib/chart-kit';
 import type { PortfolioAccount } from '@/lib/portfolio-account';
 import { today } from '@/lib/portfolio';
+import type { PricePoint } from '@/lib/price-history';
 import {
   PAYMENT_KINDS,
   activePayments,
   addDays,
   applySchool,
-  closeYear,
   daysBetween,
   firstOfHijriMonth,
   hijriDayMonth,
   hijriLabel,
+  lockDueYears,
+  lockPending,
   manualLabel,
   newBook,
   paidSteps,
@@ -67,7 +69,8 @@ const PAYMENT_LABELS: Record<ZakatPaymentKind, string> = {
 };
 
 type Parts = PortfolioAccount['portfolios'];
-type Save = (next: ZakatBook, message: string) => Promise<unknown>;
+type Save = (next: ZakatBook | null, message: string) => Promise<unknown>;
+type SaveBook = (next: ZakatBook, message: string) => Promise<unknown>;
 
 export default function ZakatPage({
   parts,
@@ -85,6 +88,10 @@ export default function ZakatPage({
 }) {
   const asOf = today();
   const [view, setView] = useState<'overview' | 'method'>('overview');
+  const lockError = useAutoLock(book, parts, rates, asOf, busy, onSave);
+  useEffect(() => {
+    if (!book) setView('overview');
+  }, [book]);
   if (!book)
     return (
       <div className="zk-page">
@@ -96,10 +103,48 @@ export default function ZakatPage({
       {view === 'method' ? (
         <Method book={book} parts={parts} asOf={asOf} busy={busy} onSave={onSave} onDone={() => setView('overview')} />
       ) : (
-        <Overview book={book} parts={parts} rates={rates} asOf={asOf} busy={busy} onSave={onSave} onMethod={() => setView('method')} />
+        <Overview book={book} parts={parts} rates={rates} asOf={asOf} busy={busy} lockError={lockError} onSave={onSave as SaveBook} onMethod={() => setView('method')} />
       )}
     </div>
   );
+}
+
+/**
+ * Fixes a zakat year from its zakat day's values once that day has passed: the closes of that day are fetched and the
+ * year is saved. If they cannot be loaded nothing is fixed (the amount is never taken from a later day by accident) and
+ * the next visit tries again.
+ */
+function useAutoLock(book: ZakatBook | null, parts: Parts, rates: ZakatInputs, asOf: string, busy: boolean, onSave: Save): string {
+  const [error, setError] = useState('');
+  const tried = useRef('');
+  useEffect(() => {
+    if (!book || busy || !lockPending(book, asOf)) return;
+    const key = `${book.years.length}:${asOf}`;
+    if (tried.current === key) return;
+    tried.current = key;
+    const tickers = [...new Set(parts.flatMap((p) => p.portfolio.companies.map((c) => c.ticker)))];
+    void (async () => {
+      try {
+        let closes: Record<string, PricePoint[]> = {};
+        if (tickers.length) {
+          const r = await fetch(`/api/price-history?tickers=${encodeURIComponent(tickers.join(','))}`);
+          const d = (await r.json()) as { histories?: Record<string, { eod: number[][] }> };
+          if (!r.ok || !d.histories) throw new Error('prices');
+          closes = Object.fromEntries(
+            Object.entries(d.histories).map(([t, h]) => [t, h.eod.filter((x) => Number.isFinite(x[0]) && Number.isFinite(x[1]) && x[1] > 0).map((x): PricePoint => [x[0], x[1]]).sort((a, b) => a[0] - b[0])]),
+          );
+        }
+        const next = lockDueYears(book, parts, { ...rates, closes }, asOf);
+        const fixed = next.years.slice(book.years.length);
+        await onSave(next, fixed.length === 1 ? `Zakat for your year ending ${longDate(fixed[0].due)} is fixed at ${rs(fixed[0].amountDue)}.` : 'Your zakat years are fixed from their zakat days.');
+        for (const y of fixed) track('zakat_year_closed', { state: y.amountDue === 0 ? 'below_nisab' : 'partial' });
+        setError('');
+      } catch {
+        setError("Your zakat day has passed but its prices could not be loaded, so the amount isn't fixed yet. It will try again next time you open this page.");
+      }
+    })();
+  }, [book, parts, rates, asOf, busy, onSave]);
+  return error;
 }
 
 // ───────────────────────── Overview ─────────────────────────
@@ -110,6 +155,7 @@ function Overview({
   rates,
   asOf,
   busy,
+  lockError,
   onSave,
   onMethod,
 }: {
@@ -118,13 +164,13 @@ function Overview({
   rates: ZakatInputs;
   asOf: string;
   busy: boolean;
-  onSave: Save;
+  lockError: string;
+  onSave: SaveBook;
   onMethod: () => void;
 }) {
   const breakdown = useMemo(() => zakatBreakdown(parts, book, rates, asOf), [parts, book, rates, asOf]);
   const progress = useMemo(() => zakatProgress(book, breakdown, asOf), [book, breakdown, asOf]);
   const [payment, setPayment] = useState<ZakatPayment | 'new' | null>(null);
-  const [closing, setClosing] = useState(false);
   const [error, setError] = useState('');
   const { year } = progress;
 
@@ -173,11 +219,16 @@ function Overview({
       {progress.closeDue && (
         <div className="zk-banner" data-tone="warn">
           <div>
-            <b>Your zakat year ended on {longDate(year.due)}.</b> Close it to lock the amount and start the next year.
+            {asOf === year.due ? (
+              <>
+                <b>Today is your zakat day.</b> The amount is fixed tomorrow from today&apos;s closing prices.
+              </>
+            ) : (
+              <>
+                <b>Your zakat day, {longDate(year.due)}, has passed.</b> {lockError || 'The amount is being fixed from that day’s values.'}
+              </>
+            )}
           </div>
-          <button type="button" className="compact" disabled={busy} onClick={() => setClosing(true)}>
-            Close this year
-          </button>
         </div>
       )}
       {!progress.closeDue && reminder && (
@@ -202,7 +253,7 @@ function Overview({
 
       <section className="slab zk-slab">
         <div className="zk-slab-main">
-          <p className="lbl">Zakat year {progress.name} · if your zakat day were today</p>
+          <p className="lbl">Zakat year {progress.name} · estimate, fixed on {longDate(year.due)}</p>
           <div className="zk-big num">{rs(breakdown.zakat)}</div>
           <div className="zk-chips">
             {breakdown.aboveNisab ? (
@@ -215,7 +266,7 @@ function Overview({
               </span>
             )}
             <span className="zk-chip">
-              Due {hijriDayMonth(dueH)} {dueH.year} · {weekday(year.due).slice(0, 3)} {longDate(year.due)}
+              Fixed on {hijriDayMonth(dueH)} {dueH.year} · {weekday(year.due).slice(0, 3)} {longDate(year.due)}
             </span>
             <span className="zk-chip" data-tone={progress.daysLeft <= 14 ? 'warn' : undefined}>
               {progress.closeDue ? 'Year ended' : `${progress.daysLeft} ${progress.daysLeft === 1 ? 'day' : 'days'} left`}
@@ -273,7 +324,7 @@ function Overview({
           <div>
             <h2>Through the year</h2>
             <p className="zk-sub">
-              What you would owe each week against what you have paid. The estimate moves with prices until the due date.
+              What you would owe each week against what you have paid. The estimate moves with prices until your zakat day, when the amount is fixed.
             </p>
           </div>
         </div>
@@ -300,7 +351,11 @@ function Overview({
           <div className="zk-card-head">
             <div>
               <h2>How it&apos;s worked out</h2>
-              <p className="zk-sub">Today&apos;s values.</p>
+              <p className="zk-sub">
+                {progress.closeDue
+                  ? 'Today’s values, while the amount for your zakat day is being fixed.'
+                  : `Today’s values, as an estimate. On ${longDate(year.due)} (${hijriDayMonth(dueH)} ${dueH.year}) your portfolio is valued and the amount for this year is fixed.`}
+              </p>
             </div>
             <span className="zk-chip">
               Nisab {rs(breakdown.nisab.value)} ·{' '}
@@ -426,18 +481,47 @@ function Overview({
           )}
           {progress.past.length > 0 && (
             <div className="zk-past">
-              <h3>Earlier years</h3>
+              <h3>Fixed years</h3>
               <ul>
-                {progress.past.map((y) => (
-                  <li key={y.id}>
-                    <span>
-                      {y.name} · due {longDate(y.due)}
-                    </span>
-                    <span className="num">
-                      {y.remaining === 0 ? `Fully paid (${rs(y.amountDue)})` : `${rs(y.remaining)} still to pay of ${rs(y.amountDue)}`}
-                    </span>
-                  </li>
-                ))}
+                {progress.past.map((y) => {
+                  const closed = book.years.find((c) => c.id === y.id);
+                  return (
+                    <li key={y.id}>
+                      <span>
+                        {y.name} · valued on {longDate(y.due)}
+                      </span>
+                      <span className="num">
+                        {y.remaining === 0 ? `Fully paid (${rs(y.amountDue)})` : `${rs(y.remaining)} still to pay of ${rs(y.amountDue)}`}
+                      </span>
+                      {closed && (
+                        <details className="zk-fixed">
+                          <summary>Values on {longDate(y.due)}</summary>
+                          <table className="zk-table">
+                            <tbody>
+                              {closed.snapshot.rows.map((r) => (
+                                <tr key={r.key} data-kind={r.kind}>
+                                  <td>{r.label}</td>
+                                  <td className="num">{r.kind === 'debt' ? '−' : ''}{num0(r.counted)}</td>
+                                </tr>
+                              ))}
+                              <tr>
+                                <td>
+                                  <b>Zakat at {Math.round(closed.snapshot.rate * 1000) / 10}%</b>
+                                </td>
+                                <td className="num">
+                                  <b>{rs(closed.amountDue)}</b>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          {closed.snapshot.valuedOnDay === false && (
+                            <small>The closing prices of that day were not available, so the latest prices of {longDate(closed.closedAt)} were used.</small>
+                          )}
+                        </details>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -462,29 +546,6 @@ function Overview({
             await onSave(next, message);
             if (kind) track('zakat_payment_logged', { kind });
             setPayment(null);
-          }}
-        />
-      )}
-      {closing && (
-        <CloseDialog
-          estimate={breakdown.zakat}
-          paid={progress.paid}
-          due={year.due}
-          asOf={asOf}
-          busy={busy}
-          onClose={() => setClosing(false)}
-          onConfirm={async (carry) => {
-            setError('');
-            try {
-              await onSave(closeYear(book, breakdown, asOf, carry), `Zakat year ${progress.name} closed at ${rs(breakdown.zakat)}.`);
-              track('zakat_year_closed', {
-                state: breakdown.zakat === 0 ? 'below_nisab' : progress.paid >= breakdown.zakat ? 'paid' : 'partial',
-              });
-              setClosing(false);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : 'Could not close the year.');
-              setClosing(false);
-            }
           }}
         />
       )}
@@ -586,73 +647,6 @@ function PaymentDialog({
           )}
           <button type="button" className="secondary" onClick={onClose}>
             Cancel
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CloseDialog({
-  estimate,
-  paid,
-  due,
-  asOf,
-  busy,
-  onClose,
-  onConfirm,
-}: {
-  estimate: number;
-  paid: number;
-  due: string;
-  asOf: string;
-  busy: boolean;
-  onClose: () => void;
-  onConfirm: (carry: boolean) => Promise<unknown>;
-}) {
-  const late = daysBetween(due, asOf);
-  const extra = Math.max(0, paid - estimate);
-  const [carry, setCarry] = useState(false);
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="form-dialog zk-dialog">
-        <DialogTitle>Close this zakat year</DialogTitle>
-        <DialogDescription>
-          The amount is worked out from today&apos;s values and locked. Later payments still count toward it until it is paid; your next year starts today.
-        </DialogDescription>
-        <dl className="zk-totals">
-          <div>
-            <dt>Zakat for the year</dt>
-            <dd className="num">{rs(estimate)}</dd>
-          </div>
-          <div>
-            <dt>Paid</dt>
-            <dd className="num" data-tone="ok">
-              {rs(paid)}
-            </dd>
-          </div>
-          <div>
-            <dt>{extra > 0 ? 'Paid extra' : 'Left to pay'}</dt>
-            <dd className="num">{rs(extra > 0 ? extra : Math.max(0, estimate - paid))}</dd>
-          </div>
-        </dl>
-        {late > 3 && (
-          <p className="zk-note" data-tone="warn">
-            The due date was {late} days ago, so today&apos;s prices are used instead of that day&apos;s. Check that your bank and cash amounts are still right.
-          </p>
-        )}
-        {extra > 0 && (
-          <label className="check-row">
-            <input type="checkbox" checked={carry} onChange={(e) => setCarry(e.target.checked)} />
-            Count the extra {rs(extra)} toward next year
-          </label>
-        )}
-        <div className="row tx-actions">
-          <button type="button" disabled={busy} onClick={() => void onConfirm(carry)}>
-            Close this year
-          </button>
-          <button type="button" className="secondary" onClick={onClose}>
-            Not yet
           </button>
         </div>
       </DialogContent>
@@ -946,6 +940,7 @@ function Method({
   const [draft, setDraft] = useState<ZakatBook>(book);
   const [error, setError] = useState('');
   const [dateOpen, setDateOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const changed = JSON.stringify(draft) !== JSON.stringify(book);
   const s = draft.settings;
   const setSettings = (settings: ZakatSettings) => setDraft({ ...draft, settings });
@@ -963,6 +958,17 @@ function Method({
   };
   const nudge = s.dueShiftDays ?? 0;
   const startH = toHijri(s.startDate);
+
+  async function reset() {
+    setError('');
+    try {
+      await onSave(null, 'Zakat removed. Set it up again when you are ready.');
+      onDone();
+    } catch (e) {
+      setResetting(false);
+      setError(e instanceof Error ? e.message : 'Could not reset.');
+    }
+  }
 
   async function save() {
     setError('');
@@ -1083,9 +1089,36 @@ function Method({
               />
             </div>
           </section>
+          <section className="panel zk-card">
+            <h2>Start over</h2>
+            <p className="zk-sub">
+              Set the zakat date, method and amounts up again from scratch. This removes your zakat date, payments, amounts and fixed years from your portfolio.
+            </p>
+            <button type="button" className="secondary" disabled={busy} onClick={() => setResetting(true)}>
+              Start zakat over
+            </button>
+          </section>
         </div>
       </div>
       {error && <p className="notice error">{error}</p>}
+      {resetting && (
+        <Dialog open onOpenChange={(v) => !v && setResetting(false)}>
+          <DialogContent className="form-dialog zk-dialog">
+            <DialogTitle>Start zakat over?</DialogTitle>
+            <DialogDescription>
+              Your zakat date, payments, amounts and fixed years are removed from your encrypted portfolio. Your holdings are not touched. You will set zakat up again from the beginning.
+            </DialogDescription>
+            <div className="row tx-actions">
+              <button type="button" disabled={busy} onClick={() => void reset()}>
+                Remove and start over
+              </button>
+              <button type="button" className="secondary" onClick={() => setResetting(false)}>
+                Keep it
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

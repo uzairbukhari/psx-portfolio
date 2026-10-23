@@ -293,7 +293,8 @@
     <string name="zakat_shares_market">Full market value</string>
     <string name="zakat_shares_proxy">25% of value</string>
     <string name="zakat_start">Start tracking</string>
-    <string name="zakat_year">Zakat year %1$s</string>
+    <string name="zakat_year">Zakat year %1$s (estimate)</string>
+    <string name="zakat_lock_pending">Your zakat day has passed. Open Sipwise on the web once to fix the amount from that day\u2019s values.</string>
     <string name="zakat_due">Zakat day %1$s (%2$s) · %3$s</string>
     <plurals name="zakat_days_left">
         <item quantity="one">%d day left</item>
@@ -304,9 +305,6 @@
     <string name="zakat_paid">Paid</string>
     <string name="zakat_left">Remaining</string>
     <string name="zakat_log_payment">Log a payment</string>
-    <string name="zakat_close_year">Close this zakat year</string>
-    <string name="zakat_close_body">This locks the year at %1$s and starts the next one.</string>
-    <string name="zakat_close_confirm">Close year</string>
     <string name="zakat_counted">What counts</string>
     <string name="zakat_debts">Debts</string>
     <string name="zakat_net">Net zakatable wealth</string>

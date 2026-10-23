@@ -72,5 +72,6 @@ data class ZakatView(
     val dueDate: String = "",
     val dueHijri: String = "",
     val recordTrail: Boolean = false,
+    val lockPending: Boolean = false,
     val reminders: List<ZakatReminderView> = emptyList(),
 )
