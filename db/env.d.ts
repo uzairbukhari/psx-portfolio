@@ -14,6 +14,9 @@ declare namespace Cloudflare {
     CF_WEB_ANALYTICS_TOKEN?: string;
     /** Where people can also write to (shown on the feedback page as a mailto link). Hidden while unset or malformed. */
     SUPPORT_EMAIL?: string;
+    /** Two public hosts on one Worker (lib/hosts.ts); both empty = one host. */
+    MARKETING_HOST?: string;
+    APP_HOST?: string;
     /** Cloudflare Turnstile site key (public) and secret for the signed-out feedback form. Signed-out sending is off while the secret is unset. */
     TURNSTILE_SITE_KEY?: string;
     TURNSTILE_SECRET_KEY?: string;

@@ -115,7 +115,7 @@ function d1() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('CREATE TABLE mobile_sessions (id text, email text, platform text, created_at text, last_seen_at text)');
   sqlite.exec('CREATE TABLE user_roles (email text PRIMARY KEY, role text NOT NULL, created_at text NOT NULL)');
-  for (const f of ['0032_powerful_mindworm.sql', '0034_striped_zarda.sql', '0038_app_users_profile.sql'])
+  for (const f of ['0032_powerful_mindworm.sql', '0034_striped_zarda.sql', '0038_app_users_profile.sql', '0042_complex_johnny_blaze.sql'])
     sqlite.exec(readFileSync(new URL(`../drizzle/${f}`, import.meta.url), 'utf8').replaceAll('--> statement-breakpoint', ''));
   const stmt = (sql, args = []) => ({
     bind: (...a) => stmt(sql, a),
@@ -177,4 +177,14 @@ test('error messages classify into categories without keeping the text', () => {
   assert.deepEqual(c('Failed to fetch'), { area: 'sync', code: 'network' });
   assert.deepEqual(c('something odd about MEBL 500'), { area: 'other', code: 'unknown' });
   assert.deepEqual(c('boom', 'app', 'uncaught'), { area: 'app', code: 'uncaught' });
+});
+
+test('the marketing button a new account came from is stored once and never overwritten', async () => {
+  const db = d1();
+  const now = new Date('2026-10-23T10:00:00Z');
+  await noteSignIn(db, 'a@x.com', 'web', 'sec', false, now, { signupSrc: 'home_hero' });
+  await noteSignIn(db, 'a@x.com', 'web', 'sec', false, now, { signupSrc: 'pricing' });
+  await noteSignIn(db, 'b@x.com', 'web', 'sec', false, now);
+  const rows = Object.fromEntries(db.sqlite.prepare('SELECT email, signup_src AS s FROM app_users').all().map((r) => [r.email, r.s]));
+  assert.deepEqual(rows, { 'a@x.com': 'home_hero', 'b@x.com': null });
 });
