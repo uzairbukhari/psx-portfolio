@@ -89,7 +89,9 @@
 			],
 			"vars": {
 				"ALLOWED_EMAILS": "suzairbukhari@gmail.com",
-				"GOOGLE_CLIENT_ID": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
+				// The separate "Sipwise Web Staging" OAuth client (its redirect URI is the staging workers.dev callback). Kept in
+				// the config because every deploy rewrites the Worker's vars from here; its secret is the GOOGLE_CLIENT_SECRET Worker secret.
+				"GOOGLE_CLIENT_ID": "50195098198-h40pn9g5s22mvke14b1g22gk5rj6uvlu.apps.googleusercontent.com",
 				"GOOGLE_MOBILE_CLIENT_IDS": "50195098198-7mas6ulcfrkarsg088lk6l6evt5dh6sf.apps.googleusercontent.com",
 				"GITHUB_REPO": "uzairbukhari/psx-portfolio",
 				"APP_ENV": "staging",
