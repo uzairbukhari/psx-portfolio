@@ -646,6 +646,8 @@ export const appUsers = sqliteTable('app_users', {
   picture: text('picture'),
   // Which marketing-site button first brought the person to sign in (closed list, lib/hosts.ts SIGNUP_SOURCES); null for older accounts.
   signupSrc: text('signup_src'),
+  // Which social channel (closed list, lib/hosts.ts SIGNUP_REFS) sent the visitor, from `?ref=` on the marketing site; null when direct.
+  signupRef: text('signup_ref'),
 });
 
 // Usage events: feature/screen names and closed-enum props only (lib/analytics-events.ts). `user_key` is an HMAC of the

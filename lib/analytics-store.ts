@@ -60,7 +60,7 @@ export async function noteSignIn(
   secret: string,
   isAdmin: boolean,
   now = new Date(),
-  profile: { name?: string | null; picture?: string | null; signupSrc?: string | null } = {},
+  profile: { name?: string | null; picture?: string | null; signupSrc?: string | null; signupRef?: string | null } = {},
 ): Promise<void> {
   try {
     const addr = email.trim().toLowerCase();
@@ -70,8 +70,8 @@ export async function noteSignIn(
     const picture = profile.picture && profile.picture.length <= 500 ? profile.picture : null;
     const existing = await db.prepare('SELECT 1 AS x FROM app_users WHERE email=?').bind(addr).first();
     if (!existing) {
-      await db.prepare('INSERT OR IGNORE INTO app_users (email,first_seen_at,first_platform,last_seen_at,last_platform,origin,name,picture,signup_src) VALUES (?,?,?,?,?,?,?,?,?)')
-        .bind(addr, ts, platform, ts, platform, 'unknown', name, picture, profile.signupSrc ?? null).run();
+      await db.prepare('INSERT OR IGNORE INTO app_users (email,first_seen_at,first_platform,last_seen_at,last_platform,origin,name,picture,signup_src,signup_ref) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .bind(addr, ts, platform, ts, platform, 'unknown', name, picture, profile.signupSrc ?? null, profile.signupRef ?? null).run();
     } else {
       await db.prepare('UPDATE app_users SET last_seen_at=?, last_platform=?, name=COALESCE(?,name), picture=COALESCE(?,picture) WHERE email=?')
         .bind(ts, platform, name, picture, addr).run();
@@ -172,10 +172,12 @@ export async function usageReport(db: D1Database, includeAdmin = false, now = ne
     `SELECT platform, COALESCE(app_version,'unknown') AS version, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE day>=? AND user_key IS NOT NULL ${adminClause} GROUP BY platform, version ORDER BY users DESC LIMIT 12`, since30);
   const origins = await all<{ origin: string; n: number }>(
     `SELECT origin, COUNT(*) AS n FROM app_users WHERE 1=1${userClause} GROUP BY origin ORDER BY n DESC`);
+  const channels = await all<{ channel: string; n: number }>(
+    `SELECT COALESCE(signup_ref,'direct') AS channel, COUNT(*) AS n FROM app_users WHERE origin IN ('signup','unknown') AND first_seen_at>=?${userClause} GROUP BY channel ORDER BY n DESC`, `${since30}T00:00:00Z`);
   const importFunnel = await all<{ event: string; users: number }>(
     `SELECT event, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE event IN ('import_started','import_completed','import_failed') AND day>=? AND user_key IS NOT NULL ${adminClause} GROUP BY event`, since30);
 
-  return shapeReport({ today, activity, signups, features, screens, accounts, signupSeries, windowDays, platforms, versions, origins, importFunnel, funnelCounts: {
+  return shapeReport({ today, activity, signups, features, screens, accounts, signupSeries, windowDays, platforms, versions, origins, channels, importFunnel, funnelCounts: {
     landing: await count('landing_viewed', 'anon_id'), clicked: await count('sign_in_clicked', 'anon_id'),
     signedUp: await count('signed_up', 'user_key'), vault: await count('vault_created', 'user_key'), content,
   }, includeAdmin, now });
@@ -191,6 +193,7 @@ export function shapeReport(i: {
   platforms?: { platform: string; users: number; events: number }[];
   versions?: { platform: string; version: string; users: number }[];
   origins?: { origin: string; n: number }[];
+  channels?: { channel: string; n: number }[];
   importFunnel?: { event: string; users: number }[];
   funnelCounts: { landing: number; clicked: number; signedUp: number; vault: number; content: number };
 }) {
@@ -214,6 +217,7 @@ export function shapeReport(i: {
     platforms: i.platforms ?? [],
     versions: i.versions ?? [],
     origins: i.origins ?? [],
+    channels: i.channels ?? [],
     imports: ['import_started', 'import_completed', 'import_failed'].map((event) => ({ event, users: i.importFunnel?.find((r) => r.event === event)?.users ?? 0 })),
     totalUsers: i.accounts?.total ?? 0,
     signups7: i.accounts?.signups7 ?? 0,

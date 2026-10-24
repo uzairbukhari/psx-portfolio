@@ -291,6 +291,32 @@ export default function UsageDashboard({
         </table>
       </div>
 
+      <h3>Sign-ups by channel (last {report.days} days)</h3>
+      <table className="usage-table">
+        <thead>
+          <tr>
+            <th>Channel</th>
+            <th>Sign-ups</th>
+          </tr>
+        </thead>
+        <tbody>
+          {report.channels.length ? (
+            report.channels.map((c) => (
+              <tr key={c.channel}>
+                <td>{label(c.channel)}</td>
+                <td>{c.n}</td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={2} className="muted">
+                No sign-ups yet.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
       <h3>Imports (last {report.days} days)</h3>
       <table className="usage-table">
         <thead>

@@ -9,6 +9,7 @@ import {
   marketingOrigin,
   normalizeHost,
   parseSignupSource,
+  parseSignupRef,
   robotsTxt,
   signInHref,
   SIGNUP_SOURCES,
@@ -48,6 +49,10 @@ test('sign-in links go to the app host with a closed-list source', () => {
   assert.equal(parseSignupSource('<script>'), null);
   assert.equal(parseSignupSource(null), null);
   assert.equal(new Set(SIGNUP_SOURCES).size, SIGNUP_SOURCES.length);
+  assert.equal(parseSignupRef('tiktok'), 'tiktok');
+  assert.equal(parseSignupRef('TikTok'), null);
+  assert.equal(parseSignupRef('<script>'), null);
+  assert.equal(parseSignupRef(null), null);
 });
 
 test('the marketing host serves only public paths; everything else is an app page', () => {
