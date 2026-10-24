@@ -69,6 +69,20 @@
 
   /* ---------- helpers ---------- */
   const $ = function (s, r) { return (r || document).querySelector(s); };
+
+  /* Social channel: ?ref=tiktok (closed list, same as lib/hosts.ts SIGNUP_REFS) is remembered for this visit and added to the
+     sign-in links, which live on the app host. Storage can be blocked, so every access is wrapped. */
+  (function () {
+    const refs = ['tiktok', 'instagram', 'facebook', 'x', 'threads', 'ads'];
+    let ref = null;
+    try { ref = new URLSearchParams(location.search).get('ref'); } catch (e) { /* ignore */ }
+    if (refs.indexOf(ref) < 0) { ref = null; try { const kept = sessionStorage.getItem('sipwise.ref'); if (refs.indexOf(kept) >= 0) ref = kept; } catch (e) { /* ignore */ } }
+    else { try { sessionStorage.setItem('sipwise.ref', ref); } catch (e) { /* ignore */ } }
+    if (!ref) return;
+    Array.prototype.forEach.call(document.querySelectorAll('a[href*="/api/auth/google/login"]'), function (a) {
+      if (a.href.indexOf('ref=') < 0) a.href += (a.href.indexOf('?') < 0 ? '?' : '&') + 'ref=' + ref;
+    });
+  })();
   /* SVG text from our own chart builder (no entities) turned into elements one tag at a time, never parsed as HTML */
   const svgInto = function (el, str) {
     const NS = 'http://www.w3.org/2000/svg';

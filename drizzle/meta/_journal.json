@@ -302,6 +302,13 @@
       "when": 1792771022381,
       "tag": "0042_complex_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1792855652173,
+      "tag": "0043_productive_kabuki",
+      "breakpoints": true
     }
   ]
 }

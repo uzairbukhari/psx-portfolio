@@ -115,7 +115,7 @@ function d1() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('CREATE TABLE mobile_sessions (id text, email text, platform text, created_at text, last_seen_at text)');
   sqlite.exec('CREATE TABLE user_roles (email text PRIMARY KEY, role text NOT NULL, created_at text NOT NULL)');
-  for (const f of ['0032_powerful_mindworm.sql', '0034_striped_zarda.sql', '0038_app_users_profile.sql', '0042_complex_johnny_blaze.sql'])
+  for (const f of ['0032_powerful_mindworm.sql', '0034_striped_zarda.sql', '0038_app_users_profile.sql', '0042_complex_johnny_blaze.sql', '0043_productive_kabuki.sql'])
     sqlite.exec(readFileSync(new URL(`../drizzle/${f}`, import.meta.url), 'utf8').replaceAll('--> statement-breakpoint', ''));
   const stmt = (sql, args = []) => ({
     bind: (...a) => stmt(sql, a),
@@ -187,4 +187,16 @@ test('the marketing button a new account came from is stored once and never over
   await noteSignIn(db, 'b@x.com', 'web', 'sec', false, now);
   const rows = Object.fromEntries(db.sqlite.prepare('SELECT email, signup_src AS s FROM app_users').all().map((r) => [r.email, r.s]));
   assert.deepEqual(rows, { 'a@x.com': 'home_hero', 'b@x.com': null });
+});
+
+test('the social channel a new account came from is stored once and shows in the usage report', async () => {
+  const db = d1();
+  const now = new Date('2026-10-23T10:00:00Z');
+  await noteSignIn(db, 'a@x.com', 'web', 'sec', false, now, { signupRef: 'tiktok' });
+  await noteSignIn(db, 'a@x.com', 'web', 'sec', false, now, { signupRef: 'x' });
+  await noteSignIn(db, 'b@x.com', 'web', 'sec', false, now);
+  const rows = Object.fromEntries(db.sqlite.prepare('SELECT email, signup_ref AS r FROM app_users').all().map((r) => [r.email, r.r]));
+  assert.deepEqual(rows, { 'a@x.com': 'tiktok', 'b@x.com': null });
+  const report = await usageReport(db, true, now);
+  assert.deepEqual(report.channels.map((c) => [c.channel, c.n]).sort(), [['direct', 1], ['tiktok', 1]]);
 });

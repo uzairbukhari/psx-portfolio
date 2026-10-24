@@ -52,6 +52,14 @@ export function parseSignupSource(value: string | null | undefined): SignupSourc
   return SIGNUP_SOURCES.find((s) => s === value) ?? null;
 }
 
+/** Closed list of social channels a visitor can arrive from (`?ref=` on any marketing page); anything else is dropped. */
+export const SIGNUP_REFS = ['tiktok', 'instagram', 'facebook', 'x', 'threads', 'ads'] as const;
+export type SignupRef = (typeof SIGNUP_REFS)[number];
+
+export function parseSignupRef(value: string | null | undefined): SignupRef | null {
+  return SIGNUP_REFS.find((s) => s === value) ?? null;
+}
+
 /** Sign-in link used by every marketing button. */
 export function signInHref(cfg: HostConfig, src: SignupSource, returnTo = '/'): string {
   return `${appOrigin(cfg)}/api/auth/google/login?return_to=${encodeURIComponent(returnTo)}&src=${src}`;
