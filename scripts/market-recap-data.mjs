@@ -72,7 +72,7 @@ export function spokenParts(recap) {
     ? `ڈیویڈنڈ کی خبر۔ ${pause(0.6)} ${dividends.map((d) => `${d.name} نے ${percentWords(d.percent)} cash dividend کا اعلان کیا۔`).join(` ${pause(0.6)} `)} ${pause(0.8)} `
     : '';
   parts.push(`${dividend}سب سے زیادہ ٹریڈ ہونے والے شیئرز یہ تھے: ${active.map((m, i) => `${i === active.length - 1 && active.length > 1 ? 'اور ' : ''}${m.name}`).join('، ')}۔`);
-  parts.push(`اپنی ماہانہ سرمایہ کاری کی منصوبہ بندی کریں۔ ${pause(0.5)} Sipwise dot trade۔`);
+  parts.push(`اپنی ماہانہ سرمایہ کاری کی منصوبہ بندی کریں۔ ${pause(0.5)} Sipwise dot trade۔ ${pause(0.5)} روزانہ market updates کے لیے subscribe کریں۔`);
   return parts;
 }
 
@@ -81,7 +81,7 @@ export function caption(recap) {
   const sign = index.changePercent >= 0 ? '+' : '-';
   const names = (l) => l.map((m) => m.name).join(', ');
   const div = dividends.length ? ` ${dividends.map((d) => `${d.name} announced a ${d.percent}% cash dividend.`).join(' ')}` : '';
-  return `Market summary, ${weekday(recap.date)} ${recap.date}. KSE-100 ${Math.round(index.close).toLocaleString('en-US')} (${sign}${Math.abs(index.changePercent).toFixed(2)}%). Gainers: ${names(gainers)}. Losers: ${names(losers)}.${div} Plan your monthly investing: link in bio. #PSX #KSE100 #Sipwise`;
+  return `Market summary, ${weekday(recap.date)} ${recap.date}. KSE-100 ${Math.round(index.close).toLocaleString('en-US')} (${sign}${Math.abs(index.changePercent).toFixed(2)}%). Gainers: ${names(gainers)}. Losers: ${names(losers)}.${div} Subscribe for daily market updates. Plan your monthly investing: link in bio. #PSX #KSE100 #Sipwise`;
 }
 
 /** Gainers, losers and most traded from a table of index members. */
