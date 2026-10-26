@@ -1,16 +1,19 @@
 // Renders the daily "Market summary" video from recap.json (scripts/market-recap-data.mjs): five 1080x1920 slides in the
 // Sipwise "after dark" look, one ElevenLabs voice-over clip per slide with a pause after each, joined with ffmpeg.
 //
-// Env: ELEVENLABS_API_KEY (skipped with --no-audio), ELEVENLABS_VOICE_ID, GEIST_DIR (folder holding the `geist` npm package).
-// Usage: node scripts/market-recap-render.mjs --in=recap.json --out=recap-out [--no-audio]
+// Env: ELEVENLABS_API_KEY (skipped with --no-audio or when --voice-dir holds voice-N.mp3 already), ELEVENLABS_VOICE_ID, GEIST_DIR (folder holding the `geist` npm package).
+// Usage: node scripts/market-recap-render.mjs --in=recap.json --out=recap-out [--no-audio] [--voice-dir=dir] [--only=1,2]
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
+import { audioSeconds, characterList, mouthTrack, renderSprites } from './market-recap-character.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const input = arg('in', 'recap.json');
 const out = arg('out', 'recap-out');
 const noAudio = process.argv.includes('--no-audio');
+const voiceDir = arg('voice-dir', '');
+const only = arg('only', '').split(',').filter(Boolean).map(Number);
 const GAP_SECONDS = 1.2;
 const W = 900;
 const H = 330;
@@ -28,7 +31,9 @@ const css = (sans, mono) => `
 body{width:1080px;height:1920px;font-family:G,sans-serif;color:#e8eefa;background:#070b18;position:relative;overflow:hidden}
 .glow1{position:absolute;width:1100px;height:1100px;right:-450px;top:-300px;background:radial-gradient(closest-side,rgba(59,130,246,.38),transparent)}
 .glow2{position:absolute;width:1000px;height:1000px;left:-450px;bottom:-250px;background:radial-gradient(closest-side,rgba(34,224,160,.2),transparent)}
-.wrap{position:relative;padding:84px 72px;height:100%;display:flex;flex-direction:column}
+.wrap{position:relative;padding:84px 72px 420px;height:100%;display:flex;flex-direction:column}
+.wrap.end{padding-bottom:84px}
+.foot{position:absolute;left:72px;bottom:84px;width:560px;flex-direction:column;gap:6px}
 .brand{display:flex;align-items:center;gap:20px}.brand b{font-size:46px;font-weight:700;letter-spacing:-.02em}
 .chip{margin-left:auto;padding:12px 24px;border-radius:99px;background:rgba(255,255,255,.08);color:#9fb0d6;font-size:28px;font-weight:500}
 .eyebrow{margin-top:90px;color:#9fb0d6;font-size:34px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
@@ -38,7 +43,7 @@ h1{font-size:96px;font-weight:700;letter-spacing:-.035em;line-height:1.02;margin
 .slab{background:linear-gradient(160deg,#0e1a3f,#0a1230);border:2px solid rgba(255,255,255,.09);border-radius:52px;padding:56px;position:relative;overflow:hidden}
 .pill{display:inline-flex;align-items:center;gap:12px;padding:14px 30px;border-radius:99px;font-size:44px;font-weight:600}
 .up{color:#2ee6a6;background:rgba(46,230,166,.13)}.dn{color:#ff6f86;background:rgba(255,111,134,.13)}
-.foot{margin-top:auto;display:flex;justify-content:space-between;color:#6f7d9c;font-size:28px}
+.foot{display:flex;color:#6f7d9c;font-size:28px}
 .fill{flex:1;margin:70px 0 40px;display:flex;flex-direction:column;justify-content:space-around}
 .row{display:flex;align-items:center;gap:32px;padding:34px 0;border-top:2px solid rgba(255,255,255,.07)}.row:first-child{border-top:0}
 .tile{width:112px;height:112px;border-radius:32px;display:grid;place-items:center;font-weight:700;font-size:34px;flex:none}
@@ -78,7 +83,7 @@ function slides(r) {
   const down = r.index.change < 0;
   const color = down ? '#ff6f86' : '#2ee6a6';
   const day = new Date(`${r.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-  const shell = (inner, n) => `<div class="glow1"></div><div class="glow2"></div><div class="wrap"><div class="brand">${mark}<b>Sipwise</b><span class="chip">PSX · Market summary</span></div>${inner}<div class="foot"><span>${day} · sipwise.trade</span><span>${n}/5</span></div></div>`;
+  const shell = (inner, n) => `<div class="glow1"></div><div class="glow2"></div><div class="wrap${n === 5 ? ' end' : ''}"><div class="brand">${mark}<b>Sipwise</b><span class="chip">PSX · Market summary</span></div>${inner}<div class="foot"><span>${day} · sipwise.trade</span><span>${n}/5</span></div></div>`;
   const dividend = r.dividends[0];
   return [
     shell(
@@ -134,16 +139,24 @@ for (let i = 0; i < html.length; i++) {
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: `${out}/slide-${i + 1}.png` });
 }
+const spriteDir = `${process.cwd()}/${out}/sprites`;
+await mkdir(spriteDir, { recursive: true });
+await renderSprites(page, spriteDir);
 await browser.close();
 if (noAudio) process.exit(0);
 
 const clips = [];
 for (let i = 0; i < html.length; i++) {
-  await speak(recap.spoken[i], `${out}/voice-${i + 1}.mp3`);
-  // The slide lasts as long as its voice-over plus the breathing gap.
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-i', `${out}/slide-${i + 1}.png`, '-i', `${out}/voice-${i + 1}.mp3`,
-    '-filter_complex', `[1:a]apad=pad_dur=${GAP_SECONDS}[a]`, '-map', '0:v', '-map', '[a]', '-shortest', '-c:v', 'libx264', '-tune', 'stillimage',
-    '-pix_fmt', 'yuv420p', '-r', '30', '-c:a', 'aac', '-b:a', '160k', `${out}/part-${i + 1}.mp4`]);
+  if (only.length && !only.includes(i + 1)) continue;
+  const voiceFile = voiceDir ? `${voiceDir}/voice-${i + 1}.mp3` : `${out}/voice-${i + 1}.mp3`;
+  if (!voiceDir) await speak(recap.spoken[i], voiceFile);
+  // The slide lasts as long as its voice-over plus the breathing gap; Sip talks through the first part.
+  const seconds = audioSeconds(voiceFile) + GAP_SECONDS;
+  await writeFile(`${out}/sip-${i + 1}.txt`, characterList(mouthTrack(voiceFile), seconds, spriteDir));
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-framerate', '30', '-i', `${out}/slide-${i + 1}.png`,
+    '-f', 'concat', '-safe', '0', '-i', `${out}/sip-${i + 1}.txt`, '-i', voiceFile,
+    '-filter_complex', `[1:v]fps=30,scale=iw*0.8:-1,format=rgba[sip];[0:v][sip]overlay=x=W-w-40:y='H-h-60+7*sin(2*PI*t*1.1)':shortest=1,format=yuv420p[v];[2:a]apad=pad_dur=${GAP_SECONDS}[a]`,
+    '-map', '[v]', '-map', '[a]', '-t', seconds.toFixed(2), '-c:v', 'libx264', '-r', '30', '-c:a', 'aac', '-b:a', '160k', `${out}/part-${i + 1}.mp4`]);
   clips.push(`file part-${i + 1}.mp4`);
 }
 await writeFile(`${out}/list.txt`, clips.join('\n'));
