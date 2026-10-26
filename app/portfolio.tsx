@@ -3139,7 +3139,7 @@ function DashboardContent({
         setHelpOpen(true);
       }}
       onFeedback={() => setTab('feedback')}
-      onAdmin={isAdmin ? () => window.location.assign('/admin') : undefined}
+      onAdmin={isAdmin ? () => window.open('/admin', '_blank', 'noopener') : undefined}
       onLock={vault?.lock}
       onSignOut={signOut}
     />
@@ -3206,7 +3206,7 @@ function DashboardContent({
             }}
             onLock={vault?.lock}
             onSignOut={signOut}
-            onAdmin={isAdmin ? () => window.location.assign('/admin') : undefined}
+            onAdmin={isAdmin ? () => window.open('/admin', '_blank', 'noopener') : undefined}
             name={name}
             email={email}
             picture={picture}
