@@ -13,6 +13,8 @@ export type UserRow = {
   joined: string; lastSeenAt: string; lastActive: string; platform: string; origin: string;
   internal: boolean; hasUsage: boolean; stage: Stage; segments: Segment[];
   sessions: number; activeDays30: number; errors7: number;
+  /** The HMAC usage key, so Analytics can link to a list of people without putting emails in a URL. */
+  key: string;
 };
 
 export type UserDirectory = {
@@ -83,7 +85,7 @@ export async function userDirectory(db: D1Database, secret: string, includeInter
       email: a.email, name: a.name, picture: a.picture, joined: a.first, lastSeenAt: a.last, lastActive: summary.lastActiveDay,
       platform: a.platform, origin: a.origin, internal: internal.has(a.email), hasUsage: summary.hasUsage,
       stage: stageOf(summary), segments: segmentsOf(summary, today),
-      sessions: ac?.sessions ?? 0, activeDays30: summary.activeDays30, errors7: summary.errors7,
+      sessions: ac?.sessions ?? 0, activeDays30: summary.activeDays30, errors7: summary.errors7, key,
     };
   });
 

@@ -200,3 +200,15 @@ test('lens report reads the real tables, keys accounts by HMAC and leaves intern
   const withAdmin = await lensReport(db, secret, { ...q, lens: 'summary' }, true, [], now);
   assert.equal(withAdmin.kpis.find((k) => k.id === 'active').value, 2);
 });
+
+import { signupsFromRows } from '../lib/analytics-lenses.ts';
+test('activation and retention come from the signed_up events, not the account list', () => {
+  const rows = [
+    row('a', '2026-10-01T05:00:00Z', 'signed_up', { platform: 'web' }), row('a', '2026-10-02T05:00:00Z', 'entry_added', { kind: 'buy' }),
+    row('b', '2026-10-01T05:00:00Z', 'signed_up', { platform: 'web' }), screen('b', '2026-10-09T05:00:00Z', 'holdings'),
+  ];
+  assert.deepEqual(signupsFromRows(rows).map((u) => u.userKey).sort(), ['a', 'b']);
+  const r = buildLens(rows, [], { lens: 'summary', days: 30, today: '2026-10-20', platform: 'all', segment: 'all' });
+  assert.equal(r.kpis.find((k) => k.id === 'activation').value, 0.5);
+  assert.equal(r.kpis.find((k) => k.id === 'retention').value, 0.5);
+});

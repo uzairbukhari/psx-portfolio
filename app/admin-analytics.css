@@ -1,0 +1,193 @@
+/* Analytics lenses in the admin console (app/admin-analytics.tsx). Tokens only, no colour literals. The night slab
+   (.slab, app/redesign.css) is the one loud element: the Summary pulse. Everything else is quiet cards on a 12-column
+   grid. Selectors start with html:root .aa-root so they win over the admin card defaults in any chunk order. */
+
+html:root .admin-card.admin-card--flat{padding:0;border:0;background:transparent;box-shadow:none}
+html:root .admin-nav__group{display:block;margin:14px 12px 4px;font:600 11px/1.2 var(--font-geist-sans),sans-serif;letter-spacing:.06em;color:var(--muted-foreground)}
+
+html:root .aa-root{display:grid;gap:18px;min-width:0}
+html:root .aa-root .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+html:root .aa-root .num{font-family:var(--font-geist-mono),monospace;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+/* Filter bar: sticky under the console header, one row, wraps on phones. */
+html:root .aa-filters{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:16px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .aa-grow{flex:1}
+html:root .aa-stamp{margin:-6px 2px 0;font-size:12.5px;color:var(--muted-foreground)}
+
+/* Pulse slab (Summary). */
+html:root .aa-pulse{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:22px;padding:22px}
+html:root .aa-pulse__tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+html:root .aa-pulse .aa-kpi{display:grid;align-content:start;gap:6px;padding:16px 16px 10px;border:1px solid var(--slab-line);border-radius:18px;background:var(--slab-chip)}
+html:root .aa-kpi__label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--muted-foreground)}
+html:root .aa-pulse .aa-kpi strong{font-size:32px;line-height:1.05;font-weight:600;color:var(--slab-tx)}
+html:root .aa-kpi__spark{height:38px;margin:2px -6px 0}
+html:root .aa-pulse__changes{padding:4px 0 0}
+html:root .aa-pulse__changes h2{margin:0 0 10px;font-size:15px;font-weight:600;color:var(--slab-tx)}
+html:root .aa-pulse__changes p{margin:0;font-size:13.5px;color:var(--slab-mu)}
+html:root .aa-pulse__changes ol{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+html:root .aa-pulse__changes li{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:12px;background:var(--slab-chip);font-size:13.5px;color:var(--slab-tx)}
+html:root .aa-pulse__changes li[data-tone=good] b{color:var(--success)}
+html:root .aa-pulse__changes li[data-tone=bad] b{color:var(--danger)}
+
+/* Delta pill: arrow, words and colour together. */
+html:root .aa-delta{justify-self:start;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font:600 12px/1.2 var(--font-geist-mono),monospace;background:var(--chip);color:var(--muted-foreground)}
+html:root .aa-delta[data-tone=good]{background:var(--gain-bg);color:var(--success)}
+html:root .aa-delta[data-tone=bad]{background:var(--loss-bg);color:var(--danger)}
+html:root .aa-delta span[aria-hidden]{font-size:9px}
+
+/* Plain stat row on lens pages. */
+html:root .aa-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+html:root .aa-stat{display:grid;gap:8px;padding:16px 18px;border:1px solid var(--border);border-radius:18px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .aa-stat strong{font-size:26px;font-weight:600;line-height:1.1}
+html:root .aa-stat[data-tone=good] strong{color:var(--success)}
+html:root .aa-stat[data-tone=bad] strong{color:var(--danger)}
+html:root .aa-stat[data-tone=warn] strong{color:var(--warn-ink)}
+
+/* 12-column grid of panels: two per row, wide ones across. */
+html:root .aa-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+html:root .aa-panel{grid-column:span 6;min-width:0;display:grid;align-content:start;gap:12px;padding:18px 20px;border:1px solid var(--border);border-radius:20px;background:var(--card);box-shadow:var(--shadow-card,none)}
+html:root .aa-panel--wide{grid-column:1 / -1}
+html:root .aa-panel__head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px}
+html:root .aa-panel__head h2{display:flex;align-items:center;gap:6px;margin:0;font-size:15.5px;font-weight:600;letter-spacing:-.01em;color:var(--foreground)}
+html:root .aa-panel__head p{margin:3px 0 0;font-size:13px;color:var(--muted-foreground);max-width:72ch}
+html:root .aa-panel__actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+html:root .aa-root .aa-icon{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted-foreground);cursor:pointer}
+html:root .aa-root .aa-icon:hover{color:var(--foreground);border-color:var(--primary)}
+html:root .aa-root .aa-icon[aria-pressed=true]{background:var(--accent);color:var(--foreground)}
+html:root .aa-root .aa-icon:disabled{opacity:.4;cursor:not-allowed}
+html:root .aa-root :is(.aa-icon,.aa-info,a,select):focus-visible{outline:2px solid rgb(var(--ch-primary) / .6);outline-offset:2px}
+html:root .aa-select select{height:32px;padding:0 28px 0 10px;font-size:13px}
+
+/* Definition tooltip, shown on hover and keyboard focus. */
+html:root .aa-root .aa-info{position:relative;display:inline-grid;place-items:center;width:18px;height:18px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground);cursor:help;font:600 11px/1 var(--font-geist-sans),sans-serif}
+html:root .aa-root .aa-info--inline{border:1px solid var(--border)}
+html:root .aa-root .aa-info:hover,html:root .aa-root .aa-info:focus-visible{color:var(--foreground)}
+html:root .aa-root .aa-info[data-tip]:is(:hover,:focus-visible)::after{content:attr(data-tip);position:absolute;z-index:20;left:50%;top:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:280px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--popover);color:var(--foreground);font:400 12.5px/1.45 var(--font-geist-sans),sans-serif;letter-spacing:0;text-align:left;white-space:normal;box-shadow:0 12px 32px -12px rgb(var(--ch-shadow) / .35)}
+html:root .aa-pulse .aa-info[data-tip]:is(:hover,:focus-visible)::after{background:var(--popover);color:var(--slab-tx)}
+
+/* Charts: the heights below are the chart heights (the global .echart minimum is for in-app cards). */
+html:root .aa-root .echart{min-height:0}
+html:root .aa-chart{width:100%;height:240px}
+html:root .aa-chart--hero{height:300px}
+html:root .aa-chart--short{height:190px}
+html:root .aa-chart--sankey{height:400px}
+html:root .aa-chart--cohort{height:320px}
+html:root .aa-chart--donut{width:150px;height:150px;flex:none}
+html:root .aa-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;padding:0;list-style:none;font-size:12.5px;color:var(--muted-foreground)}
+html:root .aa-legend li{display:inline-flex;align-items:center;gap:6px}
+html:root .aa-legend i{width:10px;height:10px;border-radius:3px}
+html:root .aa-legend--col{flex-direction:column;gap:6px}
+html:root .aa-legend--col b{margin-left:auto;padding-left:10px;font-weight:600;color:var(--foreground)}
+html:root .aa-donuts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+html:root .aa-donut{display:flex;align-items:center;gap:14px;margin:0}
+html:root .aa-donut figcaption{flex:1;min-width:0}
+
+/* Funnels and milestone rows */
+html:root .aa-funnel,html:root .aa-milestones,html:root .aa-errors,html:root .aa-timings{display:grid;gap:14px;margin:0;padding:0;list-style:none}
+html:root .aa-funnel__row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+html:root .aa-funnel__name{font-size:14px;font-weight:500;color:var(--foreground);min-width:0;overflow-wrap:anywhere}
+html:root .aa-funnel__val{font-size:15px;font-weight:600;color:var(--foreground);white-space:nowrap}
+html:root .aa-funnel__val small{display:inline;margin-left:6px;font-size:12px;font-weight:500;color:var(--muted-foreground)}
+html:root .aa-funnel__bar{display:block;height:10px;margin-top:6px;border-radius:4px;background:var(--muted);overflow:hidden}
+html:root .aa-funnel__bar i{display:block;height:100%;border-radius:4px;background:var(--primary);min-width:2px}
+html:root .aa-funnel__gap{margin:6px 0 0;padding-left:12px;border-left:2px solid var(--border);font-size:12.5px;color:var(--muted-foreground)}
+html:root .aa-funnel__gap a,html:root .aa-errors a{color:var(--primary);text-decoration:none;font-weight:500}
+html:root .aa-funnel__gap a:hover,html:root .aa-errors a:hover{text-decoration:underline}
+html:root .aa-errors p{margin:4px 0 0;font-size:12.5px;color:var(--muted-foreground);font-family:var(--font-geist-mono),monospace}
+html:root .aa-spark-bars{display:flex;align-items:flex-end;gap:2px;height:36px;margin-top:8px}
+html:root .aa-spark-bars i{flex:1;border-radius:3px 3px 1px 1px;background:rgb(var(--ch-primary) / .55)}
+html:root .aa-spark-axis{display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--muted-foreground)}
+
+/* Funnel builder */
+html:root .aa-builder{display:grid;gap:10px;padding:12px;border:1px dashed var(--border);border-radius:14px;background:var(--muted)}
+html:root .aa-builder__steps{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none;counter-reset:step}
+html:root .aa-builder__steps li{counter-increment:step;display:inline-flex;align-items:center;gap:6px;padding:4px 4px 4px 10px;border:1px solid var(--border);border-radius:999px;background:var(--card);font-size:13px}
+html:root .aa-builder__steps li::before{content:counter(step);display:inline-grid;place-items:center;width:18px;height:18px;border-radius:999px;background:var(--accent);font:600 11px/1 var(--font-geist-mono),monospace;color:var(--foreground)}
+html:root .aa-builder__steps .aa-icon{width:22px;height:22px;border:0;border-radius:999px}
+html:root .aa-builder__add{display:flex;flex-wrap:wrap;gap:8px}
+
+/* Share lists and meters */
+html:root .aa-share{display:grid;gap:9px;margin:0;padding:0;list-style:none}
+html:root .aa-share li{display:grid;grid-template-columns:minmax(90px,1.2fr) 2fr auto;align-items:center;gap:12px;font-size:13.5px}
+html:root .aa-share__name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--foreground)}
+html:root .aa-share__bar,html:root .aa-meter>span{display:block;height:8px;border-radius:4px;background:var(--muted);overflow:hidden}
+html:root .aa-share__bar i,html:root .aa-meter>span i{display:block;height:100%;border-radius:4px;background:var(--primary)}
+html:root .aa-share__bar--bad i{background:var(--danger)}
+html:root .aa-share__val{text-align:right;white-space:nowrap;font-weight:600}
+html:root .aa-share__val small{display:inline;margin-left:4px;font-weight:500;color:var(--muted-foreground)}
+html:root .aa-meter{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
+html:root .aa-meter>span{width:56px;height:6px}
+html:root .aa-mix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+html:root .aa-mix h3{margin:0 0 10px;font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted-foreground)}
+
+/* Tables */
+html:root .aa-table-wrap{overflow-x:auto;margin:0 -4px}
+html:root .aa-root .aa-table{width:100%;border-collapse:collapse;font-size:13.5px}
+html:root .aa-root .aa-table th,html:root .aa-root .aa-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:left}
+html:root .aa-root .aa-table thead th{font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted-foreground)}
+html:root .aa-root .aa-table tbody th{font-weight:500;color:var(--foreground)}
+html:root .aa-root .aa-table .num{text-align:right}
+
+/* Web vitals */
+html:root .aa-vitals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+html:root .aa-vital{display:grid;gap:6px;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--muted)}
+html:root .aa-vital header{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground)}
+html:root .aa-vital strong{font-size:22px;font-weight:600}
+html:root .aa-vital__rating{justify-self:start;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--chip);color:var(--muted-foreground)}
+html:root .aa-vital[data-rating=good] .aa-vital__rating{background:var(--gain-bg);color:var(--success)}
+html:root .aa-vital[data-rating=ni] .aa-vital__rating{background:var(--warn-bg);color:var(--warn-ink)}
+html:root .aa-vital[data-rating=poor] .aa-vital__rating{background:var(--loss-bg);color:var(--danger)}
+html:root .aa-vital__bar{display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden;background:var(--chip)}
+html:root .aa-vital__bar i[data-k=good]{background:var(--success)}
+html:root .aa-vital__bar i[data-k=ni]{background:var(--warn-strong)}
+html:root .aa-vital__bar i[data-k=poor]{background:var(--danger)}
+html:root .aa-vital small{font-size:11.5px;color:var(--muted-foreground)}
+
+/* Links to the other lenses */
+html:root .aa-links{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+html:root .aa-links a{display:grid;gap:2px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;color:var(--foreground);text-decoration:none}
+html:root .aa-links a:hover{border-color:var(--primary);background:var(--muted)}
+html:root .aa-links b{font-size:14px;font-weight:600}
+html:root .aa-links span{font-size:12.5px;color:var(--muted-foreground)}
+
+/* Loading, empty and error states */
+html:root .aa-skeleton{display:grid;gap:16px}
+html:root .aa-skeleton__row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+html:root .aa-skeleton__row--2{grid-template-columns:repeat(2,minmax(0,1fr))}
+html:root .aa-shimmer{border-radius:18px;background:linear-gradient(100deg,var(--muted) 30%,var(--accent) 50%,var(--muted) 70%);background-size:300% 100%;animation:aa-shimmer 1.4s ease-in-out infinite}
+html:root .aa-shimmer--tile{height:104px}
+html:root .aa-shimmer--hero{height:300px}
+html:root .aa-shimmer--card{height:240px}
+@keyframes aa-shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){html:root .aa-shimmer{animation:none}}
+html:root .aa-empty{display:grid;gap:4px;padding:26px 18px;border:1px dashed var(--border);border-radius:14px;text-align:center}
+html:root .aa-empty strong{font-size:14px;font-weight:600;color:var(--foreground)}
+html:root .aa-empty p{margin:0;font-size:13px;color:var(--muted-foreground)}
+html:root .aa-empty-line{margin:0;font-size:13px;color:var(--muted-foreground)}
+html:root .aa-error{display:grid;justify-items:start;gap:6px;padding:16px 18px;border:1px solid var(--danger);border-radius:16px;background:var(--loss-bg)}
+html:root .aa-error strong{color:var(--danger)}
+html:root .aa-error p{margin:0;font-size:13.5px;color:var(--foreground)}
+html:root .people-only{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--accent);font-size:13.5px}
+
+@media (max-width:1200px){
+  html:root .aa-pulse{grid-template-columns:1fr}
+  html:root .aa-vitals{grid-template-columns:repeat(3,minmax(0,1fr))}
+  html:root .aa-mix{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:900px){
+  html:root .aa-panel{grid-column:1 / -1}
+  html:root .aa-pulse__tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html:root .aa-skeleton__row--2{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  html:root .aa-pulse{padding:16px}
+  html:root .aa-pulse__tiles,html:root .aa-vitals,html:root .aa-mix{grid-template-columns:1fr}
+  html:root .aa-panel{padding:16px}
+  html:root .aa-share li{grid-template-columns:minmax(80px,1fr) 1fr auto}
+  html:root .aa-chart--sankey{height:340px}
+}
+
+/* Inside the night slab the pills use the slab's own translucent fills (the page's chip colours are light in light themes). */
+html:root .aa-pulse .aa-delta{background:var(--slab-chip);color:var(--slab-mu)}
+html:root .aa-pulse .aa-delta[data-tone=good]{background:rgb(var(--ch-success) / .16);color:var(--success)}
+html:root .aa-pulse .aa-delta[data-tone=bad]{background:rgb(var(--ch-danger) / .16);color:var(--danger)}

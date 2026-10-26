@@ -67,6 +67,16 @@ function weekOneRetention(users: AcquiredUser[], all: EventRow[], from: string, 
   return share(eligible.filter((u) => [...(days.get(u.userKey) ?? [])].some((d) => d - dayNum(u.firstDay) >= 7 && d - dayNum(u.firstDay) <= 13)).length, eligible.length);
 }
 
+/**
+ * New accounts from the server-recorded `signed_up` events (one per account, keyed like every other event), for
+ * activation, retention and cohorts. Sign-up counts and attribution still come from app_users.
+ */
+export function signupsFromRows(all: EventRow[]): AcquiredUser[] {
+  const first = new Map<string, string>();
+  for (const r of all) if (r.event === 'signed_up' && (!first.has(r.userKey) || first.get(r.userKey)! > r.day)) first.set(r.userKey, r.day);
+  return [...first].map(([userKey, firstDay]) => ({ userKey, firstDay, ref: null, src: null, origin: 'signup' }));
+}
+
 const median = (s: Session[]) => sessionStats(s).medianMs;
 const crashFree = (s: Session[]) => share(s.filter((x) => !x.crashed).length, s.length);
 
@@ -87,14 +97,15 @@ export function summary(all: EventRow[], users: AcquiredUser[], q: LensQuery) {
   const prevS = sessionize(prev);
   const spans = sparkDays(w.from, w.to);
   const slice = (rows: EventRow[], [a, b]: [string, string]) => rows.filter((r) => r.day >= a && r.day <= b);
+  const joined = signupsFromRows(all.filter((r) => q.platform === 'all' || r.platform === q.platform));
   const kpis: Kpi[] = [
     { id: 'active', label: 'Active people', value: new Set(cur.map((r) => r.userKey)).size, previous: new Set(prev.map((r) => r.userKey)).size, format: 'count', better: 'up',
       spark: spans.map((s) => new Set(slice(cur, s).map((r) => r.userKey)).size), hint: 'People who opened the app at least once in the period.' },
     { id: 'signups', label: 'New sign-ups', value: signupsIn(users, w.from, w.to).length, previous: signupsIn(users, w.prevFrom, w.prevTo).length, format: 'count', better: 'up',
       spark: spans.map(([a, b]) => signupsIn(users, a, b).length), hint: 'New accounts created in the period (accounts from before analytics are left out).' },
-    { id: 'activation', label: 'Activation', value: activation(users, all, w.from, w.to), previous: activation(users, all, w.prevFrom, w.prevTo), format: 'pct', better: 'up',
-      spark: spans.map(([a, b]) => activation(users, all, a, b) ?? 0), hint: 'Share of new sign-ups who added a holding, an asset or an import within 7 days.' },
-    { id: 'retention', label: 'Week-1 retention', value: weekOneRetention(users, all, w.from, w.to, q.today), previous: weekOneRetention(users, all, w.prevFrom, w.prevTo, q.today), format: 'pct', better: 'up',
+    { id: 'activation', label: 'Activation', value: activation(joined, all, w.from, w.to), previous: activation(joined, all, w.prevFrom, w.prevTo), format: 'pct', better: 'up',
+      spark: spans.map(([a, b]) => activation(joined, all, a, b) ?? 0), hint: 'Share of new sign-ups who added a holding, an asset or an import within 7 days.' },
+    { id: 'retention', label: 'Week-1 retention', value: weekOneRetention(joined, all, w.from, w.to, q.today), previous: weekOneRetention(joined, all, w.prevFrom, w.prevTo, q.today), format: 'pct', better: 'up',
       spark: [], hint: 'Share of new sign-ups who came back 7 to 13 days after signing up (only sign-ups at least 13 days old count).' },
     { id: 'session', label: 'Median visit', value: median(curS), previous: median(prevS), format: 'duration', better: 'up',
       spark: spans.map((s) => median(sessionize(slice(cur, s))) ?? 0), hint: 'Middle visit length. A visit ends after 30 minutes without activity.' },
@@ -135,13 +146,13 @@ export function journeys(all: EventRow[], q: LensQuery) {
   };
 }
 
-export function engagement(all: EventRow[], users: AcquiredUser[], q: LensQuery) {
+export function engagement(all: EventRow[], q: LensQuery) {
   const w = windows(q);
   const f: LensFilter = { from: w.from, to: w.to, platform: q.platform, segment: q.segment };
   const cur = filterRows(all, f);
   const platformRows = all.filter((r) => q.platform === 'all' || r.platform === q.platform);
   const sessions = sessionize(cur);
-  const signups = users.filter((u) => u.origin !== 'existing' && u.firstDay >= numDay(dayNum(q.today) - 7 * 8)).map((u) => ({ userKey: u.userKey, day: u.firstDay }));
+  const signups = signupsFromRows(platformRows).filter((u) => u.firstDay >= numDay(dayNum(q.today) - 7 * 8)).map((u) => ({ userKey: u.userKey, day: u.firstDay }));
   return {
     active: activeSeries(platformRows, w.from, w.to),
     power: powerCurve(platformRows, w.to),
@@ -189,7 +200,7 @@ export function buildLens(all: EventRow[], users: AcquiredUser[], q: LensQuery) 
   switch (q.lens) {
     case 'summary': return { ...base, ...summary(all, users, q) };
     case 'journeys': return { ...base, ...journeys(all, q) };
-    case 'engagement': return { ...base, ...engagement(all, users, q) };
+    case 'engagement': return { ...base, ...engagement(all, q) };
     case 'acquisition': return { ...base, ...acquisition(all, users, q) };
     case 'quality': return { ...base, ...quality(all, q) };
   }

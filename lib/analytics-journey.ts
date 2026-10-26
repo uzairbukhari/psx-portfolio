@@ -119,13 +119,14 @@ export function paths(sessions: Session[], anchor: string, direction: 'next' | '
     const i = nodes.indexOf(anchor);
     if (i < 0) continue;
     const seq = direction === 'next' ? nodes.slice(i, i + depth + 1) : nodes.slice(Math.max(0, i - depth), i + 1).reverse();
-    while (seq.length < depth + 1) seq.push(direction === 'next' ? 'exit' : 'start');
+    // A visit that ends early gets one exit (or start) node and stops there.
+    if (seq.length < depth + 1) seq.push(direction === 'next' ? 'exit' : 'start');
     seqs.push(seq);
   }
   const keep: Set<string>[] = [];
   for (let level = 1; level <= depth; level++) {
     const c = new Map<string, number>();
-    for (const seq of seqs) bump(c, seq[level]);
+    for (const seq of seqs) if (seq[level] !== undefined) bump(c, seq[level]);
     keep[level] = new Set([...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, top).map(([k]) => k));
   }
   const nodeValue = new Map<string, number>();
