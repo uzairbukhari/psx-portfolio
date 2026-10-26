@@ -10,6 +10,8 @@ import { classifyError, type ErrorArea, type ErrorCode } from '@/lib/error-codes
 const OPT_OUT_KEY = 'sipwise.analytics.optout';
 const ANON_KEY = 'sipwise.analytics.anon';
 const FLUSH_MS = 30_000;
+// Short commit of the build (vite.config.ts define), so the dashboard can split web usage and errors by release.
+const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : undefined;
 const queue: IncomingEvent[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 let session: string | undefined;
@@ -61,7 +63,7 @@ export async function reportAccountState(vaultExists: boolean) {
       method: 'POST',
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session, platform: 'web', events: [{ event: 'account_state', props: { vault: vaultExists ? 'exists' : 'none' } }] }),
+      body: JSON.stringify({ sessionId: session, platform: 'web', appVersion: APP_VERSION, events: [{ event: 'account_state', props: { vault: vaultExists ? 'exists' : 'none' } }] }),
     });
   } catch { /* analytics must never get in the way */ }
 }
@@ -77,7 +79,7 @@ export async function flushAnalytics() {
       method: 'POST',
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session, anonId: id('localStorage', ANON_KEY), platform: 'web', events }),
+      body: JSON.stringify({ sessionId: session, anonId: id('localStorage', ANON_KEY), platform: 'web', appVersion: APP_VERSION, events }),
     });
     if (res.status >= 500 || res.status === 429) requeue(events);
   } catch {
@@ -101,7 +103,9 @@ function requeue(events: IncomingEvent[]) {
 let onlineHooked = false;
 
 const SCREEN_BY_PATH: [RegExp, string][] = [
-  [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/(reports|insights)/, 'reports'], [/^\/(sip|monthly-picks|plan\/?$)/, 'sip'],
+  [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/(reports|insights)/, 'reports'], [/^\/plan\/?$/, 'plan'],
+  [/^\/sip-tracker/, 'sip_tracker'], [/^\/(sip|monthly-picks)/, 'sip'], [/^\/research-desk/, 'research_desk'], [/^\/ai-lab/, 'ai_lab'],
+  [/^\/currency\//, 'currency'], [/^\/future/, 'future'], [/^\/zakat/, 'zakat'], [/^\/feedback/, 'feedback'],
   [/^\/settings/, 'settings'], [/^\/notifications/, 'notifications'], [/^\/overview/, 'overview'], [/^\/$/, 'holdings'],
 ];
 const reported = new Set<string>();

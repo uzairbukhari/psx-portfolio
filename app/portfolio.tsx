@@ -242,6 +242,21 @@ const TAB_PATHS: Record<string, string> = {
   settings: '/settings',
   notifications: '/notifications',
 };
+/** The analytics screen name for each tab (lib/analytics-events.ts SCREENS); a tab missing here is not recorded. */
+const SCREEN_OF_TAB: Record<string, string> = {
+  history: 'activity',
+  reports: 'reports',
+  sip: 'sip',
+  'sip-plan': 'plan',
+  'sip-tracker': 'sip_tracker',
+  'research-desk': 'research_desk',
+  'ai-lab': 'ai_lab',
+  future: 'future',
+  zakat: 'zakat',
+  feedback: 'feedback',
+  settings: 'settings',
+  notifications: 'notifications',
+};
 const PATH_TABS: Record<string, string> = Object.fromEntries([
   ...Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab]),
   ['/history', 'history'],
@@ -1440,7 +1455,7 @@ function DashboardContent({
           : success,
       );
     } catch (e) {
-      if (wasImport && !(e instanceof VaultLockedError)) track('import_failed', { source: 'broker' });
+      if (wasImport && !(e instanceof VaultLockedError)) track('import_failed', { source: importSourceOf(p, next) });
       if (e instanceof ConflictError) {
         importActive.current = false;
         importHash.current = undefined;
@@ -1641,11 +1656,7 @@ function DashboardContent({
         ? isAll
           ? 'overview'
           : 'holdings'
-        : tab === 'history'
-          ? 'activity'
-          : tab === 'reports' || tab === 'sip' || tab === 'sip-plan' || tab === 'future' || tab === 'zakat' || tab === 'feedback' || tab === 'settings' || tab === 'notifications'
-            ? tab
-            : null;
+        : (SCREEN_OF_TAB[tab] ?? null);
     if (screen) track('screen_viewed', { screen });
   }, [email, tab, companyTicker, isAll]);
   const importOpen = ahlStatement ? 'ahl' : finqalabReview ? 'finqalab' : brokerReview ? 'broker' : ipoReview ? 'ipo' : null;

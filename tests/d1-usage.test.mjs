@@ -6,11 +6,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createD1 } from './helpers/d1.mjs';
 import { catalogRowParams, catalogUpsertSql } from '../lib/security-catalog.ts';
 import { purgeStagingEvents } from '../lib/analytics-store.ts';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** Tables whose size grows with time or users, so a scan of one costs more every month. */
 const GROWING = [
@@ -48,7 +49,7 @@ function sourceFiles() {
   walk(join(ROOT, 'lib'));
   walk(join(ROOT, 'app/api'));
   out.push(join(ROOT, 'workers/quote-refresh/src/index.ts'));
-  return out.filter((f) => !f.includes('/test-seed/'));
+  return out.filter((f) => !f.replaceAll('\\', '/').includes('/test-seed/'));
 }
 
 function selects(src) {

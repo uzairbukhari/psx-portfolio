@@ -200,3 +200,21 @@ test('the social channel a new account came from is stored once and shows in the
   const report = await usageReport(db, true, now);
   assert.deepEqual(report.channels.map((c) => [c.channel, c.n]).sort(), [['direct', 1], ['tiktok', 1]]);
 });
+
+test('feature users count each person once across the web and the phone', () => {
+  const r = shapeReport({
+    today: '2026-10-07', now: new Date('2026-10-07T10:00:00Z'), includeAdmin: false, activity: [], signups: [],
+    features: [{ event: 'entry_added', platform: 'web', n: 4, users: 2 }, { event: 'entry_added', platform: 'android', n: 3, users: 2 }],
+    featureUsers: [{ event: 'entry_added', users: 3 }],
+    screens: [], accounts: { total: 3, signups30: 0, signups7: 0 }, signupSeries: [],
+    funnelCounts: { landing: 0, clicked: 0, signedUp: 0, vault: 0, content: 0 },
+  });
+  assert.equal(r.features[0].users, 3);
+  assert.equal(r.features[0].count, 7);
+});
+
+test('every web page has a screen name the catalog accepts', () => {
+  for (const screen of ['plan', 'sip_tracker', 'research_desk', 'ai_lab', 'currency', 'future', 'zakat', 'feedback'])
+    assert.ok(validateEvent({ event: 'screen_viewed', props: { screen } }), screen);
+  assert.equal(validateEvent({ event: 'screen_viewed', props: { screen: 'sip-plan' } }), null);
+});
