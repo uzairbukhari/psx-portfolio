@@ -54,22 +54,25 @@ export function percentWords(p) {
 const weekday = (date) => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 const pause = (s) => `<break time="${s}s"/>`;
 
-/** One voice-over clip per slide; the renderer adds a pause after each. */
+/**
+ * One voice-over clip per slide, in Urdu script with English words (index name, company names, numbers,
+ * "points", "percent") left in Latin letters so the voice says them in English. The renderer adds a pause after each.
+ */
 export function spokenParts(recap) {
   const { index, gainers, losers, active, dividends } = recap;
-  const dir = index.change >= 0 ? 'up' : 'down';
-  const list = (items, verb) =>
-    items.map((m, i) => `${i === items.length - 1 && items.length > 1 ? 'And ' : ''}${m.name}, ${verb} ${percentWords(m.changePercent)}.`).join(` ${pause(0.6)} `);
+  const move = index.change >= 0 ? 'کا اضافہ' : 'کی کمی';
+  const list = (items, word) =>
+    items.map((m, i) => `${i === items.length - 1 && items.length > 1 ? 'اور ' : ''}${m.name}، ${percentWords(m.changePercent)} ${word}۔`).join(` ${pause(0.6)} `);
   const parts = [
-    `Market summary for ${weekday(recap.date)}. ${pause(0.6)} The K S E one hundred index closed at... ${intWords(index.close)}. ${pause(0.5)} That is ${dir} ${intWords(index.change)} points, ${pause(0.4)} or ${percentWords(index.changePercent)}.`,
-    `Top gainers today. ${pause(0.6)} ${list(gainers, 'up')}`,
-    `Top losers today. ${pause(0.6)} ${list(losers, 'down')}`,
+    `آج کی مارکیٹ سمری، ${weekday(recap.date)}۔ ${pause(0.6)} K S E one hundred انڈیکس آج بند ہوا... ${intWords(index.close)}۔ ${pause(0.5)} یہ ${intWords(index.change)} points ${move} ہے، ${pause(0.4)} یعنی ${percentWords(index.changePercent)}۔`,
+    `آج سب سے زیادہ بڑھنے والے شیئرز۔ ${pause(0.6)} ${list(gainers, 'اضافہ')}`,
+    `آج سب سے زیادہ گرنے والے شیئرز۔ ${pause(0.6)} ${list(losers, 'کمی')}`,
   ];
   const dividend = dividends.length
-    ? `Dividend news. ${pause(0.6)} ${dividends.map((d) => `${d.name} announced a ${percentWords(d.percent)} cash dividend.`).join(` ${pause(0.6)} `)} ${pause(0.8)} `
+    ? `ڈیویڈنڈ کی خبر۔ ${pause(0.6)} ${dividends.map((d) => `${d.name} نے ${percentWords(d.percent)} cash dividend کا اعلان کیا۔`).join(` ${pause(0.6)} `)} ${pause(0.8)} `
     : '';
-  parts.push(`${dividend}The most traded stocks were ${active.map((m, i) => `${i === active.length - 1 ? 'and ' : ''}${m.name}`).join(', ')}.`);
-  parts.push(`Plan your monthly investing. ${pause(0.5)} Sipwise dot trade.`);
+  parts.push(`${dividend}سب سے زیادہ ٹریڈ ہونے والے شیئرز یہ تھے: ${active.map((m, i) => `${i === active.length - 1 && active.length > 1 ? 'اور ' : ''}${m.name}`).join('، ')}۔`);
+  parts.push(`اپنی ماہانہ سرمایہ کاری کی منصوبہ بندی کریں۔ ${pause(0.5)} Sipwise dot trade۔`);
   return parts;
 }
 

@@ -29,8 +29,8 @@ test('company names are spoken without legal suffixes', () => {
 test('one clip per slide, company names only, no tickers', () => {
   const parts = spokenParts(recap);
   assert.equal(parts.length, 5);
-  assert.match(parts[1], /Meezan Bank, up five point two percent/);
-  assert.match(parts[3], /Oil & Gas Development announced a twenty-five percent cash dividend/);
+  assert.match(parts[1], /Meezan Bank، five point two percent اضافہ/);
+  assert.match(parts[3], /Oil & Gas Development نے twenty-five percent cash dividend/);
   assert.match(caption(recap), /Gainers: Meezan Bank, Hub Power/);
 });
 
