@@ -107,7 +107,7 @@ function slides(r) {
       4,
     ),
     shell(
-      `<div style="margin:auto 0;text-align:center"><div style="display:flex;justify-content:center;transform:scale(2.2);margin-bottom:130px">${mark}</div><h1 style="font-size:104px">Invest monthly.<br>See everything.<br><span style="color:#2ee6a6">Share nothing.</span></h1><div style="margin-top:90px;display:inline-block;padding:36px 80px;border-radius:99px;background:linear-gradient(135deg,#4c8dff,#1d4ed8);font-size:56px;font-weight:600;box-shadow:0 24px 60px -16px rgba(76,141,255,.7)">sipwise.trade</div><div style="margin-top:44px;font-size:34px;color:#9fb0d6">Free monthly SIP planner for PSX investors</div></div>`,
+      `<div style="margin:auto 0;text-align:center"><div style="display:flex;justify-content:center;transform:scale(2.2);margin-bottom:130px">${mark}</div><h1 style="font-size:104px">Invest monthly.<br>See everything.<br><span style="color:#2ee6a6">Share nothing.</span></h1><div style="margin-top:90px;display:inline-block;padding:36px 80px;border-radius:99px;background:linear-gradient(135deg,#4c8dff,#1d4ed8);font-size:56px;font-weight:600;box-shadow:0 24px 60px -16px rgba(76,141,255,.7)">sipwise.trade</div><div style="margin-top:44px;font-size:34px;color:#9fb0d6">Free monthly SIP planner for PSX investors</div><div style="margin-top:36px;display:inline-block;padding:22px 52px;border-radius:99px;border:3px solid #2ee6a6;color:#2ee6a6;font-size:42px;font-weight:600">Subscribe for daily market updates</div></div>`,
       5,
     ),
   ];
