@@ -1,0 +1,106 @@
+name: Market recap video
+
+# Builds the daily "Market summary" vertical video after the PSX close: PSX numbers and company names, an ElevenLabs
+# voice-over, Sipwise slides, uploaded to the public R2 bucket with a manifest (caption + video URL) that the social
+# posting routine reads. PSX drops Cloudflare egress, so this runs on a GitHub runner.
+# Scheduled runs stay off until the repository variable MARKET_RECAP_ENABLED is set to "true".
+on:
+  schedule:
+    # 12:00 UTC Monday-Friday = 17:00 PKT, half an hour after the 16:30 close. GitHub may delay runs.
+    - cron: '0 12 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Slides and data only: no voice-over, no video, no upload'
+        type: boolean
+        default: true
+
+concurrency:
+  group: market-recap
+  cancel-in-progress: false
+
+jobs:
+  recap:
+    if: github.event_name == 'workflow_dispatch' || vars.MARKET_RECAP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    # CLOUDFLARE_* (D1 read), ELEVENLABS_API_KEY and R2_* are `prod` environment secrets.
+    environment: prod
+    timeout-minutes: 20
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      ELEVENLABS_VOICE_ID: 1qEiC6qsybMkmnNdVMbK
+      R2_BUCKET: sipwise-social
+      PUBLIC_MEDIA_URL: https://media.sipwise.trade
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Fetch the Geist fonts
+        run: npm pack geist@1.3.1 --silent && tar xzf geist-1.3.1.tgz
+      - name: Build the recap data from PSX
+        run: node scripts/market-recap-data.mjs --out=recap.json
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Stop on a market holiday
+        id: day
+        run: |
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('recap.json', 'utf8'));
+            const t = Date.parse(r.marketDate);
+            const same = Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) === r.date;
+            console.log('PSX data date', r.marketDate, 'vs today', r.date, same ? '(ok)' : '(holiday, skipping)');
+            require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'trading=' + same + '\n');
+          "
+      - name: Render slides and video
+        if: steps.day.outputs.trading == 'true'
+        run: node scripts/market-recap-render.mjs --in=recap.json --out=recap-out ${DRY_RUN:+--no-audio}
+        env:
+          GEIST_DIR: package
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      - name: Upload the slides for review (dry run)
+        if: steps.day.outputs.trading == 'true' && env.DRY_RUN == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: recap-slides
+          path: |
+            recap-out/slide-*.png
+            recap.json
+      - name: Upload the video and manifest to R2
+        if: steps.day.outputs.trading == 'true' && env.DRY_RUN != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          date=$(node -p "require('./recap.json').date")
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          key="recap/${date}/market-summary.mp4"
+          aws s3 cp recap-out/recap.mp4 "s3://${R2_BUCKET}/${key}" --endpoint-url "$endpoint" --content-type video/mp4
+          node -e "
+            const r = JSON.parse(require('fs').readFileSync('recap.json', 'utf8'));
+            const manifest = { date: r.date, video: process.env.PUBLIC_MEDIA_URL + '/${key}', caption: r.caption };
+            require('fs').writeFileSync('manifest.json', JSON.stringify(manifest, null, 2));
+          "
+          aws s3 cp manifest.json "s3://${R2_BUCKET}/recap/${date}/manifest.json" --endpoint-url "$endpoint" --content-type application/json
+          aws s3 cp manifest.json "s3://${R2_BUCKET}/recap/latest.json" --endpoint-url "$endpoint" --content-type application/json
+      - name: Open or update a failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Scraper failing: $GITHUB_WORKFLOW"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "Scheduled run failed: $RUN_URL"
+          fi
