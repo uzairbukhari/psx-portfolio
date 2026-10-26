@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { caption, intWords, percentWords, shortName, spokenParts } from '../scripts/market-recap-data.mjs';
+import { moversFromWatch, caption, intWords, percentWords, shortName, spokenParts } from '../scripts/market-recap-data.mjs';
 
 const recap = {
   date: '2026-10-23',
@@ -32,4 +32,17 @@ test('one clip per slide, company names only, no tickers', () => {
   assert.match(parts[1], /Meezan Bank, up five point two percent/);
   assert.match(parts[3], /Oil & Gas Development announced a twenty-five percent cash dividend/);
   assert.match(caption(recap), /Gainers: Meezan Bank, Hub Power/);
+});
+
+test('movers fall back to the market-watch table and skip thin volume', () => {
+  const rows = [
+    { symbol: 'AAA', price: 10, changePercent: 9, volume: 500 },
+    { symbol: 'BBB', price: 10, changePercent: 4, volume: 900_000 },
+    { symbol: 'CCC', price: 10, changePercent: -2, volume: 200_000 },
+    { symbol: 'DDD', price: 10, changePercent: 1, volume: 5_000_000 },
+  ];
+  const m = moversFromWatch(rows);
+  assert.deepEqual(m.advancers.map((r) => r.symbol), ['BBB', 'DDD']);
+  assert.deepEqual(m.decliners.map((r) => r.symbol), ['CCC']);
+  assert.deepEqual(m.active.map((r) => r.symbol), ['DDD', 'BBB', 'CCC']);
 });

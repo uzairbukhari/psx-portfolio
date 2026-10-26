@@ -9,10 +9,13 @@
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { d1 } from './d1-rest.mjs';
-import { fetchPsxIndexSummary, fetchPsxTopMovers } from '../lib/psx-market.ts';
+import { fetchPsx } from '../lib/psx-fetch.ts';
+import { fetchPsxIndexSummary, fetchPsxTopMovers, parseMarketWatch } from '../lib/psx-market.ts';
 
 const outArg = process.argv.find((arg) => arg.startsWith('--out='));
 const TOP = 3;
+// Tiny prints in thinly traded shares would top the lists, so the market-watch fallback ignores them.
+const MIN_VOLUME = 100_000;
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
 const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
 
@@ -79,9 +82,30 @@ export function caption(recap) {
   return `Market summary, ${weekday(recap.date)} ${recap.date}. KSE-100 ${Math.round(index.close).toLocaleString('en-US')} (${sign}${Math.abs(index.changePercent).toFixed(2)}%). Gainers: ${names(gainers)}. Losers: ${names(losers)}.${div} Plan your monthly investing: link in bio. #PSX #KSE100 #Sipwise`;
 }
 
+/** Gainers, losers and most traded from the whole market-watch table (used when PSX's performers page is unavailable). */
+export function moversFromWatch(rows) {
+  const liquid = rows.filter((r) => r.volume >= MIN_VOLUME);
+  const by = (key, dir) => [...liquid].sort((a, b) => dir * (b[key] - a[key]));
+  return {
+    advancers: by('changePercent', 1).filter((r) => r.changePercent > 0),
+    decliners: by('changePercent', -1).filter((r) => r.changePercent < 0),
+    active: by('volume', 1),
+  };
+}
+
+async function topMovers() {
+  try {
+    return await fetchPsxTopMovers();
+  } catch (error) {
+    console.warn(`PSX performers page failed (${error.message}); using market-watch instead.`);
+    const response = await fetchPsx('https://dps.psx.com.pk/market-watch');
+    return moversFromWatch(parseMarketWatch(await response.text()));
+  }
+}
+
 export async function buildRecap() {
   const date = pkDay();
-  const [index, movers] = await Promise.all([fetchPsxIndexSummary('KSE100'), fetchPsxTopMovers()]);
+  const [index, movers] = await Promise.all([fetchPsxIndexSummary('KSE100'), topMovers()]);
   const names = new Map();
   let dividends = [];
   let line = [];
