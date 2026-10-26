@@ -102,7 +102,7 @@ export default function UsageDashboard({
           dayText={shortDay}
         />
       ) : (
-        <p className="muted">No new sign-ups in the last 30 days.</p>
+        <p className="muted">No new sign-ups in the last {days} days.</p>
       )}
 
       <h3>Sign-up funnel (last {report.days} days)</h3>

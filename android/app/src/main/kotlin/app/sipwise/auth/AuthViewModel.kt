@@ -11,6 +11,7 @@ import app.sipwise.BuildConfig
 import app.sipwise.SipwiseApp
 import app.sipwise.data.FileVaultCache
 import app.sipwise.network.ApiRequestException
+import app.sipwise.network.Events
 import app.sipwise.network.MeResponse
 import app.sipwise.network.MobileSignInRequest
 import app.sipwise.network.MobileSignInResponse
@@ -129,6 +130,9 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     /** User-initiated: also ends the server-side session. Offline, the revoke is queued and retried next launch. */
     fun signOut() {
         viewModelScope.launch {
+            // Sent while the session token still works, so the event is tied to the account.
+            container.analytics.track(Events.SIGNED_OUT)
+            container.analytics.flushNow()
             val result =
                 signOutRemote(
                     token = sessions.token(),

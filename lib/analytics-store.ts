@@ -1,5 +1,6 @@
 import { activeCounts, dailyActive, pktDay, retentionCohorts, returnedWithinWeek, DAY_MS, type DayUser } from './analytics-report.ts';
 import { cleanVersion, type EventBatch, type IncomingEvent, type Platform } from './analytics-events.ts';
+import type { DeviceClass } from './device-class.ts';
 
 // D1 side of usage analytics. The privacy rule lives in lib/analytics-events.ts (closed enums only); this file adds
 // the HMAC user key so the events table alone never names anyone.
@@ -26,6 +27,9 @@ export type EventContext = {
   platform: Platform;
   appVersion?: string | null;
   isAdmin?: boolean;
+  /** Cloudflare country code and coarse device class (lib/device-class.ts), read from the request on the server. */
+  country?: string | null;
+  device?: DeviceClass;
 };
 
 export async function insertEvents(db: D1Database, ctx: EventContext, events: IncomingEvent[], now = new Date()) {
@@ -33,19 +37,23 @@ export async function insertEvents(db: D1Database, ctx: EventContext, events: In
   const ts = now.toISOString();
   const day = pktDay(now);
   const stmt = db.prepare(
-    'INSERT INTO analytics_events (ts,day,user_key,anon_id,session_id,platform,app_version,event,props,is_admin) VALUES (?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO analytics_events (ts,day,user_key,anon_id,session_id,platform,app_version,event,props,is_admin,country,os,browser,form_factor) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
   );
+  const d = ctx.device;
   await db.batch(
     events.map((e) =>
       stmt.bind(ts, day, ctx.userKey ?? null, ctx.anonId ?? null, ctx.sessionId, ctx.platform, cleanVersion(ctx.appVersion), e.event,
-        Object.keys(e.props).length ? JSON.stringify(e.props) : null, ctx.isAdmin ? 1 : 0),
+        Object.keys(e.props).length ? JSON.stringify(e.props) : null, ctx.isAdmin ? 1 : 0,
+        ctx.country ?? null, d?.os ?? null, d?.browser ?? null, d?.formFactor ?? null),
     ),
   );
   return events.length;
 }
 
-export async function recordBatch(db: D1Database, batch: EventBatch, key: string | null, isAdmin: boolean) {
-  return insertEvents(db, { sessionId: batch.sessionId, anonId: key ? null : batch.anonId, userKey: key, platform: batch.platform, appVersion: batch.appVersion, isAdmin }, batch.events);
+export async function recordBatch(
+  db: D1Database, batch: EventBatch, key: string | null, isAdmin: boolean, where: { country?: string | null; device?: DeviceClass } = {},
+) {
+  return insertEvents(db, { sessionId: batch.sessionId, anonId: key ? null : batch.anonId, userKey: key, platform: batch.platform, appVersion: batch.appVersion, isAdmin, ...where }, batch.events);
 }
 
 /**
@@ -154,6 +162,9 @@ export async function usageReport(db: D1Database, includeAdmin = false, now = ne
   const signups = await all<DayUser>(`SELECT user_key AS userKey, MIN(day) AS day FROM analytics_events WHERE event='signed_up' AND user_key IS NOT NULL AND day>=? ${adminClause} GROUP BY user_key`, since);
   const features = await all<{ event: string; platform: string; n: number; users: number }>(
     `SELECT event, platform, COUNT(*) AS n, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE day>=? ${adminClause} AND user_key IS NOT NULL GROUP BY event, platform`, since30);
+  // Distinct people per feature across platforms (someone using both the web and the phone counts once).
+  const featureUsers = await all<{ event: string; users: number }>(
+    `SELECT event, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE day>=? ${adminClause} AND user_key IS NOT NULL GROUP BY event`, since30);
   const screens = await all<{ screen: string; n: number; users: number }>(
     `SELECT json_extract(props,'$.screen') AS screen, COUNT(*) AS n, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE event='screen_viewed' AND day>=? ${adminClause} AND user_key IS NOT NULL GROUP BY screen ORDER BY users DESC, n DESC`, since30);
   const count = async (event: string, col: 'user_key' | 'anon_id') =>
@@ -177,7 +188,7 @@ export async function usageReport(db: D1Database, includeAdmin = false, now = ne
   const importFunnel = await all<{ event: string; users: number }>(
     `SELECT event, COUNT(DISTINCT user_key) AS users FROM analytics_events WHERE event IN ('import_started','import_completed','import_failed') AND day>=? AND user_key IS NOT NULL ${adminClause} GROUP BY event`, since30);
 
-  return shapeReport({ today, activity, signups, features, screens, accounts, signupSeries, windowDays, platforms, versions, origins, channels, importFunnel, funnelCounts: {
+  return shapeReport({ today, activity, signups, features, featureUsers, screens, accounts, signupSeries, windowDays, platforms, versions, origins, channels, importFunnel, funnelCounts: {
     landing: await count('landing_viewed', 'anon_id'), clicked: await count('sign_in_clicked', 'anon_id'),
     signedUp: await count('signed_up', 'user_key'), vault: await count('vault_created', 'user_key'), content,
   }, includeAdmin, now });
@@ -186,6 +197,7 @@ export async function usageReport(db: D1Database, includeAdmin = false, now = ne
 export function shapeReport(i: {
   today: string; activity: DayUser[]; signups: DayUser[]; includeAdmin: boolean; now: Date;
   features: { event: string; platform: string; n: number; users: number }[];
+  featureUsers?: { event: string; users: number }[];
   screens: { screen: string; n: number; users: number }[];
   accounts: { total: number; signups30: number | null; signups7: number | null } | null;
   signupSeries: { day: string; n: number }[];
@@ -204,6 +216,10 @@ export function shapeReport(i: {
     row.users = Math.max(row.users, f.users);
     if (f.platform === 'web') row.web += f.n; else row.phone += f.n;
     byEvent.set(f.event, row);
+  }
+  for (const u of i.featureUsers ?? []) {
+    const row = byEvent.get(u.event);
+    if (row) row.users = u.users;
   }
   const f = i.funnelCounts;
   const days = i.windowDays ?? 30;

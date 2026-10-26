@@ -1,6 +1,6 @@
 // Only what the app's charts use, so the bundle stays small. Loaded on demand by `<EChart>`.
 import * as echarts from 'echarts/core';
-import { BarChart, HeatmapChart, LineChart, PieChart, TreemapChart } from 'echarts/charts';
+import { BarChart, HeatmapChart, LineChart, PieChart, SankeyChart, ScatterChart, TreemapChart } from 'echarts/charts';
 import {
   AriaComponent,
   DataZoomInsideComponent,
@@ -22,6 +22,8 @@ echarts.use([
   PieChart,
   HeatmapChart,
   TreemapChart,
+  SankeyChart,
+  ScatterChart,
   AriaComponent,
   DataZoomInsideComponent,
   DataZoomSliderComponent,

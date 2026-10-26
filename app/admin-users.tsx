@@ -33,6 +33,13 @@ export default function AdminUsers({ includeInternal }: { includeInternal: boole
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'lastActive', dir: -1 });
   const [open, setOpen] = useState<UserRow | null>(null);
   const [copied, setCopied] = useState(false);
+  // `?keys=` comes from an Analytics drill-through (people who dropped out of a funnel step, for example).
+  const [only, setOnly] = useState<Set<string> | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const keys = new URLSearchParams(window.location.search).get('keys');
+    return keys ? new Set(keys.split(',').filter((k) => /^[0-9a-f]{32}$/.test(k))) : null;
+  });
+  const onlyLabel = typeof window === 'undefined' ? null : (new URLSearchParams(window.location.search).get('from') ?? '').slice(0, 80) || null;
 
   const load = useCallback(async () => {
     setError(null);
@@ -56,9 +63,10 @@ export default function AdminUsers({ includeInternal }: { includeInternal: boole
     const list = dir.users.filter((u) =>
       (!q || u.email.includes(q) || (u.name ?? '').toLowerCase().includes(q)) &&
       (!stage || u.stage === stage) &&
-      (!segment || u.segments.includes(segment)));
+      (!segment || u.segments.includes(segment)) &&
+      (!only || only.has(u.key)));
     return list.sort((a, b) => (a[sort.key] > b[sort.key] ? 1 : a[sort.key] < b[sort.key] ? -1 : 0) * sort.dir);
-  }, [dir, query, stage, segment, sort]);
+  }, [dir, query, stage, segment, sort, only]);
 
   if (!dir) return error ? <p role="alert" className="notice error">{error}</p> : <p className="muted">Loading…</p>;
 
@@ -80,6 +88,14 @@ export default function AdminUsers({ includeInternal }: { includeInternal: boole
 
   return (
     <div className="people">
+      {only && (
+        <p className="people-only" role="status">
+          Showing {rows.length} {rows.length === 1 ? 'person' : 'people'} from Analytics{onlyLabel ? `: ${onlyLabel}` : ''}.{' '}
+          <button type="button" data-slot="link" className="link-button" onClick={() => { setOnly(null); window.history.replaceState(null, '', '/admin/users'); }}>
+            Show everyone
+          </button>
+        </p>
+      )}
       <h3>How far people got</h3>
       <EChart
         className="usage-chart people-funnel"

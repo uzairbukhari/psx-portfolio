@@ -2,7 +2,7 @@
 // Usage analytics for the web app: queues catalog events (lib/analytics-events.ts: feature and screen names only, never
 // tickers or amounts) and sends them in batches to /api/events. Honours the "Share usage stats" switch in
 // Settings (on by default, stored on this device).
-import { validateEvent, type EventName, type EventProps } from '@/lib/analytics-events';
+import { clsBucket, timingBucket, validateEvent, type EventName, type EventProps } from '@/lib/analytics-events';
 import type { IncomingEvent } from '@/lib/analytics-events';
 import { onPlatformError } from '@/lib/safe-json';
 import { classifyError, type ErrorArea, type ErrorCode } from '@/lib/error-codes';
@@ -10,6 +10,8 @@ import { classifyError, type ErrorArea, type ErrorCode } from '@/lib/error-codes
 const OPT_OUT_KEY = 'sipwise.analytics.optout';
 const ANON_KEY = 'sipwise.analytics.anon';
 const FLUSH_MS = 30_000;
+// Short commit of the build (vite.config.ts define), so the dashboard can split web usage and errors by release.
+const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : undefined;
 const queue: IncomingEvent[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 let session: string | undefined;
@@ -61,7 +63,7 @@ export async function reportAccountState(vaultExists: boolean) {
       method: 'POST',
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session, platform: 'web', events: [{ event: 'account_state', props: { vault: vaultExists ? 'exists' : 'none' } }] }),
+      body: JSON.stringify({ sessionId: session, platform: 'web', appVersion: APP_VERSION, events: [{ event: 'account_state', props: { vault: vaultExists ? 'exists' : 'none' } }] }),
     });
   } catch { /* analytics must never get in the way */ }
 }
@@ -77,7 +79,7 @@ export async function flushAnalytics() {
       method: 'POST',
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session, anonId: id('localStorage', ANON_KEY), platform: 'web', events }),
+      body: JSON.stringify({ sessionId: session, anonId: id('localStorage', ANON_KEY), platform: 'web', appVersion: APP_VERSION, events }),
     });
     if (res.status >= 500 || res.status === 429) requeue(events);
   } catch {
@@ -101,7 +103,9 @@ function requeue(events: IncomingEvent[]) {
 let onlineHooked = false;
 
 const SCREEN_BY_PATH: [RegExp, string][] = [
-  [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/(reports|insights)/, 'reports'], [/^\/(sip|monthly-picks|plan\/?$)/, 'sip'],
+  [/^\/company\//, 'company'], [/^\/(activity|history)/, 'activity'], [/^\/(reports|insights)/, 'reports'], [/^\/plan\/?$/, 'plan'],
+  [/^\/sip-tracker/, 'sip_tracker'], [/^\/(sip|monthly-picks)/, 'sip'], [/^\/research-desk/, 'research_desk'], [/^\/ai-lab/, 'ai_lab'],
+  [/^\/currency\//, 'currency'], [/^\/future/, 'future'], [/^\/zakat/, 'zakat'], [/^\/feedback/, 'feedback'],
   [/^\/settings/, 'settings'], [/^\/notifications/, 'notifications'], [/^\/overview/, 'overview'], [/^\/$/, 'holdings'],
 ];
 const reported = new Set<string>();
@@ -128,4 +132,32 @@ export function hookGlobalErrors() {
   window.addEventListener('unhandledrejection', (e) => reportError(e.reason, 'app', 'uncaught'));
   // Cloudflare's own error pages (Worker over its limits, platform trouble): recorded as a category and code only.
   onPlatformError((code) => reportError('', 'platform', code));
+}
+
+let hookedVitals = false;
+/**
+ * Records Core Web Vitals once per page load as a metric, rating and bucket (never the exact value), tagged with the
+ * screen. `web-vitals` is loaded on demand so it stays out of the first paint.
+ */
+export function hookWebVitals() {
+  if (typeof window === 'undefined' || hookedVitals) return;
+  hookedVitals = true;
+  void import('web-vitals').then(({ onCLS, onFCP, onINP, onLCP, onTTFB }) => {
+    const send = (m: { name: string; value: number; rating: string }) => {
+      const screen = SCREEN_BY_PATH.find(([re]) => re.test(window.location.pathname))?.[1];
+      const bucket = m.name === 'CLS' ? clsBucket(m.value) : timingBucket(m.value);
+      const rating = m.rating === 'needs-improvement' ? 'ni' : m.rating;
+      track('web_vital', { metric: m.name.toLowerCase(), rating, bucket, ...(screen ? { screen } : {}) });
+    };
+    onCLS(send); onFCP(send); onINP(send); onLCP(send); onTTFB(send);
+  }, () => {});
+}
+
+/** Records how long a step took, as a bucket. Returns the stop function; call it when the step finishes. */
+export function startTiming(op: 'vault_unlock' | 'first_holdings' | 'picks_run' | 'import_parse') {
+  const start = typeof performance === 'undefined' ? Date.now() : performance.now();
+  return () => {
+    const end = typeof performance === 'undefined' ? Date.now() : performance.now();
+    track('timing', { op, bucket: timingBucket(end - start) });
+  };
 }
