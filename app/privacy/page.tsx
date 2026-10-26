@@ -13,7 +13,7 @@ export default function Page() {
       <LandingNav />
       <article className="lp-legal">
         <h1>Privacy policy</h1>
-        <p className="updated">Last updated 7 October 2026</p>
+        <p className="updated">Last updated 26 October 2026</p>
         <p>
           Sipwise is a portfolio ledger and planner. This page says what we
           collect and what we cannot see.
@@ -54,7 +54,12 @@ export default function Page() {
           To learn which screens and features are used, the app records usage
           events: the name of a screen or feature (for example
           &ldquo;Reports opened&rdquo; or &ldquo;Import completed&rdquo;), the
-          platform and the app version. These events never include tickers,
+          platform and the app version. Our server also notes your country and
+          the kind of device and browser (for example &ldquo;Android phone,
+          Chrome&rdquo;) from the request, without keeping your IP address or
+          the full browser string. We also record how fast pages load and how
+          big an account is in broad ranges only (for example &ldquo;6 to 20
+          companies&rdquo; or &ldquo;two portfolios&rdquo;). These events never include tickers,
           amounts, holdings, notes or anything you type, and they are stored in
           our own database, not sent to an analytics provider. Each event is
           stored under a one-way code instead of your email, but the Sipwise

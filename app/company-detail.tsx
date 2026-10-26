@@ -35,6 +35,7 @@ import { buildEntries } from '@/lib/ledger-entries';
 import { readJson } from '@/lib/safe-json';
 import { useMarketGlance } from './use-market-glance';
 import { TickerTile } from './ui-kit';
+import { track } from './analytics';
 import CompanyKeyStats from './company-key-stats';
 
 type Holding = {
@@ -69,6 +70,8 @@ const RANGES: [HistoryRange, string][] = [
   ['1y', '1Y'],
   ['5y', '5Y'],
 ];
+/** The usage-catalog name of each chart range (lib/analytics-events.ts). */
+const RANGE_EVENT: Record<HistoryRange, string> = { today: '1d', '7d': '1w', '1m': '1m', '3m': '3m', '6m': '6m', '1y': '1y', '3y': '3y', '5y': '5y' };
 
 const tone = (n: number | null) =>
   n === null ? undefined : n >= 0 ? 'pos-text' : 'neg-text';
@@ -183,7 +186,10 @@ function PriceChart({
               type="button"
               data-slot="seg"
               aria-pressed={range === value}
-              onClick={() => setRange(value)}
+              onClick={() => {
+                setRange(value);
+                track('chart_range_changed', { range: RANGE_EVENT[value] });
+              }}
             >
               {label}
             </button>

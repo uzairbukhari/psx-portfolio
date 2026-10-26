@@ -6,6 +6,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { validateEvent, type EventName, type EventProps, type IncomingEvent } from '../../../lib/analytics-events.ts';
+import { classifyError } from '../../../lib/error-codes.ts';
 
 const OPT_OUT_KEY = 'sipwise.analytics.optout';
 const FLUSH_MS = 30_000;
@@ -67,6 +68,33 @@ export async function flushAnalytics() {
   try {
     await send({ sessionId, platform, appVersion, events });
   } catch { /* analytics must never get in the way */ }
+}
+
+const reported = new Set<string>();
+/** Records an error for the audit log: only a category and code leave the phone, never the message (as on the web). */
+export function reportError(message: unknown) {
+  const text = message instanceof Error ? message.message : typeof message === 'string' ? message : '';
+  const { area, code } = classifyError(text, 'app', 'uncaught');
+  const key = `${area}:${code}`;
+  if (reported.has(key)) return; // one of each per launch is enough to trace it
+  reported.add(key);
+  track('client_error', { area, code });
+}
+
+type ErrorHandler = (error: unknown, isFatal?: boolean) => void;
+type GlobalErrorUtils = { getGlobalHandler(): ErrorHandler; setGlobalHandler(handler: ErrorHandler): void };
+let hookedErrors = false;
+/** Captures uncaught JS errors, then hands them to React Native's own handler. Call once when analytics is configured. */
+export function hookGlobalErrors() {
+  const utils = (globalThis as { ErrorUtils?: GlobalErrorUtils }).ErrorUtils;
+  if (hookedErrors || !utils) return;
+  hookedErrors = true;
+  const previous = utils.getGlobalHandler();
+  utils.setGlobalHandler((error, isFatal) => {
+    reportError(error);
+    if (isFatal) void flushAnalytics();
+    previous(error, isFatal);
+  });
 }
 
 AppState.addEventListener('change', (state) => { if (state !== 'active') void flushAnalytics(); });

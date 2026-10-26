@@ -989,6 +989,8 @@ export type LinesCfg = {
   /** `dash` draws the baseline dashed; `inData` adds a faint dotted money-in line in the same colour. */
   series: { name: string; data: number[]; color: string; dash?: boolean; inData?: number[] }[];
   valueFormat: (n: number) => string;
+  /** Value-axis labels (default compact numbers). */
+  axisFormat?: (n: number) => string;
   /** A dashed reference such as a goal. */
   refLine?: { y: number; label: string; color?: string };
 };
@@ -1065,7 +1067,7 @@ export function linesOption(t: ChartTokens, c: LinesCfg): EChartsOption {
       axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true, fontFamily: t.mono },
     },
     yAxis: {
-      ...valueAxis(t, compact, { scale: false }),
+      ...valueAxis(t, c.axisFormat ?? compact, { scale: false }),
       ...(ref ? { max: (v: { max: number }) => Math.max(v.max, c.refLine!.y * 1.05) } : {}),
     },
     series: lines,
@@ -1376,11 +1378,15 @@ export type HeatmapCfg = {
   color: string;
   valueFormat: (n: number) => string;
   title?: (col: number, row: number) => string;
+  /** The tooltip's name for the value (default "Amount"). */
+  valueLabel?: string;
+  /** Fixed scale maximum (for example 1 for shares), instead of the largest cell. */
+  max?: number;
 };
 
 export function heatmapOption(t: ChartTokens, c: HeatmapCfg): EChartsOption {
   const o = base(t, { top: 6, right: 8, bottom: 4, left: 4 });
-  const max = Math.max(1, ...c.cells.map((x) => x[2]));
+  const max = c.max ?? Math.max(1, ...c.cells.map((x) => x[2]));
   const rgbOf =
     c.color === t.success ? t.rgb.success : c.color === t.danger ? t.rgb.danger : t.rgb.primary;
   return {
@@ -1391,7 +1397,7 @@ export function heatmapOption(t: ChartTokens, c: HeatmapCfg): EChartsOption {
       formatter: (params: unknown) => {
         const [col, row, v] = (params as { value: [number, number, number] }).value;
         return tipHtml(t, c.title ? c.title(col, row) : `${c.cols[col]} ${c.rows[row]}`, [
-          { label: 'Amount', value: c.valueFormat(v) },
+          { label: c.valueLabel ?? 'Amount', value: c.valueFormat(v) },
         ]);
       },
     },
@@ -1411,6 +1417,139 @@ export function heatmapOption(t: ChartTokens, c: HeatmapCfg): EChartsOption {
         data: c.cells,
         itemStyle: { borderColor: t.popover, borderWidth: 2, borderRadius: 5 },
         emphasis: { itemStyle: { borderColor: t.text } },
+      },
+    ],
+  } as EChartsOption;
+}
+
+// ───────────────────────── sankey (paths) ─────────────────────────
+
+export type SankeyCfg = {
+  nodes: { id: string; name: string; level: number }[];
+  links: { source: string; target: string; value: number }[];
+  /** Display name of a node (the id stays unique per column). */
+  nodeLabel: (name: string) => string;
+  valueFormat: (n: number) => string;
+  /** The node the paths start from, drawn in the primary colour; the rest use the categorical palette by name. */
+  anchor?: string;
+};
+
+/** Flows between steps, left to right, one column per step. Colour follows the step's name, never its rank. */
+export function sankeyOption(t: ChartTokens, c: SankeyCfg): EChartsOption {
+  const o = base(t);
+  const names = [...new Set(c.nodes.map((n) => n.name))].sort();
+  const colour = (name: string) =>
+    name === c.anchor ? t.primary : name === 'exit' || name === 'start' || name === 'other' ? t.other : t.cat[(names.indexOf(name) % (t.cat.length - 1)) + 1];
+  return {
+    ...o,
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const p = params as { dataType: string; data: { name?: string; source?: string; target?: string; value: number } };
+        const label = (id: string) => c.nodeLabel(id.slice(id.indexOf(':') + 1));
+        if (p.dataType === 'edge')
+          return tipHtml(t, `${label(p.data.source!)} to ${label(p.data.target!)}`, [{ label: 'Visits', value: c.valueFormat(p.data.value) }]);
+        return tipHtml(t, label(p.data.name!), [{ label: 'Visits', value: c.valueFormat(p.data.value) }]);
+      },
+    },
+    series: [
+      {
+        type: 'sankey',
+        left: 8,
+        right: 120,
+        top: 12,
+        bottom: 12,
+        nodeWidth: 10,
+        nodeGap: 12,
+        nodeAlign: 'left',
+        layoutIterations: 32,
+        draggable: false,
+        emphasis: { focus: 'adjacency' },
+        data: c.nodes.map((n) => ({ name: n.id, depth: n.level, itemStyle: { color: colour(n.name), borderWidth: 0, borderRadius: 3 } })),
+        links: c.links,
+        lineStyle: { color: 'gradient', opacity: 0.28, curveness: 0.5 },
+        label: {
+          color: t.text,
+          fontSize: 11,
+          fontFamily: t.font,
+          formatter: (p: { name: string }) => c.nodeLabel(p.name.slice(p.name.indexOf(':') + 1)),
+        },
+      },
+    ],
+  } as EChartsOption;
+}
+
+// ───────────────────────── scatter ─────────────────────────
+
+export type ScatterCfg = {
+  points: { name: string; x: number; y: number; size: number }[];
+  xName: string;
+  yName: string;
+  xFormat: (n: number) => string;
+  yFormat: (n: number) => string;
+  sizeLabel: string;
+  sizeFormat: (n: number) => string;
+  /** Dashed guides (for example the medians) that split the plot into quadrants. */
+  guides?: { x?: number; y?: number };
+  selectable?: boolean;
+};
+
+/** Two measures of one thing on one plot (for example adoption against repeat use); dot area follows `size`. */
+export function scatterOption(t: ChartTokens, c: ScatterCfg): EChartsOption {
+  const o = base(t, { top: 24, right: 20, bottom: 24, left: 8 });
+  const maxSize = Math.max(1, ...c.points.map((p) => p.size));
+  const guide = {
+    silent: true,
+    symbol: 'none',
+    animation: false,
+    lineStyle: { color: t.muted, type: 'dashed' as const, width: 1, opacity: 0.6 },
+    label: { show: false },
+    data: [...(c.guides?.x !== undefined ? [{ xAxis: c.guides.x }] : []), ...(c.guides?.y !== undefined ? [{ yAxis: c.guides.y }] : [])],
+  };
+  return {
+    ...o,
+    tooltip: {
+      ...(o.tooltip as object),
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const p = c.points[(params as { dataIndex: number }).dataIndex];
+        if (!p) return '';
+        return tipHtml(t, p.name, [
+          { label: c.xName, value: c.xFormat(p.x) },
+          { label: c.yName, value: c.yFormat(p.y) },
+          { label: c.sizeLabel, value: c.sizeFormat(p.size) },
+        ]);
+      },
+    },
+    xAxis: {
+      type: 'value',
+      name: c.xName,
+      nameLocation: 'middle',
+      nameGap: 26,
+      nameTextStyle: { color: t.muted, fontSize: 11 },
+      ...axisCommon(t),
+      axisLabel: { color: t.muted, fontSize: 11, fontFamily: t.mono, formatter: (n: number) => c.xFormat(n) },
+      splitLine: { lineStyle: { color: t.line, type: [2, 4] } },
+    },
+    yAxis: valueAxis(t, c.yFormat, { position: 'left', name: c.yName, nameTextStyle: { color: t.muted, fontSize: 11, align: 'left' } }),
+    series: [
+      {
+        type: 'scatter',
+        data: c.points.map((p) => [p.x, p.y]),
+        symbolSize: (_: unknown, p: { dataIndex: number }) => 8 + 22 * Math.sqrt(c.points[p.dataIndex].size / maxSize),
+        cursor: c.selectable ? 'pointer' : 'default',
+        itemStyle: { color: rgba(t.rgb.primary, 0.55), borderColor: t.popover, borderWidth: 2 },
+        emphasis: { itemStyle: { color: t.primary } },
+        label: {
+          show: true,
+          position: 'right',
+          color: t.muted,
+          fontSize: 10,
+          formatter: (p: { dataIndex: number }) => (c.points[p.dataIndex].size >= maxSize * 0.25 ? c.points[p.dataIndex].name : ''),
+        },
+        labelLayout: { hideOverlap: true },
+        markLine: guide.data.length ? guide : undefined,
       },
     ],
   } as EChartsOption;

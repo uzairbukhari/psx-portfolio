@@ -13,6 +13,7 @@ import {
 } from '@/lib/chart-kit';
 import { money, moneyShort, round, type Portfolio } from '@/lib/portfolio';
 import { ChartInfo } from './chart-info';
+import { track } from './analytics';
 import { TickerLink, useOpenCompany } from './ticker-link';
 import {
   portfolioReport,
@@ -43,6 +44,9 @@ const pct1 = (n: number) => `${n.toFixed(1)}%`;
 const signedPct = (n: number) =>
   `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(1)}%`;
 const signedMoney = (n: number) => `${n >= 0 ? '+' : '−'}${money(Math.abs(n))}`;
+
+/** The usage-catalog name of each Reports view (lib/analytics-events.ts). */
+const REPORT_EVENT = { all: 'summary', allocation: 'allocation', performance: 'performance', income: 'income', activity: 'other' } as const;
 
 function foldSectors(sectors: SectorPoint[], cap = sectorColors.length) {
   if (sectors.length <= cap) return sectors;
@@ -363,7 +367,10 @@ export default function PortfolioReports({
             key={value}
             type="button"
             data-active={view === value || undefined}
-            onClick={() => setView(value)}
+            onClick={() => {
+              setView(value);
+              track('report_viewed', { report: REPORT_EVENT[value] });
+            }}
           >
             {label}
           </button>

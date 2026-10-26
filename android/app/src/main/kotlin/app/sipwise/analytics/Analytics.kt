@@ -79,6 +79,17 @@ class Analytics(
         }
     }
 
+    /** Sends what is waiting and returns once it is sent (or dropped), for the last events before signing out. */
+    suspend fun flushNow() {
+        val batch = synchronized(queue) { queue.take() }
+        if (batch.isEmpty() || !signedIn) return
+        try {
+            send(batch)
+        } catch (ignored: ApiRequestException) {
+            // Dropped on purpose.
+        }
+    }
+
     private suspend fun send(events: List<AnalyticsEvent>) {
         api.postNoContent("/api/events", EventsBatch(sessionId, PLATFORM, BuildConfig.VERSION_NAME, events), EventsBatch.serializer())
     }

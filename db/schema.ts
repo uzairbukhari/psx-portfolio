@@ -666,6 +666,11 @@ export const analyticsEvents = sqliteTable(
     event: text('event').notNull(),
     props: text('props'),
     isAdmin: integer('is_admin').notNull().default(0),
+    // Read by the server from the request, closed lists only (lib/device-class.ts); null on rows older than 0044.
+    country: text('country'),
+    os: text('os'),
+    browser: text('browser'),
+    formFactor: text('form_factor'),
   },
   (table) => [
     index('analytics_events_day_idx').on(table.day, table.event),
