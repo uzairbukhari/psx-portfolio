@@ -34,7 +34,7 @@ test('one clip per slide, company names only, no tickers', () => {
   assert.match(caption(recap), /Gainers: Meezan Bank, Hub Power/);
 });
 
-test('movers fall back to the market-watch table and skip thin volume', () => {
+test('movers fall back to the All-Share table and skip thin volume', () => {
   const rows = [
     { symbol: 'AAA', price: 10, changePercent: 9, volume: 500 },
     { symbol: 'BBB', price: 10, changePercent: 4, volume: 900_000 },
