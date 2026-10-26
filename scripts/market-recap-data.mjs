@@ -27,9 +27,9 @@ const trimMover = (m, names) => ({
 export function shortName(name) {
   return String(name)
     .replace(/\s*\((?:pvt|private)\)\s*/i, ' ')
-    .replace(/[\s,]+(?:limited|ltd\.?|company|co\.?)$/i, '')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replace(/[\s,]+(?:limited|ltd\.?|company|co\.?)$/i, '');
 }
 
 /** An integer in words, read in small groups ("one hundred sixty-five thousand, four hundred thirty-two"). */
