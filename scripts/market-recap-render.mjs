@@ -113,6 +113,26 @@ function slides(r) {
   ];
 }
 
+/** One 1080x1350 picture with the whole day (index, risers, fallers, most traded, dividends) for photo posts. */
+function card(r) {
+  const down = r.index.change < 0;
+  const color = down ? '#ff6f86' : '#2ee6a6';
+  const day = new Date(`${r.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const col = (title, list, up) =>
+    `<div class="card" style="flex:1;padding:36px 32px"><div style="font-size:30px;color:#9fb0d6;margin-bottom:8px">${title}</div>${list
+      .map((m) => `<div style="padding:22px 0;border-top:2px solid rgba(255,255,255,.07)"><b style="display:block;font-size:34px;font-weight:700;line-height:1.15">${esc(m.name)}</b><span class="mono" style="font-size:36px;color:${up ? '#2ee6a6' : '#ff6f86'}">${up ? '+' : '−'}${Math.abs(m.changePercent).toFixed(2)}%</span></div>`)
+      .join('')}</div>`;
+  const dividends = r.dividends.length
+    ? `<div class="card" style="margin-top:24px;padding:28px 36px;font-size:32px"><span style="color:#9fb0d6">Dividends: </span>${r.dividends.map((d) => `${esc(d.name)} <b class="mono" style="color:#2ee6a6">${num(d.percent)}%</b>`).join(' · ')}</div>`
+    : '';
+  return `<div class="glow1"></div><div class="glow2"></div><div style="position:relative;padding:64px 64px 56px;height:100%;display:flex;flex-direction:column">
+<div class="brand">${mark}<b>Sipwise</b><span class="chip">PSX · Market summary</span></div>
+<div class="slab" style="margin-top:44px;padding:44px 52px;display:flex;align-items:center;justify-content:space-between"><div><div class="mono" style="color:#9fb0d6;font-size:30px;letter-spacing:0">KSE-100 · ${day}</div><div class="mono" style="font-size:112px;font-weight:600;margin-top:10px">${num(r.index.close)}</div></div><span class="pill ${down ? 'dn' : 'up'} mono" style="font-size:40px">${down ? '▼' : '▲'} ${down ? '−' : '+'}${Math.abs(r.index.changePercent).toFixed(2)}%</span></div>
+<div style="display:flex;gap:24px;margin-top:24px">${col('Top gainers', r.gainers, true)}${col('Top losers', r.losers, false)}</div>
+<div class="card" style="margin-top:24px;padding:28px 36px;font-size:32px"><span style="color:#9fb0d6">Most traded: </span>${r.active.map((m) => esc(m.name)).join(' · ')}</div>${dividends}
+<div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;color:#9fb0d6;font-size:28px"><span>Educational only, not investment advice.</span><b style="color:#fff;font-size:36px">sipwise.trade</b></div></div>`;
+}
+
 async function speak(text, file) {
   const key = process.env.ELEVENLABS_API_KEY;
   const voice = process.env.ELEVENLABS_VOICE_ID;
@@ -139,6 +159,11 @@ for (let i = 0; i < html.length; i++) {
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: `${out}/slide-${i + 1}.png` });
 }
+await page.setViewportSize({ width: 1080, height: 1350 });
+await page.setContent(`<html><head><style>${css(sans, mono)} body{height:1350px}</style></head><body>${card(recap)}</body></html>`);
+await page.evaluate(() => document.fonts.ready);
+await page.screenshot({ path: `${out}/summary.jpg`, type: 'jpeg', quality: 92 });
+await page.setViewportSize({ width: 1080, height: 1920 });
 const spriteDir = `${process.cwd()}/${out}/sprites`;
 await mkdir(spriteDir, { recursive: true });
 await renderSprites(page, spriteDir);

@@ -74,6 +74,7 @@ jobs:
           name: recap-slides
           path: |
             recap-out/slide-*.png
+            recap-out/summary.jpg
             recap.json
       - name: Upload the video and manifest to R2
         if: steps.day.outputs.trading == 'true' && env.DRY_RUN != 'true'
@@ -87,9 +88,10 @@ jobs:
           endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
           key="recap/${date}/market-summary.mp4"
           aws s3 cp recap-out/recap.mp4 "s3://${R2_BUCKET}/${key}" --endpoint-url "$endpoint" --content-type video/mp4
+          aws s3 cp recap-out/summary.jpg "s3://${R2_BUCKET}/recap/${date}/summary.jpg" --endpoint-url "$endpoint" --content-type image/jpeg
           node -e "
             const r = JSON.parse(require('fs').readFileSync('recap.json', 'utf8'));
-            const manifest = { date: r.date, video: process.env.PUBLIC_MEDIA_URL + '/${key}', caption: r.caption };
+            const manifest = { date: r.date, video: process.env.PUBLIC_MEDIA_URL + '/${key}', image: process.env.PUBLIC_MEDIA_URL + '/recap/${date}/summary.jpg', caption: r.caption };
             require('fs').writeFileSync('manifest.json', JSON.stringify(manifest, null, 2));
           "
           aws s3 cp manifest.json "s3://${R2_BUCKET}/recap/${date}/manifest.json" --endpoint-url "$endpoint" --content-type application/json
