@@ -60,7 +60,7 @@ jobs:
           "
       - name: Render slides and video
         if: steps.day.outputs.trading == 'true'
-        run: node scripts/market-recap-render.mjs --in=recap.json --out=recap-out ${DRY_RUN:+--no-audio}
+        run: node scripts/market-recap-render.mjs --in=recap.json --out=recap-out $([ "$DRY_RUN" = true ] && echo --no-audio)
         env:
           GEIST_DIR: package
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}

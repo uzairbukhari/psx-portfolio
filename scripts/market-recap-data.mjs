@@ -31,7 +31,7 @@ export function shortName(name) {
     .replace(/\s*\((?:pvt|private)\)\s*/i, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/[\s,]+(?:limited|ltd\.?|company|co\.?)$/i, '');
+    .replace(/[\s,]+(?:limited|ltd|company|co)\.?$/i, '');
 }
 
 /** An integer in words, read in small groups ("one hundred sixty-five thousand, four hundred thirty-two"). */
