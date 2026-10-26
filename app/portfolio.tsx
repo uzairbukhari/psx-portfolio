@@ -224,8 +224,11 @@ import type {
   PriceHistoryResponse,
 } from '@/lib/api-types';
 import { eventsForSave, importSourceOf } from '@/lib/analytics-diff';
+import { accountSnapshot } from '@/lib/analytics-snapshot';
 import { useSidebar } from './use-sidebar';
-import { flushAnalytics, hookGlobalErrors, reportError, track } from './analytics';
+import { flushAnalytics, hookGlobalErrors, hookWebVitals, reportError, track } from './analytics';
+
+let snapshotSent = false;
 
 const TAB_PATHS: Record<string, string> = {
   holdings: '/',
@@ -919,6 +922,8 @@ function DashboardContent({
     [picksHint, setPicksHint] = useState<{ avoid: string[] } | null>(null),
     [fees, setFees] = useState(DEFAULT_PICKS_FEE_PCT),
     [allowOld] = useState(false);
+  // Which transaction dialog is open, for the dialog_opened / dialog_closed usage events.
+  const txDialog = useRef<'add_entry' | 'trade' | null>(null);
   const [trade, setTrade] = useState<Trade | null>(null),
     [ahlStatement, setAhlStatement] = useState<{
       statement: AhlLedgerStatement;
@@ -1488,7 +1493,10 @@ function DashboardContent({
     if (!tickers.length) return '';
     return ` Warning: ${tickers.length === 1 ? 'a sale has' : tickers.length + ' sales have'} unknown cost basis (${tickers.join(', ')}). Review the acquisition history before relying on tax figures.`;
   }
-  useEffect(() => hookGlobalErrors(), []);
+  useEffect(() => {
+    hookGlobalErrors();
+    hookWebVitals();
+  }, []);
   useEffect(() => {
     const context = (
       document as unknown as {
@@ -1648,6 +1656,15 @@ function DashboardContent({
     if (!email) return;
     track('app_opened');
   }, [email]);
+  // Once per page load, after the account is unlocked: its size as buckets (lib/analytics-snapshot.ts).
+  const snapshotAccount = workspace?.account;
+  useEffect(() => {
+    if (!email || !snapshotAccount || snapshotSent) return;
+    snapshotSent = true;
+    try {
+      track('account_snapshot', accountSnapshot(snapshotAccount, today()));
+    } catch { /* analytics must never get in the way */ }
+  }, [email, snapshotAccount]);
   useEffect(() => {
     if (!email) return;
     const screen = companyTicker
@@ -2582,6 +2599,8 @@ function DashboardContent({
       );
       return;
     }
+    txDialog.current = 'add_entry';
+    track('dialog_opened', { dialog: 'add_entry' });
     setTxDestination(isAll ? '' : (target?.id ?? ''));
     setEditing(null);
     setEditingDividend(null);
@@ -2599,7 +2618,10 @@ function DashboardContent({
     setDividend(blankDividend(ticker));
     setStockSplit(blankStockSplit(ticker));
   }
-  function closeTx() {
+  /** Closes the transaction dialog; `cancel` when the person dismissed it without saving. */
+  function closeTx(outcome: 'done' | 'cancel' = 'done') {
+    if (txDialog.current) track('dialog_closed', { dialog: txDialog.current, outcome });
+    txDialog.current = null;
     setTrade(null);
     setDividend(null);
     setStockSplit(null);
@@ -2693,6 +2715,8 @@ function DashboardContent({
       });
       return;
     }
+    txDialog.current = 'trade';
+    track('dialog_opened', { dialog: 'trade' });
     setEditing(t.id);
     setTxType(t.kind);
     setTrade({ ...t });
@@ -4463,7 +4487,7 @@ function DashboardContent({
           open={!!(trade || dividend || stockSplit)}
           onOpenChange={(open) => {
             if (!open) {
-              closeTx();
+              closeTx('cancel');
             }
           }}
         >

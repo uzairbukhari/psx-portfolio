@@ -1,5 +1,6 @@
 import { activeCounts, dailyActive, pktDay, retentionCohorts, returnedWithinWeek, DAY_MS, type DayUser } from './analytics-report.ts';
 import { cleanVersion, type EventBatch, type IncomingEvent, type Platform } from './analytics-events.ts';
+import type { DeviceClass } from './device-class.ts';
 
 // D1 side of usage analytics. The privacy rule lives in lib/analytics-events.ts (closed enums only); this file adds
 // the HMAC user key so the events table alone never names anyone.
@@ -26,6 +27,9 @@ export type EventContext = {
   platform: Platform;
   appVersion?: string | null;
   isAdmin?: boolean;
+  /** Cloudflare country code and coarse device class (lib/device-class.ts), read from the request on the server. */
+  country?: string | null;
+  device?: DeviceClass;
 };
 
 export async function insertEvents(db: D1Database, ctx: EventContext, events: IncomingEvent[], now = new Date()) {
@@ -33,19 +37,23 @@ export async function insertEvents(db: D1Database, ctx: EventContext, events: In
   const ts = now.toISOString();
   const day = pktDay(now);
   const stmt = db.prepare(
-    'INSERT INTO analytics_events (ts,day,user_key,anon_id,session_id,platform,app_version,event,props,is_admin) VALUES (?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO analytics_events (ts,day,user_key,anon_id,session_id,platform,app_version,event,props,is_admin,country,os,browser,form_factor) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
   );
+  const d = ctx.device;
   await db.batch(
     events.map((e) =>
       stmt.bind(ts, day, ctx.userKey ?? null, ctx.anonId ?? null, ctx.sessionId, ctx.platform, cleanVersion(ctx.appVersion), e.event,
-        Object.keys(e.props).length ? JSON.stringify(e.props) : null, ctx.isAdmin ? 1 : 0),
+        Object.keys(e.props).length ? JSON.stringify(e.props) : null, ctx.isAdmin ? 1 : 0,
+        ctx.country ?? null, d?.os ?? null, d?.browser ?? null, d?.formFactor ?? null),
     ),
   );
   return events.length;
 }
 
-export async function recordBatch(db: D1Database, batch: EventBatch, key: string | null, isAdmin: boolean) {
-  return insertEvents(db, { sessionId: batch.sessionId, anonId: key ? null : batch.anonId, userKey: key, platform: batch.platform, appVersion: batch.appVersion, isAdmin }, batch.events);
+export async function recordBatch(
+  db: D1Database, batch: EventBatch, key: string | null, isAdmin: boolean, where: { country?: string | null; device?: DeviceClass } = {},
+) {
+  return insertEvents(db, { sessionId: batch.sessionId, anonId: key ? null : batch.anonId, userKey: key, platform: batch.platform, appVersion: batch.appVersion, isAdmin, ...where }, batch.events);
 }
 
 /**

@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { getViewer } from '@/lib/auth';
 import { isInternal } from '@/lib/roles';
 import { parseBatch } from '@/lib/analytics-events';
+import { classifyDevice, cleanCountry } from '@/lib/device-class';
 import { pruneJobRuns } from '@/lib/job-runs';
 import { pruneServerErrors } from '@/lib/server-errors';
 import { purgeOldEvents, purgeStagingEvents, recordBatch, resolveOrigin, userKey } from '@/lib/analytics-store';
@@ -35,7 +36,8 @@ export async function POST(req: Request) {
     const events = viewer ? batch.events : batch.events.filter((e) =>
       e.event === 'landing_viewed' || e.event === 'sign_in_clicked' || (e.event === 'screen_viewed' && ['landing', 'privacy', 'terms', 'sign_in'].includes(e.props.screen)));
     const admin = !!viewer && isInternal(viewer.role);
-    await recordBatch(database, { ...batch, events }, viewer ? who : null, admin);
+    const country = cleanCountry((req as Request & { cf?: { country?: unknown } }).cf?.country ?? req.headers.get('cf-ipcountry'));
+    await recordBatch(database, { ...batch, events }, viewer ? who : null, admin, { country, device: classifyDevice(req.headers.get('user-agent'), batch.platform) });
     const state = events.find((e) => e.event === 'account_state');
     if (viewer && state) await resolveOrigin(database, viewer.email, state.props.vault === 'exists', env.SESSION_SECRET ?? '', admin);
     if (Math.random() < 0.01) {

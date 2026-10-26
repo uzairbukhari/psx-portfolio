@@ -22,7 +22,7 @@ import { forgetTabKey, keepTabKey, recallTabKey } from '@/lib/vault-tab-keep';
 import { browserTabKeepStore } from './vault-tab-store';
 import { webVaultTransport } from './vault-transport';
 import { deriveKey } from './kdf-client';
-import { reportAccountState, track } from './analytics';
+import { reportAccountState, startTiming, track } from './analytics';
 import './vault.css';
 
 // Argon2id runs in a Worker thread in the browser, so unlocking never freezes the page.
@@ -564,7 +564,9 @@ function Unlock({
         onSubmit={(e) => {
           e.preventDefault();
           void run(async () => {
+            const done = startTiming('vault_unlock');
             const session = await unlockVault(webVaultTransport, status, { password });
+            done();
             if (keep) {
               const key = session.exportKey();
               try { await keepTabKey(browserTabKeepStore(), email, status.vault.vaultId, key); } finally { key.fill(0); }
