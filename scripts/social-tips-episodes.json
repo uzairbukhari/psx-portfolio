@@ -1,0 +1,204 @@
+{
+  "start": "2026-10-28",
+  "riskLine": "Educational only, not investment advice. Investments can lose value.",
+  "episodes": [
+    {
+      "id": "sip-basics",
+      "topic": "SIP in 30 seconds",
+      "slides": [
+        { "kicker": "Investing 101", "title": "What is a SIP?" },
+        { "kicker": "The idea", "title": "Same amount.\nSame date.\nEvery month.", "big": "Rs 5,000", "note": "example amount" },
+        { "kicker": "Why it works", "title": "No need to time the market.", "lines": ["Pick a date", "Put it in your calendar", "Invest, log it, repeat"] },
+        { "kicker": "Remember", "title": "Start small.\nStay regular.", "note": "Investments can lose value. The habit matters more than the size." }
+      ],
+      "spoken": [
+        "SIP کیا ہوتی ہے؟ تیس seconds میں سمجھیں۔",
+        "SIP یعنی systematic investment plan۔ ہر مہینے ایک fixed رقم، ایک fixed date پر invest کریں، چاہے market اوپر ہو یا نیچے۔",
+        "اس طرح آپ کو market کا صحیح وقت ڈھونڈنے کی ٹینشن نہیں رہتی۔ Calendar میں ایک date لگائیں، invest کریں، log کریں، اور بس۔",
+        "چھوٹی رقم سے بھی شروع ہو سکتا ہے۔ رقم سے زیادہ اہم regular رہنا ہے۔ ہاں، investment میں risk ہوتا ہے اور value نیچے بھی جا سکتی ہے۔",
+        "اپنی SIP کا حساب Sipwise پر free رکھیں۔ Sipwise dot trade۔ روزانہ market updates اور tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "SIP ka matlab: har mahine fixed amount, fixed date. #SIP #PSX #investing"
+    },
+    {
+      "id": "rupee-cost-averaging",
+      "topic": "Rupee-cost averaging",
+      "slides": [
+        { "kicker": "Investing 101", "title": "Why a falling price\ncan help a SIP." },
+        { "kicker": "Made-up numbers", "title": "Rs 10,000 a month", "lines": ["Month 1: price Rs 100 → 100 shares", "Month 2: price Rs 50 → 200 shares", "Month 3: price Rs 100 → 100 shares"] },
+        { "kicker": "The result", "title": "Your average cost\nis Rs 75.", "big": "Rs 75", "note": "not Rs 83 or Rs 100" },
+        { "kicker": "Be honest", "title": "It smooths the ride.\nIt does not remove risk.", "note": "Example only, not a forecast." }
+      ],
+      "spoken": [
+        "جب price گرتی ہے تو SIP کو فائدہ کیسے ہو سکتا ہے؟ ایک چھوٹی سی مثال دیکھیں۔",
+        "فرض کریں آپ ہر مہینے ten thousand rupees invest کرتے ہیں۔ پہلے مہینے price one hundred، تو ایک سو shares۔ دوسرے مہینے price fifty، تو دو سو shares۔ تیسرے مہینے پھر one hundred، تو ایک سو shares۔",
+        "کل چار سو shares، اور تیس ہزار rupees لگے۔ آپ کی average cost seventy-five rupees بنی۔ یہ سب made-up numbers ہیں، صرف idea سمجھانے کے لیے۔",
+        "Price کم ہو تو زیادہ shares ملتے ہیں، زیادہ ہو تو کم۔ اس سے سفر smooth ہوتا ہے، لیکن risk ختم نہیں ہوتا۔ یہ forecast نہیں ہے۔",
+        "اپنی average cost خود track کریں، Sipwise پر free۔ Sipwise dot trade۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Rupee-cost averaging in 30 seconds. Made-up numbers, just to show the idea. #SIP #personalfinance"
+    },
+    {
+      "id": "emergency-fund",
+      "topic": "Emergency fund first",
+      "slides": [
+        { "kicker": "Money tip", "title": "Before you invest,\ndo this first." },
+        { "kicker": "Step 1", "title": "Build an emergency fund.", "big": "3–6", "note": "months of expenses" },
+        { "kicker": "Why", "title": "So a bad month\ndoesn't force you\nto sell.", "lines": ["Job loss", "Medical bills", "Repairs"] },
+        { "kicker": "Then", "title": "Invest what you\ncan leave alone." }
+      ],
+      "spoken": [
+        "Invest کرنے سے پہلے ایک کام ضرور کریں۔",
+        "پہلے emergency fund بنائیں۔ تین سے چھ مہینے کے اخراجات، آسانی سے نکالے جا سکنے والی جگہ پر۔",
+        "تاکہ job چلی جائے، بیماری آئے یا گاڑی خراب ہو، تو آپ کو اپنے investments مجبوری میں بیچنے نہ پڑیں۔",
+        "اس کے بعد وہ رقم invest کریں جو آپ کئی سال چھوڑ سکتے ہیں۔ یہ سب سے مضبوط پہلا قدم ہے۔",
+        "اپنا SIP plan Sipwise پر free بنائیں۔ Sipwise dot trade۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Before you invest: a 3-6 month emergency fund. #moneytips #SIP #PSX"
+    },
+    {
+      "id": "blue-chip",
+      "topic": "What is a blue-chip company?",
+      "slides": [
+        { "kicker": "PSX basics", "title": "What is a\nblue-chip company?" },
+        { "kicker": "Usually", "title": "Big and established", "lines": ["Large market value", "Years of business", "Heavily traded"] },
+        { "kicker": "Where to look", "title": "The KSE-100", "big": "100", "note": "largest companies by market value" },
+        { "kicker": "Careful", "title": "Big is not\nrisk-free.", "note": "Prices of blue chips fall too. Do your own research." }
+      ],
+      "spoken": [
+        "Blue-chip company کا مطلب کیا ہے؟",
+        "عام طور پر یہ بڑی اور پرانی companies ہوتی ہیں، جن کی market value زیادہ ہو اور shares روزانہ بہت trade ہوں۔",
+        "PSX پر آپ K S E one hundred index دیکھ سکتے ہیں۔ اس میں market value کے لحاظ سے سو سب سے بڑی companies شامل ہوتی ہیں۔",
+        "لیکن بڑی company کا مطلب risk-free نہیں ہوتا۔ blue chips کی price بھی گرتی ہے۔ اپنی research خود کریں۔ یہ investment advice نہیں ہے۔",
+        "اپنے shares اور dividends ایک جگہ دیکھیں، Sipwise dot trade پر۔ روزانہ market updates کے لیے subscribe کریں۔"
+      ],
+      "caption": "Blue chips explained: big and established, but not risk-free. #PSX #KSE100 #investing"
+    },
+    {
+      "id": "dividends",
+      "topic": "How dividends work",
+      "slides": [
+        { "kicker": "PSX basics", "title": "Dividends,\nexplained." },
+        { "kicker": "Cash dividend", "title": "A company shares\nprofit with owners.", "big": "25%", "note": "of face value, Rs 10 share = Rs 2.50 (example)" },
+        { "kicker": "Dates matter", "title": "Own the share\nbefore the\nbook closure.", "lines": ["Announcement", "Book closure", "Payment"] },
+        { "kicker": "Also", "title": "Tax is usually\ncut at source.", "note": "Check the current rate for your status." }
+      ],
+      "spoken": [
+        "Dividend کیا ہوتا ہے؟",
+        "جب company منافع میں سے اپنے shareholders کو حصہ دیتی ہے تو اسے cash dividend کہتے ہیں۔ مثال کے طور پر ten rupees کے share پر twenty-five percent dividend کا مطلب ہے اڑھائی rupees۔",
+        "تاریخیں اہم ہیں۔ Announcement، پھر book closure، پھر payment۔ Dividend کے لیے آپ کو book closure سے پہلے share خریدنا ہوتا ہے۔",
+        "Dividend پر tax عام طور پر پہلے ہی کٹ جاتا ہے۔ اپنی status کے مطابق موجودہ rate چیک کریں۔",
+        "Sipwise آپ کے dividends خود track کرتا ہے۔ Sipwise dot trade۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Dividends explained: announcement, book closure, payment. Example numbers only. #PSX #dividends"
+    },
+    {
+      "id": "dont-panic",
+      "topic": "Don't panic sell",
+      "slides": [
+        { "kicker": "Mindset", "title": "Market is red.\nNow what?" },
+        { "kicker": "Ask first", "title": "Has your plan\nchanged?", "lines": ["Your goal", "Your time horizon", "Your monthly amount"] },
+        { "kicker": "If not", "title": "Stay with\nthe plan.", "note": "Selling after a fall locks in the loss." },
+        { "kicker": "Tip", "title": "Check less often.", "note": "Once a month is enough for most people." }
+      ],
+      "spoken": [
+        "Market لال ہو جائے تو کیا کریں؟",
+        "پہلے خود سے پوچھیں: کیا میرا goal بدلا ہے؟ کیا میرا time horizon بدلا ہے؟ کیا میری monthly amount بدلی ہے؟",
+        "اگر نہیں، تو plan پر قائم رہیں۔ گھبرا کر بیچنا اکثر نقصان کو پکا کر دیتا ہے۔",
+        "ایک tip: portfolio بار بار نہ دیکھیں۔ زیادہ تر لوگوں کے لیے مہینے میں ایک بار کافی ہے۔ یہ investment advice نہیں ہے۔",
+        "مہینے کا حساب آسانی سے رکھیں، Sipwise dot trade پر۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Market is red? Check your plan, not the screen. #investing #PSX #SIP"
+    },
+    {
+      "id": "diversify",
+      "topic": "Don't keep all eggs in one basket",
+      "slides": [
+        { "kicker": "Money tip", "title": "Don't put it\nall in one place." },
+        { "kicker": "Spread it", "title": "Different things\nmove differently.", "lines": ["Shares", "Mutual funds", "Gold", "Cash for emergencies"] },
+        { "kicker": "Why", "title": "When one falls,\nanother may hold.", "note": "No guarantee. It only reduces the damage from one bet." },
+        { "kicker": "See it all", "title": "One screen\nfor everything." }
+      ],
+      "spoken": [
+        "اپنا سارا پیسہ ایک ہی جگہ نہ لگائیں۔",
+        "Shares، mutual funds، gold اور emergency کے لیے cash، یہ سب مختلف طریقے سے چلتے ہیں۔",
+        "جب ایک گرتا ہے تو دوسرا سنبھال سکتا ہے۔ کوئی guarantee نہیں، بس ایک چیز کے نقصان کا اثر کم ہوتا ہے۔",
+        "مسئلہ یہ ہے کہ سب کچھ الگ الگ جگہوں پر ہوتا ہے۔ Sipwise پر shares، funds، gold اور dollars ایک screen پر دیکھیں۔",
+        "Sipwise dot trade، free اور private۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Spread your money across shares, funds, gold and cash. See it all in one place. #diversification #moneytips"
+    },
+    {
+      "id": "inflation",
+      "topic": "Cash loses value",
+      "slides": [
+        { "kicker": "Money tip", "title": "Idle cash\nslowly shrinks." },
+        { "kicker": "Example", "title": "Prices rise\nevery year.", "big": "Rs 100", "note": "buys less next year" },
+        { "kicker": "So", "title": "Keep emergency cash.\nPut long-term money\nto work.", "note": "Work means a plan, not a gamble." },
+        { "kicker": "Always", "title": "Match risk\nto your horizon." }
+      ],
+      "spoken": [
+        "پڑا ہوا cash آہستہ آہستہ کمزور ہوتا ہے۔",
+        "کیونکہ چیزوں کی قیمتیں ہر سال بڑھتی ہیں، آج کے سو rupees میں اگلے سال کم چیزیں آتی ہیں۔ اسے inflation کہتے ہیں۔",
+        "اس لیے emergency کا cash رکھیں، لیکن لمبے عرصے کے پیسے کو ایک plan کے ساتھ کام پر لگائیں۔ Plan، جوا نہیں۔",
+        "اور risk کو اپنے time horizon کے مطابق رکھیں۔ یہ investment advice نہیں ہے۔",
+        "اپنا monthly SIP plan Sipwise dot trade پر بنائیں۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Idle cash loses buying power to inflation. Make a plan for long-term money. #inflation #moneytips"
+    },
+    {
+      "id": "average-cost",
+      "topic": "Know your average cost",
+      "slides": [
+        { "kicker": "Investor habit", "title": "Do you know your\naverage cost?" },
+        { "kicker": "Why it matters", "title": "It decides your\nreal profit.", "lines": ["Fees count", "Every buy counts", "Every sell changes it"] },
+        { "kicker": "Where", "title": "Not in the\nbroker app.", "note": "Most apps show price, not your cost after fees." },
+        { "kicker": "Fix it", "title": "Track every buy\nin one place." }
+      ],
+      "spoken": [
+        "کیا آپ کو اپنی average cost معلوم ہے؟",
+        "یہی آپ کا اصل منافع یا نقصان طے کرتی ہے۔ ہر خریداری، ہر fee اور ہر فروخت اس کو بدلتی ہے۔",
+        "زیادہ تر broker apps price دکھاتی ہیں، fees کے بعد آپ کی اپنی cost نہیں۔",
+        "حل یہ ہے کہ ہر خریداری ایک ہی جگہ log کریں۔ Sipwise یہ آپ کے لیے خود نکال دیتا ہے۔",
+        "Sipwise dot trade، free۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Your average cost after fees decides your real result. Track every buy. #PSX #investing #SIP"
+    },
+    {
+      "id": "payday",
+      "topic": "Payday checklist",
+      "slides": [
+        { "kicker": "Payday", "title": "Your 1-minute\npayday checklist." },
+        { "kicker": "Steps", "title": "Pay yourself first.", "lines": ["1. Move your SIP amount", "2. Buy through your broker or fund", "3. Log it in one minute"] },
+        { "kicker": "Then", "title": "Done till\nnext month.", "note": "No scrolling, no market watching." },
+        { "kicker": "Small is fine", "title": "Rs 2,000 or\nRs 50,000.", "note": "The habit matters more." }
+      ],
+      "spoken": [
+        "Payday پر ایک منٹ کا checklist۔",
+        "پہلے خود کو pay کریں۔ ایک، اپنی SIP کی رقم الگ کریں۔ دو، اپنے broker یا fund سے خریدیں۔ تین، ایک منٹ میں log کر دیں۔",
+        "بس، اگلے مہینے تک فارغ۔ نہ scrolling، نہ market کی فکر۔",
+        "رقم دو ہزار ہو یا پچاس ہزار، habit زیادہ اہم ہے۔ ہاں، investment میں risk ہے۔",
+        "اپنی SIP log کریں Sipwise dot trade پر، free۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Payday checklist: pay yourself first, buy your SIP, log it, done. #payday #SIP #PSX"
+    },
+    {
+      "id": "start-small",
+      "topic": "Small amounts add up",
+      "slides": [
+        { "kicker": "Mindset", "title": "Is Rs 2,000 a month\nworth it?" },
+        { "kicker": "Hypothetical", "title": "Rs 2,000 a month\nfor 10 years", "big": "Rs 240,000", "note": "put in, before any gain or loss" },
+        { "kicker": "The real gain", "title": "You build\nthe habit.", "note": "Then raise it when your income rises." },
+        { "kicker": "Reminder", "title": "Returns are\nnever guaranteed." }
+      ],
+      "spoken": [
+        "کیا ہر مہینے دو ہزار rupees invest کرنا کوئی معنی رکھتا ہے؟",
+        "دس سال تک ہر مہینے دو ہزار، تو آپ کے دو لاکھ چالیس ہزار rupees لگے۔ یہ صرف وہ رقم ہے جو آپ نے ڈالی، کسی منافع یا نقصان سے پہلے۔",
+        "اصل فائدہ یہ ہے کہ آپ کو habit بن جاتی ہے۔ آمدنی بڑھے تو رقم بھی بڑھا دیں۔",
+        "اور یاد رکھیں، returns کی کوئی guarantee نہیں ہوتی۔ یہ investment advice نہیں ہے۔",
+        "اپنی چھوٹی SIP بھی Sipwise dot trade پر track کریں۔ روزانہ tips کے لیے subscribe کریں۔"
+      ],
+      "caption": "Rs 2,000 a month for 10 years is Rs 240,000 put in. The habit is the win. Hypothetical, no guarantees. #SIP #personalfinance"
+    }
+  ]
+}
