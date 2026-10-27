@@ -23,6 +23,6 @@ test('copy stays educational: no promises and no stock tips', () => {
 test('the risk line is on every caption and the pick cycles daily', () => {
   assert.match(captionFor(config.episodes[0], config.riskLine), /not investment advice/);
   assert.equal(pickEpisode(config, config.start).id, config.episodes[0].id);
-  assert.equal(pickEpisode(config, '2026-10-29').id, config.episodes[1].id);
-  assert.equal(pickEpisode(config, '2026-11-08').id, config.episodes[0].id);
+  assert.equal(pickEpisode(config, '2026-10-28').id, config.episodes[1].id);
+  assert.equal(pickEpisode(config, '2026-11-07').id, config.episodes[0].id);
 });
