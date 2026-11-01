@@ -61,6 +61,7 @@ jobs:
           name: tips-slides
           path: |
             tips-out/slide-*.png
+            tips-out/card.jpg
             tips-out/episode.json
       - name: Upload the video and manifest to R2
         if: env.DRY_RUN != 'true'
@@ -75,9 +76,10 @@ jobs:
           endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
           key="tips/${date}/${id}.mp4"
           aws s3 cp tips-out/tip.mp4 "s3://${R2_BUCKET}/${key}" --endpoint-url "$endpoint" --content-type video/mp4
+          aws s3 cp tips-out/card.jpg "s3://${R2_BUCKET}/tips/${date}/${id}.jpg" --endpoint-url "$endpoint" --content-type image/jpeg
           node -e "
             const e = JSON.parse(require('fs').readFileSync('tips-out/episode.json', 'utf8'));
-            require('fs').writeFileSync('manifest.json', JSON.stringify({ date: e.date, id: e.id, video: process.env.PUBLIC_MEDIA_URL + '/${key}', caption: e.caption }, null, 2));
+            require('fs').writeFileSync('manifest.json', JSON.stringify({ date: e.date, id: e.id, video: process.env.PUBLIC_MEDIA_URL + '/${key}', image: process.env.PUBLIC_MEDIA_URL + '/tips/${date}/${id}.jpg', caption: e.caption }, null, 2));
           "
           aws s3 cp manifest.json "s3://${R2_BUCKET}/tips/${date}/manifest.json" --endpoint-url "$endpoint" --content-type application/json
           aws s3 cp manifest.json "s3://${R2_BUCKET}/tips/latest.json" --endpoint-url "$endpoint" --content-type application/json
