@@ -32,6 +32,7 @@ h1{font-size:100px;font-weight:700;letter-spacing:-.035em;line-height:1.04;margi
 .big{font-size:150px;font-weight:600;color:#2ee6a6;line-height:1}
 .note{margin-top:20px;font-size:38px;color:#9fb0d6;line-height:1.3}
 .line{padding:30px 0;border-top:2px solid rgba(255,255,255,.07);font-size:46px;font-weight:600}.line:first-child{border-top:0;padding-top:0}
+.cardpt{display:flex;gap:26px;align-items:flex-start;background:#0d1428;border:2px solid #202b4b;border-radius:36px;padding:28px 34px}.cardpt>span{color:#2ee6a6;font-size:46px;font-weight:600}.cardpt b{display:block;font-size:40px;line-height:1.15}.cardpt small{display:block;margin-top:8px;color:#9fb0d6;font-size:28px;line-height:1.3}
 .foot{margin-top:auto;display:flex;justify-content:space-between;color:#6f7d9c;font-size:28px}
 `;
 
@@ -51,6 +52,14 @@ function slides(ep, riskLine) {
     total, total, true,
   );
   return [...content, closing];
+}
+
+/** One 1080x1350 picture with the whole tip (title and key points) for X and other photo posts. */
+function card(ep, riskLine) {
+  const points = ep.slides
+    .map((s, i) => `<div class="cardpt"><span class="mono">${i + 1}</span><div><b>${esc(s.title.replace(/\n/g, ' '))}</b>${s.lines ? `<small>${esc(s.lines.join(' · '))}</small>` : s.big ? `<small>${esc(`${s.big}${s.note ? `: ${s.note}` : ''}`)}</small>` : s.note ? `<small>${esc(s.note)}</small>` : ''}</div></div>`)
+    .join('');
+  return `<div class="glow1"></div><div class="glow2"></div><div style="position:relative;padding:64px;height:100%;display:flex;flex-direction:column"><div class="brand">${mark}<b>Sipwise</b><span class="chip">Daily tip</span></div><h1 style="font-size:84px;margin-top:56px">${esc(ep.topic)}</h1><div style="margin-top:40px;display:flex;flex-direction:column;gap:22px">${points}</div><div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;color:#9fb0d6;font-size:26px"><span>${esc(riskLine)}</span><b style="color:#fff;font-size:34px">sipwise.trade</b></div></div>`;
 }
 
 /** The episode for a date: one per day from `start`, cycling through the list. */
@@ -99,6 +108,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: `${out}/slide-${i + 1}.png` });
   }
+  await page.setViewportSize({ width: 1080, height: 1350 });
+  await page.setContent(`<html><head><style>${css(sans, mono)} body{height:1350px}</style></head><body>${card(ep, config.riskLine)}</body></html>`);
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: `${out}/card.jpg`, type: 'jpeg', quality: 92 });
+  await page.setViewportSize({ width: 1080, height: 1920 });
   const spriteDir = `${process.cwd()}/${out}/sprites`;
   await mkdir(spriteDir, { recursive: true });
   await renderSprites(page, spriteDir);
