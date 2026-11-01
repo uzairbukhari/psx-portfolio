@@ -971,8 +971,15 @@ function DashboardContent({
       null,
     );
   // Add Company: the ticker is the only typed identity field; name and sector come from the shared directory.
+  // In All, the entry goes to the chosen destination portfolio, so "not yet in your companies" is judged against that
+  // one: a symbol held in another portfolio is still new here (p is the union of every portfolio).
+  const txBook =
+    isAll && txDestination
+      ? (p?.[DISPLAY_PARTS]?.find((entry) => entry.id === txDestination)
+          ?.portfolio ?? p)
+      : p;
   const txNewTicker =
-    !p ||
+    !txBook ||
     !trade ||
     editing ||
     editingDividend ||
@@ -980,7 +987,7 @@ function DashboardContent({
     txType === 'sell' ||
     txType === 'dividend' ||
     txType === 'split' ||
-    p.companies.some((c) => c.ticker === trade.ticker)
+    txBook.companies.some((c) => c.ticker === trade.ticker)
       ? ''
       : trade.ticker;
   const txLookup = useCompanyLookup(txNewTicker);

@@ -46,3 +46,18 @@ test('a holding page opens straight from its link, even on the All view', async 
   await expect(app.getByRole('heading', { name: 'Dollars at home' })).toBeVisible({ timeout: 60_000 });
   await expect(app.getByText('Rate and your trades')).toBeVisible();
 });
+
+test('Add transaction in All: a symbol held in another portfolio still fills its company details for the chosen destination', async ({ app }) => {
+  await app.goto('/');
+  await app.getByRole('button', { name: /Add transaction/ }).first().click();
+  const dialog = app.getByRole('dialog', { name: 'Add transaction' });
+  // SYS is held in AHL Core only, so it is new to Finqalab.
+  await dialog.getByLabel('Transaction portfolio').selectOption({ label: 'Finqalab' });
+  const symbol = dialog.getByLabel('Company symbol');
+  await symbol.fill('');
+  await symbol.fill('SYS');
+  const panel = dialog.locator('.tx-newco');
+  await expect(panel.getByLabel('Company name')).toHaveValue(/\S/, { timeout: 30_000 });
+  await expect(panel.getByLabel('Sector')).toHaveValue(/\S/);
+  await expect(panel.getByText('Checking company details')).toBeHidden();
+});
