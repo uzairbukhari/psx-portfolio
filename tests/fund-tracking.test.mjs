@@ -24,3 +24,51 @@ test('the cron Worker has one trigger and runs the fund refresh on weekday night
   assert.ok(!isFundRefreshTime(new Date('2026-10-10T17:30:00Z')));
   assert.ok(!isFundRefreshTime(new Date('2026-10-06T17:35:00Z')));
 });
+
+// MUFAP challenges fetches no visitor started (cron, GitHub runners), so prices are refreshed on signed-in visits.
+test('a visit refreshes fund prices only when stale and not tried in the last 20 minutes', async () => {
+  const { fundsFreshenDue } = await import('../lib/mufap-refresh.ts');
+  const now = new Date('2026-11-02T10:00:00Z');
+  const ago = (min) => new Date(now.getTime() - min * 60_000).toISOString();
+  assert.equal(fundsFreshenDue(null, now), true);
+  assert.equal(fundsFreshenDue({ lastAttemptAt: ago(60), lastSuccessAt: ago(60) }, now), false);
+  assert.equal(fundsFreshenDue({ lastAttemptAt: ago(300), lastSuccessAt: ago(300) }, now), true);
+  assert.equal(fundsFreshenDue({ lastAttemptAt: ago(5), lastSuccessAt: ago(300) }, now), false);
+  assert.equal(fundsFreshenDue({ lastAttemptAt: ago(25), lastSuccessAt: null }, now), true);
+});
+
+test('freshenFunds claims the refresh, so only one visitor fetches MUFAP at a time', async () => {
+  const { freshenFunds } = await import('../lib/mufap-refresh.ts');
+  const calls = [];
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...args) {
+          return {
+            first: async () => null,
+            run: async () => {
+              calls.push(sql);
+              // The claim finds a newer attempt by somebody else.
+              return { meta: { changes: sql.includes('ON CONFLICT') ? 0 : 1 } };
+            },
+          };
+        },
+      };
+    },
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = () => assert.fail('must not fetch MUFAP without the claim');
+  try {
+    assert.deepEqual(await freshenFunds(db), { ran: false });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(calls.length, 1);
+});
+
+test('the cron Worker no longer fetches MUFAP, and the web app asks on each visit', () => {
+  const worker = readFileSync(new URL('../workers/quote-refresh/src/index.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(worker, /refreshFunds|refreshFundPayouts|DurableObject/);
+  const hook = readFileSync(new URL('../app/use-fund-data.ts', import.meta.url), 'utf8');
+  assert.match(hook, /freshenFunds\?\.\(\)/);
+});

@@ -21,7 +21,7 @@ type Db = Pick<D1Database, 'prepare'>;
 
 export async function recordJobRun(
   db: Db,
-  run: { job: string; source: 'github' | 'cron' | 'admin'; startedAt: string; ok: boolean; detail?: unknown; finishedAt?: string },
+  run: { job: string; source: 'github' | 'cron' | 'admin' | 'visit'; startedAt: string; ok: boolean; detail?: unknown; finishedAt?: string },
 ): Promise<void> {
   await db.prepare('INSERT INTO job_runs (job,source,started_at,finished_at,ok,detail) VALUES (?,?,?,?,?,?)')
     .bind(run.job, run.source, run.startedAt, run.finishedAt ?? new Date().toISOString(), run.ok ? 1 : 0, cleanDetail(run.detail)).run();

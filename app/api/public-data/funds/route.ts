@@ -6,7 +6,7 @@ import {
   readFundHistory,
   readFundPayouts,
 } from '@/lib/fund-store';
-import { trackFunds } from '@/lib/mufap-refresh';
+import { freshenFunds, trackFunds } from '@/lib/mufap-refresh';
 import { UserError } from '@/lib/user-error';
 
 /**
@@ -38,14 +38,23 @@ export async function GET(req: Request) {
   }
 }
 
-/** Tells the server which funds are held, by public MUFAP id only, so their price is fetched every night. */
+/**
+ * Tells the server which funds are held, by public MUFAP id only, so their price is stored. With `{freshen:true}` (sent
+ * on each web visit, nothing else in the body) it refreshes MUFAP's prices when they are stale: this is the only
+ * automatic refresh, because MUFAP challenges fetches that no visitor started (see lib/mufap-refresh.ts).
+ */
 export async function POST(req: Request) {
   try {
     await identity(req, true);
     const body = (await req.json().catch(() => null)) as {
       mufapIds?: unknown;
       retry?: unknown;
+      freshen?: unknown;
     } | null;
+    if (body?.freshen === true)
+      return Response.json(await freshenFunds(db()), {
+        headers: { 'Cache-Control': 'no-store' },
+      });
     return Response.json(
       await trackFunds(db(), body?.mufapIds, body?.retry === true),
       {

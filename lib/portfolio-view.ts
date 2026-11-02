@@ -47,6 +47,8 @@ export type PublicData = {
   }>;
   /** Tells the server which funds are held (public MUFAP ids only) so their price is stored nightly. */
   trackFunds?(mufapIds: string[], retry?: boolean): Promise<{ error?: string; added?: number; refreshed?: boolean }>;
+  /** Web visit: asks the server to refresh MUFAP's prices if they are stale (nothing about the user is sent). */
+  freshenFunds?(): Promise<{ ran: boolean; ok?: boolean }>;
   /** MUFAP payouts of these funds (public ids only). */
   fundPayouts?(
     mufapIds: string[],
