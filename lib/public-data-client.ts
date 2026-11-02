@@ -75,6 +75,9 @@ export function createPublicData(call: PublicCall): PublicData {
         ...(retry ? { retry: true } : {}),
       });
     },
+    async freshenFunds() {
+      return await call<{ ran: boolean; ok?: boolean }>('/api/public-data/funds', 'POST', { freshen: true });
+    },
     async fundPayouts(mufapIds) {
       const parts = await Promise.all(
         chunks(mufapIds, 50).map((part) =>

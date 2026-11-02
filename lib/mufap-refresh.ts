@@ -1,8 +1,14 @@
 // Fetches MUFAP's public daily NAV page and stores the fund directory and prices in the shared `fund_catalog` and
-// `fund_navs` tables. Public data only. Runs on Cloudflare (MUFAP answers Cloudflare egress, but blocks GitHub's runners).
+// `fund_navs` tables. Public data only.
+//
+// MUFAP's Cloudflare bot check scores a Worker's fetch by the person whose request started it. A fetch made while
+// answering a signed-in browser (the admin button, a visit) passes; a Cron Trigger has nobody behind it and always gets
+// the "Just a moment" challenge (45 of 45 cron runs failed, 12 Oct to 2 Nov 2026, from every placement tried), as do
+// GitHub's runners. So the prices are refreshed on visits: `freshenFunds` below, called from the web app's load.
 import { parseMufapNavs, parseMufapPayouts } from './mufap.ts';
+import { recordJobRun } from './job-runs.ts';
 
-/** Fetches a MUFAP page (directly, or through `fetcher`: the cron Worker passes one that runs near Pakistan, see workers/quote-refresh); on a refusal the error names the status and the block page's server/mitigation headers and first words, so a log says why. Retries once after a pause. */
+/** Fetches a MUFAP page (directly, or through `fetcher`, for tests); on a refusal the error names the status and the block page's server/mitigation headers and first words, so a log says why. Retries once after a pause. */
 export type MufapFetcher = (url: string, init: RequestInit) => Promise<Response>;
 
 async function fetchMufap(url: string, fetcher: MufapFetcher = fetch) {
@@ -87,6 +93,14 @@ export async function refreshFunds(db: FundDb, fetcher?: MufapFetcher) {
         upsertNav.bind(n.mufapId, n.date, n.nav, n.offer, n.repurchase, now),
       ),
   ];
+  statements.push(
+    db
+      .prepare(
+        `INSERT INTO refresh_state (kind,key,last_attempt_at,last_success_at,last_error,failure_count) VALUES ('funds','mufap',?,?,NULL,0)
+         ON CONFLICT(kind,key) DO UPDATE SET last_success_at=excluded.last_success_at, last_error=NULL, failure_count=0`,
+      )
+      .bind(now, now),
+  );
   for (let i = 0; i < statements.length; i += 100)
     await db.batch(statements.slice(i, i + 100));
   const newest = navs.reduce((a, n) => (n.date > a ? n.date : a), '');
@@ -175,4 +189,65 @@ export async function refreshFundPayouts(db: FundDb, fetcher?: MufapFetcher) {
     payouts: payouts.length,
     newest: payouts.reduce((a, p) => (p.payoutDate > a ? p.payoutDate : a), ''),
   };
+}
+
+/** Prices older than this are refreshed by the next signed-in visit. MUFAP publishes once a day, at no fixed hour. */
+export const FUNDS_STALE_MS = 4 * 3600_000;
+/** After any attempt (good or failed), nobody tries again for this long: the claim below doubles as a lock. */
+export const FUNDS_RETRY_MS = 20 * 60_000;
+
+/** Pure: whether a visit should fetch MUFAP now, from the `refresh_state` row. */
+export function fundsFreshenDue(
+  state: { lastAttemptAt: string | null; lastSuccessAt: string | null } | null,
+  now: Date,
+): boolean {
+  const t = now.getTime();
+  const success = state?.lastSuccessAt ? Date.parse(state.lastSuccessAt) : NaN;
+  if (Number.isFinite(success) && t - success < FUNDS_STALE_MS) return false;
+  const attempt = state?.lastAttemptAt ? Date.parse(state.lastAttemptAt) : NaN;
+  return !(Number.isFinite(attempt) && t - attempt < FUNDS_RETRY_MS);
+}
+
+/**
+ * Called on a signed-in web visit (POST /api/public-data/funds `{freshen:true}`). Usually one row read and nothing else;
+ * when the prices are stale it claims the refresh (one visitor at a time, see FUNDS_RETRY_MS) and fetches MUFAP while
+ * answering that visitor, which is what lets the fetch past MUFAP's bot check. Records a `visit` job run either way.
+ */
+export async function freshenFunds(db: D1Database, now = new Date()) {
+  const row = await db
+    .prepare(
+      "SELECT last_attempt_at AS lastAttemptAt, last_success_at AS lastSuccessAt FROM refresh_state WHERE kind='funds' AND key='mufap'",
+    )
+    .bind()
+    .first<{ lastAttemptAt: string | null; lastSuccessAt: string | null }>();
+  if (!fundsFreshenDue(row, now)) return { ran: false as const };
+  const at = now.toISOString();
+  const cutoff = new Date(now.getTime() - FUNDS_RETRY_MS).toISOString();
+  const claim = await db
+    .prepare(
+      `INSERT INTO refresh_state (kind,key,last_attempt_at,failure_count) VALUES ('funds','mufap',?,0)
+       ON CONFLICT(kind,key) DO UPDATE SET last_attempt_at=excluded.last_attempt_at
+       WHERE refresh_state.last_attempt_at IS NULL OR refresh_state.last_attempt_at < ?`,
+    )
+    .bind(at, cutoff)
+    .run();
+  // Another visitor claimed it a moment ago.
+  if (claim.meta?.changes === 0) return { ran: false as const };
+  try {
+    const funds = await refreshFunds(db);
+    await refreshFundPayouts(db).catch(() => {});
+    await recordJobRun(db, { job: 'funds', source: 'visit', startedAt: at, ok: true, detail: `${funds.funds} funds, ${funds.prices} prices` }).catch(() => {});
+    return { ran: true as const, ok: true };
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    await db
+      .prepare(
+        "UPDATE refresh_state SET last_error=?, failure_count=failure_count+1 WHERE kind='funds' AND key='mufap'",
+      )
+      .bind(detail.slice(0, 300))
+      .run()
+      .catch(() => {});
+    await recordJobRun(db, { job: 'funds', source: 'visit', startedAt: at, ok: false, detail }).catch(() => {});
+    return { ran: true as const, ok: false };
+  }
 }

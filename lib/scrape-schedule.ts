@@ -26,7 +26,7 @@ export function dueWorkflows(when: Date, brownout = false): ScheduledWorkflow[] 
  * The free Workers plan allows 5 cron triggers per account, so the cron Worker has ONE trigger (every 5 minutes, every day)
  * and decides here what is due, using the scheduled time (UTC). Keep `triggers.crons` in wrangler.jsonc to that one entry.
  */
-/** MUFAP fund prices: weekdays 17:30 UTC (22:30 PKT), 05:00 and 09:00 UTC (mid-morning and mid-afternoon PKT). */
+/** Pak-Qatar plan prices: weekdays 17:30 UTC (22:30 PKT), 05:00 and 09:00 UTC. (MUFAP fund prices are refreshed on visits instead.) */
 export function isFundRefreshTime(when: Date): boolean {
   const day = when.getUTCDay();
   if (day === 0 || day === 6) return false;

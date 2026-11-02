@@ -29,7 +29,7 @@ export const PIPELINES: readonly PipelineDef[] = [
   { id: 'face-values', label: 'Face values', expected: 'Weekly (Sunday)', cadence: 'weekly', lateHours: 8 * 24, failHours: 15 * 24, required: false, workflow: 'psx-face-values.yml', action: null },
   { id: 'metals', label: 'Gold and silver rates', expected: 'Three times a day, Monday to Saturday', cadence: 'daily', lateHours: 30, failHours: 72, required: true, workflow: 'metal-rates.yml', action: null },
   { id: 'fx', label: 'Foreign currency rates', expected: 'Twice a day, Monday to Saturday', cadence: 'daily', lateHours: 30, failHours: 72, required: true, workflow: 'fx-rates.yml', action: null },
-  { id: 'funds', label: 'MUFAP funds and prices', expected: 'Daily (cron Worker)', cadence: 'daily', lateHours: 36, failHours: 84, required: true, workflow: null, action: 'refresh-funds' },
+  { id: 'funds', label: 'MUFAP funds and prices', expected: 'On visits (stale after 4 h)', cadence: 'daily', lateHours: 60, failHours: 120, required: true, workflow: null, action: 'refresh-funds' },
   { id: 'ai-research', label: 'AI research', expected: 'Weekly (Saturday), experimental', cadence: 'weekly', lateHours: 9 * 24, failHours: 21 * 24, required: false, workflow: 'ai-research.yml', action: null },
 ];
 
