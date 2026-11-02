@@ -97,6 +97,18 @@ const rememberTracked = (key: string) => {
   }
 };
 
+const FRESHEN_KEY = 'sipwise.fundsFreshen';
+/** The server keeps its own 20-minute gap; this only spares a request when the same device reloads a lot. */
+const FRESHEN_GAP_MS = 20 * 60_000;
+const freshenedRecently = () => {
+  try {
+    const at = Number(localStorage.getItem(FRESHEN_KEY));
+    return Number.isFinite(at) && Date.now() - at < FRESHEN_GAP_MS;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Tells the server which funds are held (public MUFAP ids only) so their price is stored nightly. Once per set of
  * funds per day per device; the catalogue is re-read only when the server says prices may have changed.
@@ -105,6 +117,25 @@ export function useTrackFunds(mufapIds: string[], onTracked?: () => void) {
   const sent = useRef('');
   const [error, setError] = useState('');
   const key = [...new Set(mufapIds)].sort().join(',');
+  // Each visit lets the server refresh MUFAP's prices when they are stale: MUFAP only answers fetches that a real
+  // visitor started, so this is how the prices stay current (the cron Worker cannot fetch them). Fire and forget.
+  const freshened = useRef(false);
+  useEffect(() => {
+    if (freshened.current) return;
+    freshened.current = true;
+    if (freshenedRecently()) return;
+    try {
+      localStorage.setItem(FRESHEN_KEY, String(Date.now()));
+    } catch {
+      /* the server's own gap still applies */
+    }
+    webPublicData
+      .freshenFunds?.()
+      .then((r) => {
+        if (r?.ran && r.ok) onTracked?.();
+      })
+      .catch(() => {});
+  }, [onTracked]);
   useEffect(() => {
     if (!key || sent.current === key) return;
     sent.current = key;

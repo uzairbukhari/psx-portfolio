@@ -21,6 +21,7 @@ test('the portfolio switcher lists all four portfolios, one of them locked @smok
 
 test('unread notifications show on the bell', async ({ app }) => {
   await expect(app.getByRole('button', { name: /Notifications/ })).toContainText(isLocal ? '2' : /\d/);
-  // Dividends this tax year, from the seed. The exact figure moves with the date (expected payouts settle once their date passes).
-  if (isLocal) await expect(app.getByText('Dividends, tax year').locator('xpath=..')).toContainText(/Rs\s*[\d,]+\.\d{2}/);
+  // Dividends this tax year, from the seed. The exact figure moves with the date (expected payouts settle once their date passes),
+  // and a whole-rupee total is shown without paise.
+  if (isLocal) await expect(app.getByText('Dividends, tax year').locator('xpath=..')).toContainText(/Rs\s*[\d,]+(\.\d{2})?/);
 });

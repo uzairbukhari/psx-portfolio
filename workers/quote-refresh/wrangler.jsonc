@@ -11,8 +11,11 @@
     "APP_ENV": "production",
     "CF_ACCOUNT_ID": "78c9e0cc85767a65d0ff868ce76c6bba"
   },
-  "durable_objects": { "bindings": [{ "name": "MUFAP_FETCHER", "class_name": "MufapFetch" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MufapFetch"] }],
+  // v1 added a Durable Object for MUFAP fetches; it never got past MUFAP's bot check, so v2 deletes it.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["MufapFetch"] },
+    { "tag": "v2", "deleted_classes": ["MufapFetch"] }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

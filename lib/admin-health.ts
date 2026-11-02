@@ -40,7 +40,7 @@ const SUCCESS: Record<string, string> = {
   directory: "SELECT MAX(last_success_at) AS t FROM refresh_state WHERE kind='directory'",
   'face-values': "SELECT MAX(last_success_at) AS t FROM refresh_state WHERE kind='face-value'",
   metals: 'SELECT MAX(fetched_at) AS t FROM metal_rates',
-  // Funds: the cron Worker and the manual scraper both record a job run, which is what the status reads (no table scan).
+  // Funds: visits, the admin button and the manual scraper all record a job run, which is what the status reads (no table scan).
   funds: 'SELECT NULL AS t',
   'ai-research': "SELECT MAX(started_at) AS t FROM ai_research_runs WHERE status IN ('completed','capped') AND models NOT LIKE 'face-value:%'",
 };
