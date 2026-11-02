@@ -101,9 +101,19 @@ export async function refreshFunds(db: FundDb, fetcher?: MufapFetcher) {
       )
       .bind(now, now),
   );
+  const newest = navs.reduce((a, n) => (n.date > a ? n.date : a), '');
+  // The newest price date MUFAP showed (row key 'newest', date kept in last_success_at): visits stop once it is today's.
+  if (newest)
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO refresh_state (kind,key,last_success_at,failure_count) VALUES ('funds','newest',?,0)
+           ON CONFLICT(kind,key) DO UPDATE SET last_success_at=excluded.last_success_at`,
+        )
+        .bind(newest),
+    );
   for (let i = 0; i < statements.length; i += 100)
     await db.batch(statements.slice(i, i + 100));
-  const newest = navs.reduce((a, n) => (n.date > a ? n.date : a), '');
   return {
     funds: catalog.length,
     tracked: tracked.size,
@@ -196,16 +206,28 @@ export const FUNDS_STALE_MS = 4 * 3600_000;
 /** After any attempt (good or failed), nobody tries again for this long: the claim below doubles as a lock. */
 export const FUNDS_RETRY_MS = 20 * 60_000;
 
-/** Pure: whether a visit should fetch MUFAP now, from the `refresh_state` row. */
+/** The latest weekday on or before today in Pakistan (UTC+5): the newest price date MUFAP can have. */
+export function expectedNavDate(now: Date): string {
+  const d = new Date(now.getTime() + 5 * 3600_000);
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Pure: whether a visit should fetch MUFAP now. Never within FUNDS_RETRY_MS of the last attempt; never once the stored
+ * prices are dated the latest weekday (so one or two fetches a day, none at weekends once Friday's are in); otherwise
+ * when the last good refresh is over FUNDS_STALE_MS old (MUFAP posts at no fixed hour, holidays never reach "today").
+ */
 export function fundsFreshenDue(
-  state: { lastAttemptAt: string | null; lastSuccessAt: string | null } | null,
+  state: { lastAttemptAt: string | null; lastSuccessAt: string | null; newest?: string | null } | null,
   now: Date,
 ): boolean {
   const t = now.getTime();
-  const success = state?.lastSuccessAt ? Date.parse(state.lastSuccessAt) : NaN;
-  if (Number.isFinite(success) && t - success < FUNDS_STALE_MS) return false;
   const attempt = state?.lastAttemptAt ? Date.parse(state.lastAttemptAt) : NaN;
-  return !(Number.isFinite(attempt) && t - attempt < FUNDS_RETRY_MS);
+  if (Number.isFinite(attempt) && t - attempt < FUNDS_RETRY_MS) return false;
+  if (state?.newest && state.newest >= expectedNavDate(now)) return false;
+  const success = state?.lastSuccessAt ? Date.parse(state.lastSuccessAt) : NaN;
+  return !(Number.isFinite(success) && t - success < FUNDS_STALE_MS);
 }
 
 /**
@@ -214,12 +236,19 @@ export function fundsFreshenDue(
  * answering that visitor, which is what lets the fetch past MUFAP's bot check. Records a `visit` job run either way.
  */
 export async function freshenFunds(db: D1Database, now = new Date()) {
-  const row = await db
-    .prepare(
-      "SELECT last_attempt_at AS lastAttemptAt, last_success_at AS lastSuccessAt FROM refresh_state WHERE kind='funds' AND key='mufap'",
-    )
-    .bind()
-    .first<{ lastAttemptAt: string | null; lastSuccessAt: string | null }>();
+  // Two rows: 'mufap' (attempt and success times) and 'newest' (the newest price date stored).
+  const rows = (
+    await db
+      .prepare(
+        "SELECT key, last_attempt_at AS lastAttemptAt, last_success_at AS lastSuccessAt FROM refresh_state WHERE kind='funds' AND key IN ('mufap','newest')",
+      )
+      .bind()
+      .all<{ key: string; lastAttemptAt: string | null; lastSuccessAt: string | null }>()
+  ).results;
+  const main = rows.find((r) => r.key === 'mufap');
+  const row = main
+    ? { ...main, newest: rows.find((r) => r.key === 'newest')?.lastSuccessAt ?? null }
+    : null;
   if (!fundsFreshenDue(row, now)) return { ran: false as const };
   const at = now.toISOString();
   const cutoff = new Date(now.getTime() - FUNDS_RETRY_MS).toISOString();

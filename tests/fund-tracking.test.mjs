@@ -37,6 +37,22 @@ test('a visit refreshes fund prices only when stale and not tried in the last 20
   assert.equal(fundsFreshenDue({ lastAttemptAt: ago(25), lastSuccessAt: null }, now), true);
 });
 
+test('once today\'s prices are stored, visits stop fetching until the next weekday', async () => {
+  const { fundsFreshenDue, expectedNavDate } = await import('../lib/mufap-refresh.ts');
+  const old = '2026-11-01T00:00:00Z';
+  // Monday 2 Nov 2026, 15:00 PKT.
+  const mon = new Date('2026-11-02T10:00:00Z');
+  assert.equal(expectedNavDate(mon), '2026-11-02');
+  assert.equal(fundsFreshenDue({ lastAttemptAt: old, lastSuccessAt: old, newest: '2026-11-02' }, mon), false);
+  assert.equal(fundsFreshenDue({ lastAttemptAt: old, lastSuccessAt: old, newest: '2026-10-30' }, mon), true);
+  // Monday 00:30 PKT is still Sunday in UTC: the date follows Pakistan.
+  assert.equal(expectedNavDate(new Date('2026-11-01T19:30:00Z')), '2026-11-02');
+  // Saturday and Sunday want Friday's prices, so a weekend with Friday's in fetches nothing.
+  const sun = new Date('2026-11-08T10:00:00Z');
+  assert.equal(expectedNavDate(sun), '2026-11-06');
+  assert.equal(fundsFreshenDue({ lastAttemptAt: old, lastSuccessAt: old, newest: '2026-11-06' }, sun), false);
+});
+
 test('freshenFunds claims the refresh, so only one visitor fetches MUFAP at a time', async () => {
   const { freshenFunds } = await import('../lib/mufap-refresh.ts');
   const calls = [];
@@ -46,6 +62,7 @@ test('freshenFunds claims the refresh, so only one visitor fetches MUFAP at a ti
         bind(...args) {
           return {
             first: async () => null,
+            all: async () => ({ results: [] }),
             run: async () => {
               calls.push(sql);
               // The claim finds a newer attempt by somebody else.
