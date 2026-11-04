@@ -1,7 +1,7 @@
 // "Sip", the animated Sipwise character for the daily market recap video: the 3D mascot, who bounces with the voice-over
 // and nods now and then. Sprite drawing and audio maths; the renderer composes it.
 import { execFileSync } from 'node:child_process';
-import { sipDataUrl } from './social-brand.mjs';
+import { sipDataUrl, SIP_RATIO } from './social-brand.mjs';
 
 export const FPS = 15;
 export const SPRITE = { width: 400, height: 560 };
@@ -19,8 +19,10 @@ const BOUNCE = [
 export function spriteHtml(level, blink) {
   const { scale, lift } = BOUNCE[level];
   const squash = blink ? 0.975 : 1;
-  const width = SPRITE.width - 40;
-  return `<html><body style="margin:0;background:transparent"><div style="position:relative;width:${SPRITE.width}px;height:${SPRITE.height}px"><img src="${sipDataUrl}" style="position:absolute;left:20px;bottom:${12 + lift}px;width:${width}px;transform-origin:50% 100%;transform:scale(${scale},${scale * squash})"></div></body></html>`;
+  // Sized by height so the tallest bounce (scale 1.05, lift 15) still fits inside the sprite frame.
+  const height = 500;
+  const width = Math.round(height * SIP_RATIO);
+  return `<html><body style="margin:0;background:transparent"><div style="position:relative;width:${SPRITE.width}px;height:${SPRITE.height}px"><img src="${sipDataUrl}" style="position:absolute;left:${Math.round((SPRITE.width - width) / 2)}px;bottom:${12 + lift}px;width:${width}px;height:${height}px;transform-origin:50% 100%;transform:scale(${scale},${scale * squash})"></div></body></html>`;
 }
 
 /** Writes sprite-<level>-<blink>.png (transparent) for every bounce level, plain and nodding. */
