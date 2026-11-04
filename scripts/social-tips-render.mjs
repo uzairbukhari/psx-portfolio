@@ -5,6 +5,7 @@
 // Env: ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, GEIST_DIR (folder holding the `geist` npm package).
 // Usage: node scripts/social-tips-render.mjs [--episode=sip-basics | --date=2026-10-28] --out=tips-out [--no-audio]
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { spaceBackground, sipDataUrl, SIP_RATIO } from './social-brand.mjs';
 import { execFileSync } from 'node:child_process';
 import { audioSeconds, characterList, mouthTrack, renderSprites } from './market-recap-character.mjs';
 
@@ -18,9 +19,9 @@ const css = (sans, mono) => `
 @font-face{font-family:G;src:url(data:font/woff2;base64,${sans});font-weight:100 900}
 @font-face{font-family:GM;src:url(data:font/woff2;base64,${mono});font-weight:100 900}
 *{box-sizing:border-box;margin:0}
-body{width:1080px;height:1920px;font-family:G,sans-serif;color:#e8eefa;background:#070b18;position:relative;overflow:hidden}
-.glow1{position:absolute;width:1100px;height:1100px;right:-450px;top:-300px;background:radial-gradient(closest-side,rgba(59,130,246,.38),transparent)}
-.glow2{position:absolute;width:1000px;height:1000px;left:-450px;bottom:-250px;background:radial-gradient(closest-side,rgba(34,224,160,.2),transparent)}
+body{width:1080px;height:1920px;font-family:G,sans-serif;color:#e8eefa;background:${spaceBackground};position:relative;overflow:hidden}
+.glow1{display:none;position:absolute;width:1100px;height:1100px;right:-450px;top:-300px;background:radial-gradient(closest-side,rgba(59,130,246,.38),transparent)}
+.glow2{display:none;position:absolute;width:1000px;height:1000px;left:-450px;bottom:-250px;background:radial-gradient(closest-side,rgba(34,224,160,.2),transparent)}
 .wrap{position:relative;padding:84px 72px 420px;height:100%;display:flex;flex-direction:column}
 .wrap.end{padding-bottom:84px}
 .brand{display:flex;align-items:center;gap:20px}.brand b{font-size:46px;font-weight:700;letter-spacing:-.02em}
@@ -48,7 +49,7 @@ function slides(ep, riskLine) {
     return frame(`<div style="flex:1;display:flex;flex-direction:column;justify-content:center;margin-top:-120px"><div class="eyebrow" style="margin-top:0">${esc(s.kicker)}</div><h1>${multiline(s.title)}</h1>${box}${note}</div>`, i + 1, total);
   });
   const closing = frame(
-    `<div style="margin:auto 0;text-align:center"><div style="display:flex;justify-content:center;transform:scale(2.2);margin-bottom:130px">${mark}</div><h1 style="font-size:104px">Invest monthly.<br>See everything.<br><span style="color:#2ee6a6">Share nothing.</span></h1><div style="margin-top:90px;display:inline-block;padding:36px 80px;border-radius:99px;background:linear-gradient(135deg,#4c8dff,#1d4ed8);font-size:56px;font-weight:600">sipwise.trade</div><div style="margin-top:44px;display:inline-block;padding:22px 52px;border-radius:99px;border:3px solid #2ee6a6;color:#2ee6a6;font-size:42px;font-weight:600">Subscribe for daily tips</div><div style="margin-top:44px;font-size:28px;color:#6f7d9c">${esc(riskLine)}</div></div>`,
+    `<div style="margin:auto 0;text-align:center"><div style="display:flex;justify-content:center;margin-bottom:56px"><img src="${sipDataUrl}" style="height:400px;width:${Math.round(400 * SIP_RATIO)}px"></div><h1 style="font-size:104px">Invest monthly.<br>See everything.<br><span style="color:#2ee6a6">Share nothing.</span></h1><div style="margin-top:90px;display:inline-block;padding:36px 80px;border-radius:99px;background:linear-gradient(135deg,#4c8dff,#1d4ed8);font-size:56px;font-weight:600">sipwise.trade</div><div style="margin-top:44px;display:inline-block;padding:22px 52px;border-radius:99px;border:3px solid #2ee6a6;color:#2ee6a6;font-size:42px;font-weight:600">Subscribe for daily tips</div><div style="margin-top:44px;font-size:28px;color:#6f7d9c">${esc(riskLine)}</div></div>`,
     total, total, true,
   );
   return [...content, closing];
