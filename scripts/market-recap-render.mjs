@@ -7,6 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { audioSeconds, characterList, mouthTrack, renderSprites } from './market-recap-character.mjs';
+import { spaceBackground } from './social-brand.mjs';
 
 const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const input = arg('in', 'recap.json');
@@ -28,9 +29,9 @@ const css = (sans, mono) => `
 @font-face{font-family:G;src:url(data:font/woff2;base64,${sans});font-weight:100 900}
 @font-face{font-family:GM;src:url(data:font/woff2;base64,${mono});font-weight:100 900}
 *{box-sizing:border-box;margin:0}
-body{width:1080px;height:1920px;font-family:G,sans-serif;color:#e8eefa;background:#070b18;position:relative;overflow:hidden}
-.glow1{position:absolute;width:1100px;height:1100px;right:-450px;top:-300px;background:radial-gradient(closest-side,rgba(59,130,246,.38),transparent)}
-.glow2{position:absolute;width:1000px;height:1000px;left:-450px;bottom:-250px;background:radial-gradient(closest-side,rgba(34,224,160,.2),transparent)}
+body{width:1080px;height:1920px;font-family:G,sans-serif;color:#e8eefa;background:${spaceBackground};position:relative;overflow:hidden}
+.glow1{display:none;position:absolute;width:1100px;height:1100px;right:-450px;top:-300px;background:radial-gradient(closest-side,rgba(59,130,246,.38),transparent)}
+.glow2{display:none;position:absolute;width:1000px;height:1000px;left:-450px;bottom:-250px;background:radial-gradient(closest-side,rgba(34,224,160,.2),transparent)}
 .wrap{position:relative;padding:84px 72px 420px;height:100%;display:flex;flex-direction:column}
 .wrap.end{padding-bottom:84px}
 .foot{position:absolute;left:72px;bottom:84px;width:560px;flex-direction:column;gap:6px}
@@ -180,7 +181,7 @@ for (let i = 0; i < html.length; i++) {
   await writeFile(`${out}/sip-${i + 1}.txt`, characterList(mouthTrack(voiceFile), seconds, spriteDir));
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-framerate', '30', '-i', `${out}/slide-${i + 1}.png`,
     '-f', 'concat', '-safe', '0', '-i', `${out}/sip-${i + 1}.txt`, '-i', voiceFile,
-    '-filter_complex', `[1:v]fps=30,scale=iw*0.8:-1,format=rgba[sip];[0:v][sip]overlay=x=W-w-40:y='H-h-60+7*sin(2*PI*t*1.1)':shortest=1,format=yuv420p[v];[2:a]apad=pad_dur=${GAP_SECONDS}[a]`,
+    '-filter_complex', `[1:v]fps=30,scale=iw*0.6:-1,format=rgba[sip];[0:v][sip]overlay=x=W-w-40:y='H-h-60+7*sin(2*PI*t*1.1)':shortest=1,format=yuv420p[v];[2:a]apad=pad_dur=${GAP_SECONDS}[a]`,
     '-map', '[v]', '-map', '[a]', '-t', seconds.toFixed(2), '-c:v', 'libx264', '-r', '30', '-c:a', 'aac', '-b:a', '160k', `${out}/part-${i + 1}.mp4`]);
   clips.push(`file part-${i + 1}.mp4`);
 }
