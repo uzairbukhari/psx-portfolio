@@ -1,37 +1,31 @@
-// "Sip", the animated Sipwise character for the daily market recap video: a friendly version of the app icon whose
-// mouth follows the voice-over and who blinks now and then. Pure drawing and audio maths; the renderer composes it.
+// "Sip", the animated Sipwise character for the daily market recap video: the 3D mascot, who bounces with the voice-over
+// and nods now and then. Sprite drawing and audio maths; the renderer composes it.
 import { execFileSync } from 'node:child_process';
+import { sipDataUrl, SIP_RATIO } from './social-brand.mjs';
 
 export const FPS = 15;
-export const SPRITE = { width: 340, height: 420 };
+export const SPRITE = { width: 400, height: 560 };
+export const MOUTH_LEVELS = 4;
 
-const eyesOpen = `<circle cx="112" cy="142" r="25" fill="#fff"/><circle cx="188" cy="142" r="25" fill="#fff"/><circle cx="116" cy="146" r="12" fill="#0b1430"/><circle cx="192" cy="146" r="12" fill="#0b1430"/><circle cx="121" cy="141" r="4" fill="#fff"/><circle cx="197" cy="141" r="4" fill="#fff"/>`;
-const eyesShut = `<path d="M88 146 Q112 162 136 146" fill="none" stroke="#0b1430" stroke-width="7" stroke-linecap="round"/><path d="M164 146 Q188 162 212 146" fill="none" stroke="#0b1430" stroke-width="7" stroke-linecap="round"/>`;
-// Mouth shapes, closed to wide open.
-const mouths = [
-  `<path d="M124 196 Q150 214 176 196" fill="none" stroke="#0b1430" stroke-width="7" stroke-linecap="round"/>`,
-  `<ellipse cx="150" cy="200" rx="20" ry="8" fill="#0b1430"/>`,
-  `<ellipse cx="150" cy="202" rx="24" ry="15" fill="#0b1430"/><ellipse cx="150" cy="210" rx="13" ry="6" fill="#ff7a90"/>`,
-  `<ellipse cx="150" cy="206" rx="28" ry="24" fill="#0b1430"/><ellipse cx="150" cy="217" rx="16" ry="9" fill="#ff7a90"/>`,
+// "Sip" is a still 3D picture (scripts/assets/sip-3d.png), so he cannot open his mouth. Instead he talks with a bounce:
+// the louder the voice, the more he stretches up and grows a little. A blink frame is a quick small squash (a nod).
+const BOUNCE = [
+  { scale: 1, lift: 0 },
+  { scale: 1.015, lift: 4 },
+  { scale: 1.03, lift: 9 },
+  { scale: 1.05, lift: 15 },
 ];
-export const MOUTH_LEVELS = mouths.length;
 
-export function spriteHtml(mouth, blink) {
-  return `<html><body style="margin:0;background:transparent"><svg xmlns="http://www.w3.org/2000/svg" width="${SPRITE.width}" height="${SPRITE.height}" viewBox="-20 0 340 420">
-<defs><linearGradient id="head" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7db0ff"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
-<ellipse cx="150" cy="404" rx="96" ry="12" fill="#000" opacity=".28"/>
-<rect x="30" y="262" width="40" height="96" rx="20" fill="#16254f"/><rect x="230" y="262" width="40" height="96" rx="20" fill="#16254f"/>
-<rect x="64" y="244" width="172" height="146" rx="46" fill="#0f1c42" stroke="#2a3d78" stroke-width="3"/>
-<circle cx="150" cy="316" r="16" fill="#22e0a0"/><path d="M104 360h92" stroke="#2a3d78" stroke-width="6" stroke-linecap="round"/>
-<rect x="36" y="14" width="228" height="226" rx="70" fill="url(#head)"/>
-<path d="M108 82h18v-18h18v-18h18v-18h14" transform="translate(-6 8)" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".92"/><circle cx="200" cy="30" r="9" fill="#22e0a0"/>
-${blink ? eyesShut : eyesOpen}
-<circle cx="84" cy="188" r="14" fill="#ff9db0" opacity=".45"/><circle cx="216" cy="188" r="14" fill="#ff9db0" opacity=".45"/>
-${mouths[mouth]}
-</svg></body></html>`;
+export function spriteHtml(level, blink) {
+  const { scale, lift } = BOUNCE[level];
+  const squash = blink ? 0.975 : 1;
+  // Sized by height so the tallest bounce (scale 1.05, lift 15) still fits inside the sprite frame.
+  const height = 500;
+  const width = Math.round(height * SIP_RATIO);
+  return `<html><body style="margin:0;background:transparent"><div style="position:relative;width:${SPRITE.width}px;height:${SPRITE.height}px"><img src="${sipDataUrl}" style="position:absolute;left:${Math.round((SPRITE.width - width) / 2)}px;bottom:${12 + lift}px;width:${width}px;height:${height}px;transform-origin:50% 100%;transform:scale(${scale},${scale * squash})"></div></body></html>`;
 }
 
-/** Writes sprite-<mouth>-<blink>.png (transparent) for every mouth shape, eyes open and shut. */
+/** Writes sprite-<level>-<blink>.png (transparent) for every bounce level, plain and nodding. */
 export async function renderSprites(page, dir) {
   await page.setViewportSize(SPRITE);
   for (let m = 0; m < MOUTH_LEVELS; m++) {
